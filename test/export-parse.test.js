@@ -2,15 +2,16 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
+
+import { findLibrary } from '../scripts/ma3-library.mjs'
 
 import { parseSequenceExport, isExportCrashRisk } from '../dist/src/bridge/export-parse.js'
 
 // The operator's real exported library. These tests are the only thing standing
 // between the parser and 856 files of genuine console output, so they run against
 // the real corpus rather than fixtures. Skipped cleanly on a machine without it.
-const LIB = path.join(os.homedir(), 'MALightingTechnology/gma3_library/datapools/sequences')
-const haveLib = fs.existsSync(LIB)
+const LIB = findLibrary('sequences')
+const haveLib = LIB !== null
 const read = (n) => fs.readFileSync(path.join(LIB, n), 'utf8')
 
 test('synthetic: an absent CueInFade is null, not zero', () => {

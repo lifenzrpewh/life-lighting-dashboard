@@ -14,7 +14,7 @@
 		"scan": "npm run build && node spikes/scan-exports.mjs",
 		"start": "npm run build:app && electron .",
 		"test": "npm run build && node --test \"test/*.test.js\" && npm run test:lua",
-		"test:lua": "lua console-plugin/_test_lifebridge.lua",
+		"test:lua": "node scripts/run-lua-harness.mjs",
 		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.web.json"
 	},
 	"dependencies": {

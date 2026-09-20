@@ -11,6 +11,8 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+
+import { findLibrary } from '../scripts/ma3-library.mjs'
 import os from 'node:os'
 import process from 'node:process'
 import { parseSequenceExport } from '../dist/src/bridge/export-parse.js'
@@ -19,7 +21,7 @@ const arg = (n, d) => {
 	const i = process.argv.indexOf(`--${n}`)
 	return i === -1 ? d : process.argv[i + 1]
 }
-const LIB = arg('lib', path.join(os.homedir(), 'MALightingTechnology/gma3_library/datapools/sequences'))
+const LIB = arg('lib', findLibrary('sequences') ?? '')
 const OUT = arg('out', 'export-blacklist.json')
 
 if (!fs.existsSync(LIB)) {

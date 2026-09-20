@@ -135,6 +135,21 @@ Exposure this project has that the Show Creator does not: 2.4 consolidated
 `MA3_2.5_COMPAT.md` clears the generator because it writes those as MAtricks/Preset
 properties; the cue editor here touches standard recipes directly.
 
+## Prerequisites
+
+Works on macOS and Windows; the dashboard's *target* is Windows on a booth
+touchscreen, so a Windows checkout is a first-class case, not a courtesy.
+
+| | |
+|---|---|
+| **Node** | `^22.20` (see `engines`) |
+| **Lua** | any 5.x on PATH. `npm test` runs the 106-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
+| **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so |
+
+`scripts/deploy-plugin.sh` is bash and needs Git Bash or WSL on Windows. It is
+also **no longer the deployment path** — the plugin ships embedded in its XML
+(`npm run build:plugin`), so there is nothing to copy onto a console.
+
 ## Running
 
 ```
