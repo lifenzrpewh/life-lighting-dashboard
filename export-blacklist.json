@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-09-19T23:46:00.691Z",
+  "library": "/Users/joekon/MALightingTechnology/gma3_library/datapools/sequences",
+  "note": "Sequences that must never be re-exported. See MA3_SYNTAX_REFERENCE.md:568.",
+  "bySequenceName": [
+    "Band LEDs",
+    "FRONT",
+    "HAZE LVL",
+    "HEATER ON",
+    "HOUSE WHITE",
+    "Haze Ctrl",
+    "Haze Heater",
+    "Haze Level"
+  ],
+  "artifactFiles": [
+    "INV_seqs_operator.xml",
+    "INV_seqs_operator2.xml"
+  ]
+}

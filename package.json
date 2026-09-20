@@ -1,0 +1,22 @@
+{
+	"name": "life-lighting-dashboard",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": "^22.20"
+	},
+	"scripts": {
+		"build": "rimraf dist && tsc -p tsconfig.json",
+		"test": "npm run build && node --test \"test/*.test.js\" && npm run test:lua",
+		"scan": "npm run build && node spikes/scan-exports.mjs",
+		"test:lua": "lua console-plugin/_test_lifebridge.lua"
+	},
+	"dependencies": {
+		"fast-xml-parser": "^4.5.0"
+	},
+	"devDependencies": {
+		"rimraf": "^6.0.1",
+		"typescript": "^5.9.0"
+	}
+}

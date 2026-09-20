@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Import this, then put LifeBridge.lua beside it in the same folder.
+
+  Deploy to:
+    macOS    ~/MALightingTechnology/gma3_2.3.2/shared/resource/lib_plugins/LifeBridge/
+    Windows  C:/ProgramData/MALightingTechnology/gma3_<ver>/shared/resource/lib_plugins/LifeBridge/
+
+  This uses the EXTERNAL-FILE form on purpose: the Lua stays a plain editable
+  file, so a probe can be corrected at the desk without a rebuild. The shipped
+  bridge will switch to the embedded base64 <Block> form the Show Creator's
+  build_plugin_xml.py produces, which is self-contained and campus-distributable.
+
+  2.5 NOTE: DataVersion is set to the version we build on today. If a future
+  console refuses the import, lowering DataVersion is the first thing to try —
+  MA3 imports older data versions permissively and newer ones not at all.
+-->
+<GMA3 DataVersion="2.3.2.0">
+    <UserPlugin Name="LifeBridge" Version="0.0.0.0" Path="/LifeBridge">
+        <ComponentLua Name="LifeBridge" FileName="LifeBridge.lua" />
+    </UserPlugin>
+</GMA3>
