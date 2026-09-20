@@ -6,6 +6,13 @@
     macOS    ~/MALightingTechnology/gma3_2.3.2/shared/resource/lib_plugins/LifeBridge/
     Windows  C:/ProgramData/MALightingTechnology/gma3_<ver>/shared/resource/lib_plugins/LifeBridge/
 
+  OBSERVED 2026-09-20 (onPC 2.3.2, macOS): placing BOTH files directly in
+  gma3_library/datapools/plugins/ instead also worked — the plugin imported and
+  main() ran. We did not establish WHY (whether MA3 resolved FileName relative
+  to the XML, or embedded the body at import), so do not rely on it. If you edit
+  the .lua and the behaviour does not change, the body was embedded: re-import
+  the XML, or Off Plugin -> ReloadAllPlugins -> Call Plugin.
+
   This uses the EXTERNAL-FILE form on purpose: the Lua stays a plain editable
   file, so a probe can be corrected at the desk without a rebuild. The shipped
   bridge will switch to the embedded base64 <Block> form the Show Creator's

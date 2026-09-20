@@ -20,7 +20,22 @@ end
 
 -- ----------------------------- the MA3 mock --------------------------------
 
-local cmds, prints
+local cmds, prints, files
+
+--- Intercept io.open so the harness never touches real disk. The plugin's
+--- fallback path list includes /Users/Shared/MA3/, which exists and is
+--- world-writable on the dev Mac — an unmocked run would write there for real.
+local realOpen = io.open
+local function mockIO(writablePattern)
+  io.open = function(path, mode)
+    if writablePattern == nil or not path:match(writablePattern) then return nil end
+    local buf = {}
+    return {
+      write = function(_, s) buf[#buf + 1] = s end,
+      close = function() files[path] = table.concat(buf) end,
+    }
+  end
+end
 
 --- Build a mock object tree: sequence -> cues -> parts -> recipe lines.
 local function mockObject(fields, children)
@@ -78,11 +93,13 @@ local function hostileEnvironment()
   _G.UnhookMultiple = boom
 end
 
-local function run(setup)
-  cmds, prints = {}, {}
+local function run(setup, writablePattern)
+  cmds, prints, files = {}, {}, {}
+  mockIO(writablePattern)
   setup()
   local main = assert(loadfile('console-plugin/LifeBridge.lua'))()
   local ok, err = pcall(main)
+  io.open = realOpen
   return ok, err, cmds, prints
 end
 
@@ -92,7 +109,7 @@ print('LifeBridge harness')
 
 -- 1. Rich console.
 do
-  local ok, err, c, p = run(richEnvironment)
+  local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/')
   check('rich: does not throw', ok, tostring(err))
   check('rich: emits commands', #c > 0)
   check('rich: prints results', #p > 5)
@@ -134,6 +151,21 @@ do
   check('rich: every emitted line is version-stamped', resultLines == stamped,
     string.format('%d of %d', stamped, resultLines))
 
+  -- The durable capture. MA3 keeps no log of command-line feedback, so without
+  -- this a probe run survives only as long as the scrollback.
+  local reportPath, report = next(files)
+  check('rich: writes a report file', reportPath ~= nil)
+  check('rich: writes to the first candidate path',
+    reportPath == '/Users/Shared/LIFE/LifeBridge-probe.txt', tostring(reportPath))
+  if report then
+    check('rich: report names the MA3 version', report:find('2.3.2.0', 1, true) ~= nil)
+    check('rich: report carries the summary', report:find('10/10 passed', 1, true) ~= nil)
+    for _, name in ipairs({ 'osc.string', 'cue.read', 'recipe.read', 'timing.slice' }) do
+      check('rich: report includes -- ' .. name, report:find(name, 1, true) ~= nil)
+    end
+  end
+  check('rich: prints where it wrote', table.concat(p, '\n'):find('report written to', 1, true) ~= nil)
+
   -- A quote in a payload truncates the command line, and backslash-escaping it
   -- still returns OK — so it must be stripped, never escaped.
   for _, cmd in ipairs(c) do
@@ -142,9 +174,28 @@ do
   end
 end
 
+-- 1b. Only a later candidate path is writable: must fall through, not give up.
+do
+  local _, _, _, p = run(richEnvironment, '^/Users/Shared/MA3/')
+  local path = next(files)
+  check('fallback: uses a later candidate path',
+    path == '/Users/Shared/MA3/LifeBridge-probe.txt', tostring(path))
+  check('fallback: still prints where it wrote',
+    table.concat(p, '\n'):find('report written to', 1, true) ~= nil)
+end
+
+-- 1c. Nothing is writable: must say so rather than pretend it saved.
+do
+  local ok, err, _, p = run(richEnvironment, nil)
+  check('no-disk: does not throw', ok, tostring(err))
+  check('no-disk: writes nothing', next(files) == nil)
+  check('no-disk: says the report could not be written',
+    table.concat(p, '\n'):find('could not write a report file', 1, true) ~= nil)
+end
+
 -- 2. Bare console: every API missing.
 do
-  local ok, err, c, p = run(bareEnvironment)
+  local ok, err, c, p = run(bareEnvironment, nil)
   check('bare: does not throw', ok, tostring(err))
   local joined = table.concat(p, '\n')
   check('bare: reports FAIL, not a fake pass', joined:find('FAIL', 1, true) ~= nil)
@@ -158,7 +209,7 @@ end
 
 -- 3. Hostile console: every accessor raises.
 do
-  local ok, err, c, p = run(hostileEnvironment)
+  local ok, err, c, p = run(hostileEnvironment, nil)
   check('hostile: does not throw', ok, tostring(err))
   local joined = table.concat(p, '\n')
   check('hostile: reports failures', joined:find('FAIL', 1, true) ~= nil)

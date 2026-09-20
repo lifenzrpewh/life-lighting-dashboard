@@ -23,12 +23,21 @@
 --   do not need a scratch copy. Every probe is pcall-guarded, so a missing API
 --   reports FAIL rather than throwing.
 --
+--   It does write ONE plain text file, the results report (see RESULT_PATHS).
+--   That is a file on disk, not show data, and it goes through io.open rather
+--   than the command line — the harness asserts that Cmd() still only ever
+--   carries SendOSC.
+--
 --   It is also NOT the real bridge. There is no request loop, no write verb and
 --   no listener. Those arrive only after these answers do.
 --
 -- HOW TO READ THE RESULT
---   Results print to the command line AND go out over OSC, so you can capture
---   them with:  node spikes/osc-probe.mjs --listen <port>
+--   Three ways, because the first two are easy to lose:
+--     1. A RESULTS FILE on disk — the reliable one. The plugin prints the path
+--        it wrote to. MA3 keeps no log of command-line feedback, so without
+--        this a probe run survives only as long as the scrollback.
+--     2. The command line, live.
+--     3. Over OSC:  node spikes/osc-probe.mjs --host <ip> --listen <port>
 --   A PASS means the call returned without error AND returned something usable.
 --   "PASS (empty)" means the API exists but gave nothing back — treat as a FAIL
 --   for design purposes, and note it.
@@ -66,6 +75,18 @@ local PROBE_SEQUENCES = { 100, 101, 1001, 1002, 1021, 1300, 2006, 2100 }
 
 -- Sequences to time, for the slice-budget measurement.
 local TIMING_SAMPLE = 8
+
+-- Where to write the results report. Tried in order; the first that opens wins,
+-- and the chosen path is printed. Covers macOS and Windows, and falls back to
+-- the ma3-mcp IPC dirs because those already exist on a machine that has used
+-- that bridge, then to the working directory as a last resort.
+local RESULT_PATHS = {
+  '/Users/Shared/LIFE/LifeBridge-probe.txt',
+  'C:/ProgramData/LIFE/LifeBridge-probe.txt',
+  '/Users/Shared/MA3/LifeBridge-probe.txt',
+  'C:/ProgramData/MA3/LifeBridge-probe.txt',
+  'LifeBridge-probe.txt',
+}
 
 -- ---------------------------------------------------------------------------
 
@@ -297,6 +318,43 @@ local function probeShowfile()
   return true, sformat('showfile=%s  SGV2_BaseShow=%s', tostring(name), tostring(base))
 end
 
+--- Write the report. io.open is undocumented for MA3 plugins but ma3-mcp relies
+--- on it in production, so it is a reasonable bet — and a guarded one: if every
+--- candidate path fails we say so and fall back to the command line alone.
+local function writeResultsFile(summary)
+  local lines = {
+    '# LifeBridge probe report',
+    '# ' .. tostring(os.date('%Y-%m-%d %H:%M:%S')),
+    '# MA3 version: ' .. consoleVersion,
+    '# ' .. summary,
+    '#',
+    '# A PASS means the call returned without error AND returned something',
+    '# usable. Keep this file: every answer is specific to the MA3 version',
+    '# above, and re-running on 2.5 must produce a separate report.',
+    '',
+  }
+  for _, r in ipairs(results) do
+    lines[#lines + 1] = sformat('%-22s %s  %s', r.name, r.ok and 'PASS' or 'FAIL', r.detail or '')
+  end
+  local body = tconcat(lines, '\n') .. '\n'
+
+  for _, path in ipairs(RESULT_PATHS) do
+    local ok, wrote = pcall(function()
+      local f = io.open(path, 'w')
+      if f == nil then return false end
+      f:write(body)
+      f:close()
+      return true
+    end)
+    if ok and wrote == true then
+      log('report written to %s', path)
+      return path
+    end
+  end
+  log('could not write a report file — results are on the command line only')
+  return nil
+end
+
 -- ---------------------------------- main ------------------------------------
 
 local function main()
@@ -320,6 +378,10 @@ local function main()
   end
   local summary = sformat('MA3 %s: %d/%d passed', consoleVersion, pass, #results)
   log('---- %s ----', summary)
+
+  -- The durable capture. Do this BEFORE the OSC push: if SendOSC turns out to
+  -- be broken or misrouted, the report is still on disk.
+  pcall(writeResultsFile, summary)
 
   -- Push the verdict out too, so a listener captures it even if nobody is at
   -- the console. If THIS arrives, osc.string is proven regardless of the rest.
