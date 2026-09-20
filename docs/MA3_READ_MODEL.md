@@ -129,6 +129,136 @@ So its mere presence is *not* the `Export Sequence` crash marker — only a
 property. The XML-side check in `src/bridge/export-parse.ts` is unaffected: the
 console only writes a `<SelectionData>` element when there is data.
 
+## OSC transport — ✅ VERIFIED 2026-09-21, onPC/console 2.3.2.0
+
+**A console executes a command that arrived over OSC/UDP.** Channel A is real. The
+working shape, observed on desk `10.11.60.40`:
+
+| | |
+|---|---|
+| Address | `/life/cmd` — i.e. `/<prefix>/cmd` |
+| Type tag | `,s`, one string argument |
+| Payload | the command line, e.g. `Help` |
+| Entry | In & Out -> OSC, row 3 `OSCData 3` |
+| Port | `8003` |
+| Prefix | `life` (no slashes) |
+| Destination IP | `10.11.60.182` |
+| Toggles | `Receive`, `Send`, `Receive Command`, `Send Command` = Yes; global `Enable Input`/`Enable Output` on |
+
+### ⚠️ Editing an entry's Port does NOT move the live socket
+
+**This is the expensive one.** MA3 binds an entry's socket when the entry is
+activated and keeps it. Editing the `Port` field changes *the table* and nothing
+else — the entry goes on listening on its old port, and the UI gives no hint that
+the two have diverged.
+
+Observed directly: row 3 displayed `8000`, then `8003`, while its live socket
+stayed on `8010` throughout. Commands sent to the displayed port did nothing;
+commands sent to `8010` — a port that appears **nowhere** in the configuration —
+executed normally.
+
+**Fix: toggle `Enable Input` off and on.** The stale socket is released and the
+configured port is bound. Confirmed by scan: before, `8010` BOUND / `8003`
+refused; after, `8010` refused / `8003` BOUND.
+
+**Diagnosing it from outside the desk**: a connected UDP socket surfaces ICMP
+port-unreachable as `ECONNREFUSED`, so an unbound port errors and a bound one
+stays silent. Probe the candidate ports *and two controls* — the controls prove
+ICMP is not simply being filtered. This is the only way found to see the real
+socket, because the console will not show it.
+
+### Two entries may claim one port; first bound wins
+
+Rows 1 and 3 both displayed `8000`. Row 1 (`RemoteApp`, prefix `test`) held the
+socket, so `/life/cmd` arrived there, failed the prefix check, and was dropped
+**silently** — no error, no log, no System Monitor line. Give every entry its own
+port; do not rely on the prefix to separate entries that share one.
+
+**Port selects the entry; prefix then validates within it.** Both, in that order.
+
+### `Destination IP` is output-only — input is not source-filtered
+
+The console accepts OSC on a bound port from **any** sender. `Destination IP` only
+says where feedback is sent. So an entry pointing at a completely different
+machine will still receive, and silently drop, packets from this one — which is
+what made "which row is ours" so hard to pin down: the row that answered us and
+the row that pointed at us were different rows.
+
+Consequence, now measured rather than assumed: anything on the network can command
+this desk. That is the threat model `docs/PLAN.md` already accepts — accident and
+bug, not adversary — but it is literally true.
+
+### `Echo Input` defaults to `No`
+
+System Monitor shows nothing about arriving OSC until `Echo Input` is `Yes` on that
+row. An empty System Monitor is therefore **not** evidence that packets are not
+arriving, and reading it that way costs an afternoon.
+
+### Channel B — the console pushes on change ✅
+
+Moving one executor fader produced **269 messages** in a single ~30 s window:
+
+```
+/life/14.14.1.6.1005   ,sif   "FaderMaster", 3, <float>
+```
+
+Prefix, then pool `14.14.1.6`, object `1005` — the pool-address shape
+`companion-module-grandma3/docs/OSC_PROTOCOL.md` predicts. `,sif` is name, int,
+value. This is what the vendored `parse.ts`/`state.ts` decoder consumes.
+
+**It is chatty.** 269 packets for one fader sweep is ~9/second sustained, per
+control. The dashboard must coalesce these per object before they reach React —
+one state update per frame, not per packet — or a busy desk will drive the
+renderer flat out for no visible gain.
+
+**Silence is still not death.** Channel B speaks only on change; a quiet desk
+mid-sermon emits nothing for minutes and is perfectly healthy. Link health must
+come from unanswered *requests*, never from an empty inbox — which is what
+`src/shared/reading.ts` `linkFromRequests` already enforces.
+
+### Channel C — the plugin's `SendOSC` push ✅
+
+`Call Plugin "LifeBridge"` sent over channel A produced **14 messages** back over
+channel C, carrying the whole probe report. All three channels now work, and the
+console-direct architecture holds end to end: command in over A, structure out
+over C, no shared filesystem.
+
+**⚠️ `SendOSC` prepends the entry's Prefix. Addresses in the plugin must be BARE.**
+The plugin sent `/life/probe/int` and it arrived as **`/life/life/probe/int`**.
+Use `/probe/int`; the entry supplies `life`.
+
+**⚠️ `SendOSC` does not carry UTF-8.** An em-dash in a probe string arrived as the
+bytes `b \0 \20`. Payloads must be ASCII — `oscSafe` now strips high bytes, for the
+same reason it strips quotes rather than escaping them: the corruption is silent
+and the command still returns `OK`.
+
+**Both fixes ✅ re-verified on the desk the same day**: addresses arrive as
+`/life/probe/int` with one prefix, and text as `listener - a send`, clean ASCII.
+`Call Plugin 7` and `Call Plugin "LifeBridge"` both work over channel A.
+
+⚠️ **The probe accumulates results across calls.** A second `Call Plugin` in the
+same session reported `18/20 passed` — two runs of 9/10, not a changed verdict.
+The `results` table is not reset in `main()`. Harmless for a probe; the real
+bridge must not inherit it.
+
+### The plugin XML must be the EMBEDDED form, with a BOM
+
+Two hard importer requirements, both of which fail quietly:
+
+1. **UTF-8 BOM required.** A BOM-less XML will not import. Every working plugin in
+   the operator's library starts `EF BB BF`. Guarded by a test.
+2. **External-file form does not travel.** `<ComponentLua FileName="...">` stores an
+   absolute path from the machine that built it; on any other console the plugin
+   pool shows the row red with `File Exists: No` and `Call Plugin` does nothing at
+   all — no error, no log. Use `<FileContent><Block Base64=.../></FileContent>`,
+   1024-byte stride, `Size` = block count. `npm run build:plugin` emits it and
+   round-trip verifies before the file lands.
+
+### One `Port`, both directions
+
+There is no separate input/destination port — one field, used each way. Matches the
+2.3 manual's column list.
+
 ## UserVars
 
 `GetVar(UserVars(), "SGV2_BaseShow")` ✅ — the form `BaseFileSaver.lua` uses.

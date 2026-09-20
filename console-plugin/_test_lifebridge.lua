@@ -176,7 +176,7 @@ do
   -- 2.3.2 run is indistinguishable from a 2.5 one.
   local resultLines, stamped = 0, 0
   for _, cmd in ipairs(c) do
-    if cmd:find('/life/probe/result', 1, true) then
+    if cmd:find('/probe/result', 1, true) then
       resultLines = resultLines + 1
       if cmd:find('[2.3.2.0]', 1, true) then stamped = stamped + 1 end
     end

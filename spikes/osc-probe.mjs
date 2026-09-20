@@ -28,6 +28,8 @@ const USAGE = `grandMA3 OSC probe — Phase 0 spikes 1 and 3
   --listen <n>     Local port to listen on (default: same as --port).
   --wait <s>       Seconds to wait for inbound OSC (default 8).
   --cmd <string>   Command to send (default "Help", which mutates nothing).
+  --listen-only    Bind and listen; send NOTHING. For watching channel B while
+                   someone moves a fader, and for the plugin's SendOSC push.
   -h, --help       This text.
 
   node spikes/osc-probe.mjs --host 192.168.1.50 --prefix life
@@ -49,16 +51,21 @@ for (let i = 0; i < argv.length; i += 1) {
 	args[a.slice(2)] = next !== undefined && !next.startsWith('-') ? next : true
 }
 
+const LISTEN_ONLY = args['listen-only'] === true
+
 // No default host. This script sends a real packet to a real console, and
 // defaulting to loopback means running it bare fires at whatever onPC happens
 // to be on this machine. Make the target an explicit decision.
-if (typeof args.host !== 'string') {
+//
+// --listen-only sends nothing, so it needs no target and must not demand one:
+// the whole point is to watch a desk without touching it.
+if (!LISTEN_ONLY && typeof args.host !== 'string') {
 	console.error('ERROR: --host is required.\n')
 	console.error(USAGE)
 	process.exit(2)
 }
 
-const HOST = args.host
+const HOST = typeof args.host === 'string' ? args.host : null
 const PORT = Number(args.port ?? 8000)
 const PREFIX = (args.prefix ?? '').replace(/^\/+|\/+$/g, '')
 const LISTEN = Number(args.listen ?? PORT)
@@ -76,21 +83,46 @@ function oscMessage(address, str) {
 	])
 }
 
-/** Enough of an OSC decoder to prove something came back. */
+/** A real OSC 1.0 decoder. The first version dumped latin1, which rendered the
+ *  console's fader float as mojibake — the one field you actually want to read.
+ *  MA3 sends `,sif`: name, int, value. */
 function describe(buf) {
-	const end = buf.indexOf(0)
-	const address = buf.subarray(0, end === -1 ? buf.length : end).toString('ascii')
-	return `${address}  (${buf.length} bytes)  ${JSON.stringify(buf.toString('latin1').replace(/\0+/g, ' ').trim()).slice(0, 160)}`
+	const readStr = (off) => {
+		const end = buf.indexOf(0, off)
+		const str = buf.subarray(off, end === -1 ? buf.length : end).toString('ascii')
+		return [str, off + Math.ceil((str.length + 1) / 4) * 4]
+	}
+	try {
+		let off = 0
+		let address
+		;[address, off] = readStr(off)
+		let tags
+		;[tags, off] = readStr(off)
+		const args = []
+		for (const t of tags.slice(1)) {
+			if (t === 's') { const [v, n] = readStr(off); args.push(JSON.stringify(v)); off = n }
+			else if (t === 'i') { args.push(String(buf.readInt32BE(off))); off += 4 }
+			else if (t === 'f') { args.push(buf.readFloatBE(off).toFixed(3)); off += 4 }
+			else { args.push(`<${t}?>`); }
+		}
+		return `${address}  ${tags}  [${args.join(', ')}]`
+	} catch {
+		return `${buf.length} bytes, undecodable: ${JSON.stringify(buf.toString('latin1')).slice(0, 80)}`
+	}
 }
 
 const addr = PREFIX === '' ? '/cmd' : `/${PREFIX}/cmd`
 
 console.log(`grandMA3 OSC probe`)
-console.log(`  send    ${HOST}:${PORT}${addr}`)
+console.log(`  send    ${LISTEN_ONLY ? '(nothing — listen-only)' : `${HOST}:${PORT}${addr}`}`)
 console.log(`  listen  0.0.0.0:${LISTEN}`)
-console.log(`  command ${JSON.stringify(CMD)}\n`)
+// Printing a command we are not going to send invites someone to read this
+// output later and conclude we sent it. In a tool that exists to tell the truth
+// about a desk, that is not a cosmetic bug.
+if (!LISTEN_ONLY) console.log(`  command ${JSON.stringify(CMD)}`)
+console.log('')
 
-if (PREFIX === '') {
+if (PREFIX === '' && !LISTEN_ONLY) {
 	console.log('NOTE: no --prefix given. OSC_PROTOCOL.md records that grandMA3 runs a')
 	console.log('      command only at /<prefix>/cmd — a bare /cmd with the wrong or')
 	console.log('      missing prefix is SILENTLY IGNORED. If nothing happens, this is')
@@ -112,12 +144,21 @@ sock.on('error', (err) => {
 		console.error('  the OSC port exclusively — actions will still work, feedback will not.')
 		console.error('  That is spike 3: give the dashboard its own OSC entry and port.')
 	}
+	if (LISTEN_ONLY) {
+		console.error('\n  Nothing to do without the bind in listen-only mode.')
+		process.exit(1)
+	}
 	console.error('\n  Sending anyway (outbound does not need the bind).')
 	send()
 })
 
 sock.on('listening', () => {
 	console.log(`  bound ${LISTEN} OK — listening\n`)
+	if (LISTEN_ONLY) {
+		console.log(`  Sending nothing. Waiting ${WAIT}s — move a fader, or call the plugin.\n`)
+		setTimeout(finish, WAIT * 1000)
+		return
+	}
 	send()
 })
 
@@ -136,6 +177,16 @@ function send() {
 
 function finish() {
 	console.log('\n--- RESULT ---')
+	if (LISTEN_ONLY) {
+		console.log(
+			received > 0
+				? `Inbound delivery — PASS: ${received} message(s) arrived. Packets reach this machine.`
+				: 'Inbound delivery — NO DATA. Either Send is off in the OSC entry, the destination\n' +
+					'  is not this machine:port, or nothing happened on the desk during the window.',
+		)
+		sock.close()
+		return
+	}
 	console.log('Spike 1 (write path) — PASS only if the command appeared on the console')
 	console.log('  command line. UDP send success proves nothing: it is fire-and-forget.')
 	console.log('  If nothing appeared, check in order:')

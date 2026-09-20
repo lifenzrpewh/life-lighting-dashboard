@@ -86,7 +86,14 @@
 
 -- Which OSC entry (row) in Menu -> In & Out -> OSC to send results through.
 -- Must have Send enabled and point at the machine running the listener.
-local OSC_ENTRY = 1
+--
+-- Row 3, not row 1. This is spike 3 from docs/PLAN.md answering itself: the
+-- dashboard gets its OWN OSC entry rather than sharing one. Companion already
+-- runs a grandMA3 connection on prefix "companion", and a bridge that quietly
+-- repointed the entry underneath it would break a rig someone depends on, in a
+-- way that looks like the console's fault. Separate row, separate prefix,
+-- separate port, no shared state.
+local OSC_ENTRY = 3
 
 -- Sequences to probe. Defaults span the Show Creator's documented bands so the
 -- probe reports which actually exist on this show:
@@ -200,6 +207,10 @@ end
 -- ----------------------------- OSC transmission -----------------------------
 
 --- SendOSC takes the WHOLE message as one quoted string: "<address>,<type>,<value>"
+---
+--- ⚠️ ADDRESSES HERE ARE BARE -- `/probe/int`, not `/life/probe/int`. SendOSC
+--- prepends the OSC entry's own Prefix. ✅ 2026-09-21: baking `life` in produced
+--- `/life/life/probe/int` on the listener. Do not "fix" this by adding it back.
 --- (form taken from CompanionFeedback.lua:57, itself unverified).
 local function sendOsc(address, typeTag, value)
   Cmd(sformat('SendOSC %d "%s,%s,%s"', OSC_ENTRY, address, typeTag, tostring(value)))
@@ -209,24 +220,31 @@ end
 --- Escaping with a backslash does NOT work and still returns OK — that trap is
 --- recorded in MA3_SYNTAX_REFERENCE. So we strip rather than escape.
 local function oscSafe(s)
-  return (tostring(s):gsub('"', "'"):gsub('%c', ' '))
+  -- ASCII only. ✅ 2026-09-21: an em-dash in a probe string arrived as the bytes
+  -- b\0\20 -- SendOSC does not carry UTF-8 through the command line intact. We
+  -- strip rather than escape, for the same reason as the quote above: escaping
+  -- still returns OK and still corrupts, so the damage would be invisible.
+  return (tostring(s)
+    :gsub('"', "'")
+    :gsub('%c', ' ')
+    :gsub('[\128-\255]+', '-'))
 end
 
 -- -------------------------------- the probes --------------------------------
 
 local function probeOscInt()
-  sendOsc('/life/probe/int', 'i', 1)
+  sendOsc('/probe/int', 'i', 1)
   return true, 'sent (check the listener — a send cannot self-verify)'
 end
 
 local function probeOscFloat()
-  sendOsc('/life/probe/float', 'f', 0.5)
+  sendOsc('/probe/float', 'f', 0.5)
   return true, 'sent'
 end
 
 --- THE important one. Everything structural the bridge pushes is a string.
 local function probeOscString()
-  sendOsc('/life/probe/string', 's', oscSafe('LifeBridge probe v0'))
+  sendOsc('/probe/string', 's', oscSafe('LifeBridge probe v0'))
   return true, 'sent — if the listener sees this, channel C is viable'
 end
 
@@ -537,11 +555,11 @@ local function main()
   -- Push the verdict out too, so a listener captures it even if nobody is at
   -- the console. If THIS arrives, osc.string is proven regardless of the rest.
   pcall(function()
-    sendOsc('/life/probe/summary', 's', oscSafe(summary))
+    sendOsc('/probe/summary', 's', oscSafe(summary))
     for _, r in ipairs(results) do
       -- Stamp the version onto every line: captured output must be
       -- self-identifying, or a 2.3.2 result gets mistaken for a 2.5 one.
-      sendOsc('/life/probe/result', 's',
+      sendOsc('/probe/result', 's',
         oscSafe(sformat('[%s] %s=%s %s', consoleVersion, r.name,
           r.ok and 'PASS' or 'FAIL', r.detail or '')))
     end
