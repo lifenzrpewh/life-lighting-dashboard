@@ -18,14 +18,47 @@
 import dgram from 'node:dgram'
 import process from 'node:process'
 
-const args = Object.fromEntries(
-	process.argv.slice(2).reduce((acc, a, i, arr) => {
-		if (a.startsWith('--')) acc.push([a.slice(2), arr[i + 1] ?? 'true'])
-		return acc
-	}, []),
-)
+const argv = process.argv.slice(2)
 
-const HOST = args.host ?? '127.0.0.1'
+const USAGE = `grandMA3 OSC probe — Phase 0 spikes 1 and 3
+
+  --host <ip>      REQUIRED. The console to send to.
+  --port <n>       OSC port on the console (default 8000).
+  --prefix <s>     The OSC entry's Prefix. Without it MA3 silently ignores /cmd.
+  --listen <n>     Local port to listen on (default: same as --port).
+  --wait <s>       Seconds to wait for inbound OSC (default 8).
+  --cmd <string>   Command to send (default "Help", which mutates nothing).
+  -h, --help       This text.
+
+  node spikes/osc-probe.mjs --host 192.168.1.50 --prefix life
+  node spikes/osc-probe.mjs --host 192.168.1.50 --listen 8010 --wait 20
+`
+
+if (argv.length === 0 || argv.includes('-h') || argv.includes('--help')) {
+	console.log(USAGE)
+	process.exit(0)
+}
+
+// Parse only --flag <value> pairs, and treat a flag whose value is another flag
+// as a missing value rather than swallowing it.
+const args = {}
+for (let i = 0; i < argv.length; i += 1) {
+	const a = argv[i]
+	if (!a.startsWith('--')) continue
+	const next = argv[i + 1]
+	args[a.slice(2)] = next !== undefined && !next.startsWith('-') ? next : true
+}
+
+// No default host. This script sends a real packet to a real console, and
+// defaulting to loopback means running it bare fires at whatever onPC happens
+// to be on this machine. Make the target an explicit decision.
+if (typeof args.host !== 'string') {
+	console.error('ERROR: --host is required.\n')
+	console.error(USAGE)
+	process.exit(2)
+}
+
+const HOST = args.host
 const PORT = Number(args.port ?? 8000)
 const PREFIX = (args.prefix ?? '').replace(/^\/+|\/+$/g, '')
 const LISTEN = Number(args.listen ?? PORT)
