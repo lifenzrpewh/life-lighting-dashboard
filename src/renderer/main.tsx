@@ -1,0 +1,14 @@
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+
+import './theme.css'
+import { App } from './App.js'
+
+const root = document.getElementById('root')
+if (root === null) throw new Error('no #root')
+
+createRoot(root).render(
+	<StrictMode>
+		<App />
+	</StrictMode>,
+)

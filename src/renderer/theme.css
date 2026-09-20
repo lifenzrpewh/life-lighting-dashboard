@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+/* Dark only, deliberately. This screen lives in a dim booth beside a console at
+   9am on a Sunday; there is no light mode because there is no lit room. */
+@theme {
+	--color-booth-bg: #0a0a0b;
+	--color-booth-panel: #141417;
+	--color-booth-edge: #26262c;
+	--color-booth-ink: #f4f4f5;
+	--color-booth-dim: #8b8b96;
+
+	/* The state vocabulary, one colour each, used identically everywhere. */
+	--color-state-live: #4ade80;
+	--color-state-stale: #fbbf24;
+	--color-state-unknown: #6b7280;
+	--color-state-unreachable: #f87171;
+
+	/* Amber is reserved for "you must look at this": the unconfirmed-cook strip
+	   and ON BASE SHOW. Nothing decorative may use it. */
+	--color-warn: #f59e0b;
+}
+
+html,
+body,
+#root {
+	height: 100%;
+	margin: 0;
+	background: var(--color-booth-bg);
+	color: var(--color-booth-ink);
+	font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	/* A touchscreen in a booth: no text selection, no rubber-banding, no
+	   accidental pinch-zoom leaving the board at 140% mid-service. */
+	user-select: none;
+	overscroll-behavior: none;
+	touch-action: manipulation;
+}
