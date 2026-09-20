@@ -191,10 +191,15 @@ The threat model is accident and bug, not adversary. The guards above are what m
 Nothing is ✅ without a dated on-desk observation. Ordered by *what dies if the answer is no*, with
 the cheap ones pulled forward because one of them may save the architecture.
 
-1. **Does `/<prefix>/cmd` over OSC actually execute commands**, with `Receive Command` On? Blocks
-   every write. Currently 🔬 only.
-2. **Does `SendOSC <entry> "<addr>,<type>,<value>"` work from a console plugin**, including the
-   string form? This is channel C. Fail → fall to FTP, then `app_terminal`.
+1. ⚠️ **Does an OSC packet actually arrive** — in either direction? Blocks every write *and*
+   channel C. The desk returned `OK:` for `SendOSC`, which proves the syntax and the command,
+   **not delivery**: no OSC entry was configured and the listener side was never exercised. Until
+   a packet is observed arriving, both 1 and 2 rest on this. Run `spikes/osc-probe.mjs` against a
+   configured entry, `Receive Command` On, prefix matching.
+2. ✅ **Does `SendOSC <entry> "<addr>,<type>,<value>"` work from a console plugin**, including the
+   string form? **Yes — 2026-09-20, onPC 2.3.2.0.** The string form carries, so channel C is viable
+   and the console-direct architecture holds. FTP and `app_terminal` stay unneeded fallbacks.
+   Subject to 1: the console accepted the command; nothing has yet seen the packet land.
 3. **Can the console hold a second OSC entry** so the dashboard gets its own port without fighting
    Companion — and does the local onPC steal that port if OSC config syncs across the session?
 4. `app_terminal CMDLINE <console-ip>` — five minutes, no show risk. Pass → a console-direct channel
@@ -379,11 +384,21 @@ loop the new plugin is designed to avoid. **AGPL-3.0; must not be forked.**
   (**~19% are half-populated** — 386 selection-only, 346 preset-only, so a required pair would have
   dropped them), and that exports are small.
 - **`spikes/scan-exports.mjs`** — derives `export-blacklist.json`. No desk needed.
-- **`spikes/osc-probe.mjs`** — spikes 1 and 3, ready to run at a desk on a scratch show.
+- **`spikes/osc-probe.mjs`** — spikes 1 and 3, ready to run at a desk on a scratch show. The send
+  side has never been paired with a listening entry, so **delivery remains unobserved.**
+- **`console-plugin/LifeBridge.lua`** — probe v1, read-only on the show, `SendOSC` its only command.
+  Scored 9/10 on the desk. Its findings are the read model; it is meant to be *replaced* by the real
+  bridge, not extended.
+- **`console-plugin/_test_lifebridge.lua`** — offline harness, 106 checks, including the assertion
+  that no command but `SendOSC` ever appears in the plugin.
+- **`docs/MA3_READ_MODEL.md`** — the desk-verified property names, the ×1000 cue-number trap, and
+  the `HookObjectChange` failure that makes polling the design rather than a compromise.
 
 ## Open questions
 
-- **Is `visuals-song-comms` actually deployed and in use?** One push on 2026-08-18, nothing since,
-  no local clone. The data layer rests on it. If it's shelved, Phase 1 grows a standalone fallback.
+- ~~**Is `visuals-song-comms` actually deployed and in use?**~~ **Answered: yes — deployed and in
+  production use**, despite one push on 2026-08-18 and nothing since. It looks dormant and is not.
+  **Phase 1 therefore grows no standalone fallback**, and the existing `lighting_cues` field on
+  `note_values` is read as-is. Extend it with append-only migrations; don't rebuild it.
 - Which PCO service types each campus follows.
 - Whether the local-onPC read fallback is ever needed once channel C is proven.

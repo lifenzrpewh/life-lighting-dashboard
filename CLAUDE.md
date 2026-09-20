@@ -9,7 +9,7 @@ mid-service. Volunteer-simple, with an operator mode. Electron on Windows.
 code). This file is the operating manual. A fact lives in one place — link, don't
 copy.
 
-## Status — Phase 0, transport proven
+## Status — all three channels VERIFIED, Phase 1 shell standing
 
 Badge convention: ✅ VERIFIED (dated on-console observation) · ⚠️ UNVERIFIED ·
 🔬 RESEARCHED · ❌ FAILED. Harness-green alone is ⚠️. onPC counts as on-console.
@@ -23,14 +23,43 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 |---|---|
 | ✅ `src/bridge/export-parse.ts` | Export XML parser, verified against the real 856-file / 431 MB library. |
 | ✅ `spikes/scan-exports.mjs` | Derives `export-blacklist.json`. No desk needed. |
-| ✅ `console-plugin/LifeBridge.lua` | Probe v1. Run on a desk; findings recorded. Read-only on the show. |
+| ✅ `console-plugin/LifeBridge.lua` | Probe v1, run on the console 2026-09-21 — pushed 14 results back over `SendOSC`. Read-only on the show. `OSC_ENTRY = 3`. |
+| ✅ `scripts/build-plugin-xml.mjs` | Embeds the Lua into a self-contained importable XML. Round-trip verified before the file lands. |
 | ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 106 checks. |
-| ⚠️ `spikes/osc-probe.mjs` | Listener side never exercised — no OSC entry was configured, so **delivery** is still unconfirmed. |
+| ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
+| ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
+| ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk + the Phase 1 service screen. Builds, runs, renders all four states. **No transport wired** — it reports UNREACHABLE because it is. |
+| ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
 
-**Still open:** nothing has confirmed an OSC packet actually *arrives*. The console
-returned `OK:` for `SendOSC`, which proves the syntax and the command, not the
-delivery. Configure an OSC entry with Send enabled, run
-`node spikes/osc-probe.mjs --host <ip> --listen <port>`, and call the plugin.
+**✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
+A command sent as `/life/cmd` `,s` **executed on the console**, and one fader move
+pushed **269 messages** back as `/life/14.14.1.6.1005` `,sif`. Channels A and B
+are real. Full format and the traps in `docs/MA3_READ_MODEL.md` § OSC transport.
+
+Working config: OSC row 3 `OSCData 3` · port **8003** · prefix `life` · destination
+`10.11.60.182` · Receive/Send/Receive Command/Send Command all Yes.
+
+⚠️ **The trap that cost the afternoon:** editing an entry's `Port` does **not**
+move the live socket — row 3 displayed `8000` while still listening on `8010`.
+Toggle `Enable Input` off/on to rebind. Verify from outside with a connected-UDP
+port scan (unbound → `ECONNREFUSED`, bound → silence) **plus two controls**, or
+ICMP filtering will read as "bound".
+
+**✅ Channel C too.** `Call Plugin "LifeBridge"` sent over channel A produced **14
+messages back** over `SendOSC`, carrying the whole probe report. A command goes in
+over the network and structure comes out over the network, console-direct, no
+shared filesystem. The architecture holds end to end.
+
+Two defects only the desk could show, both now fixed and commented in the source:
+`SendOSC` **prepends the entry's Prefix** (so plugin addresses are bare `/probe/x`,
+not `/life/probe/x`), and it **does not carry UTF-8** (an em-dash arrived as
+`b \0 \20`, so `oscSafe` strips to ASCII).
+
+**Plugin deployment is solved: the XML is self-contained.** `npm run build:plugin`
+embeds the Lua as base64 blocks (1024-byte stride, `Size` = block count, UTF-8 BOM
+— all three are importer requirements that fail quietly). Import one file; there is
+no `.lua` to copy and no path to be wrong. A test fails if the XML drifts from the
+Lua, so the stale-import trap cannot happen silently.
 
 ## The four channels
 
@@ -110,30 +139,46 @@ properties; the cue editor here touches standard recipes directly.
 
 ```
 npm install
-npm test     # TS tests against the real library, then the Lua harness
-npm run scan # regenerate export-blacklist.json
+npm test       # TS tests against the real library, then the Lua harness
+npm run dev    # the kiosk, with the mock desk — keys 1-5 switch failure modes
+npm run typecheck
+npm run scan   # regenerate export-blacklist.json
 ```
+
+`npm test` rebuilds `dist/` from the tested layer only, so it clears an app build.
+`npm run dev` and `npm start` rebuild what they need; nothing else depends on the order.
 
 Tests read `~/MALightingTechnology/gma3_library/datapools/sequences` and skip if
 absent. ~50 s, because five real exports are 45 MB each.
 
 ## Next session starts here
 
-The probe has done its job and the seam is clean — nothing is half-built.
+Both tracks are at a clean seam. Nothing is half-built.
 
-**Build the real `LifeBridge`**, replacing the probe: a batched `snapshot` verb
-that reads N sequences via the property names in `docs/MA3_READ_MODEL.md` and
-pushes NDJSON back over `SendOSC`, inside an 8 ms slice budget with `busy` acks
-between slices. Design is in `docs/PLAN.md` under "The console plugin". Keep the
-probe's guarantees: read-only on the show, no generic `cmd` verb in the shipped
-build, write allow-list keyed to `BOUNDARIES.md` §3, and results that fail rather
-than return a plausible value.
+**Transport is finished. All three channels are ✅ (see Status)** — nothing in
+Phase 0 is blocking any more, which is the first time that has been true.
 
-Two things worth doing first, both cheap:
-1. Confirm OSC **delivery** with the listener (see Status above). Everything
-   downstream assumes packets arrive.
-2. Decide whether the Electron shell and the PCO service screen (Phase 1) should
-   go ahead in parallel — it depends on none of the console work.
+**Console track — build the real `LifeBridge`**, replacing the probe: a batched
+`snapshot` verb that reads N sequences via the property names in
+`docs/MA3_READ_MODEL.md` and pushes NDJSON back over `SendOSC`, inside an 8 ms
+slice budget with `busy` acks between slices. Design is in `docs/PLAN.md` under
+"The console plugin". Keep the probe's guarantees: read-only on the show, no
+generic `cmd` verb in the shipped build, write allow-list keyed to
+`BOUNDARIES.md` §3, and results that fail rather than return a plausible value.
+
+**App track — give the shell real sources.** The screen is built and honest; what
+it has no way to reach yet is data. In order:
+1. Supabase client in `src/main` reading the existing `note_values` /
+   `lighting_cues` rows into `Service`. Main owns state truth; the renderer asks
+   main and forms no opinion of its own.
+2. Vendor `companion-module-grandma3`'s `src/osc/{parse,apply}.ts` + `src/state.ts`
+   into `src/main/bridge/vendor/gma3-osc/` for channel B. MIT, ours.
+3. Channel A (`osc-out.ts`) — but a write path is only worth wiring once delivery
+   is confirmed, so this waits on the five minutes above.
+
+**Do not** make the shell fall back to plausible data while sources are missing.
+`readingOf` returning UNKNOWN with nothing wired is the design working, not a gap
+to paper over — see the header of `src/shared/reading.ts`.
 
 ## External files that matter
 
