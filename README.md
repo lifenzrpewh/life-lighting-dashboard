@@ -26,6 +26,7 @@ offline against real data.
 npm install
 npm test                      # builds, then runs against the real library if present
 npm run scan                  # writes export-blacklist.json
+./scripts/deploy-plugin.sh    # dry run; --write to copy the plugin to the console
 lua console-plugin/_test_lifebridge.lua
 ```
 
