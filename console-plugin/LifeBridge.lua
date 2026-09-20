@@ -57,8 +57,29 @@
 --   can reach us where it could not reach the generator. recipe.read is the
 --   probe that will show it.
 --
--- STATUS: ⚠️ UNVERIFIED. Written against the grandMA3 2.3 Lua API, never run on
---   a console. That is the entire point of it.
+-- DESK RUN 1 — onPC 2.3.2.0, show "Mount Eden Base", 2026-09-20
+--   ✅ SendOSC works from a plugin, INCLUDING the string form. The console
+--      returned OK: for /life/probe/string,s,<text>. Channel C is viable, and
+--      this is the result the architecture was waiting on.
+--   ✅ Object-model reads are effectively free: 0.02 ms per sequence resolve.
+--   ✅ ObjectList("Sequence n") resolves; Root().manetsocket.showfile reads.
+--   ✅ Recipe lines are reachable and carry the right data — Seq 100 Cue 3
+--      Part 1 returned 5 lines with Preset 21.1, exactly what LEVEL_STATES.md
+--      documents for HOLDING.
+--   ❌ `line.Object` is nil. MA3 properties are NOT plain Lua fields; they are
+--      read with obj:Get("Name"). Field access silently yields nil, which is
+--      how v0 reported a recipe line with no group as a PASS.
+--   ❌ HookObjectChange returned nil. It exists but did not install with the
+--      2-arg call. v0 called that a PASS because pcall did not throw.
+--   ❌ UserVars():Get("SGV2_BaseShow") returned empty. BaseFileSaver.lua uses
+--      GetVar(UserVars(), name); that is the form to use.
+--   ⚠️ seq:Ptr(1) is POSITIONAL and returned OffCue, not cue number 1. Index is
+--      not cue number anywhere in this API. Do not conflate them.
+--   ⚠️ v0 scored itself 10/10 by treating "did not throw" as PASS. That is the
+--      exact failure this project exists to design out, and it was in the probe
+--      itself. v1 requires a usable VALUE, and has a negative control.
+--
+-- STATUS: ⚠️ v1 is UNVERIFIED — it fixes what run 1 found, and must be re-run.
 -- ============================================================================
 
 -- ------------------------------ configuration ------------------------------
@@ -75,6 +96,10 @@ local PROBE_SEQUENCES = { 100, 101, 1001, 1002, 1021, 1300, 2006, 2100 }
 
 -- Sequences to time, for the slice-budget measurement.
 local TIMING_SAMPLE = 8
+
+-- A sequence that must NOT exist. If the probe reports this one present, the
+-- resolver is lying and every other "present" result is worthless.
+local NEGATIVE_CONTROL = 9987
 
 -- Where to write the results report. Tried in order; the first that opens wins,
 -- and the chosen path is printed. Covers macOS and Windows, and falls back to
@@ -117,6 +142,59 @@ local function probe(name, fn)
   end
   record(name, a and true or false, b)
   return a
+end
+
+--- v0 treated "did not throw" as success and so reported a nil group and a nil
+--- hook id as PASSes. A probe that needs a value must say so.
+local function requireValue(v, what)
+  if v == nil or v == '' then return false, 'no value for ' .. what end
+  return true, nil
+end
+
+--- MA3 properties are read with obj:Get(name), NOT as Lua fields, and the name
+--- list is discovered via PropertyCount/PropertyName (0-based).
+local function getProp(obj, name)
+  local ok, v = pcall(function() return obj:Get(name) end)
+  if ok then return v end
+  return nil
+end
+
+local function describeValue(v)
+  if v == nil then return 'nil' end
+  local t = type(v)
+  if t == 'userdata' then
+    local ok, n = pcall(function() return v.name end)
+    return ok and n ~= nil and ('handle:' .. tostring(n)) or 'handle'
+  end
+  return tostring(v)
+end
+
+--- Dump every property of an object. This is how we stop guessing names.
+local function dumpProps(obj)
+  local out = {}
+  local ok, count = pcall(function() return obj:PropertyCount() end)
+  if not ok or count == nil then return out end
+  for i = 0, count - 1 do
+    local okn, name = pcall(function() return obj:PropertyName(i) end)
+    if okn and name ~= nil then
+      out[#out + 1] = { name = tostring(name), value = describeValue(getProp(obj, name)) }
+    end
+  end
+  return out
+end
+
+-- Property dumps are too long for the command line; they go in the report.
+local dumps = {}
+local function keepDump(label, obj)
+  local list = dumpProps(obj)
+  dumps[#dumps + 1] = { label = label, props = list }
+  return list
+end
+
+local function propNames(list, limit)
+  local names = {}
+  for i = 1, math.min(#list, limit or 12) do names[#names + 1] = list[i].name end
+  return tconcat(names, ' ')
 end
 
 -- ----------------------------- OSC transmission -----------------------------
@@ -189,7 +267,16 @@ local function probeSequenceAccess()
   if #found == 0 then
     return false, 'no probe sequence resolved by any accessor'
   end
-  return true, sformat('via %s; present: %s', via or '?', tconcat(found, ' '))
+  -- Without this control, "everything is present" and "the resolver always says
+  -- yes" look identical -- and they DID, on run 1, on a show where all eight
+  -- bands genuinely exist.
+  local ghost = resolveSequence(NEGATIVE_CONTROL)
+  if ghost ~= nil then
+    return false, sformat('RESOLVER LIES: Sequence %d must not exist but resolved. '
+      .. 'Every "present" result is void.', NEGATIVE_CONTROL)
+  end
+  return true, sformat('via %s; present: %s; control %d correctly absent',
+    via or '?', tconcat(found, ' '), NEGATIVE_CONTROL)
 end
 
 --- Read one sequence's cues, timing and recipe lines. This IS the read model.
@@ -198,79 +285,117 @@ local function probeCueRead()
     local seq = resolveSequence(no)
     if seq ~= nil then
       local okCount, count = pcall(function() return seq:Count() end)
-      if not okCount or not count or count == 0 then goto continue end
+      if okCount and count and count > 0 then
+        keepDump(sformat('Sequence %d', no), seq)
 
-      local cue = seq:Ptr(1)
-      if cue == nil then goto continue end
-
-      local name = pcall(function() return cue.Name end) and cue.Name or nil
-      local cueNo = pcall(function() return cue.No end) and cue.No or nil
-
-      -- CueInFade lives on Part 0, not on the cue.
-      local fade, recipes = nil, 0
-      pcall(function()
-        local part = cue:Ptr(1)
-        if part then
-          fade = part.CueInFade
-          local pc = part:Count()
-          if pc then recipes = pc end
+        -- Ptr(i) is POSITIONAL. On run 1, Ptr(1) was OffCue, not cue number 1.
+        -- Walk positions and read each cue's real number with Get("No").
+        local rows, firstReal = {}, nil
+        for i = 1, count do
+          local cue = seq:Ptr(i)
+          if cue ~= nil then
+            local cueNo = getProp(cue, 'No')
+            local cueName = getProp(cue, 'Name')
+            rows[#rows + 1] = sformat('[%d]%s/%s', i, describeValue(cueNo), describeValue(cueName))
+            if firstReal == nil and cueNo ~= nil then firstReal = cue end
+          end
         end
-      end)
-
-      return true, sformat('Seq %d: %d cues; cue1 no=%s name=%s CueInFade=%s parts/recipes=%d',
-        no, count, tostring(cueNo), tostring(name), tostring(fade), recipes)
+        if #rows > 0 then
+          local target = firstReal or seq:Ptr(1)
+          keepDump(sformat('Sequence %d cue', no), target)
+          local part = target and target:Ptr(1) or nil
+          local fade
+          if part ~= nil then
+            keepDump(sformat('Sequence %d cue part', no), part)
+            fade = getProp(part, 'CueInFade')
+          end
+          local okv, why = requireValue(fade, 'CueInFade')
+          return okv, sformat('Seq %d: %d cues; pos/no/name = %s; CueInFade=%s%s',
+            no, count, tconcat(rows, ' '), describeValue(fade), okv and '' or ('  [' .. why .. ']'))
+        end
+      end
     end
-    ::continue::
   end
   return false, 'no sequence yielded a readable cue'
 end
 
---- A recipe line is a Group + a Preset on a cue Part. This is what the cue
---- editor edits, so we must be able to read it back.
+--- A recipe line is a Group + a Preset on a cue Part. Run 1 proved the lines are
+--- reachable but `line.Object` was nil, because MA3 properties are not Lua
+--- fields. This version DUMPS the property names so we stop guessing.
 local function probeRecipeRead()
   for _, no in ipairs(PROBE_SEQUENCES) do
     local seq = resolveSequence(no)
-    if seq == nil then goto nextSeq end
-    for ci = 1, (select(2, pcall(function() return seq:Count() end)) or 0) do
-      local cue = seq:Ptr(ci)
-      if cue ~= nil then
-        for pi = 1, (select(2, pcall(function() return cue:Count() end)) or 0) do
-          local part = cue:Ptr(pi)
-          if part ~= nil then
-            local ok, detail = pcall(function()
-              local n = part:Count() or 0
-              if n == 0 then return nil end
+    if seq ~= nil then
+      local cueCount = select(2, pcall(function() return seq:Count() end)) or 0
+      for ci = 1, cueCount do
+        local cue = seq:Ptr(ci)
+        if cue ~= nil then
+          local partCount = select(2, pcall(function() return cue:Count() end)) or 0
+          for pi = 1, partCount do
+            local part = cue:Ptr(pi)
+            local lineCount = part and (select(2, pcall(function() return part:Count() end)) or 0) or 0
+            if lineCount > 0 then
               local line = part:Ptr(1)
-              if line == nil then return nil end
-              return sformat('Seq %d Cue %d Part %d: %d line(s); [1] Object=%s Preset=%s',
-                no, ci, pi, n, tostring(line.Object), tostring(line.Preset))
-            end)
-            if ok and detail then return true, detail end
+              if line ~= nil then
+                local list = keepDump(sformat('Seq %d Cue[%d] Part[%d] recipe line', no, ci, pi), line)
+
+                -- Try the names the exported XML uses, plus the one v0 guessed.
+                local group, groupVia
+                for _, candidate in ipairs({ 'Object', 'Selection', 'Group', 'SelectionSource', 'Values' }) do
+                  local v = getProp(line, candidate)
+                  if v ~= nil and describeValue(v) ~= 'nil' then
+                    group, groupVia = v, candidate
+                    break
+                  end
+                end
+                local preset = getProp(line, 'Preset')
+
+                local okv, why = requireValue(group, 'the recipe line group')
+                return okv, sformat(
+                  'Seq %d Cue[%d] Part[%d]: %d line(s); group=%s via %s; Preset=%s; %d props: %s%s',
+                  no, ci, pi, lineCount, describeValue(group), tostring(groupVia),
+                  describeValue(preset), #list, propNames(list, 10),
+                  okv and '' or ('  [' .. why .. ' -- see the dump in the report]'))
+              end
+            end
           end
         end
       end
     end
-    ::nextSeq::
   end
-  return false, 'no recipe line found on any probe sequence (a show with no recipes reads the same — check on a built show)'
+  return false, 'no recipe line found on any probe sequence'
 end
 
---- If this fires on a cue change, the bridge stops polling.
+--- Run 1: exists, but the 2-arg call returned nil -- it did not install, and v0
+--- called that a PASS. The symbol table suggests
+--- HookObjectChange(callback, handle, plugin_handle[, target]).
 local function probeHook()
   if HookObjectChange == nil then
     return false, 'HookObjectChange is not defined in this Lua environment'
   end
-  local seq = resolveSequence(PROBE_SEQUENCES[1])
+  local seq
   for _, no in ipairs(PROBE_SEQUENCES) do
     seq = seq or resolveSequence(no)
   end
   if seq == nil then return false, 'no sequence to hook' end
-  local ok, id = pcall(function()
-    return HookObjectChange(function() end, seq)
-  end)
-  if not ok then return false, 'exists but raised: ' .. tostring(id) end
-  if UnhookMultiple then pcall(function() UnhookMultiple(seq) end) end
-  return true, sformat('installed, id=%s — now change a cue and watch for a callback', tostring(id))
+
+  local cb = function() end
+  local plugin
+  pcall(function() plugin = MyHandle and MyHandle() or nil end)
+
+  local attempts = {
+    { '3-arg (cb, obj, plugin)', function() return HookObjectChange(cb, seq, plugin) end },
+    { '2-arg (cb, obj)', function() return HookObjectChange(cb, seq) end },
+  }
+  for _, a in ipairs(attempts) do
+    local ok, id = pcall(a[2])
+    if ok and id ~= nil then
+      if UnhookMultiple then pcall(function() UnhookMultiple(seq) end) end
+      return true, sformat('installed via %s, id=%s -- now change a cue and watch for a callback',
+        a[1], tostring(id))
+    end
+  end
+  return false, 'exists but no call form returned a hook id -- treat push as unavailable, keep polling'
 end
 
 --- Sizes the slice budget: how long does reading a sequence actually cost?
@@ -306,16 +431,28 @@ local function probeShowfile()
   pcall(function() name = Root().manetsocket.showfile end)
   if name == nil then pcall(function() name = Root().ShowData.Name end) end
 
-  local base
-  pcall(function()
-    local uv = UserVars and UserVars() or nil
-    if uv then base = uv:Get('SGV2_BaseShow') end
-  end)
-
-  if name == nil and base == nil then
-    return false, 'neither showfile name nor SGV2_BaseShow readable'
+  -- Run 1: UserVars():Get(...) returned empty. BaseFileSaver.lua reads it as
+  -- GetVar(UserVars(), "SGV2_BaseShow"), so try that form first.
+  local base, via
+  for _, a in ipairs({
+    { 'GetVar(UserVars(), n)', function() return GetVar(UserVars(), 'SGV2_BaseShow') end },
+    { 'UserVars():Get(n)', function() return UserVars():Get('SGV2_BaseShow') end },
+  }) do
+    local ok, v = pcall(a[2])
+    if ok and v ~= nil and tostring(v) ~= '' then
+      base, via = v, a[1]
+      break
+    end
   end
-  return true, sformat('showfile=%s  SGV2_BaseShow=%s', tostring(name), tostring(base))
+
+  if not requireValue(name, 'showfile name') then return false, 'showfile name unreadable' end
+  if base == nil then
+    -- Genuinely absent on a show the generator never touched, so this is really
+    -- a WARN -- but it must not read as a pass either.
+    return false, sformat('showfile=%s but SGV2_BaseShow is empty by BOTH accessors '
+      .. '(either this show was never generated, or neither form works)', tostring(name))
+  end
+  return true, sformat('showfile=%s  SGV2_BaseShow=%s via %s', tostring(name), tostring(base), via)
 end
 
 --- Write the report. io.open is undocumented for MA3 plugins but ma3-mcp relies
@@ -336,6 +473,20 @@ local function writeResultsFile(summary)
   for _, r in ipairs(results) do
     lines[#lines + 1] = sformat('%-22s %s  %s', r.name, r.ok and 'PASS' or 'FAIL', r.detail or '')
   end
+  -- The property dumps are the point of v1: they end the guessing about which
+  -- name holds a recipe line's group. Too long for the command line, so they
+  -- live here.
+  lines[#lines + 1] = ''
+  lines[#lines + 1] = '## Property dumps'
+  if #dumps == 0 then lines[#lines + 1] = '(none captured)' end
+  for _, d in ipairs(dumps) do
+    lines[#lines + 1] = ''
+    lines[#lines + 1] = sformat('### %s  (%d properties)', d.label, #d.props)
+    for _, pr in ipairs(d.props) do
+      lines[#lines + 1] = sformat('  %-28s %s', pr.name, pr.value)
+    end
+  end
+
   local body = tconcat(lines, '\n') .. '\n'
 
   for _, path in ipairs(RESULT_PATHS) do

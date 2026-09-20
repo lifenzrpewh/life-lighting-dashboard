@@ -38,40 +38,66 @@ local function mockIO(writablePattern)
 end
 
 --- Build a mock object tree: sequence -> cues -> parts -> recipe lines.
+--- MA3 properties are read with obj:Get(name) and enumerated with
+--- PropertyCount/PropertyName (0-based), NOT as Lua fields. Modelling that is
+--- the whole reason v0's false PASSes were invisible to the old mock.
 local function mockObject(fields, children)
   local o = {}
-  for k, v in pairs(fields or {}) do o[k] = v end
+  local f = fields or {}
+  local names = {}
+  for k in pairs(f) do names[#names + 1] = k end
+  table.sort(names)
   local kids = children or {}
   function o:Count() return #kids end
   function o:Ptr(i) return kids[i] end
+  function o:Get(n) return f[n] end
+  function o:PropertyCount() return #names end
+  function o:PropertyName(i) return names[i + 1] end
   return o
 end
 
-local function richEnvironment()
-  local line = mockObject({ Object = 'Group 3', Preset = 'Dimmer.At Full' })
+--- The shape the real desk showed: the recipe line's group is NOT at .Object,
+--- and position 1 of a sequence is OffCue, which has no cue number.
+local function mockSequence()
+  local line = mockObject({ Selection = 'Group 3', Preset = 'Preset 21.1' })
   local part = mockObject({ CueInFade = 2.0 }, { line })
   local cue = mockObject({ No = 1, Name = 'Wash' }, { part })
-  local seq = mockObject({ Name = 'Dimmer G1' }, { cue })
+  local offCue = mockObject({ Name = 'OffCue' })
+  return mockObject({ Name = 'Dimmer G1' }, { offCue, cue })
+end
 
+local function installCommon(seq)
   _G.Cmd = function(s) cmds[#cmds + 1] = s end
   _G.Printf = function(s) prints[#prints + 1] = s end
   _G.ObjectList = function(addr)
-    -- Only the documented bands exist, so the probe must report which resolved.
     if addr:match('Sequence 100[12]') or addr:match('Sequence 100$') then return { seq } end
-    return {}
+    return {}   -- including the negative control
   end
   _G.GetObject = function() return nil end
   _G.DataPool = function() return { Sequences = { Ptr = function() return nil end } } end
   _G.Root = function() return { manetsocket = { showfile = 'Sunday 21 Sep' }, Version = '2.3.2.0' } end
-  _G.UserVars = function() return { Get = function(_, k)
-    return k == 'SGV2_BaseShow' and 'LIFE Basefile Master' or nil
-  end } end
+  _G.UserVars = function() return { Get = function() return nil end } end
+  _G.GetVar = function(_, k) return k == 'SGV2_BaseShow' and 'LIFE Basefile Master' or nil end
   _G.Version = function() return '2.3.2.0' end
+  _G.MyHandle = function() return 'plugin-handle' end
   _G.HookObjectChange = function() return 7 end
   _G.UnhookMultiple = function() end
 end
 
---- A console where none of our guesses hold. Everything must FAIL, not throw.
+local function richEnvironment()
+  installCommon(mockSequence())
+end
+
+--- A console that resolves objects and reports children, but whose Get() always
+--- returns nil. This is v0's exact failure: it scored 10/10 against a desk that
+--- was telling it nothing. v1 must FAIL here.
+local function lyingEnvironment()
+  local line = mockObject({})
+  local part = mockObject({}, { line })
+  local cue = mockObject({}, { part })
+  installCommon(mockObject({}, { cue }))
+end
+
 local function bareEnvironment()
   _G.Cmd = function(s) cmds[#cmds + 1] = s end
   _G.Printf = function(s) prints[#prints + 1] = s end
@@ -122,7 +148,15 @@ do
   end
 
   check('rich: reads the cue', joined:find('CueInFade=2.0', 1, true) ~= nil, joined)
-  check('rich: reads the recipe line', joined:find('Group 3', 1, true) ~= nil)
+  check('rich: reads the recipe line', joined:find('Group 3', 1, true) ~= nil, joined)
+  -- The desk showed the group is not at .Object; the probe must say where it is.
+  check('rich: names the property the group came from',
+    joined:find('via Selection', 1, true) ~= nil, joined)
+  -- Ptr(1) is positional and is OffCue; the probe must not call that cue 1.
+  check('rich: distinguishes position from cue number',
+    joined:find('[1]nil/OffCue', 1, true) ~= nil, joined)
+  check('rich: proves the resolver can say no',
+    joined:find('control 9987 correctly absent', 1, true) ~= nil, joined)
   check('rich: reads the showfile', joined:find('Sunday 21 Sep', 1, true) ~= nil)
   check('rich: reports the base show', joined:find('LIFE Basefile Master', 1, true) ~= nil)
   check('rich: only the present sequences resolve',
@@ -159,7 +193,9 @@ do
     reportPath == '/Users/Shared/LIFE/LifeBridge-probe.txt', tostring(reportPath))
   if report then
     check('rich: report names the MA3 version', report:find('2.3.2.0', 1, true) ~= nil)
-    check('rich: report carries the summary', report:find('10/10 passed', 1, true) ~= nil)
+    check('rich: report carries the summary', report:find('10/10 passed', 1, true) ~= nil, report)
+    check('rich: report carries the property dumps',
+      report:find('## Property dumps', 1, true) ~= nil and report:find('Selection', 1, true) ~= nil)
     for _, name in ipairs({ 'osc.string', 'cue.read', 'recipe.read', 'timing.slice' }) do
       check('rich: report includes -- ' .. name, report:find(name, 1, true) ~= nil)
     end
@@ -191,6 +227,20 @@ do
   check('no-disk: writes nothing', next(files) == nil)
   check('no-disk: says the report could not be written',
     table.concat(p, '\n'):find('could not write a report file', 1, true) ~= nil)
+end
+
+-- 1d. A console that answers every read with nil. v0 scored 10/10 against
+--     exactly this; v1 must refuse to.
+do
+  local ok, err, _, p = run(lyingEnvironment, '^/Users/Shared/LIFE/')
+  check('lying: does not throw', ok, tostring(err))
+  local joined = table.concat(p, '\n')
+  check('lying: cue.read fails rather than inventing a value',
+    joined:match('cue%.read%s+FAIL') ~= nil, joined)
+  check('lying: recipe.read fails when the group is nil',
+    joined:match('recipe%.read%s+FAIL') ~= nil, joined)
+  check('lying: does not claim a clean sweep',
+    joined:find('10/10 passed', 1, true) == nil, joined)
 end
 
 -- 2. Bare console: every API missing.
