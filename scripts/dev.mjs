@@ -33,7 +33,12 @@ function waitForPort(port, timeoutMs = 30_000) {
 	const deadline = Date.now() + timeoutMs
 	return new Promise((resolve, reject) => {
 		const attempt = () => {
-			const sock = net.connect(port, '127.0.0.1')
+			// Connect by NAME, not 127.0.0.1. On Windows Vite binds ::1 only and
+			// localhost resolves to ::1 ahead of 127.0.0.1, so an IPv4-only probe is
+			// refused every time — the launch dies on a 30 s timeout while Vite sits
+			// there serving perfectly well. autoSelectFamily tries both families, so
+			// this holds wherever the host resolves.
+			const sock = net.connect({ port, host: 'localhost', autoSelectFamily: true })
 			sock.once('connect', () => {
 				sock.destroy()
 				resolve()
@@ -49,12 +54,14 @@ function waitForPort(port, timeoutMs = 30_000) {
 }
 
 const children = []
-const shutdown = () => {
+const shutdown = (code = 0) => {
 	for (const c of children) c.kill()
-	process.exit(0)
+	process.exit(code)
 }
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
+// Wrapped, not passed directly: a signal handler is called with the signal name
+// and an exit handler with the exit code, either of which would land in `code`.
+process.on('SIGINT', () => shutdown(0))
+process.on('SIGTERM', () => shutdown(0))
 
 console.log('[dev] building main + preload')
 await once('npx', ['tsc', '-p', 'tsconfig.main.json'])
@@ -62,11 +69,19 @@ await once('npx', ['tsc', '-p', 'tsconfig.main.json'])
 console.log('[dev] starting vite')
 children.push(run('npx', ['vite']))
 
-await waitForPort(PORT)
+try {
+	await waitForPort(PORT)
+} catch (err) {
+	// Crashing out of the top level skips shutdown() and leaves Vite holding the
+	// port, so the next run fails against a stale listener — which is exactly the
+	// hunt this script says it exists to avoid.
+	console.error(`[dev] ${err.message}`)
+	shutdown(1)
+}
 console.log(`[dev] vite up on ${URL} — launching electron`)
 
 const electron = run('npx', ['electron', '.'], { VITE_DEV_SERVER_URL: URL })
 children.push(electron)
 // Closing the kiosk window ends the session; leaving Vite running in a dead
 // terminal is just a port you have to hunt down later.
-electron.on('exit', shutdown)
+electron.on('exit', (code) => shutdown(code ?? 0))
