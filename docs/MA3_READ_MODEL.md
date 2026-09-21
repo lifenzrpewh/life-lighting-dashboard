@@ -211,6 +211,21 @@ control. The dashboard must coalesce these per object before they reach React �
 one state update per frame, not per packet — or a busy desk will drive the
 renderer flat out for no visible gain.
 
+✅ **Second capture, 2026-09-21, dashboard on 10.11.60.215:** 1221 packets in
+90 s, all of them channel B, decoded 1221/1221 by `src/bridge/osc.ts`. Coalesced
+at 10 Hz that is **267 frames**, a 4.6x reduction. The rate holds: ~13/s here
+against ~26/s before, the difference being how hard the faders were worked.
+
+⚠️ **The executor set is open.** Four were live this time — `1002`, `1003`,
+`1004`, `1005` — where the first capture saw two. Nothing may assume a known
+pair, or a fixed count.
+
+⚠️ **The level range is still only partly observed.** Values reached **76.8**,
+past the 54.5 maximum of the first capture. It reads as a percent, but neither
+end has been seen: no capture has run a fader to its stop and read the number.
+So `value` is carried unscaled and unclamped in `src/bridge/channel-b.ts`, and
+nothing normalises it to 0..1 on an assumption.
+
 **Silence is still not death.** Channel B speaks only on change; a quiet desk
 mid-sermon emits nothing for minutes and is perfectly healthy. Link health must
 come from unanswered *requests*, never from an empty inbox — which is what

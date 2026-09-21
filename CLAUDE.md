@@ -30,6 +30,10 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
 | ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk + the Phase 1 service screen. Builds, runs, renders all four states. **No transport wired** — it reports UNREACHABLE because it is. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
+| ✅ `src/bridge/osc.ts` | OSC 1.0 decoder. An unknown type tag fails the **whole message**, not just that argument — OSC args are positional, so skipping one reads every later value at the wrong offset and a fader level becomes whatever four bytes sit there. |
+| ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
+| ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
+| ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
 A command sent as `/life/cmd` `,s` **executed on the console**, and one fader move
@@ -59,6 +63,17 @@ afternoon on the wrong half of the config.
 `,sif ["FaderMaster", 3, n]`. That is ~26/s against the ~9/s recorded from a
 single control, so coalescing per object before anything reaches React is a
 requirement, not a nicety.
+
+✅ **The shipped decoder read the desk, 2026-09-21.** `spikes/channel-b-live.mjs`
+took **1221 packets, decoded 1221** — nothing undecodable, nothing of an
+unrecognised shape — and the coalescer turned them into **267 rendered frames**
+at 10 Hz, a 4.6x reduction with the last position of every fader intact. 16 unit
+tests cover the decode and the buffer; this is what moves them past harness-green.
+
+⚠️ **It also widened the read model:** four executors live rather than two,
+and levels past the earlier maximum, so neither the executor set nor the value
+range may be assumed. Both recorded in `docs/MA3_READ_MODEL.md` — Channel B,
+which is where wire facts live.
 
 ⚠️ **The trap that cost the afternoon:** editing an entry's `Port` does **not**
 move the live socket — row 3 displayed `8000` while still listening on `8010`.
