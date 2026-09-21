@@ -144,11 +144,27 @@ touchscreen, so a Windows checkout is a first-class case, not a courtesy.
 |---|---|
 | **Node** | `^22.20` (see `engines`) |
 | **Lua** | any 5.x on PATH. `npm test` runs the 106-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
-| **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so |
+| **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so. **Present but empty** (MA3 installed, exports not copied across: the normal state on a fresh Windows box) makes three tests *fail* rather than skip (`expected a large corpus, got 0`), because `findLibrary` only asks whether the directory exists, not whether it holds anything |
 
 `scripts/deploy-plugin.sh` is bash and needs Git Bash or WSL on Windows. It is
 also **no longer the deployment path** — the plugin ships embedded in its XML
 (`npm run build:plugin`), so there is nothing to copy onto a console.
+
+⚠️ **Windows: junctions and symlinks may not traverse on a managed machine.**
+Observed 2026-09-21 on the booth-class Windows box. `mklink /J` reports success
+and `fsutil reparsepoint query` shows a correct Mount Point with the right
+target, but reading *through* the link fails with "The system cannot find the
+path specified" while reading the target directly works. That is a filesystem
+filter driver, almost certainly endpoint security: machine policy, not a
+setting to toggle.
+
+It kills every symlink-based Node version manager, **fnm** and **nvm-windows**
+alike, and they fail *silently*, which is the dangerous part: `fnm use 22`
+prints "Using Node v22.23.2" and `fnm current` still answers `none`. Same
+shape as the rule at the top of this file, a read that failed coming back
+looking like an answer. Put Node 22 on PATH directly, or use a shim-based
+manager (Volta) that never creates a link. Note `winget` cannot supply 22.x at
+all: `OpenJS.NodeJS.LTS` is 24.x, which `engines` rejects.
 
 ## Running
 
