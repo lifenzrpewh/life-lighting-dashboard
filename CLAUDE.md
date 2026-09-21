@@ -39,6 +39,27 @@ are real. Full format and the traps in `docs/MA3_READ_MODEL.md` § OSC transport
 Working config: OSC row 3 `OSCData 3` · port **8003** · prefix `life` · destination
 `10.11.60.182` · Receive/Send/Receive Command/Send Command all Yes.
 
+✅ **Re-verified end to end from the Windows box, 2026-09-21** — desk
+`10.11.60.40`, dashboard on `10.11.60.215`. All three channels, on a fresh
+checkout with nothing carried over from the Mac.
+
+**The destination is per-machine, not a constant.** The `10.11.60.182` above is
+one station’s address, and reading it as configuration is why the first run here
+came back silent: channel A worked, B and C had nowhere to go. Whatever machine
+the dashboard is on goes in that field.
+
+**Diagnose a silent channel B by calling the plugin first.** `SendOSC` leaves
+through the same entry’s destination and `Send`, so channel C arriving proves
+both are right and narrows the silence to which executors the native OSC output
+covers — a different setting entirely. Staring at a dead B instead spends the
+afternoon on the wrong half of the config.
+
+**Channel B is chattier than first measured.** One sweep of two executors pushed
+**771 messages in 30 s** — `/life/14.14.1.6.1004` and `.1005`, both
+`,sif ["FaderMaster", 3, n]`. That is ~26/s against the ~9/s recorded from a
+single control, so coalescing per object before anything reaches React is a
+requirement, not a nicety.
+
 ⚠️ **The trap that cost the afternoon:** editing an entry's `Port` does **not**
 move the live socket — row 3 displayed `8000` while still listening on `8010`.
 Toggle `Enable Input` off/on to rebind. Verify from outside with a connected-UDP
