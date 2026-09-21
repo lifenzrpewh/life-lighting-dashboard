@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Channel, LinkState, WriteOutcome } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
 import type { Board, Tile } from '../shared/board.js'
+import type { DeskState } from '../shared/desk.js'
 import type { Service } from '../shared/service.js'
 import { StatusBar } from './components/StatusBar.js'
 import { RunOrder } from './components/RunOrder.js'
@@ -70,6 +71,26 @@ export function App() {
 		}
 	}, [])
 
+	// Channel B is polled even in dev, unlike the link above. The mock desk drives
+	// the four READING states; this is the real console, and being able to watch
+	// real fader traffic arrive while the mock exercises the failure modes is the
+	// whole point of having both on screen at once.
+	const [desk, setDesk] = useState<DeskState | null>(null)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.deskState().then((d) => alive && setDesk(d))
+		poll()
+		// 2 Hz. Main already coalesces to 10 Hz; this only has to be fast enough
+		// that "heard 0s ago" does not visibly lag a fader being moved.
+		const id = setInterval(poll, 500)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
 	const sources: Sources = DEV
 		? mockState(scenario, now)
 		: { ...coldSources(now), ...(mainLink === null ? {} : { link: mainLink }) }
@@ -97,7 +118,7 @@ export function App() {
 				</div>
 			)}
 
-			<StatusBar link={sources.link} now={now} />
+			<StatusBar link={sources.link} now={now} desk={desk} />
 
 			{sources.link.state === 'unreachable' && (
 				<div className="border-b border-state-unreachable/40 bg-state-unreachable/15 px-6 py-2 text-sm text-state-unreachable">

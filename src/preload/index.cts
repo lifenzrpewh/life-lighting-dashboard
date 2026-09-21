@@ -11,11 +11,22 @@ import { contextBridge, ipcRenderer } from 'electron'
 // `resolution-mode` because this file is CommonJS (a sandboxed preload cannot
 // be an ES module) while src/shared is ESM. Type-only, so nothing is emitted.
 import type { LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
+import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
 
 const api = {
-	/** The console link as main knows it. Today: always unreachable, because no
-	 *  OSC transport is wired (docs/PLAN.md Phase 0 spike 1). */
+	/** The console link as main knows it.
+	 *
+	 *  Still always unreachable, and deliberately so: liveness needs a request
+	 *  that went unanswered, and channel B is the console speaking unprompted.
+	 *  See the header of src/main/kiosk.ts. */
 	linkState: (): Promise<LinkState> => ipcRenderer.invoke('link:state'),
+
+	/** Live executor levels from channel B, plus when the desk was last heard.
+	 *
+	 *  Separate from `linkState` on purpose. "We heard the desk 0.3 s ago" is an
+	 *  observation; "the link is live" is a verdict, and this app does not let
+	 *  the first quietly become the second. */
+	deskState: (): Promise<DeskState> => ipcRenderer.invoke('desk:state'),
 }
 
 export type LifeApi = typeof api

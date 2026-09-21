@@ -20,34 +20,12 @@
 // src/shared/reading.ts — and must never be derived from an empty inbox here.
 
 import type { OscMessage } from './osc.js'
+import type { ExecutorUpdate } from '../shared/desk.js'
 
-export type ExecutorUpdate = {
-	/** The dotted pool address exactly as the console sends it, e.g.
-	 *  "14.14.1.6.1005". Kept whole because it is the only stable identity we
-	 *  have for the control, and it is what the coalescer keys on. */
-	path: string
-	/** Trailing component of the path — the executor's object number, e.g. 1005.
-	 *  Note this IS the pool number a person sees, unlike a cue's `NO`, which is
-	 *  the display number ×1000 (docs/MA3_READ_MODEL.md). No conversion here. */
-	object: number
-	/** First argument: the control's role as MA3 names it, e.g. "FaderMaster". */
-	control: string
-	/** Second argument.
-	 *
-	 *  ⚠️ MEANING UNVERIFIED. Observed constant `3` across every one of the 771
-	 *  messages captured 2026-09-21, which is not enough to distinguish a page
-	 *  number from an executor index from a control-type enum. Recorded so a
-	 *  later desk run can answer it; not interpreted, and nothing should branch
-	 *  on it until something does. */
-	code: number
-	/** Third argument: the level.
-	 *
-	 *  ⚠️ Observed spanning 0.000 to 54.468 in the capture — i.e. it reads as a
-	 *  PERCENT, not a 0..1 fraction. It is carried through unscaled and unclamped:
-	 *  normalising a number whose range we have only partly observed would be a
-	 *  guess applied to every value on screen. */
-	value: number
-}
+// The shape lives in src/shared/desk.ts so the renderer can hold it without
+// pulling the decoder into the web bundle. Re-exported here because this is
+// where it is produced, and callers of the parser should not need to know that.
+export type { ExecutorUpdate }
 
 export type ChannelBResult =
 	| { ok: true; update: ExecutorUpdate }
