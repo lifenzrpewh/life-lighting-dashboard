@@ -97,6 +97,14 @@ embeds the Lua as base64 blocks (1024-byte stride, `Size` = block count, UTF-8 B
 no `.lua` to copy and no path to be wrong. A test fails if the XML drifts from the
 Lua, so the stale-import trap cannot happen silently.
 
+⚠️ **That guards the FILE, not the console.** Re-importing does not reload
+a plugin the console already has in memory: a rebuilt XML imported over plugin
+7 on 2026-09-21 ran the old code, and `Call Plugin` reported success while doing
+it. Distribution is solved; deployment is not. Delete the plugin object and
+re-import, or restart the console — details and the proof in
+`docs/MA3_READ_MODEL.md`. The same cache is why module state survives between
+calls, so anything shipped must reset what it owns.
+
 ## The four channels
 
 | | Carries | Mechanism |

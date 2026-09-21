@@ -269,6 +269,31 @@ Two hard importer requirements, both of which fail quietly:
    1024-byte stride, `Size` = block count. `npm run build:plugin` emits it and
    round-trip verifies before the file lands.
 
+### ❌ Re-importing does NOT reload a plugin already in memory
+
+❌ 2026-09-21. A rebuilt `LifeBridge.xml` was imported over plugin 7 and
+called again. It ran the OLD code.
+
+The proof is the probe's own accumulation bug, used as an instrument: the
+tally came back `36/40`, then `45/50`. Five runs of ten probes, every one
+appending to a single `results` table — a table that can only exist inside a
+chunk that was never re-read. The new build has eleven probes and resets that
+table per call, so it can only ever report `N/11`. `Call Plugin 7` and
+`Call Plugin "LifeBridge"` both hit the stale one.
+
+⚠️ **Nothing says so.** `Call Plugin` succeeds, the plugin pool shows the
+newly imported file, and the output is the old program. This is the same shape
+as the external-file trap above: the failure is silent and the thing you are
+looking at says you succeeded.
+
+To actually load new code, the loaded chunk has to go: delete the plugin object
+and re-import, or restart the console. Import alone is not enough — which
+means "the XML is self-contained" solves DISTRIBUTION, not DEPLOYMENT.
+
+⚠️ It also means module state survives between calls, which is why the
+probe accumulated in the first place. Anything shipped must assume the chunk
+outlives the call and reset what it owns.
+
 ### One `Port`, both directions
 
 There is no separate input/destination port — one field, used each way. Matches the
