@@ -142,3 +142,41 @@ export function decodeOsc(bytes: Uint8Array): OscDecodeResult {
 
 	return { ok: true, message: { address: address.value, args } }
 }
+
+export type OscEncodeResult =
+	| { ok: true; bytes: Uint8Array }
+	| { ok: false; reason: 'not-ascii'; detail: string }
+	| { ok: false; reason: 'bad-address'; detail: string }
+
+/** Encode one OSC message carrying a single string: channel A's whole shape,
+ *  `/life/cmd ,s "<command line>"` (✅ 2026-09-21).
+ *
+ *  Printable ASCII only, and anything else is refused rather than encoded. The
+ *  desk has shown it does not carry UTF-8 (the em-dash above), and a NUL would
+ *  end the OSC string early, so the console would run the part before it: a
+ *  different command from the one asked for, and one that looks sent. */
+export function encodeOscString(address: string, value: string): OscEncodeResult {
+	for (const [what, text] of [['address', address], ['value', value]] as const) {
+		const bad = text.search(/[^\x20-\x7e]/)
+		if (bad !== -1) {
+			return { ok: false, reason: 'not-ascii', detail: `${what} has char ${text.charCodeAt(bad)} at ${bad}` }
+		}
+	}
+	if (!address.startsWith('/')) return { ok: false, reason: 'bad-address', detail: `address does not start with '/'` }
+
+	const parts = [address, ',s', value].map(padded)
+	const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0))
+	let offset = 0
+	for (const p of parts) {
+		bytes.set(p, offset)
+		offset += p.length
+	}
+	return { ok: true, bytes }
+}
+
+/** A string, its NUL terminator, and zeros out to a multiple of 4. */
+function padded(text: string): Uint8Array {
+	const out = new Uint8Array(Math.ceil((text.length + 1) / 4) * 4)
+	for (let i = 0; i < text.length; i += 1) out[i] = text.charCodeAt(i)
+	return out
+}

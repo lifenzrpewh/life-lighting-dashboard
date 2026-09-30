@@ -54,7 +54,9 @@ const coalescer = createCoalescer()
 let frames = 0
 let framesWithWork = 0
 
-const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+// No reuseAddr: on macOS a reusing socket can bind "successfully" beside onPC
+// and hear nothing (measured 2026-09-30, see src/main/bridge/osc-in.ts).
+const sock = dgram.createSocket({ type: 'udp4' })
 
 sock.on('message', (buf) => {
 	tally.packets += 1

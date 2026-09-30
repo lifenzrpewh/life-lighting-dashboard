@@ -299,6 +299,26 @@ outlives the call and reset what it owns.
 There is no separate input/destination port — one field, used each way. Matches the
 2.3 manual's column list.
 
+### ⚠️ The link ping — still to observe
+
+The dashboard now sends `Call Plugin "LifeBridge" "ping <token>"` over channel A
+every second and is LIVE only while the echo `/life/ping ,s "<version>|<token>"`
+comes back (`src/bridge/ping.ts`). Proven end to end against
+`spikes/stand-in-desk.mjs` on 2026-09-30, **never against MA**. Three things only
+a console can answer, and onPC on the same computer answers all three:
+
+1. **Does `Call Plugin` pass an argument?** Only the bare form is ✅. If the echo
+   never arrives but channel B does, check this first.
+2. **Does a ping a second disturb anyone?** Two commands a second on the console
+   (the call, and the plugin's `SendOSC`). Watch the command line and its
+   history, and type on it while pings run.
+3. **onPC on the dashboard's own computer.** onPC holds its entry's Port, so the
+   dashboard cannot listen there (the bind fails loudly, by design). The layout to
+   try: one entry receiving commands on 8003, and **row 3** (the plugin sends
+   through row 3) sending to `127.0.0.1:8004`, with replies on 8004 in Settings.
+   Open question: does onPC also bind 8004 for a Send-only row? `lsof -nP -iUDP`
+   shows its sockets directly; no port scan needed on the same machine.
+
 ## UserVars
 
 `GetVar(UserVars(), "SGV2_BaseShow")` ✅ — the form `BaseFileSaver.lua` uses.

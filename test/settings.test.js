@@ -1,13 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_SETTINGS, applyPatch, fromDisk, patchFrom } from '../dist/src/shared/settings.js'
+import { DEFAULT_SETTINGS, applyPatch, fromDisk, patchFrom, replyPortOf } from '../dist/src/shared/settings.js'
 
 test('first boot has no console address, rather than a guessed one', () => {
 	assert.equal(DEFAULT_SETTINGS.consoleHost, null)
 	assert.equal(DEFAULT_SETTINGS.webRemotePort, 8080)
 	assert.equal(DEFAULT_SETTINGS.volunteerUser, 'Remote')
 	assert.equal(DEFAULT_SETTINGS.operatorUser, null)
+	assert.equal(DEFAULT_SETTINGS.oscPort, 8003, 'the working config, OSC row 3')
+	assert.equal(DEFAULT_SETTINGS.replyPort, null, 'replies on the same port unless told otherwise')
+	assert.equal(replyPortOf(DEFAULT_SETTINGS), 8003)
 })
 
 test('a good patch applies, trimmed', () => {
@@ -47,13 +50,48 @@ test('an empty password is an error, so blank can only ever mean "unchanged"', (
 })
 
 test('a corrupt file costs only the bad values', () => {
-	const s = fromDisk({ consoleHost: 'http://nope', webRemotePort: 8081, volunteerUser: 42, operatorUser: 'LD' })
-	assert.deepEqual(s, { consoleHost: null, webRemotePort: 8081, volunteerUser: 'Remote', operatorUser: 'LD' })
+	const s = fromDisk({ consoleHost: 'http://nope', webRemotePort: 8081, volunteerUser: 42, operatorUser: 'LD', oscPort: 0, replyPort: 8004 })
+	assert.deepEqual(s, {
+		consoleHost: null,
+		webRemotePort: 8081,
+		volunteerUser: 'Remote',
+		operatorUser: 'LD',
+		oscPort: 8003,
+		replyPort: 8004,
+	})
 	assert.deepEqual(fromDisk('garbage'), DEFAULT_SETTINGS)
 })
 
 test('a patch of the wrong shape off IPC is rejected whole, never dropped quietly', () => {
 	assert.equal(patchFrom({ webRemotePort: '8080' }), null)
+	assert.equal(patchFrom({ replyPort: '8004' }), null)
+	assert.deepEqual(patchFrom({ replyPort: null }), { replyPort: null })
 	assert.equal(patchFrom(null), null)
 	assert.deepEqual(patchFrom({ consoleHost: '10.11.60.40', junk: 1 }), { consoleHost: '10.11.60.40' })
+})
+
+test('the reply port follows the console port unless it is set apart', () => {
+	const moved = applyPatch(DEFAULT_SETTINGS, { oscPort: 8010 })
+	assert.ok(moved.ok)
+	assert.equal(replyPortOf(moved.settings), 8010, 'one entry, one port, both ways: MA\'s own model')
+
+	const apart = applyPatch(DEFAULT_SETTINGS, { replyPort: 8004 })
+	assert.ok(apart.ok)
+	assert.equal(apart.settings.oscPort, 8003)
+	assert.equal(replyPortOf(apart.settings), 8004, 'onPC on this computer holds 8003')
+})
+
+test('a reply port set equal to the console port is stored as "same", not a copy', () => {
+	// A copy would stay behind at the old number when the console port moves,
+	// and replies would silently stop arriving.
+	const r = applyPatch(DEFAULT_SETTINGS, { replyPort: 8003 })
+	assert.ok(r.ok)
+	assert.equal(r.settings.replyPort, null)
+	assert.equal(fromDisk({ oscPort: 8003, replyPort: 8003 }).replyPort, null)
+})
+
+test('a bad OSC port rejects the patch and says which', () => {
+	const r = applyPatch(DEFAULT_SETTINGS, { oscPort: 70000, replyPort: Number.NaN })
+	assert.ok(!r.ok)
+	assert.deepEqual(Object.keys(r.errors).sort(), ['oscPort', 'replyPort'])
 })

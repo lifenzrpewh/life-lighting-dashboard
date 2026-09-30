@@ -73,4 +73,6 @@ export type DeskState = {
 	 *  fact from a quiet desk and must never be rendered as one. Almost always
 	 *  means grandMA3 onPC is running on this machine and owns the port. */
 	listening: boolean
+	/** The port this computer listens on, so a bind failure can say which. */
+	port: number
 }

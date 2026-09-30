@@ -30,7 +30,9 @@ function coldSources(now: number): Sources {
 
 export function App() {
 	const [now, setNow] = useState(() => Date.now())
-	const [scenario, setScenario] = useState<Scenario>('cold')
+	// 'real' is dev's way to watch main's own link, against onPC or a stand-in,
+	// in a window rather than the full-screen kiosk. The run order stays cold.
+	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
 	const [runOrderOpen, setRunOrderOpen] = useState(true)
 	const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -44,6 +46,7 @@ export function App() {
 	useEffect(() => {
 		if (!DEV) return
 		const onKey = (e: KeyboardEvent) => {
+			if (e.key === '0') return setScenario('real')
 			const i = Number(e.key) - 1
 			const picked = SCENARIOS[i]
 			if (picked !== undefined) setScenario(picked)
@@ -55,10 +58,10 @@ export function App() {
 	// Outside dev, the link is whatever main reports — main owns state truth, and
 	// the renderer must not form its own opinion about a desk it cannot see.
 	// `window.life` is absent when the renderer is opened in a plain browser, and
-	// then cold is exactly right: no preload, no main, no desk.
+	// then cold is exactly right: no preload, no main, no desk. Polled in dev too,
+	// for the 'real' scenario.
 	const [mainLink, setMainLink] = useState<LinkState | null>(null)
 	useEffect(() => {
-		if (DEV) return
 		const api = window.life
 		if (api === undefined) return
 		let alive = true
@@ -117,9 +120,10 @@ export function App() {
 		if (mode === 'volunteer') setSettingsOpen(false)
 	}, [mode])
 
-	const sources: Sources = DEV
-		? mockState(scenario, now)
-		: { ...coldSources(now), ...(mainLink === null ? {} : { link: mainLink }) }
+	const sources: Sources =
+		DEV && scenario !== 'real'
+			? mockState(scenario, now)
+			: { ...coldSources(now), ...(mainLink === null ? {} : { link: mainLink }) }
 
 	const service = readingOf(sources.service, now, sources.link)
 
@@ -127,10 +131,19 @@ export function App() {
 		<div className="flex h-full flex-col overflow-hidden">
 			{DEV && (
 				<div className="flex items-center gap-3 bg-warn px-4 py-1.5 text-xs font-semibold text-booth-bg">
-					<span className="tracking-widest">MOCK DESK — NOT A REAL CONSOLE</span>
-					<span className="font-normal">{SCENARIO_LABEL[scenario]}</span>
+					{scenario === 'real' ? (
+						<>
+							<span className="tracking-widest">DEV — REAL CONSOLE LINK</span>
+							<span className="font-normal">the link is main's own ping; the run order has no source yet</span>
+						</>
+					) : (
+						<>
+							<span className="tracking-widest">MOCK DESK — NOT A REAL CONSOLE</span>
+							<span className="font-normal">{SCENARIO_LABEL[scenario]}</span>
+						</>
+					)}
 					<span className="ml-auto font-normal opacity-80">
-						{SCENARIOS.map((s, i) => `${i + 1} ${s}`).join('   ')}
+						{['0 real', ...SCENARIOS.map((s, i) => `${i + 1} ${s}`)].join('   ')}
 					</span>
 				</div>
 			)}

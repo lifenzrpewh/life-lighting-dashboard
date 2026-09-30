@@ -16,11 +16,9 @@ import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js
 import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
 
 const api = {
-	/** The console link as main knows it.
-	 *
-	 *  Still always unreachable, and deliberately so: liveness needs a request
-	 *  that went unanswered, and channel B is the console speaking unprompted.
-	 *  See the header of src/main/kiosk.ts. */
+	/** The console link as main knows it: LIVE only while LifeBridge answers
+	 *  the pings main sends, never inferred from channel B traffic. See the
+	 *  header of src/main/kiosk.ts. */
 	linkState: (): Promise<LinkState> => ipcRenderer.invoke('link:state'),
 
 	/** The MA pane (src/main/ma-pane.ts). The renderer says where it goes and

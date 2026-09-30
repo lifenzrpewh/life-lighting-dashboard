@@ -8,11 +8,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { webRemoteUrl } from '../../shared/ma-pane.js'
-import type { SettingsField, SettingsPatch, SettingsView } from '../../shared/settings.js'
+import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
 
 type Draft = {
 	consoleHost: string
 	webRemotePort: string
+	oscPort: string
+	/** Blank means the same port as the console's. */
+	replyPort: string
 	volunteerUser: string
 	operatorUser: string
 	volunteerPassword: string
@@ -24,6 +27,8 @@ type Draft = {
 const draftOf = (v: SettingsView): Draft => ({
 	consoleHost: v.consoleHost ?? '',
 	webRemotePort: String(v.webRemotePort),
+	oscPort: String(v.oscPort),
+	replyPort: v.replyPort === null ? '' : String(v.replyPort),
 	volunteerUser: v.volunteerUser,
 	operatorUser: v.operatorUser ?? '',
 	volunteerPassword: '',
@@ -32,11 +37,15 @@ const draftOf = (v: SettingsView): Draft => ({
 	removeOperatorPassword: false,
 })
 
+/** Not parsed leniently: "80 80" must be an error, not 80. */
+const portOf = (text: string) => (/^\d+$/.test(text.trim()) ? Number(text.trim()) : Number.NaN)
+
 function patchOf(d: Draft): SettingsPatch {
 	const patch: SettingsPatch = {
 		consoleHost: d.consoleHost,
-		// Not parsed leniently: "80 80" must be an error, not 80.
-		webRemotePort: /^\d+$/.test(d.webRemotePort.trim()) ? Number(d.webRemotePort.trim()) : Number.NaN,
+		webRemotePort: portOf(d.webRemotePort),
+		oscPort: portOf(d.oscPort),
+		replyPort: d.replyPort.trim() === '' ? null : portOf(d.replyPort),
 		volunteerUser: d.volunteerUser,
 		operatorUser: d.operatorUser === '' ? null : d.operatorUser,
 	}
@@ -95,6 +104,34 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 				</Field>
 				<p className="text-sm text-booth-dim">
 					{preview === null ? 'No address yet: the MA pane has nowhere to connect.' : `The MA pane loads ${preview}`}
+				</p>
+			</Section>
+
+			<Section title="OSC">
+				<p className="text-sm text-booth-dim">
+					How the dashboard checks the console is there: a ping every second, answered by the LifeBridge plugin.
+					These must match the console's OSC entry, prefix <code>life</code>.
+				</p>
+				<div className="grid grid-cols-2 gap-4">
+					<Field label="OSC port on the console" error={errors.oscPort} hint="The Port of the console's OSC entry.">
+						<Input value={draft.oscPort} onChange={(v) => set({ oscPort: v })} inputMode="numeric" />
+					</Field>
+					<Field
+						label="Replies come back on"
+						error={errors.replyPort}
+						hint="Blank for the same port. Only grandMA3 onPC on this computer needs another."
+					>
+						<Input
+							value={draft.replyPort}
+							onChange={(v) => set({ replyPort: v })}
+							inputMode="numeric"
+							placeholder={`same (${draft.oscPort.trim() || view.oscPort})`}
+						/>
+					</Field>
+				</div>
+				<p className="text-sm text-booth-dim">
+					Listening on {replyPortOf(view)} now. onPC on this computer holds its own OSC port, so replies need a
+					different one, and the console a second OSC entry that sends to it.
 				</p>
 			</Section>
 

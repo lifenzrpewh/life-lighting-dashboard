@@ -23,7 +23,7 @@ function DeskPill({ desk, now }: { desk: DeskState | null; now: number }) {
 	if (!desk.listening) {
 		// A port that would not bind is a fault to act on, not a quiet desk.
 		// Amber is reserved for exactly this.
-		return <span className="text-warn">OSC port not bound</span>
+		return <span className="text-warn">OSC port {desk.port} not bound</span>
 	}
 
 	if (desk.lastHeardAt === null) {
@@ -42,12 +42,19 @@ function DeskPill({ desk, now }: { desk: DeskState | null; now: number }) {
 	)
 }
 
+/** A round trip in milliseconds, which is what `roundTripMs` holds. Tenths
+ *  below 10 ms, because a console on this computer answers in well under one
+ *  and "0 ms" would read as no measurement at all. */
+function formatRoundTrip(ms: number): string {
+	return ms < 10 ? `${ms.toFixed(1)} ms` : `${Math.round(ms)} ms`
+}
+
 function LinkPill({ link }: { link: LinkState }) {
 	if (link.state === 'live') {
 		return (
 			<span className="flex items-center gap-2 text-state-live">
 				<span className="size-2 rounded-full bg-state-live" />
-				LIVE {link.roundTripMs.toFixed(1)}s
+				LIVE {formatRoundTrip(link.roundTripMs)}
 			</span>
 		)
 	}

@@ -1,4 +1,4 @@
-// The channel B socket. Main owns this; the renderer never sees a packet.
+// The socket for channels B and C. Main owns this; the renderer never sees a packet.
 //
 // WHY THIS EXISTS: `src/bridge/` decodes and coalesces, and is pure so it can be
 // tested without a desk. This is the part that cannot be: a UDP socket, a bind
@@ -14,18 +14,15 @@
 
 import dgram from 'node:dgram'
 
-import { decodeOsc } from '../../bridge/osc.js'
+import { decodeOsc, type OscMessage } from '../../bridge/osc.js'
 import { readExecutorUpdate } from '../../bridge/channel-b.js'
 import { createCoalescer } from '../../bridge/coalesce.js'
 import type { DeskState, ExecutorLevel } from '../../shared/desk.js'
 
-/** The console's OSC entry, as recorded in CLAUDE.md's working config.
- *
- *  Not "configuration" in the sense the project resists — there is no preference
- *  here for anyone to get wrong. It is one half of a protocol agreement with the
- *  desk, and if it drifts from the console's entry nothing arrives at all, which
- *  `spikes/channel-b-live.mjs` says out loud rather than leaving you to wonder. */
-export const OSC_PORT = 8003
+/** The Prefix of the console's OSC entry, as recorded in CLAUDE.md's working
+ *  config. Not a setting: it is the name the setup asks the LD to type, and
+ *  both channels check it. The port is a setting (src/shared/settings.ts)
+ *  because it has to change when onPC shares this computer. */
 export const OSC_PREFIX = 'life'
 
 /** 10 Hz. Fast enough that a fader move reads as continuous to an eye 30 cm
@@ -41,19 +38,22 @@ export type ChannelBHandle = {
 }
 
 export type ChannelBOptions = {
-	port?: number
+	port: number
 	prefix?: string
 	drainHz?: number
 	/** Called with the settled updates of one frame. Never called with an empty
 	 *  set: a quiet desk should cost the renderer nothing at all. */
 	onFrame?: (updates: ExecutorLevel[]) => void
-	/** Bind failure. EADDRINUSE here almost always means grandMA3 onPC is running
-	 *  on this machine and has taken the port — it owns it exclusively. */
+	/** Every message that decoded but is not an executor update: channel C,
+	 *  which shares this port. Routed by the caller, never counted as rejected. */
+	onOtherChannel?: (message: OscMessage) => void
+	/** Bind failure. EADDRINUSE usually means grandMA3 onPC is running on this
+	 *  computer and holds the port; see the bind below for why that is loud. */
 	onBindError?: (error: NodeJS.ErrnoException) => void
 }
 
-export function startChannelB(options: ChannelBOptions = {}): ChannelBHandle {
-	const port = options.port ?? OSC_PORT
+export function startChannelB(options: ChannelBOptions): ChannelBHandle {
+	const port = options.port
 	const prefix = options.prefix ?? OSC_PREFIX
 	const drainHz = options.drainHz ?? DRAIN_HZ
 
@@ -67,7 +67,14 @@ export function startChannelB(options: ChannelBOptions = {}): ChannelBHandle {
 	let lastHeardAt: number | null = null
 	let listening = false
 
-	const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+	// No `reuseAddr`, on purpose. On macOS libuv implements it as SO_REUSEPORT,
+	// and measured on this project's Mac (2026-09-30): when both sockets set it,
+	// the second bind SUCCEEDS and hears nothing, every packet going to the first
+	// holder. So if onPC opens its port that way, a reusing listener would report
+	// itself listening to a desk it can never hear. Without the option the bind
+	// fails with EADDRINUSE whatever the other process did, and the screen says
+	// "not bound" instead of "not heard yet".
+	const socket = dgram.createSocket({ type: 'udp4' })
 
 	socket.on('listening', () => {
 		listening = true
@@ -92,7 +99,8 @@ export function startChannelB(options: ChannelBOptions = {}): ChannelBHandle {
 			// `other-channel` is a channel C push sharing this port — expected
 			// traffic, and counting it as a fault would make a healthy desk look
 			// broken. Only a shape we should have understood counts as rejected.
-			if (read.reason !== 'other-channel') rejected += 1
+			if (read.reason === 'other-channel') options.onOtherChannel?.(decoded.message)
+			else rejected += 1
 			return
 		}
 
@@ -126,6 +134,7 @@ export function startChannelB(options: ChannelBOptions = {}): ChannelBHandle {
 			packets,
 			rejected,
 			listening,
+			port,
 		}),
 		stop: () => {
 			clearInterval(timer)

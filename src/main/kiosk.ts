@@ -11,28 +11,29 @@
 // typed surface and nothing else. A volunteer touchscreen that can reach the
 // filesystem is a category of accident we simply decline to have.
 //
-// ✅ CHANNEL B IS WIRED (2026-09-21). Main binds the OSC port and holds live
+// ✅ CHANNEL B IS WIRED (2026-09-21). Main binds the reply port and holds live
 // executor levels from the desk — see `./bridge/osc-in.ts`.
 //
-// ⚠️ `linkState()` still reports UNREACHABLE, and that is not an oversight.
+// ⚠️ THE LINK IS A PING ROUND TRIP (./bridge/link.ts), unverified on a desk.
 // Liveness needs a request we sent and did not get an answer to; channel B is
 // the console talking unprompted, so it can prove the desk IS there and can
-// never prove it is not. `LinkState.live` also demands a `roundTripMs`, and
-// there is no honest number to put in it until something round-trips. Hearing
-// packets is therefore reported as its own fact in `DeskState.lastHeardAt`,
-// beside the link rather than inside it, until the plugin gains a ping verb.
+// never prove it is not. So main asks LifeBridge for an echo every second, and
+// the link is LIVE only while echoes come back. Hearing channel B stays its own
+// fact in `DeskState.lastHeardAt`, beside the link rather than inside it.
 
 import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { LinkState } from '../shared/reading.js'
 import type { Mode, PaneRect } from '../shared/ma-pane.js'
-import { patchFrom } from '../shared/settings.js'
+import { patchFrom, replyPortOf } from '../shared/settings.js'
 import { createMaPane, type MaPane } from './ma-pane.js'
 import { openSettings, type SettingsStore } from './settings.js'
 import type { DeskState } from '../shared/desk.js'
-import { startChannelB, OSC_PORT, type ChannelBHandle } from './bridge/osc-in.js'
+import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.js'
+import { startLink, type LinkHandle } from './bridge/link.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -48,18 +49,21 @@ let settings: SettingsStore | null = null
  *  security boundary: the MA users' own rights are. */
 let mode: Mode = 'volunteer'
 let channelB: ChannelBHandle | null = null
+let consoleLink: LinkHandle | null = null
+const BOOTED_AT = Date.now()
 
 /** What main knows from channel B before the socket has even bound.
  *
  *  `listening: false` with nothing heard is a different fact from a desk that has
  *  gone quiet, and the two must never render the same. */
-const NO_DESK: DeskState = {
+const noDesk = (port: number): DeskState => ({
 	executors: [],
 	lastHeardAt: null,
 	packets: 0,
 	rejected: 0,
 	listening: false,
-}
+	port,
+})
 
 function createWindow(): void {
 	window = new BrowserWindow({
@@ -108,14 +112,58 @@ function createWindow(): void {
 	else void window.loadFile(path.join(HERE, '../../renderer/index.html'))
 }
 
-/** The console link, as main currently knows it.
- *
- *  Returns UNREACHABLE because it IS unreachable: no OSC transport is wired yet.
- *  This deliberately does not pretend, and it is not a stub to be replaced with
- *  something optimistic — when the transport lands, this returns what the
- *  transport actually reports, and the failure path stays exactly as it is. */
+/** The console link, as main currently knows it: the ping round trip, or
+ *  unreachable since boot before the link has even started. */
 function linkState(): LinkState {
-	return { state: 'unreachable', since: Date.now() }
+	return consoleLink?.link() ?? { state: 'unreachable', since: BOOTED_AT }
+}
+
+/** The OSC settings the sockets were last started with, to tell whether a
+ *  settings change needs them restarted. */
+let oscKey = ''
+
+/** Start (or restart) both OSC halves from settings as they are now: the reply
+ *  socket for channels B and C, and the pinger on channel A. */
+function startOsc(store: SettingsStore): void {
+	const s = store.current()
+	const replyPort = replyPortOf(s)
+	const key = JSON.stringify([s.consoleHost, s.oscPort, replyPort])
+	if (key === oscKey) return
+	oscKey = key
+
+	stopOsc()
+	// Logged once per distinct fault. A console with no route answers every
+	// ping with the same error, and a line a second would bury everything else.
+	let lastSendError = ''
+	consoleLink = startLink({
+		host: s.consoleHost,
+		port: s.oscPort,
+		prefix: OSC_PREFIX,
+		session: randomBytes(4).toString('hex'),
+		onSendError: (detail) => {
+			if (detail !== lastSendError) console.error(`[kiosk] channel A: ${detail}`)
+			lastSendError = detail
+		},
+	})
+	channelB = startChannelB({
+		port: replyPort,
+		onOtherChannel: (message) => consoleLink?.offer(message),
+		onBindError: (error) => {
+			console.error(`[kiosk] could not listen on ${replyPort}: ${error.message}`)
+			if (error.code === 'EADDRINUSE') {
+				console.error('[kiosk]   Something on this computer holds that port, usually grandMA3 onPC.')
+				console.error('[kiosk]   Commands still go out; nothing can come back, so the link stays unreachable.')
+				console.error('[kiosk]   Give replies their own port in Settings, and the console an OSC entry sending to it.')
+			}
+		},
+	})
+}
+
+function stopOsc(): void {
+	consoleLink?.stop()
+	consoleLink = null
+	channelB?.stop()
+	channelB = null
 }
 
 /** A rect off the IPC boundary, or null (hidden) if it is not one. */
@@ -132,20 +180,16 @@ app.whenReady().then(() => {
 	// no menu bar to elevate from and no remembered mode across a restart.
 	Menu.setApplicationMenu(null)
 
-	ipcMain.handle('link:state', () => linkState())
-	ipcMain.handle('desk:state', () => channelB?.deskState() ?? NO_DESK)
+	settings = openSettings()
+	const store = settings
 
-	// Bound before the window exists, so the first thing the renderer asks for
+	ipcMain.handle('link:state', () => linkState())
+	ipcMain.handle('desk:state', () => channelB?.deskState() ?? noDesk(replyPortOf(store.current())))
+
+	// Started before the window exists, so the first thing the renderer asks for
 	// already has whatever the desk has said in the meantime.
-	channelB = startChannelB({
-		onBindError: (error) => {
-			console.error(`[kiosk] channel B could not bind ${OSC_PORT}: ${error.message}`)
-			if (error.code === 'EADDRINUSE') {
-				console.error('[kiosk]   grandMA3 onPC on this machine owns the OSC port exclusively.')
-				console.error('[kiosk]   Actions will still work; feedback will not. Give the dashboard its own entry.')
-			}
-		},
-	})
+	startOsc(store)
+	store.onChange(() => startOsc(store))
 
 	// Only the kiosk's own renderer may move the pane. The pane's page has no
 	// preload and so no way to send, but the check costs nothing.
@@ -162,7 +206,6 @@ app.whenReady().then(() => {
 		maPane?.setMode(next)
 	})
 
-	settings = openSettings()
 	ipcMain.handle('settings:get', (e) => (fromKiosk(e) ? settings?.view() : undefined))
 	ipcMain.handle('settings:save', (e, raw: unknown) => {
 		if (!fromKiosk(e) || settings === null) return undefined
@@ -189,7 +232,4 @@ app.on('window-all-closed', () => {
 // Release the OSC port explicitly. A socket left bound by a half-exited process
 // is the kind of thing that makes the NEXT launch look like a dead desk, and
 // nobody debugging that at 8:50 on a Sunday would suspect the previous run.
-app.on('will-quit', () => {
-	channelB?.stop()
-	channelB = null
-})
+app.on('will-quit', () => stopOsc())

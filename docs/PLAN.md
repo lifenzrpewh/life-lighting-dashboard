@@ -303,8 +303,9 @@ MA user**, each with an optional password. Operator mode only; the panel stands 
 
 Passwords are write-only from the screen, encrypted at rest with the OS keystore (DPAPI on Windows),
 and never saved in the clear: with no keystore, none can be saved at all. A save is all-or-nothing
-and lands by rename. OSC port and prefix are **not** settings yet, because nothing uses them; they
-arrive with the transport.
+and lands by rename. With the link ping (2026-09-30) come the **console's OSC port** (8003) and a
+**reply port**, blank meaning the same port, which is MA's own one-port model. It differs only when onPC
+runs on the dashboard's computer and holds the OSC port itself. The prefix stays fixed at `life`.
 
 ### Phase 2 — ~~Cue editor~~ retired: MA's own editor, in the pane
 

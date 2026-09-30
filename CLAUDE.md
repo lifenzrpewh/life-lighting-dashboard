@@ -41,6 +41,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
+| ⚠️ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: `Call Plugin "LifeBridge" "ping <token>"` a second over A, LIVE only while the echo comes back over C. 20 tests, and driven end to end in the kiosk against `spikes/stand-in-desk.mjs` 2026-09-30. **Never against MA**; the three open questions are in `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
 A command sent as `/life/cmd` `,s` **executed on the console**, and one fader move
@@ -247,8 +248,15 @@ absent. ~50 s, because five real exports are 45 MB each.
 
 ## Next session starts here
 
-**The service screen is built: run order + MA pane + settings.** It has been driven
-end to end against a local stand-in, never a desk. So the first thing is the desk.
+**The service screen is built: run order + MA pane + settings, and the link now
+pings.** All of it has been driven end to end against local stand-ins, never a desk.
+So the first thing is a console, and **onPC on this Mac counts**. It answers the
+link's three questions and most of the web remote checks without the booth.
+
+**onPC on the same computer needs two OSC entries**, because onPC holds its entry's
+Port and the dashboard cannot listen there. The layout and the open question
+(whether a Send-only row binds too) are in `docs/MA3_READ_MODEL.md` § The link ping.
+This is also the "onPC alone" campus, so it is a real deployment, not a test rig.
 
 **At the desk — the six checks in `docs/MA3_READ_MODEL.md` § Web remote.** Rights,
 URL login, the two-slot limit across a crash-reload, silent-drop timing, touch, and
@@ -265,11 +273,10 @@ HOLDING and PRE/POST are its biggest targets (`docs/PLAN.md`, Phase 1).
 
 **Console track — much smaller than it was.** No trigger board and no cue editor
 means no batched sequence snapshot and no timing/recipe verbs.
-1. **Turn the link green.** `LifeBridge` already has `ping` (981b3cc): it echoes a
-   token back over channel C. Main does not send it yet. Send it over channel A
-   every second, match the echoed token, and feed `linkFromRequests`; that
-   replaces the permanent UNREACHABLE with a real round trip. Remember
-   re-importing does not reload a plugin (delete and re-import, or restart).
+1. **Prove the link on MA.** Built (2026-09-30), unproven on a console. Delete
+   LifeBridge from the plugin pool and import `console-plugin/LifeBridge.xml`
+   fresh: re-importing does not reload a plugin, and the console's copy predates
+   `ping`. Then the three questions in `docs/MA3_READ_MODEL.md` § The link ping.
 2. Still owed after that: showfile name, `SGV2_BaseShow`, and (Phase 3) Save As.
    The `pool` verb was for joining channel B addresses to tiles; with no tiles it
    waits until something needs that join. Keep the probe's guarantees: read-only on the show except the allow-listed
