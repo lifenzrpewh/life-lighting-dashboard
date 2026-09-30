@@ -1,8 +1,13 @@
 # LIFE Lighting Dashboard — operating manual
 
-Touchscreen operator dashboard for grandMA3, beside the console: the Planning
-Center run order, the sequences fired on a Sunday, and the small edits made
-mid-service. Volunteer-simple, with an operator mode. Electron on Windows.
+Touchscreen dashboard for grandMA3, beside the console: the Planning Center run
+order next to the console's own web remote, which carries every button and every
+edit. Volunteer-simple, with an operator mode. Electron on Windows.
+
+**Pivot, 2026-09-27: the MA draws the buttons.** The trigger board, bottom rail
+and cue editor are gone; volunteers fire from an MA layout view in the pane and
+the LD edits in MA's own editor. `docs/PLAN.md` Phase 1 has the shape and the
+reasons.
 
 **Read in this order:** `docs/PLAN.md` (the spec — architecture and phasing),
 `docs/MA3_READ_MODEL.md` (✅ desk-verified API facts, read before touching console
@@ -28,7 +33,9 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 106 checks. |
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
-| ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk + the Phase 1 service screen. Builds, runs, renders all four states. **No transport wired** — it reports UNREACHABLE because it is. |
+| ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. **No OSC transport wired**, so the link reports UNREACHABLE because it is. |
+| ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Exercised end to end 2026-09-27 against a local stand-in on `:8080`, **not a desk**. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
+| ⚠️ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. Verified locally on macOS Keychain; DPAPI on Windows unexercised. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
@@ -70,6 +77,10 @@ Lua, so the stale-import trap cannot happen silently.
 | **C** Structure in | cue lists, timing, recipe lines | console plugin → `SendOSC` push |
 | **D** Bulk fallback | same, offline | `Export Sequence` → parse XML, **never during a service** |
 
+**The MA pane shrinks these.** A carries only showfile writes now, B is no longer
+needed for button feedback (MA draws it), and C only for showfile info and a
+heartbeat. Nothing is deleted until the console track resumes and decides.
+
 The dashboard runs on the backup PC but **talks to the console, not the PC it sits
 on**. Reading the local onPC's synced copy would make session health load-bearing,
 and a station that falls out of session keeps answering confidently and wrongly.
@@ -87,8 +98,15 @@ and a station that falls out of session keeps answering confidently and wrongly.
   inside a generator-swept range; the next Show Creator run erases it.
 - **Every write is unconfirmed until a read-back shows it.** `Cmd()` discards its
   return, so a failed command is indistinguishable from a successful one.
-- **Resist configuration.** The board self-populates from `SGV2_*` UserVars and the
-  numbering map. If something needs configuring, that's a bug in the derivation.
+- **Resist configuration.** Anything the show can describe about itself is read from
+  the show; a setting for it is a bug in the derivation. `src/shared/settings.ts`
+  holds only what no show knows (console address, web remote port, the two MA
+  users) and must stay that way.
+- **The MA pane is a picture, not a reading.** Its best state is `showing`: a page
+  loaded. Never render it as "live", and never draw over it; a native view cannot
+  be overlaid, so anything said about it sits beside it.
+- **A password never crosses to the renderer.** Main builds the login URL; the
+  screen learns only whether a password is set.
 
 ## Hazards, all already paid for
 
@@ -133,7 +151,8 @@ output, dated and versioned.
 Exposure this project has that the Show Creator does not: 2.4 consolidated
 **standard-recipe** range properties (`Speed From`/`To` → `Speed`).
 `MA3_2.5_COMPAT.md` clears the generator because it writes those as MAtricks/Preset
-properties; the cue editor here touches standard recipes directly.
+properties. That exposure left with the cue editor (2026-09-27): nothing here
+writes standard recipes now. It returns only if code ever writes them again.
 
 ## Prerequisites
 
@@ -168,28 +187,31 @@ absent. ~50 s, because five real exports are 45 MB each.
 
 ## Next session starts here
 
-Both tracks are at a clean seam. Nothing is half-built.
+**The service screen is built: run order + MA pane + settings.** It has been driven
+end to end against a local stand-in, never a desk. So the first thing is the desk.
 
-**Transport is finished. All three channels are ✅ (see Status)** — nothing in
-Phase 0 is blocking any more, which is the first time that has been true.
+**At the desk — the six checks in `docs/MA3_READ_MODEL.md` § Web remote.** Rights,
+URL login, the two-slot limit across a crash-reload, silent-drop timing, touch, and
+render cost. Build the volunteer layout view on the MA user `Remote` while there;
+HOLDING and PRE/POST are its biggest targets (`docs/PLAN.md`, Phase 1).
 
-**Console track — build the real `LifeBridge`**, replacing the probe: a batched
-`snapshot` verb that reads N sequences via the property names in
-`docs/MA3_READ_MODEL.md` and pushes NDJSON back over `SendOSC`, inside an 8 ms
-slice budget with `busy` acks between slices. Design is in `docs/PLAN.md` under
-"The console plugin". Keep the probe's guarantees: read-only on the show, no
-generic `cmd` verb in the shipped build, write allow-list keyed to
-`BOUNDARIES.md` §3, and results that fail rather than return a plausible value.
+**App track — give the run order a real source.**
+1. Supabase client in `src/main` reading `note_values` / `lighting_cues` into
+   `Service`. Main owns state truth; the renderer asks main and forms no opinion
+   of its own. **Give the run order its own link while there**: it is still derived
+   against the console link, so a dead console blanks PCO data (PLAN, "Known
+   wrinkle").
+2. Showfile info (Phase 3) — the chip is still static text.
 
-**App track — give the shell real sources.** The screen is built and honest; what
-it has no way to reach yet is data. In order:
-1. Supabase client in `src/main` reading the existing `note_values` /
-   `lighting_cues` rows into `Service`. Main owns state truth; the renderer asks
-   main and forms no opinion of its own.
-2. Vendor `companion-module-grandma3`'s `src/osc/{parse,apply}.ts` + `src/state.ts`
-   into `src/main/bridge/vendor/gma3-osc/` for channel B. MIT, ours.
-3. Channel A (`osc-out.ts`) — but a write path is only worth wiring once delivery
-   is confirmed, so this waits on the five minutes above.
+**Console track — much smaller than it was.** No trigger board and no cue editor
+means no batched sequence snapshot and no timing/recipe verbs. What `LifeBridge`
+still owes: showfile name, `SGV2_BaseShow`, a heartbeat for the link, and (Phase 3)
+Save As. Keep the probe's guarantees: read-only on the show except the allow-listed
+Save As, no generic `cmd` verb in the shipped build, results that fail rather than
+return a plausible value.
+
+**Housekeeping:** `README.md` is stale (pre-desk status, 84 checks, the old
+design). Bring it in line with this file by linking, not copying.
 
 **Do not** make the shell fall back to plausible data while sources are missing.
 `readingOf` returning UNKNOWN with nothing wired is the design working, not a gap
@@ -205,7 +227,8 @@ the plugin).
 allow-list), `MA3_SYNTAX_REFERENCE.md` (syntax oracle), `LEVEL_STATES.md`
 (HOLDING/PRE-POST + the SNAP trap), `MA3_2.5_COMPAT.md`.
 `companion-module-grandma3/` — `console-plugin/CompanionFeedback.lua:57` (`SendOSC`
-form), `src/osc/{parse,apply}.ts` + `src/state.ts` (MIT, vendor these for channel B).
+form), `src/osc/{parse,apply}.ts` + `src/state.ts` (MIT; vendor these only if
+channel B comes back — the MA pane made it unnecessary for button feedback).
 `ma3-mcp/plugin/mcp_server.lua` — **hazard reference only. AGPL-3.0, do not fork.**
 
 `visuals-song-comms` (GitHub, private) is **deployed and in production use** despite

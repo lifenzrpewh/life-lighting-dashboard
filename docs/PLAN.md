@@ -10,6 +10,11 @@ the small edits made mid-service — simple enough for a volunteer, with enough 
 Priority: **PCO → sequence trigger + cue edit → showfile management.** Show Creator integration is
 explicitly not a priority ("Not a major for show creator AT ALL").
 
+> **Pivot, 2026-09-27: the MA draws the buttons.** grandMA3's web remote is a real Display of the
+> console (✅ operator-observed), so the screen is now the PCO run order beside an embedded web
+> remote. Volunteers fire from an MA layout view; the LD edits in MA's own editor. Our trigger
+> board, bottom rail and cue editor are retired. Details under Phase 1 and "Mode switching".
+
 **Target:** Electron app on Windows, full-screen on a touchscreen, at a campus running a console
 with a backup PC (ideal) or onPC alone.
 
@@ -64,6 +69,11 @@ and pushes answers back over the network. Sync stops being a question.
 | **B — Live state in** | Active flags, fader levels, key state | Console's native OSC out, decoded by the existing `parse.ts`/`state.ts`/`apply.ts` |
 | **C — Structure in** | Cue lists, names, `CueInFade`, `TrigType`, recipe lines (group + preset), showfile name, current cue | **Console-side Lua plugin → `SendOSC` push** |
 | **D — Bulk fallback** | Same structural data, offline | `Export Sequence N "dash_N"` → parse XML. **Never during a service** (see below) |
+
+> **The MA pane shrinks this (2026-09-27).** Firing and editing now happen in the web remote, so A
+> carries only showfile writes (Phase 3), B is no longer needed for button feedback because MA
+> draws it, and C is needed only for showfile info and a heartbeat. Nothing is deleted yet; the
+> console track decides what survives when it resumes.
 
 > ⚠️ **Correction to an assumption I made earlier.** OSC `/<prefix>/cmd` executing arbitrary commands
 > is **🔬 RESEARCHED, not ✅ verified** — `companion-module-grandma3/docs/OSC_PROTOCOL.md` says
@@ -128,6 +138,8 @@ life-lighting-dashboard/            ← new repo
       vendor/gma3-osc/              parse.ts · state.ts · apply.ts (MIT, ours, copied)
       bridge-client.ts              one interface; typed errors; never a fallback value
     kiosk.ts                        full-screen, no menu, crash-restart
+    ma-pane.ts                      the MA web remote, as a WebContentsView main owns
+    settings.ts                     console address + MA users, passwords via the OS keystore
   src/preload/                      contextBridge — no nodeIntegration
   src/renderer/                     React + Vite + TS + Tailwind v4 (@theme tokens)
   console-plugin/                   LifeBridge.lua + XML bundle
@@ -139,13 +151,14 @@ and main share types, and the whole stack stays in the language you work in. Tau
 smaller binary at the cost of a Rust port of the one piece we most want unchanged.
 
 **Data split.** Supabase (shared) holds the PCO cache, campuses, permissions and the existing
-`lighting_cues` notes read as-is. The only new tables are the curated board and item pins. Local
+`lighting_cues` notes read as-is. No new tables: the curated board and item pins went with the
+trigger board (MA layout views hold the buttons now). Local
 Dexie mirrors everything a service needs. **A service must survive the Supabase box, the network, or
 the console going away — independently.**
 
 > The payoff of sharing the backend: the LD writes a lighting note against a song in the Visuals App
-> during the week, and it appears on the console touchscreen on Sunday next to the button that fires
-> it. Neither app had to know about the other.
+> during the week, and it appears on the console touchscreen on Sunday next to the MA screen that
+> fires it. Neither app had to know about the other.
 
 **Kiosk auth.** Reuse the existing QR device-pairing flow — the booth PC is paired once at
 volunteer permission only. Operator mode is a separate elevation, so a permanently-logged-in kiosk
@@ -154,6 +167,11 @@ can never be the thing that authorises a destructive write.
 ---
 
 ## The console plugin — `LifeBridge`
+
+> ⚠️ **Scope shrinks with the MA pane (2026-09-27).** With no trigger board and no cue editor, the
+> plugin needs only the showfile name, `SGV2_BaseShow`, a heartbeat, and (Phase 3) Save As. The
+> batched sequence snapshot and the timing/recipe write verbs below are no longer needed. The
+> guarantees stand for whatever survives.
 
 Written fresh. Not forked from `mcp_server.lua`: that file is **AGPL-3.0**, and independently its
 architecture *is* the hangs we're escaping. Its loop does unbounded work inside one coroutine step,
@@ -210,101 +228,96 @@ the cheap ones pulled forward because one of them may save the architecture.
 7. Round-trip one write of each kind on a **scratch** sequence; confirm read-back reflects it.
 8. `Export` bulk read — **last, on a scratch show, never near a service.**
 
-### Phase 1 — The service screen (PCO + trigger)
+### Phase 1 — The service screen: run order + MA pane
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ ● LIVE 0.4s   Sunday 21 Sep          10:31        VOLUNTEER        Showfile ▸  │
-├──────────────────────────┬─────────────────────────────────────────────────────┤
-│  RUN ORDER        [PCO●] │  NOW · Worship · "Great Are You" · 4:30              │
-│                          │  ┌────────────┐ ┌───────┐┌───────┐┌───────┐         │
-│  ▸ Countdown      10:02  │  │ GO THIS    │ │ Warm  ││ Deep  ││ Chase │         │
-│  ▸ Welcome        10:05  │  │ ITEM       │ │       ││ Blue  ││  ON   │         │
-│ ╔══════════════════════╗ │  └────────────┘ └───────┘└───────┘└───────┘         │
-│ ║ NOW · Worship  4:30  ║ ├─────────────────────────────────────────────────────┤
-│ ║ "Great Are You"      ║ │  ▌LOOKS▐  GROUPS   PINNED   ALL⚙        [ Find ]    │
-│ ║ ♪3  ▣2               ║ ├─────────────────────────────────────────────────────┤
-│ ║ "band only,          ║ │  ┌──────┐┌──────┐┌──────┐┌──────┐┌──────┐          │
-│ ║  no movers"          ║ │  │ Warm ││ Cool ││ Full ││Preach││Baptism│          │
-│ ╚══════════════════════╝ │  └──────┘└──────┘└──────┘└──────┘└──────┘          │
-│  ▸ Message        10:12  │  ┌──────┐┌──────┐┌┈┈┈┈┈┈┐                           │
-│  ▸ Response       10:40  │  │Comms ││ Kids ││? Btn7│ ← existence unknown       │
-│         [ jump to NOW ]  │  └──────┘└──────┘└┈┈┈┈┈┈┘                           │
-├──────────────────┬───────┴──────┬─────────┬─────────┬──────────────────────────┤
-│   PRE / POST     │   HOLDING    │  HAZE   │  FADE   │  RECOVER                 │
-└──────────────────┴──────────────┴─────────┴─────────┴──────────────────────────┘
+│ ● LIVE  Sunday 21 Sep  MA · 10.11.60.40 · Remote    10:31  VOLUNTEER Showfile ▸ │
+├───────────────────────┬────────────────────────────────────────────────────────┤
+│ RUN ORDER      PCO  ‹ │                                                        │
+│ ▸ Countdown     10:02 │                                                        │
+│ ▸ Welcome       10:05 │          grandMA3 web remote: a real Display           │
+│ ╔═══════════════════╗ │                                                        │
+│ ║ NOW · song   4:30 ║ │   volunteer: a layout view built for the MA user       │
+│ ║ Great Are You     ║ │   Remote. Big buttons, and MA draws their state.       │
+│ ║ "band only,       ║ │                                                        │
+│ ║  no movers"       ║ │   operator: the LD's own MA user and screens.          │
+│ ╚═══════════════════╝ │                                                        │
+│ ▸ Message       10:12 │                                                        │
+│ ▸ Response      10:40 │                                                        │
+└───────────────────────┴────────────────────────────────────────────────────────┘
 ```
 
-- **The run order is a permanent left spine**, never covered. It's the only thing a volunteer
-  understands without training.
-- **HOLDING and PRE/POST are the biggest targets on the screen, bottom-left**, in easiest reach.
-  They are the recovery path — **no overlay in the app may ever cover the bottom rail.**
-- **Top band is read-only, bottom band is act-only.** Status where you look; actions where your hand
-  rests. Nothing destructive lives in the bottom rail.
-- **The Sunday path is four controls**: PRE/POST before doors → HOLDING at start → GO THIS ITEM per
-  item → PRE/POST at the end.
-- **The board self-populates from UserVars + `BOUNDARIES.md` §3** — group count, names, order,
-  colours and which aspects exist are all read from the showfile. A show built without Bump has no
-  Bump tiles, not a greyed tab. **The app has zero user-facing configuration.** If something needs
-  configuring, that's a bug in the derivation.
-- **Curation is the residue of browsing**, not a settings page: Pin, Attach to this item, Hide,
-  Rename — four verbs performed on tiles. That's the answer to "between curated and browse-all."
-- **`ALL` is search-first**, operator-only, capped at 8 results, each badged `CAMPUS` (safe) or
-  `ENGINE` (inside a generator-swept range — read-only by default, because the next Show Creator run
-  would erase the edit).
-- **Item changes never fire anything.** Auto-firing a look because someone advanced PCO during a
-  prayer is the worst thing this app could do.
-- **No colour picker or position pad.** The console is 30 cm away with better ones.
+- **The run order is the left spine**, a sibling of the pane and never under it. It is the one thing
+  beside the MA that the MA cannot show. It folds to a strip, one tap each way, to give the MA the
+  full width; folded is not hidden, so the way back stays on screen.
+- **The buttons are MA's.** Volunteers fire from a layout view the LD builds for the volunteer user,
+  and MA draws each button's state itself, so feedback cannot go stale behind our back. What the
+  old rail stood for moves into that view: **HOLDING and PRE/POST are its biggest targets**, in
+  easiest reach. That is now a rule for the layout view, not for our code.
+- **Nothing in the app fires anything.** Advancing PCO moves the highlight and nothing else.
+- **The status bar is read-only**: link, date, the pane's status (`MA · <host> · <user>`, never
+  "live"), clock, the mode chip, Settings in operator mode, and Showfile.
 
-**State honesty — four states, one vocabulary, used identically everywhere:**
+**The MA pane** (`src/main/ma-pane.ts`, `src/renderer/components/MaPane.tsx`):
+
+- **Main owns the target.** The renderer says where the pane sits and which mode the screen is in;
+  the address and logins come from settings, and a password never crosses back over IPC.
+- **Shown only once a page has loaded.** Until then our placeholder, underneath the native view,
+  says why: no address set, connecting, or not reachable (retrying every 5 s, with Try now).
+- **`showing` means a page loaded, never that the console is live.** The web remote shows its own
+  "disconnected" (✅ operator-observed). Our link state is a bar above the pane, never over it: a
+  native view cannot be overlaid, so the layout gives the pane a rect of its own and re-measures it
+  after every render.
+- **Locked down:** its origin only, no popups, no permissions, an in-memory session that is
+  cleared on every change of user.
+- **It holds one of the console's two web remote slots all service** (🔬 manual 2.2–2.5). That
+  leaves one for anyone else.
+
+**State honesty — four states, one vocabulary, used identically everywhere.** It now covers the
+run order and the showfile chip; the pane renders MA's truth, not ours.
 
 | | Rendering |
 |---|---|
 | **LIVE** | full contrast, solid border |
 | **STALE** | 60% contrast, value shown **with its age** (`78% · 4m ago`), dashed underline |
-| **UNKNOWN** | `?` **in place of the value**, dotted border — tile still firable |
+| **UNKNOWN** | `?` **in place of the value**, dotted border |
 | **UNREACHABLE** | full-width bar; every element drops to UNKNOWN at the same instant |
 
 The read layer returns a discriminated union (`{ok,value}` / `{timeout}` / `{error}`) with no default
 branch, no `?? 0`, no `|| "off"` — so rendering a timeout as a value is a **type error**, not a
 code-review item. This exists because `ma3-mcp/server.py:184` is literally
 `send(...) or "No groups found"`, and that one line makes a slow desk look like an empty show.
-**Boot state is UNKNOWN, not off.** Writes get a third outcome: `sent · unconfirmed`.
-**Unreachable does not disable the buttons** — the desk may still be taking commands, and a
-volunteer needs HOLDING to work regardless.
+**Boot state is UNKNOWN, not off.**
 
-### Phase 2 — Cue editor (operator mode)
+> ⚠️ **Known wrinkle.** The run order is still derived against the *console* link, so a dead console
+> blanks PCO data that Supabase may well have. It should be judged against its own source's link.
+> Fix it when the Supabase client lands (it is the first App-track step).
 
-Opens as a right-hand sheet that **never covers the run order or the bottom rail.**
+### Settings — the facts no show knows
 
-- **Timing**: no free text — a detented picker (`0 · 0.5 · 1 · 2 · 3 · 4 · 5 · 8 · 10 · 15 · 20 · 30`),
-  with a keypad for the rare exact number. Writes `CueInFade`, leaving `CueOutFade` at `"CueTiming"`
-  (setting both makes a split `0/0`).
-- **Cooking is not a step the user can forget — it is part of Apply.** The generator already uses
-  the targeted form `Cook Sequence <s> Cue <c> Part 0 /Merge` (`ShowfileGenerator.lua:6898`), so a
-  recipe edit costs one cheap scoped command, not a show-wide Cook-All. There is no "apply without
-  cooking" and the user is never asked. *The hard parts are code decisions, not questions for the
-  user.*
-- The forgettable step survives only as the **failure** case, and gets the loudest treatment in the
-  app: if the cook is unacknowledged, a full-width amber strip appears above the bottom rail —
-  not a toast, not dismissible, persists across navigation and mode switches: *"1 recipe edit sent —
-  cook NOT confirmed. The rig may not have changed. [VERIFY]"*. It clears only on a confirmed
-  read-back, never on a timer.
-- After Apply, re-read the part and check **`FAILEDCOOKEDPART`** — if populated, flag the line red:
-  *"This line cooked to nothing — the group is empty or the preset has no data."* A recipe against
-  an empty preset fails **silently**, and `Preset 21.1/21.2` ship empty on the master.
-- **Deleting a recipe line renumbers the survivors** (✅ desk-verified 2026-08-28). After any delete
-  the editor discards its line list and re-reads before accepting another action. Never hold an
-  index across a delete.
-- **The SNAP guard.** On Sequences 100/101, if a fade edit on cue 1 would exceed cue 2's trigger
-  time, show the actual numbers inline: *"Fade 6.0 s is longer than the SNAP trigger at 4.0 s. The
-  beams will change gobo while the audience can see them."* — with a one-tap fix. This trap fails
-  silently on stage and nothing else catches it.
-- **Store and Delete** sit in a separate band with 120 px of empty space above them, never adjacent
-  to Apply. After any destructive action the panel goes to UNKNOWN and re-reads — optimistic
-  rendering is banned app-wide.
-- All writes append `/NC`. Cooks are **not** sent with `/NoOops` — a live edit stays undoable from
-  the desk's own Oops.
+*Resist configuration* still holds: anything the show can describe about itself is read from the
+show. Settings hold only what no show knows: the **console address**, the **web remote port**
+(8080), the **volunteer MA user** (`Remote` by default, which needs no password) and the **operator
+MA user**, each with an optional password. Operator mode only; the panel stands in the pane's place.
+
+Passwords are write-only from the screen, encrypted at rest with the OS keystore (DPAPI on Windows),
+and never saved in the clear: with no keystore, none can be saved at all. A save is all-or-nothing
+and lands by rename. OSC port and prefix are **not** settings yet, because nothing uses them; they
+arrive with the transport.
+
+### Phase 2 — ~~Cue editor~~ retired: MA's own editor, in the pane
+
+Replaced by the MA pane on 2026-09-27. The LD edits in MA's own editor, with MA's own cooking and
+Oops. The design that was here (detented timing picker, cook as part of Apply, the
+`FAILEDCOOKEDPART` check, the SNAP guard, the Store/Delete band) is in git history at `49ca006`.
+
+What not building it gave up, and who owns each now:
+
+- **The SNAP guard**: the LD, as at the console today. `LEVEL_STATES.md` still describes the trap.
+- **The unconfirmed-cook strip**: MA shows its own cook state.
+- The write hazards in `MA3_READ_MODEL.md` (`CUEOUTFADE`, recipe renumbering) stop being ours to
+  guard. They stay true for anything that writes to the console from code.
 
 ### Phase 3 — Showfile
 
@@ -334,12 +347,22 @@ A **chip in the status bar**, not a panel, opening to a sheet.
 
 ## Mode switching
 
+**The mode is which MA user the pane logs in as.** Volunteer mode is the volunteer user (`Remote` by
+default: the web remote's own auto-login). Operator mode is the LD's user, by the manual's URL login
+(`?user=…&password=…`). What each may do is set on the console, in those users' rights; the app
+enforces nothing about the show. Admin, Guest and 3D users cannot log in to a web remote.
+
 **Boots into volunteer, always; operator mode is never remembered across a restart.** Switching in
-is a **3-second hold** on the mode chip — no PIN, because the risk is an accidental switch, not a
-rogue volunteer, and a PIN is a setting (*resist configuration*). Entering operator mode **reveals,
-it never acts** — every dangerous thing inside still carries its own guard. Switching out is one
-tap: becoming more restricted is always safe. Auto-drops after 15 minutes idle, never while a cook
-is unconfirmed. Volunteers keep plain Save — taking it away would train people to leave work unsaved.
+is a **3-second hold** on the mode chip, counted at release too, so a late timer cannot lose a
+completed hold. No PIN, because the risk is an accidental switch, not a rogue volunteer, and a PIN
+is a setting (*resist configuration*). Entering operator mode **reveals, it never acts**. Switching
+out is one tap: becoming more restricted is always safe. **Auto-drops after 15 minutes idle**,
+counting touches inside the pane, which main reports because the renderer cannot see them.
+
+Every change of user clears the pane's session first, so operator rights cannot linger in a cookie.
+A renderer crash-reload logs the pane back to the volunteer user before the new screen draws. With
+no operator user set, operator mode keeps the volunteer user and the status bar says so.
+Volunteers keep plain Save (Phase 3); taking it away would train people to leave work unsaved.
 
 ---
 
@@ -368,8 +391,8 @@ loop the new plugin is designed to avoid. **AGPL-3.0; must not be forked.**
 - **Real UDP integration test** in the style of `companion-module-grandma3/test/integration.test.js`
   — that layer caught a live bug every unit test below it passed.
 - **Export parser** tested against the 858 real sequence XMLs already on disk.
-- **On desk, per phase**: fire every tile and confirm feedback; edit timing and confirm on the
-  console; edit a recipe, apply, and confirm output changed; Load and Save As a scratch show.
+- **On desk, per phase**: the MA pane checks in `docs/MA3_READ_MODEL.md` § Web remote; Load and Save
+  As a scratch show.
 - **A full service in shadow mode** — dashboard live, volunteer driving, operator ready to take
   over — before it is trusted alone.
 
@@ -393,6 +416,11 @@ loop the new plugin is designed to avoid. **AGPL-3.0; must not be forked.**
   that no command but `SendOSC` ever appears in the plugin.
 - **`docs/MA3_READ_MODEL.md`** — the desk-verified property names, the ×1000 cue-number trap, and
   the `HookObjectChange` failure that makes polling the design rather than a compromise.
+- **The service screen** — run order + MA pane + settings (`src/main/ma-pane.ts`,
+  `src/main/settings.ts`, `src/renderer`). Exercised end to end on 2026-09-27 against a local
+  stand-in page on `:8080`, **not yet against a desk**: placement tracks every layout change, the
+  pane recovers by itself when the page appears, links and popups go nowhere, a mode switch logs
+  in as the other user, a crash-reload comes back as Remote, and passwords land encrypted.
 
 ## Open questions
 

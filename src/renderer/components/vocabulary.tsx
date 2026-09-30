@@ -1,8 +1,9 @@
 // The state vocabulary, in one place, used identically everywhere.
 //
 // docs/PLAN.md gives four renderings and insists they are one vocabulary. If
-// LIVE looks different in the run order than on a tile, an operator has to learn
-// the screen twice. So nothing below is allowed to be re-styled locally.
+// LIVE looks different in the run order than on the showfile chip, an operator
+// has to learn the screen twice. So nothing below is allowed to be re-styled
+// locally.
 
 import type { UnknownReason } from '../../shared/reading.js'
 

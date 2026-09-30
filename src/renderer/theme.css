@@ -20,6 +20,17 @@
 	--color-warn: #f59e0b;
 }
 
+/* The mode chip's hold, filling left to right so a held finger can see it is
+   being counted. components/ModeChip.tsx. */
+@keyframes hold-fill {
+	from {
+		transform: scaleX(0);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+
 html,
 body,
 #root {

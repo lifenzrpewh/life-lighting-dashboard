@@ -269,3 +269,39 @@ On "Mount Eden Base", `SGV2_BaseShow` = `Mount Eden Base` — the campus show na
 knowing before building the showfile panel.
 
 Showfile name: `Root().manetsocket.showfile` ✅.
+
+## Web remote — the MA pane
+
+What the MA pane stands on. Mostly 🔬 from the manual, which agrees on every point
+below across **2.2, 2.3, 2.4 and 2.5** (checked 2026-09-27), so the 2.5 move should
+not disturb it.
+
+| | |
+|---|---|
+| ✅ What it is | A real **Display** of the station: identical to the MA, interactive (operator-observed 2026-09-27) |
+| ✅ Losing the console | The page shows its own **"disconnected"** (operator-observed 2026-09-27) |
+| 🔬 Address | `http://<station-ip>:8080`, any modern browser |
+| 🔬 Switch | Menu › Network (or Station Control) › Web Remote On |
+| 🔬 Login | Logs in as the user **`Remote`** by itself; `?user=<name>&password=<pw>` in the URL logs in as anyone else |
+| 🔬 Independent user | "Can log in as a different user than the one currently logged in on the connected station" |
+| 🔬 Refused users | **Admin, Guest and 3D** cannot log in to a web remote |
+| 🔬 `Remote` | Every new show file has it: the default user profile with its own screen configuration |
+| 🔬 Slots | **2 on a console or replay unit**; 1–5 on onPC (the Connection Limit setting). The overview says "five per station"; the menu page is the one that matters |
+| 🔬 Resolution | Capped at 480p / 720p / 1080p / unlimited; 2.4+ adds 1440p and 4K, and a console tops out at 1440p |
+| 🔬 Linked command line | Opt-in, by a button beside the command line. When linked, typing shows on every linked station **logged in with the same user profile**. Leave it off |
+| 🔬 2.5 | Adds QR codes per network interface. Nothing the pane depends on changed |
+
+### Still to observe on a desk
+
+Each of these is a claim the pane's design leans on. Run them at the desk before a
+service trusts the pane:
+
+1. **Rights.** Log the pane in as a Playback-only user: can it fire, and is Store refused?
+2. **Login by URL.** `?user=<name>` with no `password` parameter: accepted for a
+   passwordless user? And what does the page show when a login is refused?
+3. **Slots.** The kiosk holds one of two. After a kiosk crash-reload, is the old slot
+   freed promptly, or can a reload loop eat both?
+4. **Silent drop.** Pull the cable rather than switching Web Remote off: how long
+   until the page admits "disconnected"? Until then, our link bar is the only warning.
+5. **Touch** through Electron's embedded view on the booth screen.
+6. **Cost.** Does rendering an extra Display slow the console during a busy cue?

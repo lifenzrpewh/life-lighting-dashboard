@@ -13,7 +13,6 @@
 
 import type { Channel, LinkState } from '../shared/reading.js'
 import { record, unread } from '../shared/reading.js'
-import type { Board } from '../shared/board.js'
 import type { Service } from '../shared/service.js'
 
 export type Scenario = 'healthy' | 'stale' | 'silent' | 'unreachable' | 'cold'
@@ -49,33 +48,11 @@ const SERVICE: Service = {
 	],
 }
 
-const BOARD: Board = {
-	looks: [
-		{ sequence: 1001, label: 'Warm', colour: 'e0a458', confirmed: true },
-		{ sequence: 1002, label: 'Cool', colour: '5b8fb9', confirmed: true },
-		{ sequence: 1003, label: 'Full', colour: 'f4f4f5', confirmed: true },
-		{ sequence: 1004, label: 'Preach', colour: 'd9c39a', confirmed: true },
-		{ sequence: 1005, label: 'Baptism', colour: '7ec8e3', confirmed: true },
-		{ sequence: 1006, label: 'Comms', colour: null, confirmed: true },
-		{ sequence: 1007, label: 'Kids', colour: null, confirmed: true },
-		// The mockup's "? Btn7 — existence unknown": the numbering map says a tile
-		// belongs here; the showfile read has not confirmed it. Still firable.
-		{ sequence: 1008, label: 'Btn 8', colour: null, confirmed: false },
-	],
-	groups: [
-		{ sequence: 2001, label: 'Front', colour: null, confirmed: true },
-		{ sequence: 2002, label: 'Blinders', colour: null, confirmed: true },
-		{ sequence: 2003, label: 'Movers', colour: null, confirmed: true },
-		{ sequence: 2004, label: 'Auras', colour: null, confirmed: true },
-	],
-}
-
 const MINUTE = 60_000
 
 export type MockState = {
 	link: LinkState
 	service: Channel<Service>
-	board: Channel<Board>
 }
 
 /** Build the whole app state for one scenario, at time `now`.
@@ -93,7 +70,6 @@ export function mockState(scenario: Scenario, now: number): MockState {
 			return {
 				link: live,
 				service: record(unread<Service>(), { ok: true, value: SERVICE, at: now }),
-				board: record(unread<Board>(), { ok: true, value: BOARD, at: now }),
 			}
 
 		case 'stale':
@@ -101,7 +77,6 @@ export function mockState(scenario: Scenario, now: number): MockState {
 			return {
 				link: live,
 				service: record(unread<Service>(), { ok: true, value: SERVICE, at: now - 4 * MINUTE }),
-				board: record(unread<Board>(), { ok: true, value: BOARD, at: now - 4 * MINUTE }),
 			}
 
 		case 'silent': {
@@ -111,11 +86,7 @@ export function mockState(scenario: Scenario, now: number): MockState {
 				record(unread<Service>(), { ok: true, value: SERVICE, at: now - 6 * MINUTE }),
 				{ ok: false, reason: 'timeout', at: now },
 			)
-			const brd = record(
-				record(unread<Board>(), { ok: true, value: BOARD, at: now - 6 * MINUTE }),
-				{ ok: false, reason: 'timeout', at: now },
-			)
-			return { link: live, service: svc, board: brd }
+			return { link: live, service: svc }
 		}
 
 		case 'unreachable':
@@ -124,7 +95,6 @@ export function mockState(scenario: Scenario, now: number): MockState {
 			return {
 				link: dead,
 				service: record(unread<Service>(), { ok: true, value: SERVICE, at: now }),
-				board: record(unread<Board>(), { ok: true, value: BOARD, at: now }),
 			}
 
 		case 'cold':
@@ -136,6 +106,6 @@ export function mockState(scenario: Scenario, now: number): MockState {
 			// ("Boot state is UNKNOWN, not off") — is with the desk answering and
 			// the first snapshot still in flight. That is a real moment, every
 			// single boot, and it needs to be a moment you can look at.
-			return { link: live, service: unread<Service>(), board: unread<Board>() }
+			return { link: live, service: unread<Service>() }
 	}
 }

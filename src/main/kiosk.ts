@@ -11,17 +11,20 @@
 // typed surface and nothing else. A volunteer touchscreen that can reach the
 // filesystem is a category of accident we simply decline to have.
 //
-// ⚠️ NOT YET WIRED TO A DESK. Channels A/B/C need an OSC packet to have been
-// observed arriving, and as of 2026-09-20 none has (docs/PLAN.md Phase 0 spike
-// 1 — the console returned `OK:` for `SendOSC`, which proves the syntax and not
-// the delivery). Until then `linkState()` below reports UNREACHABLE, which is
-// not a placeholder: it is the truth, and the UI renders it correctly today.
+// ⚠️ NOT YET WIRED TO A DESK. All three OSC channels are proven on the console
+// (2026-09-21, by the spikes), but no transport lives in this app yet. Until one
+// does, `linkState()` below reports UNREACHABLE, which is not a placeholder: it
+// is the truth, and the UI renders it correctly today.
 
-import { app, BrowserWindow, Menu, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { LinkState } from '../shared/reading.js'
+import type { Mode, PaneRect } from '../shared/ma-pane.js'
+import { patchFrom } from '../shared/settings.js'
+import { createMaPane, type MaPane } from './ma-pane.js'
+import { openSettings, type SettingsStore } from './settings.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -30,6 +33,12 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const DEV_SERVER = process.env['VITE_DEV_SERVER_URL']
 
 let window: BrowserWindow | null = null
+let maPane: MaPane | null = null
+let settings: SettingsStore | null = null
+/** The screen's mode, as the renderer last reported it. Main learns it only to
+ *  pick the pane's MA user and to keep settings operator-only. It is not a
+ *  security boundary: the MA users' own rights are. */
+let mode: Mode = 'volunteer'
 
 function createWindow(): void {
 	window = new BrowserWindow({
@@ -50,6 +59,15 @@ function createWindow(): void {
 	})
 
 	window.once('ready-to-show', () => window?.show())
+
+	if (settings !== null) maPane = createMaPane(window, settings)
+	// A reloaded renderer boots into volunteer mode. Without this, a crash-and-
+	// reload would leave the pane logged in as the operator under a fresh
+	// volunteer screen, until the renderer got round to saying otherwise.
+	window.webContents.on('did-start-loading', () => {
+		mode = 'volunteer'
+		maPane?.release()
+	})
 
 	// A renderer crash mid-service must not leave a dead rectangle in the booth.
 	// Reload rather than quit: the operator's fallback is the console 30 cm away,
@@ -79,12 +97,49 @@ function linkState(): LinkState {
 	return { state: 'unreachable', since: Date.now() }
 }
 
+/** A rect off the IPC boundary, or null (hidden) if it is not one. */
+function asRect(v: unknown): PaneRect | null {
+	if (typeof v !== 'object' || v === null) return null
+	const { x, y, width, height } = v as Record<string, unknown>
+	const nums = [x, y, width, height]
+	if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n))) return null
+	return { x: x as number, y: y as number, width: width as number, height: height as number }
+}
+
 app.whenReady().then(() => {
 	// Boots into volunteer mode, always (docs/PLAN.md, Mode switching). There is
 	// no menu bar to elevate from and no remembered mode across a restart.
 	Menu.setApplicationMenu(null)
 
 	ipcMain.handle('link:state', () => linkState())
+
+	// Only the kiosk's own renderer may move the pane. The pane's page has no
+	// preload and so no way to send, but the check costs nothing.
+	const fromKiosk = (e: IpcMainEvent | IpcMainInvokeEvent) => e.sender === window?.webContents
+	ipcMain.handle('ma-pane:report', (e) => (fromKiosk(e) ? maPane?.report() : undefined))
+	ipcMain.on('ma-pane:place', (e, rect: unknown) => {
+		if (fromKiosk(e)) maPane?.place(rect === null ? null : asRect(rect))
+	})
+	ipcMain.on('ma-pane:release', (e) => fromKiosk(e) && maPane?.release())
+	ipcMain.on('ma-pane:retry', (e) => fromKiosk(e) && maPane?.retry())
+	ipcMain.on('ma-pane:mode', (e, next: unknown) => {
+		if (!fromKiosk(e) || (next !== 'volunteer' && next !== 'operator')) return
+		mode = next
+		maPane?.setMode(next)
+	})
+
+	settings = openSettings()
+	ipcMain.handle('settings:get', (e) => (fromKiosk(e) ? settings?.view() : undefined))
+	ipcMain.handle('settings:save', (e, raw: unknown) => {
+		if (!fromKiosk(e) || settings === null) return undefined
+		if (mode !== 'operator') return { ok: false, errors: { form: 'Settings can be changed in operator mode only.' } }
+		const patch = patchFrom(raw)
+		if (patch === null) return { ok: false, errors: { form: 'Those settings could not be read.' } }
+		const checked = settings.save(patch)
+		// The renderer is told whether it worked, never handed the settings back:
+		// it asks for the view again, which carries no passwords.
+		return checked.ok ? { ok: true } : checked
+	})
 
 	createWindow()
 

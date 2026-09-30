@@ -1,8 +1,13 @@
-// The permanent left spine. Never covered by anything, which is enforced by it
-// being a grid column rather than a thing overlays are asked politely to avoid.
+// The left spine. Never covered by anything, which is enforced by it being a
+// grid column rather than a thing overlays are asked politely to avoid.
 //
 // It is the only part of this screen a volunteer understands without training,
-// so it is also the part that must never lie about what it does not know.
+// and the one thing beside the MA that the MA cannot show: the PCO run order
+// and the LD's notes from the week. So it is also the part that must never lie
+// about what it does not know.
+//
+// It folds to a strip, one tap each way, to give the MA the full width. Folded
+// is not hidden: the strip stays, so the way back is always on screen.
 
 import type { Reading } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
@@ -57,16 +62,40 @@ function List({ service, ageMs }: { service: Service; ageMs: number | null }) {
 	)
 }
 
-export function RunOrder({ service }: { service: Reading<Service> }) {
+export function FoldedRunOrder({ onOpen }: { onOpen: () => void }) {
+	return (
+		<nav className="flex w-14 shrink-0 flex-col border-r-2 border-booth-edge bg-booth-panel">
+			<button
+				type="button"
+				onClick={onOpen}
+				aria-label="Show the run order"
+				className="flex flex-1 flex-col items-center gap-4 pt-5 text-booth-dim active:bg-booth-edge"
+			>
+				<span className="text-lg">›</span>
+				<span className="text-xs font-semibold uppercase tracking-widest [writing-mode:vertical-rl]">Run order</span>
+			</button>
+		</nav>
+	)
+}
+
+export function RunOrder({ service, onFold }: { service: Reading<Service>; onFold: () => void }) {
 	return (
 		<nav
 			className={`flex w-[22rem] shrink-0 flex-col border-r-2 bg-booth-panel ${
 				stateClass[service.state]
 			}`}
 		>
-			<div className="flex items-center justify-between border-b border-booth-edge px-4 py-3">
+			<div className="flex items-center gap-3 border-b border-booth-edge py-1 pl-4 pr-1">
 				<h2 className="text-xs font-semibold uppercase tracking-widest text-booth-dim">Run order</h2>
-				<span className="text-xs text-booth-dim">PCO</span>
+				<span className="ml-auto text-xs text-booth-dim">PCO</span>
+				<button
+					type="button"
+					onClick={onFold}
+					aria-label="Fold the run order away"
+					className="h-10 w-12 rounded text-lg text-booth-dim active:bg-booth-edge"
+				>
+					‹
+				</button>
 			</div>
 
 			{matchReading(service, {

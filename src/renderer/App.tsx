@@ -1,37 +1,37 @@
 import { useEffect, useState } from 'react'
 
-import type { Channel, LinkState, WriteOutcome } from '../shared/reading.js'
+import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
-import type { Board, Tile } from '../shared/board.js'
 import type { Service } from '../shared/service.js'
+import type { MaPaneReport } from '../shared/ma-pane.js'
 import { StatusBar } from './components/StatusBar.js'
-import { RunOrder } from './components/RunOrder.js'
-import { NowPanel } from './components/NowPanel.js'
-import { TileGrid } from './components/TileGrid.js'
-import { BottomRail } from './components/BottomRail.js'
+import { FoldedRunOrder, RunOrder } from './components/RunOrder.js'
+import { MaPane, paneSummary } from './components/MaPane.js'
+import { SettingsPanel } from './components/SettingsPanel.js'
+import { useMode } from './mode.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
 
-type Sources = { link: LinkState; service: Channel<Service>; board: Channel<Board> }
+type Sources = { link: LinkState; service: Channel<Service> }
 
 /** What the app knows with no transport wired: nothing, and it says so.
  *
- *  This is not a placeholder awaiting real data — it is the correct state today
- *  (docs/PLAN.md Phase 0 spike 1: no OSC packet has been observed arriving). When
+ *  This is not a placeholder awaiting real data — it is the correct state today:
+ *  the channels are proven on the desk, but none is wired into the app yet. When
  *  the transport lands it replaces the source, not this shape. */
 function coldSources(now: number): Sources {
 	return {
 		link: { state: 'unreachable', since: now },
 		service: unread<Service>(),
-		board: unread<Board>(),
 	}
 }
 
 export function App() {
 	const [now, setNow] = useState(() => Date.now())
 	const [scenario, setScenario] = useState<Scenario>('cold')
-	const [lastWrite, setLastWrite] = useState<{ label: string; outcome: WriteOutcome } | null>(null)
+	const [runOrderOpen, setRunOrderOpen] = useState(true)
+	const [settingsOpen, setSettingsOpen] = useState(false)
 
 	// The clock is real time; ages derive from it, so STALE arrives on its own
 	// rather than needing something to happen.
@@ -70,20 +70,37 @@ export function App() {
 		}
 	}, [])
 
+	// The MA pane is real in dev too: it is a page from the console, not a value
+	// the mock desk could fake. Polled, like the link, because main owns it.
+	const [pane, setPane] = useState<MaPaneReport | null>(null)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.maPane().then((r) => alive && setPane(r))
+		poll()
+		const id = setInterval(poll, 1000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
+	const { mode, enter, leave } = useMode(now, pane?.lastInputAt ?? null)
+
+	// The mode is which MA user the pane is (src/renderer/mode.ts). Main does the
+	// login; the renderer only says which. Settings close with operator mode, by
+	// a tap or by the idle drop, so a volunteer never inherits an open panel.
+	useEffect(() => {
+		window.life?.setMaPaneMode(mode)
+		if (mode === 'volunteer') setSettingsOpen(false)
+	}, [mode])
+
 	const sources: Sources = DEV
 		? mockState(scenario, now)
 		: { ...coldSources(now), ...(mainLink === null ? {} : { link: mainLink }) }
 
 	const service = readingOf(sources.service, now, sources.link)
-	const board = readingOf(sources.board, now, sources.link)
-
-	// No transport exists yet, so a press cannot have been sent. Saying "sent ·
-	// unconfirmed" here would be the first lie in the codebase.
-	const act = (label: string) =>
-		setLastWrite({
-			label,
-			outcome: { state: 'failed', at: Date.now(), detail: 'no console transport wired yet' },
-		})
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
@@ -97,26 +114,43 @@ export function App() {
 				</div>
 			)}
 
-			<StatusBar link={sources.link} now={now} />
+			<StatusBar
+				link={sources.link}
+				now={now}
+				mode={mode}
+				onEnter={enter}
+				onLeave={leave}
+				pane={paneSummary(pane, mode)}
+				settingsOpen={settingsOpen}
+				onSettings={() => setSettingsOpen(!settingsOpen)}
+			/>
 
+			{/* Above the pane, never over it: a native view cannot be overlaid. */}
 			{sources.link.state === 'unreachable' && (
-				<div className="border-b border-state-unreachable/40 bg-state-unreachable/15 px-6 py-2 text-sm text-state-unreachable">
-					Console unreachable — every value on this screen is unknown. Buttons still send.
+				<div className="border-b border-state-unreachable/40 bg-state-unreachable/15 px-6 py-2 text-sm">
+					<span className="text-state-unreachable">
+						No console link — readings here are unknown, and the dashboard can't confirm the MA picture is current.
+					</span>{' '}
+					<span className="text-booth-dim">The web remote shows its own “disconnected” once it notices.</span>
 				</div>
 			)}
 
-			{/* Left spine and bottom rail are grid siblings of the main pane, never
-			    overlays on top of it. "Must never be covered" is therefore a fact
-			    about the layout rather than a rule someone has to remember. */}
+			{/* The run order is a sibling of the pane, never an overlay on it, so
+			    "never covered" is a fact about the layout rather than a rule
+			    someone has to remember. The buttons are the MA's own, in the pane. */}
 			<div className="flex min-h-0 flex-1">
-				<RunOrder service={service} />
+				{runOrderOpen ? (
+					<RunOrder service={service} onFold={() => setRunOrderOpen(false)} />
+				) : (
+					<FoldedRunOrder onOpen={() => setRunOrderOpen(true)} />
+				)}
 				<main className="flex min-w-0 flex-1 flex-col">
-					<NowPanel service={service} lastWrite={lastWrite} onGo={() => act('GO THIS ITEM')} />
-					<TileGrid board={board} onFire={(t: Tile) => act(t.label)} />
+					{/* Always mounted, so the connection survives the settings panel
+					    standing in its place. */}
+					<MaPane report={pane} hidden={settingsOpen} now={now} />
+					{settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
 				</main>
 			</div>
-
-			<BottomRail onAct={act} />
 		</div>
 	)
 }
