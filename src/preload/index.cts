@@ -13,10 +13,14 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
+import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
 
 const api = {
-	/** The console link as main knows it. Today: always unreachable, because no
-	 *  OSC transport is wired (docs/PLAN.md Phase 0 spike 1). */
+	/** The console link as main knows it.
+	 *
+	 *  Still always unreachable, and deliberately so: liveness needs a request
+	 *  that went unanswered, and channel B is the console speaking unprompted.
+	 *  See the header of src/main/kiosk.ts. */
 	linkState: (): Promise<LinkState> => ipcRenderer.invoke('link:state'),
 
 	/** The MA pane (src/main/ma-pane.ts). The renderer says where it goes and
@@ -35,6 +39,13 @@ const api = {
 	/** Operator mode only; main refuses otherwise. */
 	saveSettings: (patch: SettingsPatch): Promise<{ ok: true } | Extract<Checked, { ok: false }>> =>
 		ipcRenderer.invoke('settings:save', patch),
+
+	/** Live executor levels from channel B, plus when the desk was last heard.
+	 *
+	 *  Separate from `linkState` on purpose. "We heard the desk 0.3 s ago" is an
+	 *  observation; "the link is live" is a verdict, and this app does not let
+	 *  the first quietly become the second. */
+	deskState: (): Promise<DeskState> => ipcRenderer.invoke('desk:state'),
 }
 
 export type LifeApi = typeof api

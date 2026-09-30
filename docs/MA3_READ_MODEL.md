@@ -211,6 +211,21 @@ control. The dashboard must coalesce these per object before they reach React �
 one state update per frame, not per packet — or a busy desk will drive the
 renderer flat out for no visible gain.
 
+✅ **Second capture, 2026-09-21, dashboard on 10.11.60.215:** 1221 packets in
+90 s, all of them channel B, decoded 1221/1221 by `src/bridge/osc.ts`. Coalesced
+at 10 Hz that is **267 frames**, a 4.6x reduction. The rate holds: ~13/s here
+against ~26/s before, the difference being how hard the faders were worked.
+
+⚠️ **The executor set is open.** Four were live this time — `1002`, `1003`,
+`1004`, `1005` — where the first capture saw two. Nothing may assume a known
+pair, or a fixed count.
+
+⚠️ **The level range is still only partly observed.** Values reached **76.8**,
+past the 54.5 maximum of the first capture. It reads as a percent, but neither
+end has been seen: no capture has run a fader to its stop and read the number.
+So `value` is carried unscaled and unclamped in `src/bridge/channel-b.ts`, and
+nothing normalises it to 0..1 on an assumption.
+
 **Silence is still not death.** Channel B speaks only on change; a quiet desk
 mid-sermon emits nothing for minutes and is perfectly healthy. Link health must
 come from unanswered *requests*, never from an empty inbox — which is what
@@ -253,6 +268,31 @@ Two hard importer requirements, both of which fail quietly:
    all — no error, no log. Use `<FileContent><Block Base64=.../></FileContent>`,
    1024-byte stride, `Size` = block count. `npm run build:plugin` emits it and
    round-trip verifies before the file lands.
+
+### ❌ Re-importing does NOT reload a plugin already in memory
+
+❌ 2026-09-21. A rebuilt `LifeBridge.xml` was imported over plugin 7 and
+called again. It ran the OLD code.
+
+The proof is the probe's own accumulation bug, used as an instrument: the
+tally came back `36/40`, then `45/50`. Five runs of ten probes, every one
+appending to a single `results` table — a table that can only exist inside a
+chunk that was never re-read. The new build has eleven probes and resets that
+table per call, so it can only ever report `N/11`. `Call Plugin 7` and
+`Call Plugin "LifeBridge"` both hit the stale one.
+
+⚠️ **Nothing says so.** `Call Plugin` succeeds, the plugin pool shows the
+newly imported file, and the output is the old program. This is the same shape
+as the external-file trap above: the failure is silent and the thing you are
+looking at says you succeeded.
+
+To actually load new code, the loaded chunk has to go: delete the plugin object
+and re-import, or restart the console. Import alone is not enough — which
+means "the XML is self-contained" solves DISTRIBUTION, not DEPLOYMENT.
+
+⚠️ It also means module state survives between calls, which is why the
+probe accumulated in the first place. Anything shipped must assume the chunk
+outlives the call and reset what it owns.
 
 ### One `Port`, both directions
 

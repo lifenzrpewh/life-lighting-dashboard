@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
+import type { DeskState } from '../shared/desk.js'
 import type { Service } from '../shared/service.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import { StatusBar } from './components/StatusBar.js'
@@ -86,6 +87,26 @@ export function App() {
 		}
 	}, [])
 
+	// Channel B is polled even in dev, unlike the link above. The mock desk drives
+	// the four READING states; this is the real console, and being able to watch
+	// real fader traffic arrive while the mock exercises the failure modes is the
+	// whole point of having both on screen at once.
+	const [desk, setDesk] = useState<DeskState | null>(null)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.deskState().then((d) => alive && setDesk(d))
+		poll()
+		// 2 Hz. Main already coalesces to 10 Hz; this only has to be fast enough
+		// that "heard 0s ago" does not visibly lag a fader being moved.
+		const id = setInterval(poll, 500)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
 	const { mode, enter, leave } = useMode(now, pane?.lastInputAt ?? null)
 
 	// The mode is which MA user the pane is (src/renderer/mode.ts). Main does the
@@ -123,6 +144,7 @@ export function App() {
 				pane={paneSummary(pane, mode)}
 				settingsOpen={settingsOpen}
 				onSettings={() => setSettingsOpen(!settingsOpen)}
+				desk={desk}
 			/>
 
 			{/* Above the pane, never over it: a native view cannot be overlaid. */}

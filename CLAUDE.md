@@ -30,13 +30,17 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `spikes/scan-exports.mjs` | Derives `export-blacklist.json`. No desk needed. |
 | ✅ `console-plugin/LifeBridge.lua` | Probe v1, run on the console 2026-09-21 — pushed 14 results back over `SendOSC`. Read-only on the show. `OSC_ENTRY = 3`. |
 | ✅ `scripts/build-plugin-xml.mjs` | Embeds the Lua into a self-contained importable XML. Round-trip verified before the file lands. |
-| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 106 checks. |
+| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 153 checks. |
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
-| ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. **No OSC transport wired**, so the link reports UNREACHABLE because it is. |
+| ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. Channel B is wired (the "desk heard" pill); the link still reports UNREACHABLE because nothing round-trips yet. |
 | ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Exercised end to end 2026-09-27 against a local stand-in on `:8080`, **not a desk**. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
 | ⚠️ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. Verified locally on macOS Keychain; DPAPI on Windows unexercised. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
+| ✅ `src/bridge/osc.ts` | OSC 1.0 decoder. An unknown type tag fails the **whole message**, not just that argument — OSC args are positional, so skipping one reads every later value at the wrong offset and a fader level becomes whatever four bytes sit there. |
+| ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
+| ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
+| ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
 A command sent as `/life/cmd` `,s` **executed on the console**, and one fader move
@@ -45,6 +49,38 @@ are real. Full format and the traps in `docs/MA3_READ_MODEL.md` § OSC transport
 
 Working config: OSC row 3 `OSCData 3` · port **8003** · prefix `life` · destination
 `10.11.60.182` · Receive/Send/Receive Command/Send Command all Yes.
+
+✅ **Re-verified end to end from the Windows box, 2026-09-21** — desk
+`10.11.60.40`, dashboard on `10.11.60.215`. All three channels, on a fresh
+checkout with nothing carried over from the Mac.
+
+**The destination is per-machine, not a constant.** The `10.11.60.182` above is
+one station’s address, and reading it as configuration is why the first run here
+came back silent: channel A worked, B and C had nowhere to go. Whatever machine
+the dashboard is on goes in that field.
+
+**Diagnose a silent channel B by calling the plugin first.** `SendOSC` leaves
+through the same entry’s destination and `Send`, so channel C arriving proves
+both are right and narrows the silence to which executors the native OSC output
+covers — a different setting entirely. Staring at a dead B instead spends the
+afternoon on the wrong half of the config.
+
+**Channel B is chattier than first measured.** One sweep of two executors pushed
+**771 messages in 30 s** — `/life/14.14.1.6.1004` and `.1005`, both
+`,sif ["FaderMaster", 3, n]`. That is ~26/s against the ~9/s recorded from a
+single control, so coalescing per object before anything reaches React is a
+requirement, not a nicety.
+
+✅ **The shipped decoder read the desk, 2026-09-21.** `spikes/channel-b-live.mjs`
+took **1221 packets, decoded 1221** — nothing undecodable, nothing of an
+unrecognised shape — and the coalescer turned them into **267 rendered frames**
+at 10 Hz, a 4.6x reduction with the last position of every fader intact. 16 unit
+tests cover the decode and the buffer; this is what moves them past harness-green.
+
+⚠️ **It also widened the read model:** four executors live rather than two,
+and levels past the earlier maximum, so neither the executor set nor the value
+range may be assumed. Both recorded in `docs/MA3_READ_MODEL.md` — Channel B,
+which is where wire facts live.
 
 ⚠️ **The trap that cost the afternoon:** editing an entry's `Port` does **not**
 move the live socket — row 3 displayed `8000` while still listening on `8010`.
@@ -67,6 +103,14 @@ embeds the Lua as base64 blocks (1024-byte stride, `Size` = block count, UTF-8 B
 — all three are importer requirements that fail quietly). Import one file; there is
 no `.lua` to copy and no path to be wrong. A test fails if the XML drifts from the
 Lua, so the stale-import trap cannot happen silently.
+
+⚠️ **That guards the FILE, not the console.** Re-importing does not reload
+a plugin the console already has in memory: a rebuilt XML imported over plugin
+7 on 2026-09-21 ran the old code, and `Call Plugin` reported success while doing
+it. Distribution is solved; deployment is not. Delete the plugin object and
+re-import, or restart the console — details and the proof in
+`docs/MA3_READ_MODEL.md`. The same cache is why module state survives between
+calls, so anything shipped must reset what it owns.
 
 ## The four channels
 
@@ -162,12 +206,28 @@ touchscreen, so a Windows checkout is a first-class case, not a courtesy.
 | | |
 |---|---|
 | **Node** | `^22.20` (see `engines`) |
-| **Lua** | any 5.x on PATH. `npm test` runs the 106-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
-| **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so |
+| **Lua** | any 5.x on PATH. `npm test` runs the 153-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
+| **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so. **Present but empty** (MA3 installed, exports not copied across: the normal state on a fresh Windows box) makes three tests *fail* rather than skip (`expected a large corpus, got 0`), because `findLibrary` only asks whether the directory exists, not whether it holds anything |
 
 `scripts/deploy-plugin.sh` is bash and needs Git Bash or WSL on Windows. It is
 also **no longer the deployment path** — the plugin ships embedded in its XML
 (`npm run build:plugin`), so there is nothing to copy onto a console.
+
+⚠️ **Windows: junctions and symlinks may not traverse on a managed machine.**
+Observed 2026-09-21 on the booth-class Windows box. `mklink /J` reports success
+and `fsutil reparsepoint query` shows a correct Mount Point with the right
+target, but reading *through* the link fails with "The system cannot find the
+path specified" while reading the target directly works. That is a filesystem
+filter driver, almost certainly endpoint security: machine policy, not a
+setting to toggle.
+
+It kills every symlink-based Node version manager, **fnm** and **nvm-windows**
+alike, and they fail *silently*, which is the dangerous part: `fnm use 22`
+prints "Using Node v22.23.2" and `fnm current` still answers `none`. Same
+shape as the rule at the top of this file, a read that failed coming back
+looking like an answer. Put Node 22 on PATH directly, or use a shim-based
+manager (Volta) that never creates a link. Note `winget` cannot supply 22.x at
+all: `OpenJS.NodeJS.LTS` is 24.x, which `engines` rejects.
 
 ## Running
 
@@ -204,9 +264,15 @@ HOLDING and PRE/POST are its biggest targets (`docs/PLAN.md`, Phase 1).
 2. Showfile info (Phase 3) — the chip is still static text.
 
 **Console track — much smaller than it was.** No trigger board and no cue editor
-means no batched sequence snapshot and no timing/recipe verbs. What `LifeBridge`
-still owes: showfile name, `SGV2_BaseShow`, a heartbeat for the link, and (Phase 3)
-Save As. Keep the probe's guarantees: read-only on the show except the allow-listed
+means no batched sequence snapshot and no timing/recipe verbs.
+1. **Turn the link green.** `LifeBridge` already has `ping` (981b3cc): it echoes a
+   token back over channel C. Main does not send it yet. Send it over channel A
+   every second, match the echoed token, and feed `linkFromRequests`; that
+   replaces the permanent UNREACHABLE with a real round trip. Remember
+   re-importing does not reload a plugin (delete and re-import, or restart).
+2. Still owed after that: showfile name, `SGV2_BaseShow`, and (Phase 3) Save As.
+   The `pool` verb was for joining channel B addresses to tiles; with no tiles it
+   waits until something needs that join. Keep the probe's guarantees: read-only on the show except the allow-listed
 Save As, no generic `cmd` verb in the shipped build, results that fail rather than
 return a plausible value.
 

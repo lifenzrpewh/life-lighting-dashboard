@@ -129,6 +129,13 @@ local sformat, tconcat = string.format, table.concat
 local results = {}
 local consoleVersion = 'unknown'
 
+-- Every argument MA3 handed the plugin, stringified, in the order received.
+-- Recorded rather than assumed: the call signature of a grandMA3 plugin is
+-- widely quoted as (displayHandle, argument, signalTable, myHandle) and has
+-- never been verified on this desk. `args.received` reports it so one full run
+-- settles it, instead of the dispatch below silently depending on folklore.
+local receivedArgs = {}
+
 local function log(fmt, ...)
   local s = select('#', ...) > 0 and sformat(fmt, ...) or fmt
   Printf('LifeBridge: ' .. s)
@@ -524,12 +531,150 @@ local function writeResultsFile(summary)
   return nil
 end
 
+-- ------------------------------ argument probe ------------------------------
+
+--- What MA3 actually passed us. The dispatch in main() scans for a string
+--- rather than trusting a position, so this is the record that would let a
+--- later version stop scanning and index directly.
+local function probeArgs()
+  if #receivedArgs == 0 then
+    return false, 'no arguments received — verb dispatch is unavailable on this '
+      .. 'console, and `Call Plugin "LifeBridge" ping` runs this whole probe instead'
+  end
+  return true, 'argv: ' .. tconcat(receivedArgs, ' | ')
+end
+
+-- ---------------------------------- verbs -----------------------------------
+
+--- `ping` — one packet out. Nothing read, nothing written, no results recorded.
+---
+--- WHY THIS EXISTS: the dashboard's link state needs a REQUEST that can go
+--- unanswered. Channel B is the console speaking unprompted, so it can prove the
+--- desk is there and can never prove it is not — see `linkFromRequests` in
+--- src/shared/reading.ts. This is the cheapest round trip there is: a command in
+--- over channel A, a single message out over channel C.
+---
+--- The echo carries back whatever followed the verb, so a reply can be matched
+--- to the request that caused it rather than to whichever one is outstanding.
+local function pingVerb(echo)
+  -- Sets consoleVersion. Called directly rather than through probe(), because a
+  -- ping must not append to `results` — the probe already accumulates across
+  -- calls and a ping every second would make that unbounded.
+  pcall(probeVersion)
+  sendOsc('/ping', 's', oscSafe(sformat('%s|%s', consoleVersion, echo or '')))
+end
+
+--- Try each address accessor and report which one answers.
+local function addressOf(obj)
+  local attempts = {
+    { 'Addr', function() return obj:Addr() end },
+    { 'AddrNative', function() return obj:AddrNative() end },
+    { 'ToAddr', function() return obj:ToAddr() end },
+  }
+  for _, a in ipairs(attempts) do
+    local ok, v = pcall(a[2])
+    if ok and v ~= nil and tostring(v) ~= '' then return tostring(v), a[1] end
+  end
+  return nil, nil
+end
+
+--- `pool` — what object does a channel B address actually point at?
+---
+--- WHY THIS EXISTS: channel B arrives as `/life/14.14.1.6.1005`, and the board
+--- cannot join a fader level to a tile without knowing what pool `14.14.1.6` is.
+--- Concluding that executor 1005 is sequence 1005 because the numbers match is
+--- precisely the assumption this project badges ⚠️ and later regrets, so the
+--- console is asked instead: resolve each object and report its OWN address. If
+--- one comes back as `14.14.1.6.1005` the question is answered. If none does, we
+--- have learned that matching numbers mean nothing here, which is worth as much.
+local function poolVerb()
+  pcall(probeVersion)
+  sendOsc('/pool/begin', 's', oscSafe(consoleVersion))
+
+  for _, no in ipairs(PROBE_SEQUENCES) do
+    local obj, how = resolveSequence(no)
+    if obj == nil then
+      sendOsc('/pool/seq', 's', oscSafe(sformat('%d absent', no)))
+    else
+      local addr, via = addressOf(obj)
+      sendOsc('/pool/seq', 's', oscSafe(sformat('%d addr=%s via=%s resolved=%s',
+        no, addr or 'NONE', via or 'none', how or '?')))
+    end
+  end
+
+  -- A wider net, because the executor a fader belongs to may not be a sequence
+  -- at all. Absent is an answer too, so every spec reports either way.
+  for _, spec in ipairs({
+    'Executor 1005', 'Executor 1', 'Page 1', 'Page 1.1',
+    'Sequence 1005', 'DataPool 1',
+  }) do
+    local obj
+    pcall(function()
+      local o = ObjectList(spec)
+      if type(o) == 'table' then o = o[1] end
+      obj = o
+    end)
+    if obj == nil then
+      sendOsc('/pool/obj', 's', oscSafe(spec .. ' -> absent'))
+    else
+      local addr, via = addressOf(obj)
+      sendOsc('/pool/obj', 's', oscSafe(sformat('%s -> addr=%s via=%s',
+        spec, addr or 'NONE', via or 'none')))
+    end
+  end
+
+  sendOsc('/pool/end', 's', oscSafe('done'))
+end
+
 -- ---------------------------------- main ------------------------------------
 
-local function main()
+local function main(...)
+  -- MA3's plugin call signature is widely quoted as (displayHandle, argument,
+  -- signalTable, myHandle) and has never been verified on this desk. So rather
+  -- than index a position we merely believe in, scan every argument for the
+  -- first non-empty STRING and take that as the verb. If MA3 passes the verb in
+  -- a different slot this still finds it; if it passes some OTHER string first
+  -- we get an unknown verb, which is reported rather than quietly doing the
+  -- wrong thing. `args.received` below records what actually arrived, so one
+  -- full run replaces the folklore with a fact.
+  receivedArgs = {}
+  local verb, rest = '', ''
+  for i = 1, select('#', ...) do
+    local a = select(i, ...)
+    receivedArgs[#receivedArgs + 1] = sformat('%s:%s', type(a), tostring(a))
+    if verb == '' and type(a) == 'string' and a:match('%S') then
+      verb, rest = a:match('^%s*(%S*)%s*(.-)%s*$')
+    end
+  end
+
+  if verb == 'ping' then return pingVerb(rest) end
+
+  if verb == 'pool' then
+    log('pool probe — READ-ONLY, resolving object addresses')
+    return poolVerb()
+  end
+
+  if verb ~= '' then
+    -- An unrecognised verb must NOT fall through to the full probe. A typo would
+    -- then look like it had worked, and produce thirty lines of unrelated output
+    -- that someone would reasonably read as the answer to what they asked.
+    log('unknown verb %q — nothing was done', verb)
+    pcall(function() sendOsc('/error', 's', oscSafe('unknown verb ' .. verb)) end)
+    return
+  end
+
+  -- `results` and `dumps` are module state and MA3 keeps the chunk loaded
+  -- between calls, so a second run used to append to the first and report 18/20
+  -- where it meant two runs of 9/10 — and 27/30 for three, which is what the
+  -- 2026-09-21 desk run actually showed. Harmless in a probe nobody calls twice;
+  -- not harmless now that a ping may run every second beside it.
+  results = {}
+  dumps = {}
+
   log('probe v0 starting — READ-ONLY, no show data is modified')
   log('OSC entry %d must have Send enabled and point at your listener', OSC_ENTRY)
 
+  probe('args.received', probeArgs)
   probe('console.version', probeVersion)
   probe('osc.int', probeOscInt)
   probe('osc.float', probeOscFloat)

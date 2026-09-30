@@ -119,14 +119,31 @@ local function hostileEnvironment()
   _G.UnhookMultiple = boom
 end
 
-local function run(setup, writablePattern)
+local function run(setup, writablePattern, ...)
   cmds, prints, files = {}, {}, {}
   mockIO(writablePattern)
   setup()
   local main = assert(loadfile('console-plugin/LifeBridge.lua'))()
-  local ok, err = pcall(main)
+  local ok, err = pcall(main, ...)
   io.open = realOpen
   return ok, err, cmds, prints
+end
+
+--- Load the plugin ONCE and call it twice, the way a console does. Every other
+--- scenario reloads the chunk and so cannot see state that survives a call —
+--- which is exactly how the results accumulated across desk runs unnoticed.
+local function runTwice(setup, writablePattern, argsA, argsB)
+  cmds, prints, files = {}, {}, {}
+  mockIO(writablePattern)
+  setup()
+  local main = assert(loadfile('console-plugin/LifeBridge.lua'))()
+  -- CLAUDE.md promises any Lua 5.x runs this harness; unpack moved in 5.2.
+  local unpack_ = table.unpack or unpack
+  local okA = pcall(main, unpack_(argsA or {}))
+  local firstCmds = #cmds
+  local okB = pcall(main, unpack_(argsB or {}))
+  io.open = realOpen
+  return okA and okB, firstCmds, cmds, prints
 end
 
 -- -------------------------------- scenarios ---------------------------------
@@ -141,8 +158,8 @@ do
   check('rich: prints results', #p > 5)
 
   local joined = table.concat(p, '\n')
-  for _, name in ipairs({ 'console.version', 'osc.int', 'osc.float', 'osc.string',
-                          'sequence.access', 'cue.read', 'recipe.read',
+  for _, name in ipairs({ 'args.received', 'console.version', 'osc.int', 'osc.float',
+                          'osc.string', 'sequence.access', 'cue.read', 'recipe.read',
                           'hook.objectchange', 'timing.slice', 'showfile.identity' }) do
     check('rich: probe reported -- ' .. name, joined:find(name, 1, true) ~= nil)
   end
@@ -181,7 +198,7 @@ do
       if cmd:find('[2.3.2.0]', 1, true) then stamped = stamped + 1 end
     end
   end
-  check('rich: emits a line per probe', resultLines >= 10, tostring(resultLines))
+  check('rich: emits a line per probe', resultLines >= 11, tostring(resultLines))
   check('rich: every emitted line is version-stamped', resultLines == stamped,
     string.format('%d of %d', stamped, resultLines))
 
@@ -193,7 +210,10 @@ do
     reportPath == '/Users/Shared/LIFE/LifeBridge-probe.txt', tostring(reportPath))
   if report then
     check('rich: report names the MA3 version', report:find('2.3.2.0', 1, true) ~= nil)
-    check('rich: report carries the summary', report:find('10/10 passed', 1, true) ~= nil, report)
+    -- 10 of 11: this scenario calls main with NO arguments, so args.received
+    -- correctly fails. That is the honest result on a console where verb
+    -- dispatch is unavailable, and the ping scenario below covers the other case.
+    check('rich: report carries the summary', report:find('10/11 passed', 1, true) ~= nil, report)
     check('rich: report carries the property dumps',
       report:find('## Property dumps', 1, true) ~= nil and report:find('Selection', 1, true) ~= nil)
     for _, name in ipairs({ 'osc.string', 'cue.read', 'recipe.read', 'timing.slice' }) do
@@ -268,6 +288,84 @@ do
   for _, cmd in ipairs(c) do
     check('hostile: command is SendOSC only', cmd:match('^SendOSC %d+ ".*"$') ~= nil, cmd)
   end
+end
+
+-- 4. `ping` — the link-state round trip. Must be cheap and must stay cheap:
+--    the dashboard may call this every second, so anything it does per call is
+--    something it does 3600 times an hour on a live console.
+do
+  -- Mimics the quoted MA3 signature (displayHandle, argument, ...). The verb is
+  -- deliberately NOT first, because the dispatch must find it by scanning.
+  local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/', {}, 'ping 42')
+  check('ping: does not throw', ok, tostring(err))
+  check('ping: emits exactly one message', #c == 1, tostring(#c))
+  if c[1] then
+    check('ping: command is SendOSC only', c[1]:match('^SendOSC %d+ ".*"$') ~= nil, c[1])
+    check('ping: addresses /ping', c[1]:find('/ping', 1, true) ~= nil, c[1])
+    check('ping: carries the console version', c[1]:find('2.3.2.0', 1, true) ~= nil, c[1])
+    -- Without the echo a reply can only be matched to whichever request is
+    -- outstanding, which is wrong the moment two are.
+    check('ping: echoes the token back', c[1]:find('42', 1, true) ~= nil, c[1])
+  end
+  -- A ping that wrote a report file would put a disk write on the dashboard's
+  -- once-a-second path, on a machine beside a live desk.
+  check('ping: writes no file', next(files) == nil)
+  check('ping: runs no probes', table.concat(p, '\n'):find('PASS', 1, true) == nil,
+    table.concat(p, '\n'))
+end
+
+-- 5. `pool` — resolving what a channel B address points at.
+do
+  local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/', {}, 'pool')
+  check('pool: does not throw', ok, tostring(err))
+  check('pool: emits messages', #c > 2, tostring(#c))
+  local joined = table.concat(c, '\n')
+  check('pool: brackets the run', joined:find('/pool/begin', 1, true) ~= nil
+    and joined:find('/pool/end', 1, true) ~= nil, joined)
+  check('pool: reports per-sequence addresses', joined:find('/pool/seq', 1, true) ~= nil, joined)
+  check('pool: casts the wider net too', joined:find('/pool/obj', 1, true) ~= nil, joined)
+  -- An accessor the mock does not implement must report NONE, not vanish: a
+  -- missing address is an answer, and a silent omission would read as "no such
+  -- object" when it means "we could not ask".
+  check('pool: names the accessor or says NONE',
+    joined:find('via=', 1, true) ~= nil, joined)
+  for _, cmd in ipairs(c) do
+    check('pool: command is SendOSC only', cmd:match('^SendOSC %d+ ".*"$') ~= nil, cmd)
+  end
+  check('pool: writes no file', next(files) == nil)
+  check('pool: runs no probes', table.concat(p, '\n'):find('PASS', 1, true) == nil)
+end
+
+-- 6. An unrecognised verb. A typo must not silently run the whole probe and
+--    hand back thirty lines someone would read as the answer they asked for.
+do
+  local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/', {}, 'pnig')
+  check('unknown verb: does not throw', ok, tostring(err))
+  check('unknown verb: emits exactly one message', #c == 1, tostring(#c))
+  if c[1] then
+    check('unknown verb: says so over OSC', c[1]:find('/error', 1, true) ~= nil, c[1])
+    check('unknown verb: command is SendOSC only', c[1]:match('^SendOSC %d+ ".*"$') ~= nil, c[1])
+  end
+  check('unknown verb: does not run the probe',
+    table.concat(p, '\n'):find('PASS', 1, true) == nil, table.concat(p, '\n'))
+  check('unknown verb: writes no file', next(files) == nil)
+end
+
+-- 7. Calling twice on ONE loaded chunk. Every scenario above reloads the file,
+--    which is exactly why the desk run reported 27/30 — three runs of 9/10
+--    accumulating in module state — and nothing here noticed.
+do
+  local ok, firstCmds, c, p = runTwice(richEnvironment, '^/Users/Shared/LIFE/', {}, {})
+  check('twice: neither call throws', ok)
+  local joined = table.concat(p, '\n')
+  check('twice: the second run does not double the tally',
+    joined:find('20/22 passed', 1, true) == nil, joined)
+  check('twice: the second run reports its own result',
+    select(2, joined:gsub('10/11 passed', '')) == 2, joined)
+  -- Same work, twice: a second run that emitted more lines than the first is
+  -- accumulating something.
+  check('twice: the second run emits the same number of messages',
+    #c - firstCmds == firstCmds, string.format('first %d, second %d', firstCmds, #c - firstCmds))
 end
 
 print(string.format('%d checks, %d failed', checks, failures))
