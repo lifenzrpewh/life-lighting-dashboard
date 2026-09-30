@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { LinkState } from '../shared/reading.js'
 import type { Mode, PaneRect } from '../shared/ma-pane.js'
-import { patchFrom, replyPortOf } from '../shared/settings.js'
+import { isLoopback, patchFrom, replyPortOf } from '../shared/settings.js'
 import { createMaPane, type MaPane } from './ma-pane.js'
 import { openSettings, type SettingsStore } from './settings.js'
 import type { DeskState } from '../shared/desk.js'
@@ -145,15 +145,19 @@ function startOsc(store: SettingsStore): void {
 			lastSendError = detail
 		},
 	})
+	// onPC on this computer holds the reply port on every address, so listen on
+	// loopback exactly, beside it (./bridge/osc-in.ts, at the bind).
+	const beside = s.consoleHost !== null && isLoopback(s.consoleHost) ? '127.0.0.1' : undefined
 	channelB = startChannelB({
 		port: replyPort,
+		beside,
 		onOtherChannel: (message) => consoleLink?.offer(message),
 		onBindError: (error) => {
 			console.error(`[kiosk] could not listen on ${replyPort}: ${error.message}`)
 			if (error.code === 'EADDRINUSE') {
 				console.error('[kiosk]   Something on this computer holds that port, usually grandMA3 onPC.')
 				console.error('[kiosk]   Commands still go out; nothing can come back, so the link stays unreachable.')
-				console.error('[kiosk]   Give replies their own port in Settings, and the console an OSC entry sending to it.')
+				console.error('[kiosk]   If onPC is on this computer, set the console address to 127.0.0.1.')
 			}
 		},
 	})

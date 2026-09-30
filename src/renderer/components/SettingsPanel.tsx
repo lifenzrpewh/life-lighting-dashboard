@@ -130,8 +130,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 					</Field>
 				</div>
 				<p className="text-sm text-booth-dim">
-					Listening on {replyPortOf(view)} now. onPC on this computer holds its own OSC port, so replies need a
-					different one, and the console a second OSC entry that sends to it.
+					Listening on {replyPortOf(view)} now. For onPC on this computer, set the console address to 127.0.0.1: onPC
+					holds its own OSC ports, so replies need a port and an OSC row of their own, row 3, sending to 127.0.0.1.
 				</p>
 			</Section>
 

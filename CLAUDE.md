@@ -41,7 +41,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
-| ⚠️ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: `Call Plugin "LifeBridge" "ping <token>"` a second over A, LIVE only while the echo comes back over C. 20 tests, and driven end to end in the kiosk against `spikes/stand-in-desk.mjs` 2026-09-30. **Never against MA**; the three open questions are in `docs/MA3_READ_MODEL.md` § The link ping. |
+| ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: `Call Plugin "LifeBridge" "ping <token>"` a second over A, LIVE only while the echo comes back over C. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30, 45–52 ms.** Still to watch: whether the pings clutter the command line. `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
 A command sent as `/life/cmd` `,s` **executed on the console**, and one fader move
@@ -252,6 +252,12 @@ absent. ~50 s, because five real exports are 45 MB each.
 pings.** All of it has been driven end to end against local stand-ins, never a desk.
 So the first thing is a console, and **onPC on this Mac counts**. It answers the
 link's three questions and most of the web remote checks without the booth.
+
+**The MA pane has two gaps the desk showed (2026-09-30), both unbuilt.** It never
+leaves `showing` once a page loads, so "Remotes are disabled!" stays after the LD
+turns Web Remote on; and it has no load timeout, so a full slot, which onPC answers
+with silence, leaves it `connecting` indefinitely. Both need a way back that sits
+beside the pane, never over it. `docs/MA3_READ_MODEL.md` § Web remote.
 
 **onPC on the same computer needs two OSC entries**, because onPC holds its entry's
 Port and the dashboard cannot listen there. The layout and the open question

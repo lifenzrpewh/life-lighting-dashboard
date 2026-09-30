@@ -290,6 +290,11 @@ To actually load new code, the loaded chunk has to go: delete the plugin object
 and re-import, or restart the console. Import alone is not enough — which
 means "the XML is self-contained" solves DISTRIBUTION, not DEPLOYMENT.
 
+And import reads the **library's** copy, not the repo's:
+`gma3_library/datapools/plugins/LifeBridge.xml`. On 2026-09-30 that was still the
+21 September build, so even a clean delete-and-import would have loaded code
+without `ping`. Copy `console-plugin/LifeBridge.xml` there first.
+
 ⚠️ It also means module state survives between calls, which is why the
 probe accumulated in the first place. Anything shipped must assume the chunk
 outlives the call and reset what it owns.
@@ -299,25 +304,40 @@ outlives the call and reset what it owns.
 There is no separate input/destination port — one field, used each way. Matches the
 2.3 manual's column list.
 
-### ⚠️ The link ping — still to observe
+### The link ping — ✅ onPC 2.3.2.0 on macOS, 2026-09-30
 
-The dashboard now sends `Call Plugin "LifeBridge" "ping <token>"` over channel A
-every second and is LIVE only while the echo `/life/ping ,s "<version>|<token>"`
-comes back (`src/bridge/ping.ts`). Proven end to end against
-`spikes/stand-in-desk.mjs` on 2026-09-30, **never against MA**. Three things only
-a console can answer, and onPC on the same computer answers all three:
+The dashboard sends `Call Plugin "LifeBridge" "ping <token>"` over channel A every
+second and is LIVE only while the echo `/life/ping ,s "<version>|<token>"` comes
+back (`src/bridge/ping.ts`). onPC on the dashboard's own computer:
 
-1. **Does `Call Plugin` pass an argument?** Only the bare form is ✅. If the echo
-   never arrives but channel B does, check this first.
-2. **Does a ping a second disturb anyone?** Two commands a second on the console
-   (the call, and the plugin's `SendOSC`). Watch the command line and its
-   history, and type on it while pings run.
-3. **onPC on the dashboard's own computer.** onPC holds its entry's Port, so the
-   dashboard cannot listen there (the bind fails loudly, by design). The layout to
-   try: one entry receiving commands on 8003, and **row 3** (the plugin sends
-   through row 3) sending to `127.0.0.1:8004`, with replies on 8004 in Settings.
-   Open question: does onPC also bind 8004 for a Send-only row? `lsof -nP -iUDP`
-   shows its sockets directly; no port scan needed on the same machine.
+1. ✅ **`Call Plugin` passes an argument.** The token came back exactly:
+   `2.3.2.0|probemuntuva0.1`. The kiosk then held **LIVE, 45–52 ms** per round
+   trip, every ping answered, nothing rejected. (The stand-in answers in ~1 ms;
+   the difference is the console running the plugin.)
+2. ⚠️ **Does a ping a second disturb anyone?** Two commands a second on the
+   console (the call, and the plugin's `SendOSC`). Still to watch: the command
+   line and its history, and typing on it while pings run.
+3. ✅ **onPC holds every row's Port, on every address (`*:port`), the rows that
+   only send included.** So a reply row sending to `127.0.0.1:8004` leaves 8004
+   taken, and the dashboard cannot listen there the ordinary way. It can listen on
+   `127.0.0.1:8004` **exactly**, beside onPC, with the reuse option (and only
+   with it), and then receives everything sent there. The kiosk does this
+   whenever the console address is loopback (`src/main/bridge/osc-in.ts`).
+   ⚠️ macOS only; Windows has its own rules for this and is untried.
+
+The working layout: a row receiving commands on **8003** (Receive, Receive
+Command; Send off, or onPC feeds its own output back in), and **row 3**, the row
+the plugin sends through, to `127.0.0.1` on **8004**. Settings: console
+`127.0.0.1`, OSC port 8003, replies on 8004.
+
+**❌ onPC opens no OSC socket at all while its station interface is missing.**
+Observed the same day: `manet_socket.xml` had `Interface 3.1`, the booth adapter
+(`en5`, 10.11.60.182), which was not plugged in. No row bound, the booth's rows
+included, and nothing said so; the web server kept answering because it binds
+every address. Menu › Network › interface `127.0.0.1` fixed it at once.
+`lsof -nP -iUDP` shows onPC's sockets directly on the same machine; no port scan
+needed. The same file carries the session (`Mount Eden Main Auditorium`), so this
+Mac rejoins the live show whenever it is on the booth network.
 
 ## UserVars
 
@@ -341,6 +361,9 @@ not disturb it.
 | ✅ What it is | A real **Display** of the station: identical to the MA, interactive (operator-observed 2026-09-27) |
 | ✅ Losing the console | The page shows its own **"disconnected"** (operator-observed 2026-09-27) |
 | 🔬 Address | `http://<station-ip>:8080`, any modern browser |
+| ✅ Web Remote off | onPC still answers on `:8080`, **HTTP 200**, with a white page reading "Remotes are disabled!" (onPC 2.3.2.0, 2026-09-30). A loaded page is not proof the remote is on; the pane reports it as `showing`, and the picture says what is wrong. **Turning Web Remote on does not reach that page**: it stays until reloaded |
+| ✅ Slots full | A client past the limit is **accepted and never answered**: the TCP connection opens, no HTTP response comes, no error (onPC 2.3.2.0, 2026-09-30, one other remote open). Not a refusal, so the pane cannot tell it from a slow console. Freeing the slot made the next request answer in 1 ms |
+| ✅ In the pane | The real web remote, as `Remote`, inside the kiosk on onPC 2.3.2.0, 2026-09-30 |
 | 🔬 Switch | Menu › Network (or Station Control) › Web Remote On |
 | 🔬 Login | Logs in as the user **`Remote`** by itself; `?user=<name>&password=<pw>` in the URL logs in as anyone else |
 | 🔬 Independent user | "Can log in as a different user than the one currently logged in on the connected station" |

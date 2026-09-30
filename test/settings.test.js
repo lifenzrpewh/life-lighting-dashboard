@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_SETTINGS, applyPatch, fromDisk, patchFrom, replyPortOf } from '../dist/src/shared/settings.js'
+import { DEFAULT_SETTINGS, applyPatch, fromDisk, isLoopback, patchFrom, replyPortOf } from '../dist/src/shared/settings.js'
 
 test('first boot has no console address, rather than a guessed one', () => {
 	assert.equal(DEFAULT_SETTINGS.consoleHost, null)
@@ -94,4 +94,18 @@ test('a bad OSC port rejects the patch and says which', () => {
 	const r = applyPatch(DEFAULT_SETTINGS, { oscPort: 70000, replyPort: Number.NaN })
 	assert.ok(!r.ok)
 	assert.deepEqual(Object.keys(r.errors).sort(), ['oscPort', 'replyPort'])
+})
+
+test('onPC on this computer with replies on its own port is refused, and says why', () => {
+	// ✅ 2026-09-30: onPC holds every row's port, and the reply socket sits beside
+	// it on 127.0.0.1, so one shared port would hand the dashboard its own commands.
+	for (const host of ['127.0.0.1', 'localhost', '127.0.0.2']) {
+		const r = applyPatch(DEFAULT_SETTINGS, { consoleHost: host })
+		assert.ok(!r.ok, host)
+		assert.match(r.errors.replyPort, /this computer/)
+	}
+	assert.ok(applyPatch(DEFAULT_SETTINGS, { consoleHost: '127.0.0.1', replyPort: 8004 }).ok)
+	assert.ok(applyPatch(DEFAULT_SETTINGS, { consoleHost: '10.11.60.40' }).ok, 'a console elsewhere shares one port, as MA intends')
+	assert.equal(isLoopback('127.0.0.1.example'), false)
+	assert.equal(isLoopback('10.11.60.40'), false)
 })

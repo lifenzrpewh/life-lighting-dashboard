@@ -39,6 +39,9 @@ export type ChannelBHandle = {
 
 export type ChannelBOptions = {
 	port: number
+	/** Listen on this address exactly, beside a program that holds the port on
+	 *  every address. For onPC on this computer: see the bind below. */
+	beside?: string
 	prefix?: string
 	drainHz?: number
 	/** Called with the settled updates of one frame. Never called with an empty
@@ -74,7 +77,17 @@ export function startChannelB(options: ChannelBOptions): ChannelBHandle {
 	// itself listening to a desk it can never hear. Without the option the bind
 	// fails with EADDRINUSE whatever the other process did, and the screen says
 	// "not bound" instead of "not heard yet".
-	const socket = dgram.createSocket({ type: 'udp4' })
+	//
+	// `beside` is the one exception, and a measured one (2026-09-30, onPC 2.3.2
+	// on macOS). onPC holds every OSC row's port on all addresses, the rows that
+	// only send included, so a reply row sending to 127.0.0.1:8004 leaves 8004
+	// taken. A socket on 127.0.0.1:8004 EXACTLY can still bind beside it, with
+	// the reuse option and only with it, and receives everything sent there,
+	// because the more specific address wins. The silent failure reuse allows
+	// is covered here by the link itself: if the echoes do not arrive, the link
+	// stays unreachable, whatever this socket believes.
+	// ⚠️ macOS only so far. Windows has its own rules for this; untried.
+	const socket = dgram.createSocket({ type: 'udp4', reuseAddr: options.beside !== undefined })
 
 	socket.on('listening', () => {
 		listening = true
@@ -115,7 +128,7 @@ export function startChannelB(options: ChannelBOptions): ChannelBHandle {
 		options.onBindError?.(error)
 	})
 
-	socket.bind(port)
+	socket.bind(port, options.beside)
 
 	const timer = setInterval(() => {
 		const drained = coalescer.drain()

@@ -31,9 +31,9 @@ export type Settings = {
 	 *  means the same as `oscPort`, which is MA's own model: an entry has one
 	 *  Port, used both ways (docs/MA3_READ_MODEL.md § One Port, both directions).
 	 *
-	 *  It differs only when grandMA3 onPC runs on this computer. onPC then holds
-	 *  `oscPort` itself, so replies need a port of their own, and the console
-	 *  needs a second OSC entry that sends to it. */
+	 *  It differs only when grandMA3 onPC runs on this computer, whose address is
+	 *  then 127.0.0.1. onPC holds every row's port itself (✅ 2026-09-30), so
+	 *  replies need a row and a port of their own. */
 	replyPort: number | null
 }
 
@@ -43,6 +43,12 @@ export const DEFAULT_OSC_PORT = 8003
 /** The port this computer actually listens on. */
 export function replyPortOf(s: Settings): number {
 	return s.replyPort ?? s.oscPort
+}
+
+/** True when the console address is this computer: onPC running beside the
+ *  dashboard. Loopback only, so it is decided from the address alone. */
+export function isLoopback(host: string): boolean {
+	return host === 'localhost' || /^127(?:\.\d{1,3}){3}$/.test(host)
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -114,6 +120,12 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 	// Stored as "same" rather than as a copy, so a later change to the console's
 	// port carries the replies with it.
 	if (next.replyPort === next.oscPort) next.replyPort = null
+	// The one layout known to fail. onPC on this computer holds its rows'
+	// ports, and the reply socket sits beside it on 127.0.0.1 exactly, so a
+	// shared port would carry the dashboard's own commands straight back to it.
+	if (next.consoleHost !== null && isLoopback(next.consoleHost) && replyPortOf(next) === next.oscPort && errors.replyPort === undefined) {
+		errors.replyPort = `The console is this computer, so onPC holds ${next.oscPort} itself. Replies need their own port, such as ${next.oscPort + 1}.`
+	}
 	if (patch.volunteerUser !== undefined) {
 		const e = userError(patch.volunteerUser)
 		if (e === null) next.volunteerUser = patch.volunteerUser
