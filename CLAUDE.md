@@ -248,10 +248,40 @@ absent. ~50 s, because five real exports are 45 MB each.
 
 ## Next session starts here
 
-**The service screen is built: run order + MA pane + settings, and the link now
-pings.** All of it has been driven end to end against local stand-ins, never a desk.
-So the first thing is a console, and **onPC on this Mac counts**. It answers the
-link's three questions and most of the web remote checks without the booth.
+**Where things stand (2026-09-30).** The service screen runs end to end against
+onPC on this Mac: the link is LIVE (a quiet ping, `src/bridge/ping.ts`) and the MA
+pane shows the real web remote as `Remote`. onPC counts as on-console.
+
+**Next: showfile info (Phase 3, the read half).** The `Showfile ▸` chip in
+`src/renderer/components/StatusBar.tsx` is still static text. Wanted: the loaded
+show's name, and a permanent amber `ON BASE SHOW` when it matches `SGV2_BaseShow`,
+normalised exactly as `SaveGuard.lua` does (Show Creator `plugin/`). Both reads
+are ✅ in `docs/MA3_READ_MODEL.md` § UserVars: `Root().manetsocket.showfile` and
+`GetVar(UserVars(), "SGV2_BaseShow")`. On Mount Eden Base both read `Mount Eden
+Base`: that show names itself as its base, so the chip should be amber there.
+- **Try first, costs nothing to test:** does the command line expand a variable
+  inside `SendOSC`? If so, the quiet ping could carry the name with no extra line
+  and no plugin. ⚠️ Untried; `$` expansion of system and user variables is not
+  observed anywhere in these docs.
+- **Otherwise a `show` verb in LifeBridge**, read-only, `SendOSC` only (the
+  harness enforces it). Deploying it: copy `console-plugin/LifeBridge.xml` into
+  `gma3_library/datapools/plugins/`, then **delete** the plugin and import.
+  Importing over it keeps the old code running.
+- Every ask is a line on the console's command line, so read on link-up and not
+  on a timer. Render it with the four states: UNKNOWN until read, never a
+  guessed name. Save As and Load are a separate decision, still open: MA's own
+  dialog plus SaveGuard may be enough.
+
+**Testing against onPC on this Mac.** The dashboard's settings are already right:
+console `127.0.0.1`, OSC 8003, replies 8004. In onPC:
+- Menu › Network interface **127.0.0.1**. With the booth's `en5` selected and
+  absent, onPC opens no OSC sockets at all.
+- Web Remote **On**.
+- OSC row 3 sends to `127.0.0.1:8004`; a row on 8003 has Receive and Receive
+  Command on, Send off.
+Then `npm run dev` and press `0` for the real link. `lsof -nP -iUDP` shows onPC's
+sockets directly. Keep this Mac off the booth network while testing: it is set
+to rejoin the live session. Details in `docs/MA3_READ_MODEL.md` § The link ping.
 
 **The MA pane has two gaps the desk showed (2026-09-30), both unbuilt.** It never
 leaves `showing` once a page loads, so "Remotes are disabled!" stays after the LD
@@ -259,35 +289,23 @@ turns Web Remote on; and it has no load timeout, so a full slot, which onPC answ
 with silence, leaves it `connecting` indefinitely. Both need a way back that sits
 beside the pane, never over it. `docs/MA3_READ_MODEL.md` § Web remote.
 
-**onPC on the same computer needs two OSC entries**, because onPC holds its entry's
-Port and the dashboard cannot listen there. The layout and the open question
-(whether a Send-only row binds too) are in `docs/MA3_READ_MODEL.md` § The link ping.
-This is also the "onPC alone" campus, so it is a real deployment, not a test rig.
+**Still for a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web
+remote (rights, URL login, the two-slot limit across a crash-reload, silent-drop
+timing, touch, render cost), and whether listening beside onPC works on Windows.
+Build the volunteer layout view on the MA user `Remote`; HOLDING and PRE/POST are
+its biggest targets (`docs/PLAN.md`, Phase 1).
 
-**At the desk — the six checks in `docs/MA3_READ_MODEL.md` § Web remote.** Rights,
-URL login, the two-slot limit across a crash-reload, silent-drop timing, touch, and
-render cost. Build the volunteer layout view on the MA user `Remote` while there;
-HOLDING and PRE/POST are its biggest targets (`docs/PLAN.md`, Phase 1).
+**App track — give the run order a real source.** Supabase client in `src/main`
+reading `note_values` / `lighting_cues` into `Service`. Main owns state truth; the
+renderer asks main and forms no opinion of its own. **Give the run order its own
+link while there**: it is still derived against the console link, so a dead
+console blanks PCO data (PLAN, "Known wrinkle").
 
-**App track — give the run order a real source.**
-1. Supabase client in `src/main` reading `note_values` / `lighting_cues` into
-   `Service`. Main owns state truth; the renderer asks main and forms no opinion
-   of its own. **Give the run order its own link while there**: it is still derived
-   against the console link, so a dead console blanks PCO data (PLAN, "Known
-   wrinkle").
-2. Showfile info (Phase 3) — the chip is still static text.
-
-**Console track — much smaller than it was.** No trigger board and no cue editor
-means no batched sequence snapshot and no timing/recipe verbs.
-1. **Prove the link on MA.** Built (2026-09-30), unproven on a console. Delete
-   LifeBridge from the plugin pool and import `console-plugin/LifeBridge.xml`
-   fresh: re-importing does not reload a plugin, and the console's copy predates
-   `ping`. Then the three questions in `docs/MA3_READ_MODEL.md` § The link ping.
-2. Still owed after that: showfile name, `SGV2_BaseShow`, and (Phase 3) Save As.
-   The `pool` verb was for joining channel B addresses to tiles; with no tiles it
-   waits until something needs that join. Keep the probe's guarantees: read-only on the show except the allow-listed
-Save As, no generic `cmd` verb in the shipped build, results that fail rather than
-return a plausible value.
+**Console track — keep it small.** The link and showfile info are all the MA pane
+leaves it. The `pool` verb waits until something needs that join. Keep the
+probe's guarantees: read-only on the show except an allow-listed Save As, no
+generic `cmd` verb in the shipped build, results that fail rather than return a
+plausible value.
 
 **Housekeeping:** `README.md` is stale (pre-desk status, 84 checks, the old
 design). Bring it in line with this file by linking, not copying.
