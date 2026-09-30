@@ -306,17 +306,22 @@ There is no separate input/destination port — one field, used each way. Matche
 
 ### The link ping — ✅ onPC 2.3.2.0 on macOS, 2026-09-30
 
-The dashboard sends `Call Plugin "LifeBridge" "ping <token>"` over channel A every
-second and is LIVE only while the echo `/life/ping ,s "<version>|<token>"` comes
-back (`src/bridge/ping.ts`). onPC on the dashboard's own computer:
+When the console has been quiet for 15 s, the dashboard sends
+`SendOSC 3 "/ping,s,<token>"` over channel A; the console answers by sending
+`/life/ping ,s "<token>"` back through row 3. Anything else the console says
+counts as proof it is there, so a console someone is working is never asked.
+Three unanswered asks in a row make the link UNREACHABLE, about 21 s after the
+console last spoke (`src/bridge/ping.ts`). onPC on the dashboard's own computer:
 
-1. ✅ **`Call Plugin` passes an argument.** The token came back exactly:
-   `2.3.2.0|probemuntuva0.1`. The kiosk then held **LIVE, 45–52 ms** per round
-   trip, every ping answered, nothing rejected. (The stand-in answers in ~1 ms;
-   the difference is the console running the plugin.)
-2. ⚠️ **Does a ping a second disturb anyone?** Two commands a second on the
-   console (the call, and the plugin's `SendOSC`). Still to watch: the command
-   line and its history, and typing on it while pings run.
+1. ✅ **`Call Plugin` passes an argument.** `Call Plugin "LifeBridge" "ping <t>"`
+   came back as `2.3.2.0|<t>`, exact. No longer how the link pings, but every
+   future plugin verb stands on it.
+2. ❌ **A ping a second was far too loud.** Each one wrote **two** lines on the
+   command line, `OK:call Plugin "LifeBridge" "ping …"` and then
+   `OK:SendOSC 3 "/ping,s,…"`, burying the history (operator's screenshot). Hence
+   the design above. ✅ **`SendOSC` sent directly over channel A answers the
+   same way**, one line per ask, 40.7 ms, no plugin involved. Measured in the
+   kiosk: **5 asks in 62 s** on a quiet console, LIVE throughout, 50–60 ms.
 3. ✅ **onPC holds every row's Port, on every address (`*:port`), the rows that
    only send included.** So a reply row sending to `127.0.0.1:8004` leaves 8004
    taken, and the dashboard cannot listen there the ordinary way. It can listen on

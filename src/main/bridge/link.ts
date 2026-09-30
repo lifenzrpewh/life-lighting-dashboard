@@ -1,18 +1,18 @@
-// The console link: a ping a second over channel A, echoes matched off channel C.
+// The console link: the timer and socket around src/bridge/ping.ts.
 //
-// WHY THIS EXISTS: src/bridge/ping.ts keeps the books and is pure; this is the
-// timer and the socket around it. `linkState()` in kiosk.ts returned UNREACHABLE
-// unconditionally until this landed, because nothing round-tripped.
+// WHY THIS EXISTS: ping.ts keeps the books and decides when to ask, and is pure;
+// this is the part that cannot be: a timer, a socket, and the messages off the
+// reply port.
 //
-// THE RULE THIS FILE ENFORCES: the link is LIVE only while echoes come back.
-// Nothing else counts: not channel B traffic, not a send that did not error, not
-// an address that resolves.
+// THE RULE THIS FILE ENFORCES: the link is LIVE only on evidence from the console
+// itself. An echo of our own ping, or anything else it says under our prefix.
+// Never a send that did not error, and never an address that resolves.
 
 import { performance } from 'node:perf_hooks'
 
 import { readPing } from '../../bridge/channel-c.js'
 import type { OscMessage } from '../../bridge/osc.js'
-import { createPingTracker, pingCommand, PING_INTERVAL_MS, type PingStats } from '../../bridge/ping.js'
+import { createLinkTracker, pingCommand, type PingStats } from '../../bridge/ping.js'
 import type { LinkState } from '../../shared/reading.js'
 import { createCommandSender, type CommandSender } from './osc-out.js'
 
@@ -21,13 +21,14 @@ import { createCommandSender, type CommandSender } from './osc-out.js'
  *  reads as a time of day. */
 const clock = () => performance.timeOrigin + performance.now()
 
+/** How often to ask ping.ts whether a ping is due. Local and cheap: nothing goes
+ *  to the console unless one is. Fine-grained so a miss is confirmed promptly. */
+const TICK_MS = 250
+
 export type LinkHandle = {
 	link(): LinkState
-	/** Offer a message off the reply port. Anything that is not a ping echo is
-	 *  ignored, since channel C carries more than pings. */
+	/** Offer a message off the reply port: an echo, or other proof of life. */
 	offer(message: OscMessage): void
-	/** The console version from the last echo, or null before one. */
-	version(): string | null
 	stats(): PingStats
 	stop(): void
 }
@@ -41,11 +42,21 @@ export function startLink(options: {
 	/** Different on every run, so no echo from an earlier run can match. */
 	session: string
 	onSendError?: (detail: string) => void
+	/** The link went live or down. For the log: a booth log that says when the
+	 *  console went away is worth more than one that says nothing. */
+	onChange?: (link: LinkState) => void
 }): LinkHandle {
-	const tracker = createPingTracker(options.session, clock())
-	let version: string | null = null
+	const tracker = createLinkTracker(options.session, clock())
+	const ours = `/${options.prefix}/`
 	let sender: CommandSender | null = null
 	let timer: ReturnType<typeof setInterval> | null = null
+	let lastState = tracker.link(clock()).state
+
+	const check = () => {
+		const now = tracker.link(clock())
+		if (now.state !== lastState) options.onChange?.(now)
+		lastState = now.state
+	}
 
 	if (options.host !== null) {
 		const target = createCommandSender({
@@ -55,20 +66,26 @@ export function startLink(options: {
 			onError: options.onSendError,
 		})
 		sender = target
-		const ping = () => target.send(pingCommand(tracker.send(clock())))
-		ping()
-		timer = setInterval(ping, PING_INTERVAL_MS)
+		const tick = () => {
+			const now = clock()
+			if (tracker.due(now)) target.send(pingCommand(tracker.send(now)))
+			check()
+		}
+		tick()
+		timer = setInterval(tick, TICK_MS)
 		timer.unref?.()
 	}
 
 	return {
 		link: () => tracker.link(clock()),
 		offer(message) {
+			// An echo that matches nothing (late, or another run's) is not a round
+			// trip, but it did come from the console, so it still counts as heard.
 			const read = readPing(message, options.prefix)
-			if (!read.ok) return
-			if (tracker.answer(read.reply.echo, clock()).ok) version = read.reply.version
+			const answered = read.ok && tracker.answer(read.reply.echo, clock()).ok
+			if (!answered && message.address.startsWith(ours)) tracker.heard(clock())
+			check()
 		},
-		version: () => version,
 		stats: () => tracker.stats(),
 		stop() {
 			if (timer !== null) clearInterval(timer)

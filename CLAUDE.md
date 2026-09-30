@@ -41,7 +41,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
-| ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: `Call Plugin "LifeBridge" "ping <token>"` a second over A, LIVE only while the echo comes back over C. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30, 45–52 ms.** Still to watch: whether the pings clutter the command line. `docs/MA3_READ_MODEL.md` § The link ping. |
+| ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
 A command sent as `/life/cmd` `,s` **executed on the console**, and one fader move

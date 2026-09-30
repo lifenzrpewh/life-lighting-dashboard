@@ -14,12 +14,13 @@
 // ✅ CHANNEL B IS WIRED (2026-09-21). Main binds the reply port and holds live
 // executor levels from the desk — see `./bridge/osc-in.ts`.
 //
-// ⚠️ THE LINK IS A PING ROUND TRIP (./bridge/link.ts), unverified on a desk.
-// Liveness needs a request we sent and did not get an answer to; channel B is
-// the console talking unprompted, so it can prove the desk IS there and can
-// never prove it is not. So main asks LifeBridge for an echo every second, and
-// the link is LIVE only while echoes come back. Hearing channel B stays its own
-// fact in `DeskState.lastHeardAt`, beside the link rather than inside it.
+// THE LINK (./bridge/link.ts, ../bridge/ping.ts). Liveness needs a request that
+// can go unanswered; channel B is the console talking unprompted, so it can
+// prove the console IS there and never that it is not. So when the console has
+// been quiet for 15 s, main asks it to echo a token, and three unanswered asks
+// in a row make it UNREACHABLE. Anything the console says counts as proof it is
+// there, so a console someone is working is never asked at all: every ask is a
+// line on its command line. ✅ LIVE against onPC 2.3.2.0, 2026-09-30.
 
 import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
@@ -144,6 +145,8 @@ function startOsc(store: SettingsStore): void {
 			if (detail !== lastSendError) console.error(`[kiosk] channel A: ${detail}`)
 			lastSendError = detail
 		},
+		onChange: (link) =>
+			console.log(link.state === 'live' ? `[kiosk] console link live, ${link.roundTripMs.toFixed(0)} ms` : '[kiosk] console link unreachable'),
 	})
 	// onPC on this computer holds the reply port on every address, so listen on
 	// loopback exactly, beside it (./bridge/osc-in.ts, at the bind).
@@ -151,7 +154,7 @@ function startOsc(store: SettingsStore): void {
 	channelB = startChannelB({
 		port: replyPort,
 		beside,
-		onOtherChannel: (message) => consoleLink?.offer(message),
+		onMessage: (message) => consoleLink?.offer(message),
 		onBindError: (error) => {
 			console.error(`[kiosk] could not listen on ${replyPort}: ${error.message}`)
 			if (error.code === 'EADDRINUSE') {

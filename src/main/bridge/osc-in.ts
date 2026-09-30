@@ -47,9 +47,10 @@ export type ChannelBOptions = {
 	/** Called with the settled updates of one frame. Never called with an empty
 	 *  set: a quiet desk should cost the renderer nothing at all. */
 	onFrame?: (updates: ExecutorLevel[]) => void
-	/** Every message that decoded but is not an executor update: channel C,
-	 *  which shares this port. Routed by the caller, never counted as rejected. */
-	onOtherChannel?: (message: OscMessage) => void
+	/** Every message that decoded, channel B and C alike, for the link: anything
+	 *  the console says is proof it is there. Called before the channel B read,
+	 *  so a message this file then rejects was still heard. */
+	onMessage?: (message: OscMessage) => void
 	/** Bind failure. EADDRINUSE usually means grandMA3 onPC is running on this
 	 *  computer and holds the port; see the bind below for why that is loud. */
 	onBindError?: (error: NodeJS.ErrnoException) => void
@@ -106,14 +107,14 @@ export function startChannelB(options: ChannelBOptions): ChannelBHandle {
 			rejected += 1
 			return
 		}
+		options.onMessage?.(decoded.message)
 
 		const read = readExecutorUpdate(decoded.message, prefix)
 		if (!read.ok) {
 			// `other-channel` is a channel C push sharing this port — expected
 			// traffic, and counting it as a fault would make a healthy desk look
 			// broken. Only a shape we should have understood counts as rejected.
-			if (read.reason === 'other-channel') options.onOtherChannel?.(decoded.message)
-			else rejected += 1
+			if (read.reason !== 'other-channel') rejected += 1
 			return
 		}
 

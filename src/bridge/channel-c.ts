@@ -1,24 +1,22 @@
-// Channel C — what the LifeBridge plugin pushes back over `SendOSC`.
+// Channel C — what the console pushes back over `SendOSC`, whether the plugin or
+// the console's own command line runs it.
 //
 // WHY THIS EXISTS: channel C shares a port with channel B (docs/MA3_READ_MODEL.md
-// § One Port, both directions), so everything the plugin says arrives in the same
+// § One Port, both directions), so everything it carries arrives in the same
 // stream as the fader traffic and has to be picked out of it by address. Only
 // `ping` is read so far, because the link is the only thing that needs it yet.
 //
-// THE RULE THIS FILE ENFORCES: an echo is read exactly as the plugin writes it,
-// or not at all. `pingVerb` in console-plugin/LifeBridge.lua sends one string,
-// `<console version>|<echo>`, to the bare address `/ping`, and the OSC entry
-// prepends its Prefix (✅ 2026-09-21: SendOSC prepends it, so `/ping` arrives as
-// `/life/ping`). Any other shape is refused, because a reply read loosely is a
-// reply that can match a ping it does not answer.
+// THE RULE THIS FILE ENFORCES: an echo is read exactly as the console writes it,
+// or not at all. `pingCommand` in ./ping.ts has the console run
+// `SendOSC 3 "/ping,s,<token>"`, and the row prepends its Prefix (✅ 2026-09-21:
+// SendOSC prepends it, so `/ping` arrives as `/life/ping`). One string, the token
+// and nothing else. Any other shape is refused, because a reply read loosely is
+// a reply that can match a ping it does not answer.
 
 import type { OscMessage } from './osc.js'
 
 export type PingReply = {
-	/** What the console says it runs, e.g. `2.3.2.0`. The plugin probes it
-	 *  every ping, so a console upgraded mid-run changes it here. */
-	version: string
-	/** Whatever followed `ping` in the command: the token the request carried. */
+	/** The token the ping carried, as the console sent it back. */
 	echo: string
 }
 
@@ -40,8 +38,5 @@ export function readPing(message: OscMessage, prefix: string): PingReadResult {
 		return { ok: false, reason: 'bad-args', detail: `expected s, got ${shape || '(none)'}` }
 	}
 
-	const bar = only.value.indexOf('|')
-	if (bar === -1) return { ok: false, reason: 'bad-args', detail: `no '|' in ${JSON.stringify(only.value)}` }
-
-	return { ok: true, reply: { version: only.value.slice(0, bar), echo: only.value.slice(bar + 1) } }
+	return { ok: true, reply: { echo: only.value } }
 }

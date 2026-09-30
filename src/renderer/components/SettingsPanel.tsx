@@ -109,7 +109,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
 			<Section title="OSC">
 				<p className="text-sm text-booth-dim">
-					How the dashboard checks the console is there: a ping every second, answered by the LifeBridge plugin.
+					How the dashboard checks the console is there: after 15 s of quiet it asks the console to echo a
+					message back, which puts one SendOSC line on the console's command line.
 					These must match the console's OSC entry, prefix <code>life</code>.
 				</p>
 				<div className="grid grid-cols-2 gap-4">

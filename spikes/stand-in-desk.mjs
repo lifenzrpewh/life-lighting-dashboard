@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // A stand-in console for the link, for running the kiosk with no desk and no onPC.
 //
-// WHY THIS EXISTS: the ping round trip has three halves in main (the sender, the
-// reply socket, the timer) that the unit tests cannot reach. This answers pings
-// the way LifeBridge's `pingVerb` does, so the real app can be run end to end.
+// WHY THIS EXISTS: the link has three halves in main (the sender, the reply
+// socket, the timer) that the unit tests cannot reach. This answers pings the way
+// a console runs `SendOSC 3 "/ping,s,<token>"`, so the real app can be run end to
+// end.
 //
 // ⚠️ IT IS NOT A DESK, and proves nothing about one. It answers the command
-// string src/bridge/ping.ts sends, which is exactly the part still unverified on
-// a console: a wrong `Call Plugin` syntax passes here and fails on the MA. It
-// runs nothing else it is sent, and says so. Its echoes carry the version
-// `stand-in`, so nothing downstream can mistake them for a console's.
+// string src/bridge/ping.ts sends, so a command MA would refuse passes here. It
+// runs nothing else it is sent, and says so, and it prints every ping, which is
+// the other half of the point: it shows how often the dashboard asks.
 //
 // It holds the OSC port the way onPC does, so on one computer the dashboard
 // needs a reply port of its own: the same setup onPC needs, rehearsed.
@@ -37,7 +37,7 @@ const SILENT_AFTER_S = flag('silent-after', null)
 const PREFIX = 'life'
 // The exact form src/bridge/ping.ts sends. Kept literal rather than imported so
 // a change there fails here, where someone will notice, instead of passing.
-const PING = /^Call Plugin "LifeBridge" "ping (\S+)"$/
+const PING = /^SendOSC 3 "\/ping,s,(\S+)"$/
 
 const started = Date.now()
 const silent = () => SILENT_AFTER_S !== null && Date.now() - started > Number(SILENT_AFTER_S) * 1000
@@ -60,11 +60,12 @@ sock.on('message', (buf, from) => {
 		return
 	}
 
-	const reply = encodeOscString(`/${PREFIX}/ping`, `stand-in|${token}`)
+	const reply = encodeOscString(`/${PREFIX}/ping`, token)
 	if (!reply.ok) return console.log(`  !! could not encode reply: ${reply.detail}`)
 	sock.send(reply.bytes, REPLY_PORT, REPLY_HOST)
 	answered += 1
-	if (answered === 1 || answered % 10 === 0) console.log(`  <> ping ${token} answered (${answered} so far)`)
+	const at = ((Date.now() - started) / 1000).toFixed(1)
+	console.log(`  <> [+${at}s] ping ${token} answered (${answered} so far)`)
 })
 
 sock.on('error', (e) => {
