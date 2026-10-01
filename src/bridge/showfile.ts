@@ -7,18 +7,28 @@
 // asks when the link comes up, and after that at most once every
 // SHOW_REFRESH_MS, only in a quiet gap: when a ping is going out anyway because
 // the console has said nothing for 15 s. A console the LD is working is never
-// asked (agreed with the operator, 2026-09-30). About 0.4 lines a minute on a
-// quiet console, none on a busy one.
+// asked (agreed with the operator, 2026-09-30). About two lines a minute on a
+// quiet console since the refresh went to one minute (2026-10-02), none on a
+// busy one.
 //
 // WHY IT ASKS AGAIN AT ALL: a Load or a Save As at the console changes the name
 // and need not drop the link. Link-up alone could hold the old name for a whole
-// service. Five minutes is the most it can be behind on a quiet console; on a
+// service. A minute is the most it can be behind on a quiet console; on a
 // busy one it ages, and says so (SHOW_STALE_AFTER_MS, in src/shared/showfile.ts
 // with the other timings, because the renderer needs it).
 //
 // THE RULE THIS FILE ENFORCES: the Channel holds only what the console said.
 // An ask with no answer becomes a timeout, never a name; a failed read keeps
 // the last good name only as `lastOk`, which readingOf shows with its age.
+//
+// WATCHED, NOT ONLY ASKED (✅ onPC 2.3.2.0, 2026-10-02). Each ask is `watch`
+// rather than `show`: LifeBridge answers as `show` does, then keeps a loop on the
+// console that reads the name each second and pushes it only when it changes.
+// So a Load or Save As reaches the chip in about a second, and the asks above
+// are what restart a watcher that has stopped (docs/MA3_READ_MODEL.md § The
+// showfile, watched). A push needs no ask in flight: `reply` records whatever
+// the console says. A plugin older than `watch` says so, and is asked `show`
+// until the next link-up.
 //
 // Deliberately time-free, like ping.ts: the caller passes a monotonic `now`.
 
@@ -28,9 +38,10 @@ import { SHOW_REFRESH_MS, SHOW_TIMEOUT_MS, type Showfile } from '../shared/showf
 import type { ShowReply } from './channel-c.js'
 
 /** The command that asks. `Call Plugin` passes the verb (✅ 2026-09-30, onPC
- *  2.3.2.0: `Call Plugin "LifeBridge" "ping <t>"` arrived exact). */
-export function showCommand(): string {
-	return 'Call Plugin "LifeBridge" "show"'
+ *  2.3.2.0: `Call Plugin "LifeBridge" "ping <t>"` arrived exact). `watch` by
+ *  default; `show` for a plugin that has said it has no `watch`. */
+export function showCommand(verb: 'watch' | 'show' = 'watch'): string {
+	return `Call Plugin "LifeBridge" "${verb}"`
 }
 
 /** Why the chance to ask came up. */
@@ -44,6 +55,8 @@ export type AskMoment =
 export type ShowfileReader = {
 	/** Should an ask go out now? Never while one is in flight. */
 	due(now: number, moment: AskMoment): boolean
+	/** The command for the ask that is due. */
+	command(): string
 	/** An ask went out. */
 	asked(now: number): void
 	/** A reply came back, from readShow in ./channel-c.ts. */
@@ -57,6 +70,8 @@ export function createShowfileReader(): ShowfileReader {
 	let channel = unread<Showfile>()
 	let askedAt: number | null = null
 	let lastAskAt: number | null = null
+	/** Whether the console's LifeBridge knows `watch`, as far as we know. */
+	let verb: 'watch' | 'show' = 'watch'
 
 	const put = (result: ReadResult<Showfile>) => {
 		channel = record(channel, result)
@@ -72,12 +87,19 @@ export function createShowfileReader(): ShowfileReader {
 		due(now, moment) {
 			expire(now)
 			if (askedAt !== null) return false
-			if (moment === 'link-up') return true
+			// A link-up is the moment a plugin may have been re-imported, so a
+			// console that refused `watch` is offered it again.
+			if (moment === 'link-up') {
+				verb = 'watch'
+				return true
+			}
 			// Timed from the last ASK, not the last good read. A console without
 			// the verb, or without the plugin, would otherwise be asked in every
 			// quiet gap, two lines each, for as long as it stayed broken.
 			return lastAskAt === null || now - lastAskAt >= SHOW_REFRESH_MS
 		},
+
+		command: () => showCommand(verb),
 
 		asked(now) {
 			expire(now)
@@ -87,6 +109,14 @@ export function createShowfileReader(): ShowfileReader {
 
 		reply(reply, now) {
 			expire(now)
+			if (reply.kind === 'no-watch') {
+				// The ask was answered, with no name: ask `show` at the next quiet
+				// gap rather than waiting out a whole refresh for it.
+				askedAt = null
+				lastAskAt = null
+				verb = 'show'
+				return
+			}
 			// Recorded whether or not an ask is in flight: a late answer, or one to
 			// someone else's ask, is still what the console said when it said it.
 			askedAt = null

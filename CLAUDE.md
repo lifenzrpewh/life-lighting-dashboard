@@ -36,7 +36,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `spikes/scan-exports.mjs` | Derives `export-blacklist.json`. No desk needed. |
 | ✅ `console-plugin/LifeBridge.lua` | Probe v1, run on the console 2026-09-21 — pushed 14 results back over `SendOSC`. Read-only on the show. `OSC_ENTRY = 3`. |
 | ✅ `scripts/build-plugin-xml.mjs` | Embeds the Lua into a self-contained importable XML. Round-trip verified before the file lands. |
-| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 225 checks. |
+| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 240 checks. |
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
 | ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. Channel B is wired (the "desk heard" pill); the link still reports UNREACHABLE because nothing round-trips yet. |
@@ -47,7 +47,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
-| ✅ `src/bridge/showfile.ts` · LifeBridge `show` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap; the old plugin's `unknown verb show` recognised. `docs/MA3_READ_MODEL.md` § The showfile. |
+| ✅ `src/bridge/showfile.ts` · LifeBridge `show` · `watch` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap. **Watched since 2026-10-02**: the ask is `watch`, and LifeBridge then pushes any change within a second (the chip went amber 1.8 s after a base change, in the kiosk). A Load ends the watcher, so a Load still waits for the next link-up or ask. An older plugin's `unknown verb watch` falls back to `show`. `docs/MA3_READ_MODEL.md` § The showfile, watched. |
 | ✅ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, Settings can clear it. **Working on this Mac, 2026-10-02 (owner-observed):** signed in by the app's own QR as a booth device, songs-only and note editing both work. Server side: `visuals-song-comms` `2675660` (booth devices edit), migrations `20261002090000_pairing_kind` and `20261002100000_booth_device_edit`. Not yet on Windows. |
 | 🔬 `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's running timer and stage message (`/v1/timers/current`, `/v1/stage/message`) otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. Shapes researched from OnTime's source (v4.14) and ProPresenter's OpenAPI spec, 2026-10-02; **the kiosk ran end to end against stand-ins in those shapes** (both phases, and both going away), **not yet against a real OnTime or ProPresenter.** Addresses are in Settings › Countdown. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
@@ -219,7 +219,7 @@ touchscreen, so a Windows checkout is a first-class case, not a courtesy.
 | | |
 |---|---|
 | **Node** | `^22.20` (see `engines`) |
-| **Lua** | any 5.x on PATH. `npm test` runs the 225-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
+| **Lua** | any 5.x on PATH. `npm test` runs the 240-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
 | **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so. **Present but empty** (MA3 installed, exports not copied across: the normal state on a fresh Windows box) makes three tests *fail* rather than skip (`expected a large corpus, got 0`), because `findLibrary` only asks whether the directory exists, not whether it holds anything |
 
 `scripts/deploy-plugin.sh` is bash and needs Git Bash or WSL on Windows. It is
@@ -290,11 +290,16 @@ on-console.
    address (port 4001), ProPresenter's address and the port its Network settings
    show, with Enable Network on. Watch an OnTime event start and stop, and a
    ProPresenter timer and stage message. Then move the 🔬 row above to ✅.
-0. **Showfile name updates are too slow (owner, 2026-10-02).** By design today: an
-   ask is two lines on the console's command line, so it goes out on link-up and
-   then at most every 5 min, only in a quiet gap (`src/bridge/showfile.ts`). A
-   Load or Save As can take minutes to show. Find a faster trigger that stays off
-   the command line, such as the plugin pushing on a show change, before asking more often.
+0. **A showfile read that stays off the command line (research).** The watcher
+   pushes a Save As or base change within a second, but a Load ends it, so the new
+   name waits for the next ask: once a quiet minute now (was 5 min, the owner's
+   call 2026-10-02), two lines each. Two leads, both unverified: whether
+   `CmdIndirect` runs `SendOSC` without the echo, and whether a show can start its
+   watcher itself on load. The bare ping cannot carry the name (❌ variables do
+   not expand in `SendOSC`). Also still to see: whether each push is a line.
+0. **Every booth show needs the OSC row and LifeBridge** (✅ 2026-10-02: a Load
+   replaces OSC settings; "Mount Eden Base" as saved has no 8003 row). The work
+   is the Show Creator's: its `docs/ROADMAP.md` § From the Lighting Dashboard.
 1. **The test installer on the booth PC** (`npm run dist:win`). Whether a managed
    machine runs it unsigned decides hosting, self-update and start at login. On the
    booth screen, also check the Windows touch keyboard comes up for a note.
@@ -332,7 +337,8 @@ MA pane (`src/renderer/panePlacement.ts` keeps both native views over their boxe
 It signs itself in, by emailed code or its own QR, keeps that sign-in and its offline
 queue in a persistent session, and is a picture, not a reading: the app shows its own
 offline banner. Folding the column hides it without reloading, so a half-typed note
-survives. Input in it counts toward operator mode's idle timer.
+survives. Its edge drags to resize (`src/renderer/cueWidth.ts` has the limits), and
+dragged nearly shut it folds; double-tap puts it back to a phone's width. Input in it counts toward operator mode's idle timer.
 
 **The showfile chip.** LifeBridge's `show` verb makes SaveGuard's verdict on the
 console, because the trip mangles names (`docs/MA3_READ_MODEL.md` § The showfile).

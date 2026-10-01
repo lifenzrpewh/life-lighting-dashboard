@@ -19,7 +19,7 @@ import { performance } from 'node:perf_hooks'
 import { readPing, readShow } from '../../bridge/channel-c.js'
 import type { OscMessage } from '../../bridge/osc.js'
 import { createLinkTracker, pingCommand, type PingStats } from '../../bridge/ping.js'
-import { createShowfileReader, showCommand, type AskMoment } from '../../bridge/showfile.js'
+import { createShowfileReader, type AskMoment } from '../../bridge/showfile.js'
 import type { Channel, LinkState, ReadResult } from '../../shared/reading.js'
 import type { Showfile } from '../../shared/showfile.js'
 import { createCommandSender, type CommandSender } from './osc-out.js'
@@ -83,7 +83,7 @@ export function startLink(options: {
 	const askShow = (moment: AskMoment) => {
 		const now = clock()
 		if (sender === null || !showfile.due(now, moment)) return
-		sender.send(showCommand())
+		sender.send(showfile.command())
 		showfile.asked(now)
 	}
 

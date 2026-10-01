@@ -379,9 +379,10 @@ The verdict is made there because the trip mangles the names (ASCII only, no
 commas), and the chip must agree with SaveGuard, which sees them unmangled.
 `default` means the show has no `SGV2_BaseShow` and SaveGuard's own
 `LIFE Basefile Master` applies. Decoded by `readShow` in
-`src/bridge/channel-c.ts`; asked on link-up and then at most every 5 min, only
-in a quiet gap (`src/bridge/showfile.ts`). Two command lines per ask, about 0.4
-a minute on a quiet console.
+`src/bridge/channel-c.ts`; asked on link-up and then at most once a minute
+(every 5 min until 2026-10-02), only
+in a quiet gap (`src/bridge/showfile.ts`). Two command lines per ask: about 0.4
+a minute at the old cadence, under two a minute now.
 
 ✅ **The answer, onPC 2.3.2.0 on "Mount Eden Base", 2026-09-30**, after deleting
 and re-importing LifeBridge: `2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base`,
@@ -393,6 +394,46 @@ first quiet gap past the 5-minute mark: two asks in five minutes, four lines.
 no `show`, onPC answered `/life/error ,s "unknown verb show"`. The dashboard
 reads that exact string as "delete LifeBridge and import it again", so the
 stale-import trap above shows up on the chip rather than as a silent `?`.
+
+### The showfile, watched — LifeBridge `watch`, ✅ onPC 2.3.2.0, 2026-10-02
+
+`Call Plugin "LifeBridge" "watch"` answers exactly as `show` does, then stays:
+a loop on the console reads the same two values once a second
+(`coroutine.yield(1)`) and sends `/show` again only when the answer changes.
+`/watch ,s "started"`, `"already"` (one is running; this call answered and
+returned) and `"stopped"` (after `unwatch`) say what the loop did. The dashboard
+asks `watch` wherever it asked `show`, so a stopped watcher is restarted by the
+next ask, at no extra cost in lines.
+
+Observed on "test", with the plugin deleted and imported first:
+
+- ✅ **MA3 keeps resuming a yielded plugin.** `unwatch` at 14:02:08.9 UTC,
+  `stopped` at 14:02:09.9: the loop woke within its second and saw it.
+- ✅ **The console stays responsive beside it.** While it ran, `show`, a bare
+  `SendOSC` ping and a second `watch` were each answered at once, with another
+  plugin's `MessageBox` open on screen as well.
+- ✅ **A change arrives in about a second, unasked.** `SetUserVariable
+  "SGV2_BaseShow" "Watch Test"` → `/show` with the new base 3 s after the
+  watcher started, i.e. at its next wake; setting it back, 2 s later, likewise.
+  In the kiosk, the chip went to ON BASE SHOW within 1.8 s and back.
+- ✅ **A `LoadShow` ends the watcher.** After `LoadShow "Mount Eden Base"
+  /NoConfirmation /NoSave` and loading "test" back, a base change produced
+  nothing, and LifeBridge answered `unknown verb watch`: the plugin running was
+  the saved show's own, older one. Nothing in memory crosses a load. So a Load
+  reaches the chip at the next link-up or the next ask, not in a second.
+- ❌ **A system variable does not expand inside `SendOSC`'s string.**
+  `SendOSC 3 "/ping,s,x=$VERSION"` arrived as the literal `x=$VERSION`, as did
+  `$SHOWFILE`, `$SHOWNAME` and `$SHOW`. So the bare ping cannot carry the show
+  name, which would have caught a Load within one quiet gap.
+- ⚠️ **Not yet seen: whether each push is a line on the LD's command line.** It
+  is a `Cmd('SendOSC …')`, as every reply is, so presumably yes, one per change.
+
+✅ **OSC settings are show data, and a Load replaces them.** "Mount Eden Base" as
+saved on disk opens UDP 8000 only, so loading it took 8003 and 8004 away and the
+dashboard had no link, and no way to send, until "test" was loaded again. Every
+show a booth loads must carry the dashboard's OSC row, as well as LifeBridge, or
+the link drops with the load. The 2026-09-30 link on "Mount Eden Base" was
+against that show as it stood in memory, not as saved.
 
 ## UserVars
 

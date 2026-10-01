@@ -10,8 +10,10 @@
 // actually refuses the save. They are carried to be shown, and that is all.
 
 /** How long a read may go before a quiet gap asks again. The cadence and why it
- *  is this slow are in src/bridge/showfile.ts. */
-export const SHOW_REFRESH_MS = 5 * 60_000
+ *  is this slow are in src/bridge/showfile.ts. One minute since 2026-10-02 (was
+ *  five): the watcher carries every change but a Load, which ends it, so this
+ *  is how soon a Load reaches the chip on a quiet console (the owner's call). */
+export const SHOW_REFRESH_MS = 60_000
 
 /** How long an ask may take before it counts as unanswered. A plugin call is
  *  slower than a bare SendOSC, and a busy console slower still; an answer after

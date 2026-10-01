@@ -458,6 +458,54 @@ do
     #c - firstCmds == firstCmds, string.format('first %d, second %d', firstCmds, #c - firstCmds))
 end
 
+-- 8. `watch` — answers as `show` does, then stays, pushing only on a change.
+--    Run as the console runs it: inside a coroutine, resumed after each yield.
+--    One chunk throughout, because the watcher is module state on purpose.
+do
+  cmds, prints, files = {}, {}, {}
+  mockIO('^/Users/Shared/LIFE/')
+  local showfile = '/shows/test.show'
+  showEnvironment(showfile, 'Mount Eden Base')()
+  _G.Root = function() return { manetsocket = { showfile = showfile }, Version = '2.3.2.0' } end
+  local main = assert(loadfile('console-plugin/LifeBridge.lua'))()
+  local co = coroutine.create(function() return main('watch') end)
+  local oscOf = function(i) return cmds[i] and cmds[i]:match('^SendOSC %d+ "(.-)"$') end
+
+  local ok, slept = coroutine.resume(co)
+  check('watch: starts without throwing', ok, tostring(slept))
+  check('watch: answers with the show first', oscOf(1) == '/show,s,2.3.2.0|other|uservar|test|Mount Eden Base', tostring(cmds[1]))
+  check('watch: then says it started', oscOf(2) == '/watch,s,started', tostring(cmds[2]))
+  check('watch: then yields, one second', coroutine.status(co) == 'suspended' and slept == 1, tostring(slept))
+
+  coroutine.resume(co)
+  check('watch: a quiet second says nothing', #cmds == 2, table.concat(cmds, '\n'))
+
+  showfile = '/shows/Mount Eden Base.show'
+  coroutine.resume(co)
+  check('watch: a change is pushed once', #cmds == 3 and oscOf(3) == '/show,s,2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base',
+    table.concat(cmds, '\n'))
+  coroutine.resume(co)
+  check('watch: and not again while it holds', #cmds == 3, table.concat(cmds, '\n'))
+
+  -- A second watch, as the dashboard's next ask: answers, does not stack.
+  local okB = pcall(main, 'watch')
+  check('watch again: answers and returns', okB and oscOf(4) ~= nil and oscOf(4):match('^/show,s,') ~= nil, tostring(cmds[4]))
+  check('watch again: says one is already running', oscOf(5) == '/watch,s,already', tostring(cmds[5]))
+
+  pcall(main, 'unwatch')
+  check('unwatch: sends nothing itself', #cmds == 5, table.concat(cmds, '\n'))
+  coroutine.resume(co)
+  check('unwatch: the loop ends at its next wake', coroutine.status(co) == 'dead')
+  check('unwatch: and says it stopped', oscOf(6) == '/watch,s,stopped', tostring(cmds[6]))
+
+  local onlyOsc = true
+  for _, c in ipairs(cmds) do if not c:match('^SendOSC %d+ ".*"$') then onlyOsc = false end end
+  check('watch: SendOSC is the only command it ever sent', onlyOsc, table.concat(cmds, '\n'))
+  check('watch: prints nothing', #prints == 0, table.concat(prints, '\n'))
+  check('watch: writes no file', next(files) == nil)
+  io.open = realOpen
+end
+
 print(string.format('%d checks, %d failed', checks, failures))
 if failures > 0 then os.exit(1) end
 print('LIFEBRIDGE HARNESS: OK')

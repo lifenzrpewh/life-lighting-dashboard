@@ -614,18 +614,69 @@ end
 ---
 --- Read-only, like everything here. No Printf either: the command line is the
 --- LD's, and this runs on every link-up and every few quiet minutes.
-local function showVerb()
+local function showPayload()
   pcall(probeVersion)
   local raw
   pcall(function() raw = Root().manetsocket.showfile end)
   local name = normaliseShowName(raw)
-  if name == nil then
-    sendOsc('/show', 's', fieldSafe(consoleVersion) .. '|unreadable')
+  if name == nil then return fieldSafe(consoleVersion) .. '|unreadable' end
+  local base, from = baseShowName()
+  return sformat('%s|%s|%s|%s|%s', fieldSafe(consoleVersion),
+    name == base and 'base' or 'other', from, fieldSafe(name), fieldSafe(base))
+end
+
+local function showVerb()
+  sendOsc('/show', 's', showPayload())
+end
+
+--- `watch` — answer as `show` does, then keep watching, and say it again only
+--- when it changes.
+---
+--- WHY THIS EXISTS: `show` is asked, and every ask is two lines on the LD's
+--- command line, so the dashboard asks rarely and a Load or Save As took
+--- minutes to reach the chip. Watching reads the same two values in-process
+--- once a second (an object read is ~0.01 ms) and puts nothing on the command
+--- line until the answer changes: then one SendOSC line.
+---
+--- One watcher at a time. A second `watch` answers and returns, so the
+--- dashboard can ask again whenever it likes without stacking loops. The token
+--- is a fresh table per loop, so `unwatch` followed by `watch` cannot leave an
+--- old loop running beside the new one: the old one sees it is no longer the
+--- watcher and ends.
+---
+--- ✅ onPC 2.3.2.0, 2026-10-02: MA3 keeps resuming it, the console stays
+--- responsive beside it, and a change arrives in about a second. A LoadShow
+--- ends it (the new show runs its own plugin), so the dashboard's next ask
+--- starts it again. docs/MA3_READ_MODEL.md § The showfile, watched.
+local WATCH_EVERY_S = 1
+local watcher = nil
+
+local function watchVerb()
+  local said = showPayload()
+  sendOsc('/show', 's', said)
+  if watcher ~= nil then
+    sendOsc('/watch', 's', 'already')
     return
   end
-  local base, from = baseShowName()
-  sendOsc('/show', 's', sformat('%s|%s|%s|%s|%s', fieldSafe(consoleVersion),
-    name == base and 'base' or 'other', from, fieldSafe(name), fieldSafe(base)))
+  local me = {}
+  watcher = me
+  sendOsc('/watch', 's', 'started')
+  while watcher == me do
+    coroutine.yield(WATCH_EVERY_S)
+    if watcher ~= me then break end
+    local now = showPayload()
+    if now ~= said then
+      sendOsc('/show', 's', now)
+      said = now
+    end
+  end
+  sendOsc('/watch', 's', 'stopped')
+end
+
+--- `unwatch` — the watcher ends at its next wake. Sends nothing itself: the
+--- watcher's own `stopped` is the proof it ended.
+local function unwatchVerb()
+  watcher = nil
 end
 
 --- Try each address accessor and report which one answers.
@@ -714,6 +765,10 @@ local function main(...)
   if verb == 'ping' then return pingVerb(rest) end
 
   if verb == 'show' then return showVerb() end
+
+  if verb == 'watch' then return watchVerb() end
+
+  if verb == 'unwatch' then return unwatchVerb() end
 
   if verb == 'pool' then
     log('pool probe — READ-ONLY, resolving object addresses')

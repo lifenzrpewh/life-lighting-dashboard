@@ -25,6 +25,18 @@ export const stateClass: Record<'live' | 'stale' | 'unknown', string> = {
  *  hide the explanation along with the thing being explained. */
 export const staleContent = 'opacity-60'
 
+/** The one shape every chip in the status bar takes, so the bar reads as a
+ *  row of like things: same height, same corners, same spacing. The state
+ *  classes above go on top of it. */
+export const chip = 'flex h-10 min-w-0 items-center gap-3 rounded-md border px-3'
+
+/** The small caps naming what a chip is (SHOW, ONTIME). */
+export const chipLabel = 'text-[10px] font-semibold tracking-widest whitespace-nowrap text-booth-dim uppercase'
+
+/** A quiet button in a bar: chip-sized, so it lines up with the chips. */
+export const barButton =
+	'flex h-10 shrink-0 items-center rounded-md border border-booth-edge px-3 text-xs tracking-wide whitespace-nowrap text-booth-dim active:scale-[0.98] active:bg-booth-edge'
+
 export function formatAge(ms: number): string {
 	const s = Math.round(ms / 1000)
 	if (s < 60) return `${s}s ago`

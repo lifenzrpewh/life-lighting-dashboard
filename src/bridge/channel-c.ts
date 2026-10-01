@@ -53,6 +53,9 @@ export type ShowReply =
 	 *  `unknown verb show`. Re-importing over it is not enough (❌ 2026-09-21);
 	 *  the plugin has to be deleted and imported. */
 	| { kind: 'no-verb' }
+	/** The LifeBridge loaded predates `watch`, and said `unknown verb watch`.
+	 *  Not a failure of the read: the reader asks `show` instead. */
+	| { kind: 'no-watch' }
 
 export type ShowReadResult =
 	| { ok: true; reply: ShowReply }
@@ -79,6 +82,7 @@ export function readShow(message: OscMessage, prefix: string): ShowReadResult {
 	if (message.address === `/${bare}/error`) {
 		// Only this verb's refusal is ours; another verb's is someone else's.
 		if (only === 'unknown verb show') return { ok: true, reply: { kind: 'no-verb' } }
+		if (only === 'unknown verb watch') return { ok: true, reply: { kind: 'no-watch' } }
 		return { ok: false, reason: 'other-channel', detail: `${message.address} is not about show` }
 	}
 

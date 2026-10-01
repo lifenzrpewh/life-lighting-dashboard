@@ -11,7 +11,7 @@ import type { TimerSources } from '../../shared/timer.js'
 import { ModeChip } from './ModeChip.js'
 import { TimerChip } from './TimerChip.js'
 import type { DeskState } from '../../shared/desk.js'
-import { Unknown, formatAge, staleContent, stateClass } from './vocabulary.js'
+import { Unknown, barButton, chip, chipLabel, formatAge, staleContent, stateClass } from './vocabulary.js'
 
 /** What channel B has actually heard — an OBSERVATION, sat deliberately apart
  *  from the link pill's VERDICT.
@@ -28,15 +28,15 @@ function DeskPill({ desk, now }: { desk: DeskState | null; now: number }) {
 	if (!desk.listening) {
 		// A port that would not bind is a fault to act on, not a quiet desk.
 		// Amber is reserved for exactly this.
-		return <span className="text-warn">OSC port {desk.port} not bound</span>
+		return <span className="whitespace-nowrap text-warn">OSC port {desk.port} not bound</span>
 	}
 
 	if (desk.lastHeardAt === null) {
-		return <span className="text-booth-dim">desk not heard yet</span>
+		return <span className="whitespace-nowrap text-booth-dim">desk not heard yet</span>
 	}
 
 	return (
-		<span className="text-booth-dim">
+		<span className="whitespace-nowrap text-booth-dim">
 			desk {formatAge(now - desk.lastHeardAt)} · {desk.executors.length}{' '}
 			{desk.executors.length === 1 ? 'control' : 'controls'}
 			{/* Should sit at zero forever. A number climbing here means the desk is
@@ -54,17 +54,19 @@ function formatRoundTrip(ms: number): string {
 	return ms < 10 ? `${ms.toFixed(1)} ms` : `${Math.round(ms)} ms`
 }
 
-function LinkPill({ link }: { link: LinkState }) {
+/** The link's verdict. The round trip is a number for the operator; a
+ *  volunteer needs only whether the console is there. */
+function LinkPill({ link, detail }: { link: LinkState; detail: boolean }) {
 	if (link.state === 'live') {
 		return (
-			<span className="flex items-center gap-2 text-state-live">
+			<span className="flex items-center gap-2 whitespace-nowrap text-state-live">
 				<span className="size-2 rounded-full bg-state-live" />
-				LIVE {formatRoundTrip(link.roundTripMs)}
+				LIVE{detail && <span className="text-booth-dim">{formatRoundTrip(link.roundTripMs)}</span>}
 			</span>
 		)
 	}
 	return (
-		<span className="flex items-center gap-2 text-state-unreachable">
+		<span className="flex items-center gap-2 whitespace-nowrap text-state-unreachable">
 			<span className="size-2 rounded-full bg-state-unreachable" />
 			UNREACHABLE
 		</span>
@@ -83,8 +85,8 @@ function ShowfileChip({ showfile, failure }: { showfile: Reading<Showfile>; fail
 		live: (show) => <ShowName show={show} ageMs={null} />,
 		stale: (show, ageMs) => <ShowName show={show} ageMs={ageMs} />,
 		unknown: (why) => (
-			<span className={`flex min-w-0 items-center gap-2 rounded border px-3 py-1 ${stateClass.unknown}`}>
-				<span className="text-booth-dim">Showfile</span>
+			<span className={`${chip} ${stateClass.unknown}`}>
+				<span className={chipLabel}>Show</span>
 				<Unknown why={why} />
 				{/* What went wrong, when the console said: an out-of-date plugin is
 				    something the LD can fix, and "read failed" alone does not say how. */}
@@ -104,10 +106,14 @@ function ShowName({ show, ageMs }: { show: Showfile; ageMs: number | null }) {
 			? stateClass.stale
 			: stateClass.live
 	return (
-		<span className={`flex min-w-0 items-center gap-2 rounded border px-3 py-1 ${frame}`}>
-			<span className={`flex min-w-0 items-center gap-2 ${stale ? staleContent : ''}`}>
-				{show.onBase && <span className="font-semibold tracking-widest whitespace-nowrap text-warn">ON BASE SHOW</span>}
-				<span className="truncate">{show.name}</span>
+		<span className={`${chip} ${frame}`}>
+			<span className={`flex min-w-0 items-center gap-3 ${stale ? staleContent : ''}`}>
+				{show.onBase ? (
+					<span className="text-xs font-semibold tracking-widest whitespace-nowrap text-warn">ON BASE SHOW</span>
+				) : (
+					<span className={chipLabel}>Show</span>
+				)}
+				<span className="truncate text-sm">{show.name}</span>
 			</span>
 			{stale && <span className="text-xs whitespace-nowrap text-state-stale">{formatAge(ageMs)}</span>}
 		</span>
@@ -151,44 +157,54 @@ export function StatusBar({
 	const clock = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 	// Today, from the same clock the ages derive from — not a literal, and not
 	// the service's own date, which is a different fact and can disagree.
-	const date = new Date(now).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' })
+	const date = new Date(now).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
+	const operator = mode === 'operator'
 	return (
-		<header className="flex items-center gap-6 border-b border-booth-edge bg-booth-panel px-6 py-3 text-sm">
-			<LinkPill link={link} />
-			<DeskPill desk={desk} now={now} />
-			<span className="text-booth-dim">{date}</span>
-			<span className="min-w-0 truncate text-booth-dim">MA · {pane}</span>
-			{/* Beside the pane, never over it. The pane reloads itself when MA's
-			    page is stuck in a state it never leaves; this is for whatever that
-			    does not recognise. It reconnects the picture and fires nothing. */}
-			{onReloadPane !== null && (
-				<button
-					type="button"
-					onClick={onReloadPane}
-					className="rounded border border-booth-edge px-3 py-1 text-xs whitespace-nowrap text-booth-dim active:scale-[0.98]"
-				>
-					Reload MA
-				</button>
+		<header className="flex h-16 shrink-0 items-center gap-4 border-b border-booth-edge bg-booth-panel px-4 text-sm">
+			{/* The console: is it there, and which show is it on. */}
+			<LinkPill link={link} detail={operator} />
+			<ShowfileChip showfile={showfile} failure={showfileFailure} />
+			{/* For the operator only: what the wire has heard and where the pane
+			    is pointed. A volunteer has the pane itself to look at. */}
+			{operator && (
+				<span className="flex min-w-0 items-center gap-4 text-xs">
+					<DeskPill desk={desk} now={now} />
+					<span className="min-w-0 truncate text-booth-dim">MA · {pane}</span>
+				</span>
 			)}
-			{/* The countdown to what comes next, beside the time of day. */}
+
+			{/* The time: what comes next, and what it is now. */}
 			<span className="ml-auto flex min-w-0 items-center">
 				<TimerChip sources={timers} />
 			</span>
-			<span className="text-2xl font-medium tabular-nums">{clock}</span>
-			{/* Boots into volunteer, always, and never remembers otherwise. */}
-			<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
-			{mode === 'operator' && (
-				<button
-					type="button"
-					onClick={onSettings}
-					className={`rounded border px-4 py-2 text-xs tracking-widest ${
-						settingsOpen ? 'border-booth-ink bg-booth-ink text-booth-bg' : 'border-booth-edge text-booth-dim'
-					}`}
-				>
-					SETTINGS
-				</button>
-			)}
-			<ShowfileChip showfile={showfile} failure={showfileFailure} />
+			<span className="flex shrink-0 flex-col items-end leading-tight">
+				<span className="text-2xl font-medium tabular-nums">{clock}</span>
+				<span className="text-xs text-booth-dim">{date}</span>
+			</span>
+
+			{/* Controls, where the hand rests. None touches the show. */}
+			<span className="flex shrink-0 items-center gap-2 border-l border-booth-edge pl-4">
+				{/* Beside the pane, never over it. The pane reloads itself when MA's
+				    page is stuck in a state it never leaves; this is for whatever
+				    that does not recognise. It reconnects the picture and fires
+				    nothing. */}
+				{onReloadPane !== null && (
+					<button type="button" onClick={onReloadPane} className={barButton}>
+						↻ MA
+					</button>
+				)}
+				{operator && (
+					<button
+						type="button"
+						onClick={onSettings}
+						className={settingsOpen ? `${barButton} border-booth-ink bg-booth-ink text-booth-bg` : barButton}
+					>
+						SETTINGS
+					</button>
+				)}
+				{/* Boots into volunteer, always, and never remembers otherwise. */}
+				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
+			</span>
 		</header>
 	)
 }

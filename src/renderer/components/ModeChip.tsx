@@ -49,7 +49,7 @@ export function ModeChip({ mode, onEnter, onLeave }: { mode: Mode; onEnter: () =
 			onClick={() => pressedIn.current === 'operator' && onLeave()}
 			// A long press on a touchscreen opens a context menu. Not here.
 			onContextMenu={(e) => e.preventDefault()}
-			className={`relative overflow-hidden rounded border px-4 py-2 text-xs tracking-widest ${
+			className={`relative flex h-10 shrink-0 items-center overflow-hidden rounded-md border px-4 text-xs tracking-widest ${
 				mode === 'operator'
 					? 'border-booth-ink bg-booth-ink font-semibold text-booth-bg'
 					: 'border-booth-edge text-booth-dim'

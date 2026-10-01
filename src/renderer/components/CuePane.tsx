@@ -10,6 +10,7 @@ import { useRef } from 'react'
 import type { CuePaneReport, CuePaneState } from '../../shared/cue-pane.js'
 import { usePanePlacement } from '../panePlacement.js'
 import { Say } from './MaPane.js'
+import { barButton } from './vocabulary.js'
 
 function Message({ pane, now }: { pane: CuePaneState | null; now: number }) {
 	if (pane === null) return <Say head="No Cue Manager here" body="The Cue Manager is shown only inside the kiosk." />
@@ -45,7 +46,7 @@ function Message({ pane, now }: { pane: CuePaneState | null; now: number }) {
 
 export function FoldedCuePane({ onOpen }: { onOpen: () => void }) {
 	return (
-		<nav className="flex w-14 shrink-0 flex-col border-r-2 border-booth-edge bg-booth-panel">
+		<nav className="flex w-14 shrink-0 flex-col border-r border-booth-edge bg-booth-panel">
 			<button
 				type="button"
 				onClick={onOpen}
@@ -65,11 +66,14 @@ export function CuePane({
 	report,
 	folded,
 	onFold,
+	width,
 	now,
 }: {
 	report: CuePaneReport | null
 	folded: boolean
 	onFold: () => void
+	/** In pixels: the divider beside it sets it (../cueWidth.ts). */
+	width: number
 	now: number
 }) {
 	const box = useRef<HTMLDivElement>(null)
@@ -77,26 +81,21 @@ export function CuePane({
 
 	const showing = report?.pane.state === 'showing'
 	return (
-		// A phone's width: the app is built for phones, and narrower than this
-		// it starts to wrap song titles.
-		<nav className={`w-[26rem] shrink-0 flex-col border-r-2 border-booth-edge bg-booth-panel ${folded ? 'hidden' : 'flex'}`}>
-			<div className="flex items-center gap-3 border-b border-booth-edge py-1 pl-4 pr-1">
-				<h2 className="text-xs font-semibold uppercase tracking-widest text-booth-dim">Run order</h2>
-				<span className="text-xs text-booth-dim">Cue Manager</span>
+		// Its width is the divider's; the limits, and why, are in ../cueWidth.ts.
+		<nav style={{ width }} className={`shrink-0 flex-col bg-booth-panel ${folded ? 'hidden' : 'flex'}`}>
+			<div className="flex h-12 items-center gap-2 border-b border-booth-edge pr-1 pl-4">
+				<h2 className="text-[10px] font-semibold tracking-widest text-booth-dim uppercase">Run order</h2>
+				<span className="ml-auto" />
 				{showing && (
-					<button
-						type="button"
-						onClick={() => window.life?.retryCuePane()}
-						className="ml-auto rounded border border-booth-edge px-3 py-1 text-xs text-booth-dim active:scale-[0.98]"
-					>
-						Reload
+					<button type="button" onClick={() => window.life?.retryCuePane()} className={`${barButton} h-9`} aria-label="Reload the run order">
+						↻
 					</button>
 				)}
 				<button
 					type="button"
 					onClick={onFold}
 					aria-label="Fold the run order away"
-					className={`h-10 w-12 rounded text-lg text-booth-dim active:bg-booth-edge ${showing ? '' : 'ml-auto'}`}
+					className="h-10 w-12 rounded-md text-lg text-booth-dim active:bg-booth-edge"
 				>
 					‹
 				</button>

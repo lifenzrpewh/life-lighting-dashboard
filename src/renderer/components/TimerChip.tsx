@@ -18,7 +18,7 @@ import {
 	type ProPresenterNow,
 	type TimerSources,
 } from '../../shared/timer.js'
-import { Unknown, formatAge, staleContent, stateClass, unknownWhy } from './vocabulary.js'
+import { Unknown, chip, chipLabel, formatAge, staleContent, stateClass, unknownWhy } from './vocabulary.js'
 
 /** Finer than the status bar's one-second clock, so a countdown does not hold a
  *  number for nearly two seconds when its tick and the clock's fall apart. */
@@ -68,7 +68,7 @@ function OnTime({ value, remaining, ageMs }: { value: OnTimeNow; remaining: numb
 	if (!onTimeRunning(value)) {
 		return (
 			<Frame source="OnTime" ageMs={ageMs}>
-				<span className="text-booth-dim">no event running</span>
+				<span className="text-sm text-booth-dim">no event running</span>
 			</Frame>
 		)
 	}
@@ -92,8 +92,8 @@ function ProPresenter({ value, ageMs, ontime }: { value: ProPresenterNow; ageMs:
 	return (
 		<Frame source="ProPresenter" ageMs={ageMs} note={ontime}>
 			{value.timer !== null && <Countdown label={value.timer.name || 'Timer'} ms={value.timer.seconds * 1000} />}
-			{value.message !== null && <span className="max-w-[24rem] truncate text-base">{value.message}</span>}
-			{value.timer === null && value.message === null && <span className="text-booth-dim">no timer running</span>}
+			{value.message !== null && <span className="max-w-[24rem] truncate text-sm">{value.message}</span>}
+			{value.timer === null && value.message === null && <span className="text-sm text-booth-dim">no timer running</span>}
 		</Frame>
 	)
 }
@@ -101,7 +101,7 @@ function ProPresenter({ value, ageMs, ontime }: { value: ProPresenterNow; ageMs:
 function Countdown({ label, ms }: { label: string; ms: number | null }) {
 	return (
 		<span className="flex min-w-0 items-baseline gap-3">
-			<span className="max-w-[20rem] truncate text-base">{label}</span>
+			<span className="max-w-[20rem] truncate text-sm">{label}</span>
 			<span className="text-2xl font-medium tabular-nums">{ms === null ? '–:––' : formatCountdown(ms)}</span>
 		</span>
 	)
@@ -124,8 +124,8 @@ function Frame({
 	const stale = ageMs !== null
 	const frame = unknown ? stateClass.unknown : stale ? stateClass.stale : stateClass.live
 	return (
-		<span className={`flex min-w-0 items-center gap-3 rounded border px-3 py-1 ${frame}`}>
-			<span className="text-[10px] font-semibold tracking-widest whitespace-nowrap text-booth-dim uppercase">{source}</span>
+		<span className={`${chip} ${frame}`}>
+			<span className={chipLabel}>{source}</span>
 			<span className={`flex min-w-0 items-center gap-3 ${stale ? staleContent : ''}`}>{children}</span>
 			{stale && <span className="text-xs whitespace-nowrap text-state-stale">{formatAge(ageMs)}</span>}
 			{/* An event may be running in OnTime that nobody can see: said here,

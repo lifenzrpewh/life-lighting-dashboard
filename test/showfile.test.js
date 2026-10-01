@@ -26,8 +26,10 @@ const SHOW = { kind: 'show', show: ON_BASE }
 // --- the ask -----------------------------------------------------------------
 
 test('the ask is one plugin call, and it survives the trip to the console', () => {
-	assert.equal(showCommand(), 'Call Plugin "LifeBridge" "show"')
+	assert.equal(showCommand(), 'Call Plugin "LifeBridge" "watch"')
+	assert.equal(showCommand('show'), 'Call Plugin "LifeBridge" "show"')
 	assert.ok(encodeOscString('/life/cmd', showCommand()).ok)
+	assert.ok(encodeOscString('/life/cmd', showCommand('show')).ok)
 })
 
 test('the verb asked for is a verb LifeBridge dispatches', () => {
@@ -164,6 +166,31 @@ test('an unreadable name and an out-of-date plugin are failures with the reason'
 	assert.deepEqual(readingOf(r.channel(T0 + 1), T0 + 1, LIVE, SHOW_STALE_AFTER_MS), { state: 'unknown', why: 'error' })
 })
 
+test('a plugin without watch is asked show at the next quiet gap, and offered watch again on link-up', () => {
+	assert.deepEqual(readShow(msg('/life/error', str('unknown verb watch')), 'life'), { ok: true, reply: { kind: 'no-watch' } })
+	const r = createShowfileReader()
+	assert.equal(r.due(T0, 'link-up'), true)
+	assert.equal(r.command(), 'Call Plugin "LifeBridge" "watch"')
+	r.asked(T0)
+	r.reply({ kind: 'no-watch' }, T0 + 100)
+	assert.equal(r.channel(T0 + 100).latest, null, 'no name, and not a failure either')
+	assert.equal(r.due(T0 + 15_000, 'quiet-gap'), true, 'not a whole refresh later')
+	assert.equal(r.command(), 'Call Plugin "LifeBridge" "show"')
+	r.asked(T0 + 15_000)
+	r.reply(SHOW, T0 + 15_100)
+	assert.equal(r.due(T0 + 30_000, 'quiet-gap'), false, 'then the usual cadence')
+	assert.equal(r.command(), 'Call Plugin "LifeBridge" "show"')
+	assert.equal(r.due(T0 + 40_000, 'link-up'), true)
+	assert.equal(r.command(), 'Call Plugin "LifeBridge" "watch"')
+})
+
+test('a push from the watcher is recorded with no ask in flight', () => {
+	const r = createShowfileReader()
+	r.reply(SHOW, T0)
+	r.reply({ kind: 'show', show: { ...ON_BASE, name: 'test', onBase: false } }, T0 + 60_000)
+	assert.equal(r.channel(T0 + 60_000).latest.value.name, 'test')
+})
+
 test('the channel is the same object until something new is recorded', () => {
 	// link.ts logs a showfile change by identity; a fresh object per call would
 	// log every quarter second.
@@ -223,10 +250,11 @@ test('a console that never answers is not asked in every quiet gap', () => {
 			asks += 1
 		}
 	}
-	assert.ok(asks <= 12, `${asks} asks in an hour of silence`)
+	// One a minute, the refresh: never one every 15 s gap (240).
+	assert.ok(asks <= 60, `${asks} asks in an hour of silence`)
 })
 
-test('a quiet hour costs about twelve asks: 0.4 command lines a minute', () => {
+test('a quiet hour costs about sixty asks: two command lines a minute', () => {
 	// The ping goes out every QUIET_MS on a quiet console; each is a gap.
 	const r = createShowfileReader()
 	r.asked(T0)
@@ -240,6 +268,6 @@ test('a quiet hour costs about twelve asks: 0.4 command lines a minute', () => {
 		}
 	}
 	const linesPerMinute = (asks * 2) / 60
-	assert.ok(asks >= 12 && asks <= 13, `${asks} asks in a quiet hour`)
-	assert.ok(linesPerMinute <= 0.45, `${linesPerMinute.toFixed(2)} lines a minute`)
+	assert.ok(asks >= 45 && asks <= 61, `${asks} asks in a quiet hour`)
+	assert.ok(linesPerMinute <= 2.05, `${linesPerMinute.toFixed(2)} lines a minute`)
 })

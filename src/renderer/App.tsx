@@ -9,6 +9,8 @@ import type { CuePaneReport } from '../shared/cue-pane.js'
 import type { TimerSources } from '../shared/timer.js'
 import { StatusBar } from './components/StatusBar.js'
 import { CuePane, FoldedCuePane } from './components/CuePane.js'
+import { Divider } from './components/Divider.js'
+import { useCueWidth } from './cueWidth.js'
 import { MaPane, paneSummary } from './components/MaPane.js'
 import { SettingsPanel } from './components/SettingsPanel.js'
 import { useMode } from './mode.js'
@@ -44,6 +46,7 @@ export function App() {
 	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
 	const [runOrderOpen, setRunOrderOpen] = useState(true)
 	const [settingsOpen, setSettingsOpen] = useState(false)
+	const cueWidth = useCueWidth()
 
 	// The clock is real time; ages derive from it, so STALE arrives on its own
 	// rather than needing something to happen.
@@ -247,8 +250,21 @@ export function App() {
 			    "never covered" is a fact about the layout rather than a rule
 			    someone has to remember. The buttons are the MA's own, in the pane. */}
 			<div className="flex min-h-0 flex-1">
-				<CuePane report={cue} folded={!runOrderOpen} onFold={() => setRunOrderOpen(false)} now={now} />
-				{!runOrderOpen && <FoldedCuePane onOpen={() => setRunOrderOpen(true)} />}
+				<CuePane report={cue} folded={!runOrderOpen} onFold={() => setRunOrderOpen(false)} width={cueWidth.width} now={now} />
+				{runOrderOpen ? (
+					<Divider
+						width={cueWidth.width}
+						onDrag={cueWidth.set}
+						onDone={cueWidth.commit}
+						onFold={() => {
+							cueWidth.revert()
+							setRunOrderOpen(false)
+						}}
+						onReset={cueWidth.reset}
+					/>
+				) : (
+					<FoldedCuePane onOpen={() => setRunOrderOpen(true)} />
+				)}
 				<main className="flex min-w-0 flex-1 flex-col">
 					{/* Always mounted, so the connection survives the settings panel
 					    standing in its place. */}

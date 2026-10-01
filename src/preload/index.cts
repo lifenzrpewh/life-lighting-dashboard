@@ -26,7 +26,7 @@ const api = {
 
 	/** What the console has said about its loaded showfile (LifeBridge's `show`
 	 *  verb), for the renderer to age and render in the four states. Read on
-	 *  link-up and every few quiet minutes, never guessed. */
+	 *  link-up and once a quiet minute, never guessed. */
 	showfile: (): Promise<Channel<Showfile>> => ipcRenderer.invoke('showfile:state'),
 
 	/** What OnTime and ProPresenter last said, for the countdown chip. A source

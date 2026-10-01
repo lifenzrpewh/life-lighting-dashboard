@@ -23,7 +23,7 @@
 // line on its command line. ✅ LIVE against onPC 2.3.2.0, 2026-09-30.
 //
 // THE SHOWFILE (../bridge/showfile.ts) is read over the same link: LifeBridge's
-// `show` verb, on link-up and in quiet gaps every few minutes. Main holds what
+// `show` verb, on link-up and in quiet gaps once a minute. Main holds what
 // the console said; the renderer ages it and renders it in the four states.
 //
 // THE RUN ORDER is the visuals app itself, embedded (./cue-pane.ts), with its
