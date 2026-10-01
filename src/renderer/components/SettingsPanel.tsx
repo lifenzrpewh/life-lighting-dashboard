@@ -17,6 +17,10 @@ type Draft = {
 	oscPort: string
 	/** Blank means the same port as the console's. */
 	replyPort: string
+	onTimeHost: string
+	onTimePort: string
+	proPresenterHost: string
+	proPresenterPort: string
 	volunteerUser: string
 	operatorUser: string
 	volunteerPassword: string
@@ -30,6 +34,10 @@ const draftOf = (v: SettingsView): Draft => ({
 	webRemotePort: String(v.webRemotePort),
 	oscPort: String(v.oscPort),
 	replyPort: v.replyPort === null ? '' : String(v.replyPort),
+	onTimeHost: v.onTimeHost ?? '',
+	onTimePort: String(v.onTimePort),
+	proPresenterHost: v.proPresenterHost ?? '',
+	proPresenterPort: v.proPresenterPort === null ? '' : String(v.proPresenterPort),
 	volunteerUser: v.volunteerUser,
 	operatorUser: v.operatorUser ?? '',
 	volunteerPassword: '',
@@ -47,6 +55,10 @@ function patchOf(d: Draft): SettingsPatch {
 		webRemotePort: portOf(d.webRemotePort),
 		oscPort: portOf(d.oscPort),
 		replyPort: d.replyPort.trim() === '' ? null : portOf(d.replyPort),
+		onTimeHost: d.onTimeHost,
+		onTimePort: portOf(d.onTimePort),
+		proPresenterHost: d.proPresenterHost,
+		proPresenterPort: d.proPresenterPort.trim() === '' ? null : portOf(d.proPresenterPort),
 		volunteerUser: d.volunteerUser,
 		operatorUser: d.operatorUser === '' ? null : d.operatorUser,
 	}
@@ -135,6 +147,31 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 					Listening on {replyPortOf(view)} now. For onPC on this computer, set the console address to 127.0.0.1: onPC
 					holds its own OSC ports, so replies need a port and an OSC row of their own, row 3, sending to 127.0.0.1.
 				</p>
+			</Section>
+
+			<Section title="Countdown">
+				<p className="text-sm text-booth-dim">
+					The timer beside the clock. OnTime is shown whenever an event is running there; otherwise ProPresenter’s
+					running timer and stage message. Leave an address blank to not use that program.
+				</p>
+				<div className="grid grid-cols-2 gap-4">
+					<Field label="OnTime address" error={errors.onTimeHost}>
+						<Input value={draft.onTimeHost} onChange={(v) => set({ onTimeHost: v })} placeholder="not used" />
+					</Field>
+					<Field label="OnTime port" error={errors.onTimePort} hint="4001 unless OnTime says otherwise.">
+						<Input value={draft.onTimePort} onChange={(v) => set({ onTimePort: v })} inputMode="numeric" />
+					</Field>
+					<Field label="ProPresenter address" error={errors.proPresenterHost}>
+						<Input value={draft.proPresenterHost} onChange={(v) => set({ proPresenterHost: v })} placeholder="not used" />
+					</Field>
+					<Field
+						label="ProPresenter port"
+						error={errors.proPresenterPort}
+						hint="ProPresenter › Settings › Network, with Enable Network on."
+					>
+						<Input value={draft.proPresenterPort} onChange={(v) => set({ proPresenterPort: v })} inputMode="numeric" />
+					</Field>
+				</div>
 			</Section>
 
 			<Section title="MA users">

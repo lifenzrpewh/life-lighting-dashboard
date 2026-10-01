@@ -9,7 +9,8 @@
 //
 // The OSC ports pass that test only because of the order things happen in: the
 // show does know them, in its OSC entry, but nothing can be read from the show
-// until they are already right.
+// until they are already right. OnTime and ProPresenter pass it plainly: they
+// are other computers, and no show knows where they are.
 //
 // Passwords are write-only from the renderer's side. `SettingsView` says
 // whether one is set and never what it is; main keeps them encrypted at rest.
@@ -35,7 +36,17 @@ export type Settings = {
 	 *  then 127.0.0.1. onPC holds every row's port itself (✅ 2026-09-30), so
 	 *  replies need a row and a port of their own. */
 	replyPort: number | null
+	/** OnTime, for the countdown chip. Null host: OnTime is not used. */
+	onTimeHost: string | null
+	onTimePort: number
+	/** ProPresenter, likewise. Its port is whatever its Network settings show,
+	 *  which it picks itself, so there is no default to offer. */
+	proPresenterHost: string | null
+	proPresenterPort: number | null
 }
+
+/** OnTime's own default (docs.getontime.no, HTTP API). */
+export const DEFAULT_ONTIME_PORT = 4001
 
 /** The working config's port (✅ 2026-09-21, OSC row 3). */
 export const DEFAULT_OSC_PORT = 8003
@@ -58,6 +69,10 @@ export const DEFAULT_SETTINGS: Settings = {
 	operatorUser: null,
 	oscPort: DEFAULT_OSC_PORT,
 	replyPort: null,
+	onTimeHost: null,
+	onTimePort: DEFAULT_ONTIME_PORT,
+	proPresenterHost: null,
+	proPresenterPort: null,
 }
 
 /** What the renderer is shown. Passwords appear only as whether they exist. */
@@ -126,6 +141,30 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 	if (next.consoleHost !== null && isLoopback(next.consoleHost) && replyPortOf(next) === next.oscPort && errors.replyPort === undefined) {
 		errors.replyPort = `The console is this computer, so onPC holds ${next.oscPort} itself. Replies need their own port, such as ${next.oscPort + 1}.`
 	}
+	const hostError = 'An IP address like 10.11.60.50, or a hostname. No port or http://.'
+	if (patch.onTimeHost !== undefined) {
+		const host = patch.onTimeHost === null ? '' : patch.onTimeHost.trim()
+		if (host === '') next.onTimeHost = null
+		else if (isConsoleHost(host)) next.onTimeHost = host
+		else errors.onTimeHost = hostError
+	}
+	if (patch.onTimePort !== undefined) {
+		if (isPort(patch.onTimePort)) next.onTimePort = patch.onTimePort
+		else errors.onTimePort = `A whole number from 1 to 65535. OnTime uses ${DEFAULT_ONTIME_PORT}.`
+	}
+	if (patch.proPresenterHost !== undefined) {
+		const host = patch.proPresenterHost === null ? '' : patch.proPresenterHost.trim()
+		if (host === '') next.proPresenterHost = null
+		else if (isConsoleHost(host)) next.proPresenterHost = host
+		else errors.proPresenterHost = hostError
+	}
+	if (patch.proPresenterPort !== undefined) {
+		if (patch.proPresenterPort === null || isPort(patch.proPresenterPort)) next.proPresenterPort = patch.proPresenterPort
+		else errors.proPresenterPort = 'A whole number from 1 to 65535: the port in ProPresenter’s Network settings.'
+	}
+	if (next.proPresenterHost !== null && next.proPresenterPort === null && errors.proPresenterPort === undefined) {
+		errors.proPresenterPort = 'ProPresenter picks its own port: copy it from ProPresenter’s Network settings.'
+	}
 	if (patch.volunteerUser !== undefined) {
 		const e = userError(patch.volunteerUser)
 		if (e === null) next.volunteerUser = patch.volunteerUser
@@ -160,6 +199,10 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['operatorUser'] === 'string' && userError(r['operatorUser']) === null) out.operatorUser = r['operatorUser']
 	if (typeof r['oscPort'] === 'number' && isPort(r['oscPort'])) out.oscPort = r['oscPort']
 	if (typeof r['replyPort'] === 'number' && isPort(r['replyPort']) && r['replyPort'] !== out.oscPort) out.replyPort = r['replyPort']
+	if (typeof r['onTimeHost'] === 'string' && isConsoleHost(r['onTimeHost'])) out.onTimeHost = r['onTimeHost']
+	if (typeof r['onTimePort'] === 'number' && isPort(r['onTimePort'])) out.onTimePort = r['onTimePort']
+	if (typeof r['proPresenterHost'] === 'string' && isConsoleHost(r['proPresenterHost'])) out.proPresenterHost = r['proPresenterHost']
+	if (typeof r['proPresenterPort'] === 'number' && isPort(r['proPresenterPort'])) out.proPresenterPort = r['proPresenterPort']
 	return out
 }
 
@@ -178,6 +221,10 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['webRemotePort', num],
 		['oscPort', num],
 		['replyPort', (v) => v === null || num(v)],
+		['onTimeHost', strOrNull],
+		['onTimePort', num],
+		['proPresenterHost', strOrNull],
+		['proPresenterPort', (v) => v === null || num(v)],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

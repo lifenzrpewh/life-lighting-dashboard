@@ -6,6 +6,7 @@ import type { DeskState } from '../shared/desk.js'
 import { SHOW_STALE_AFTER_MS, type Showfile } from '../shared/showfile.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import type { CuePaneReport } from '../shared/cue-pane.js'
+import type { TimerSources } from '../shared/timer.js'
 import { StatusBar } from './components/StatusBar.js'
 import { CuePane, FoldedCuePane } from './components/CuePane.js'
 import { MaPane, paneSummary } from './components/MaPane.js'
@@ -93,6 +94,24 @@ export function App() {
 		const poll = () => void api.showfile().then((c) => alive && setMainShowfile(c))
 		poll()
 		const id = setInterval(poll, 1000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
+	// OnTime and ProPresenter, as main last heard them. Real in dev too: they are
+	// not the console, so the mock desk has nothing to say about them. Polled
+	// faster than the rest, so a ProPresenter timer, which cannot be counted
+	// down here, is never far behind the one on stage.
+	const [timers, setTimers] = useState<TimerSources | null>(null)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.timers().then((t) => alive && setTimers(t))
+		poll()
+		const id = setInterval(poll, 250)
 		return () => {
 			alive = false
 			clearInterval(id)
@@ -211,6 +230,7 @@ export function App() {
 				desk={desk}
 				showfile={showfile}
 				showfileFailure={failureOf(sources.showfile)}
+				timers={timers}
 			/>
 
 			{/* Above the pane, never over it: a native view cannot be overlaid. */}

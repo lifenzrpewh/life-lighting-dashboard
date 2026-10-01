@@ -12,6 +12,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 // be an ES module) while src/shared is ESM. Type-only, so nothing is emitted.
 import type { Channel, LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
 import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 'import' }
+import type { TimerSources } from '../shared/timer.js' with { 'resolution-mode': 'import' }
 import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
@@ -27,6 +28,10 @@ const api = {
 	 *  verb), for the renderer to age and render in the four states. Read on
 	 *  link-up and every few quiet minutes, never guessed. */
 	showfile: (): Promise<Channel<Showfile>> => ipcRenderer.invoke('showfile:state'),
+
+	/** What OnTime and ProPresenter last said, for the countdown chip. A source
+	 *  is null when settings name no address for it. */
+	timers: (): Promise<TimerSources> => ipcRenderer.invoke('timers:state'),
 
 	/** The Cue Manager pane (src/main/cue-pane.ts): the visuals app itself,
 	 *  where the run order used to be. Placed like the MA pane. */

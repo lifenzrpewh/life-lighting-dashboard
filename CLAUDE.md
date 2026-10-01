@@ -48,7 +48,8 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
 | ✅ `src/bridge/showfile.ts` · LifeBridge `show` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap; the old plugin's `unknown verb show` recognised. `docs/MA3_READ_MODEL.md` § The showfile. |
-| ⚠️ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, Settings can clear it. ✅ loads in the kiosk on this Mac, 2026-10-02; signing in and editing there not yet watched. |
+| ✅ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, Settings can clear it. **Working on this Mac, 2026-10-02 (owner-observed):** signed in by the app's own QR as a booth device, songs-only and note editing both work. Server side: `visuals-song-comms` `2675660` (booth devices edit), migrations `20261002090000_pairing_kind` and `20261002100000_booth_device_edit`. Not yet on Windows. |
+| 🔬 `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's running timer and stage message (`/v1/timers/current`, `/v1/stage/message`) otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. Shapes researched from OnTime's source (v4.14) and ProPresenter's OpenAPI spec, 2026-10-02; **the kiosk ran end to end against stand-ins in those shapes** (both phases, and both going away), **not yet against a real OnTime or ProPresenter.** Addresses are in Settings › Countdown. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
@@ -155,7 +156,7 @@ and a station that falls out of session keeps answering confidently and wrongly.
 - **Resist configuration.** Anything the show can describe about itself is read from
   the show; a setting for it is a bug in the derivation. `src/shared/settings.ts`
   holds only what no show knows (console address, web remote port, the two MA
-  users) and must stay that way.
+  users, where OnTime and ProPresenter are) and must stay that way.
 - **The MA pane is a picture, not a reading.** Its best state is `showing`: a page
   loaded. Never render it as "live", and never draw over it; a native view cannot
   be overlaid, so anything said about it sits beside it.
@@ -275,26 +276,30 @@ installer is the open question**; it decides everything after it (hosting on
 
 ## Next session starts here
 
-**Where things stand (2026-10-02).** Against onPC on this Mac the MA pane shows the
-real web remote as `Remote` and recovers by itself, and the run order's column holds
-the real Cue Manager. The dashboard's own run order read the live backend once
-(paired as a Central booth device) before it was retired for the embed. The console
-link needs onPC's network interface on 127.0.0.1 again: on 2026-10-01 onPC held no OSC
-socket at all. onPC counts as on-console.
+**Where things stand (2026-10-02).** The whole service screen works against onPC on
+this Mac, logged in one run: console link LIVE (70 ms), the showfile chip `ON BASE
+SHOW Mount Eden Base`, the MA pane on the real web remote as `Remote`, and the Cue
+Manager signed in as a booth device with notes edited in place. onPC needs its
+network interface on 127.0.0.1 for the link (on 2026-10-01 it held no OSC socket
+until that was set). What is left is Windows and a real console. onPC counts as
+on-console.
 
 ### TODO, in order
 
-1. **Sign the Cue Manager in, and let booths edit.**
-   - Server (visuals-song-comms): give the "Booth device" role `notes.edit` (Option A),
-     mark a QR shown inside the kiosk as a booth's (the pane's user agent carries
-     `LIFEBoothKiosk/1`), and fix `current_user_context()`'s campus filter, which now
-     decides what the booth lists. The prompt is in the 2026-10-02 session.
-   - Kiosk: in the Cue Manager column, **Sign in with a QR code**; an admin approves
-     it as the campus's booth device. Then open today's service, try songs-only, edit
-     a note, and watch it arrive on a phone.
-   - On Windows: whether the touch keyboard comes up for a note on the booth screen.
-2. **The test installer on the booth PC** (`npm run dist:win`). Whether a managed
-   machine runs it unsigned decides hosting, self-update and start at login.
+0. **The countdown against the real programs.** Settings › Countdown: OnTime's
+   address (port 4001), ProPresenter's address and the port its Network settings
+   show, with Enable Network on. Watch an OnTime event start and stop, and a
+   ProPresenter timer and stage message. Then move the 🔬 row above to ✅.
+0. **Showfile name updates are too slow (owner, 2026-10-02).** By design today: an
+   ask is two lines on the console's command line, so it goes out on link-up and
+   then at most every 5 min, only in a quiet gap (`src/bridge/showfile.ts`). A
+   Load or Save As can take minutes to show. Find a faster trigger that stays off
+   the command line, such as the plugin pushing on a show change, before asking more often.
+1. **The test installer on the booth PC** (`npm run dist:win`). Whether a managed
+   machine runs it unsigned decides hosting, self-update and start at login. On the
+   booth screen, also check the Windows touch keyboard comes up for a note.
+2. **Sign the booth PC's Cue Manager in** with its own QR, as its own booth device,
+   so one lost PC can be revoked alone.
 3. **The MA pane, still to watch firing:** Web Remote off then on, and a console
    restart. `docs/MA3_READ_MODEL.md` § Stuck pages.
 4. **For a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web remote,
@@ -313,12 +318,12 @@ because the backend stores neither (no plan or item times are synced, and
 the seam. The Cue Manager's own booth mode moves a current item locally, by key
 or tap; we declined that here.
 
-**Seen in `visuals-song-comms`, not ours to fix** (as of `3d89c0b`, confirmed on the
-server 2026-10-01): `is_live` is never cleared; `current_user_context()` lost its
-visible-campus filter in `20260614100000`, so a booth device sees every campus's
-services, which **now matters**, because the booth is the app; `upcoming_service_cue_status`
-counts a song twice when it has two notes; its "today" is the UTC date, a day behind
-New Zealand until 1 pm. `pco-sync` is locked down now.
+**Seen in `visuals-song-comms`, not ours to fix:** `is_live` is never cleared, and
+`upcoming_service_cue_status` counts a song twice when it has two notes (both
+confirmed on the server 2026-10-01, fixes proposed there, not applied). **Fixed
+2026-10-02**, because the booth now is the app: `current_user_context()` has its
+visible-campus filter back (`20261002100000`), so a booth lists only its campus, and
+"today" is the New Zealand date (`nzDate`, `2675660`). `pco-sync` is locked down now.
 
 ### How the pieces work, briefly
 

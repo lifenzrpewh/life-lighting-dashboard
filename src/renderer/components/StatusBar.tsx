@@ -7,7 +7,9 @@ import type { LinkState, Reading } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
 import type { Mode } from '../../shared/ma-pane.js'
 import type { Showfile } from '../../shared/showfile.js'
+import type { TimerSources } from '../../shared/timer.js'
 import { ModeChip } from './ModeChip.js'
+import { TimerChip } from './TimerChip.js'
 import type { DeskState } from '../../shared/desk.js'
 import { Unknown, formatAge, staleContent, stateClass } from './vocabulary.js'
 
@@ -125,6 +127,7 @@ export function StatusBar({
 	desk,
 	showfile,
 	showfileFailure,
+	timers,
 }: {
 	link: LinkState
 	now: number
@@ -142,6 +145,8 @@ export function StatusBar({
 	showfile: Reading<Showfile>
 	/** Why the last showfile read failed, in the console's words, if it did. */
 	showfileFailure: string | null
+	/** OnTime and ProPresenter, as main last heard them. */
+	timers: TimerSources | null
 }) {
 	const clock = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 	// Today, from the same clock the ages derive from — not a literal, and not
@@ -165,7 +170,11 @@ export function StatusBar({
 					Reload MA
 				</button>
 			)}
-			<span className="ml-auto text-2xl font-medium tabular-nums">{clock}</span>
+			{/* The countdown to what comes next, beside the time of day. */}
+			<span className="ml-auto flex min-w-0 items-center">
+				<TimerChip sources={timers} />
+			</span>
+			<span className="text-2xl font-medium tabular-nums">{clock}</span>
 			{/* Boots into volunteer, always, and never remembers otherwise. */}
 			<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
 			{mode === 'operator' && (

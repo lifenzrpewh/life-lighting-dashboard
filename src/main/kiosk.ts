@@ -30,6 +30,9 @@
 // own sign-in, cache and offline queue. The dashboard's own read-only run order
 // (./backend/) is retired from the screen as of 2026-10-02 and not started;
 // it stays in the tree until the embed has run a service.
+//
+// THE COUNTDOWN (./timers.ts) is OnTime and ProPresenter, asked over HTTP on the
+// booth network. Nothing to do with the console: it is never sent there.
 
 import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
@@ -47,6 +50,7 @@ import { openSettings, type SettingsStore } from './settings.js'
 import type { DeskState } from '../shared/desk.js'
 import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.js'
 import { startLink, type LinkHandle } from './bridge/link.js'
+import { startTimers, type TimersHandle } from './timers.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -64,6 +68,7 @@ let settings: SettingsStore | null = null
 let mode: Mode = 'volunteer'
 let channelB: ChannelBHandle | null = null
 let consoleLink: LinkHandle | null = null
+let timers: TimersHandle | null = null
 const BOOTED_AT = Date.now()
 
 /** What main knows from channel B before the socket has even bound.
@@ -197,6 +202,18 @@ function startOsc(store: SettingsStore): void {
 	})
 }
 
+/** The timer settings the pollers were last started with. */
+let timersKey = ''
+
+function startTimerPolls(store: SettingsStore): void {
+	const s = store.current()
+	const key = JSON.stringify([s.onTimeHost, s.onTimePort, s.proPresenterHost, s.proPresenterPort])
+	if (key === timersKey) return
+	timersKey = key
+	timers?.stop()
+	timers = startTimers(s)
+}
+
 function stopOsc(): void {
 	consoleLink?.stop()
 	consoleLink = null
@@ -242,11 +259,14 @@ app.whenReady().then(() => {
 	ipcMain.handle('link:state', () => linkState())
 	ipcMain.handle('desk:state', () => channelB?.deskState() ?? noDesk(replyPortOf(store.current())))
 	ipcMain.handle('showfile:state', () => showfileState())
+	ipcMain.handle('timers:state', () => timers?.sources() ?? { ontime: null, propresenter: null })
 
 	// Started before the window exists, so the first thing the renderer asks for
 	// already has whatever the desk has said in the meantime.
 	startOsc(store)
 	store.onChange(() => startOsc(store))
+	startTimerPolls(store)
+	store.onChange(() => startTimerPolls(store))
 
 	// Only the kiosk's own renderer may move the pane. The pane's page has no
 	// preload and so no way to send, but the check costs nothing.
@@ -305,4 +325,5 @@ app.on('window-all-closed', () => {
 // nobody debugging that at 8:50 on a Sunday would suspect the previous run.
 app.on('will-quit', () => {
 	stopOsc()
+	timers?.stop()
 })
