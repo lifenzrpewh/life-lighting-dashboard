@@ -7,13 +7,12 @@
 // showing the MA — which is exactly when they need to be told why.
 //
 // THE RULE THIS FILE ENFORCES: the native view goes where this box is, and
-// nowhere else. The box is re-measured after every render, not only on resize,
-// because a layout that shifts without resizing (a bar appearing above) would
-// otherwise leave the view somewhere it no longer belongs.
+// nowhere else (../panePlacement.ts).
 
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
-import type { MaPaneReport, MaPaneState, Mode, PaneRect } from '../../shared/ma-pane.js'
+import type { MaPaneReport, MaPaneState, Mode } from '../../shared/ma-pane.js'
+import { usePanePlacement } from '../panePlacement.js'
 
 function hostOf(url: string): string {
 	return new URL(url).hostname
@@ -89,7 +88,7 @@ function Message({ pane, now }: { pane: MaPaneState | null; now: number }) {
 	}
 }
 
-function Say({ head, body, children }: { head: string; body: string; children?: ReactNode }) {
+export function Say({ head, body, children }: { head: string; body: string; children?: ReactNode }) {
 	return (
 		<div className="max-w-md px-6 text-center">
 			<p className="text-lg">{head}</p>
@@ -98,10 +97,6 @@ function Say({ head, body, children }: { head: string; body: string; children?: 
 		</div>
 	)
 }
-
-const sameRect = (a: PaneRect | null, b: PaneRect | null) =>
-	a === b ||
-	(a !== null && b !== null && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height)
 
 export function MaPane({
 	report,
@@ -115,40 +110,12 @@ export function MaPane({
 	now: number
 }) {
 	const box = useRef<HTMLDivElement>(null)
-	const sent = useRef<PaneRect | null | undefined>(undefined)
-
-	const place = () => {
-		const el = box.current
-		let rect: PaneRect | null = null
-		if (!hidden && el !== null) {
-			const r = el.getBoundingClientRect()
-			rect = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }
-		}
-		if (sent.current !== undefined && sameRect(sent.current, rect)) return
-		sent.current = rect
-		window.life?.placeMaPane(rect)
-	}
-
-	// After every render (the clock alone re-renders once a second)...
-	const latest = useRef(place)
-	useLayoutEffect(() => {
-		latest.current = place
-		place()
-	})
-	// ...and on every resize in between, so a fold or window change tracks.
-	useEffect(() => {
-		const el = box.current
-		if (el === null) return
-		const ro = new ResizeObserver(() => latest.current())
-		ro.observe(el)
-		return () => ro.disconnect()
-	}, [])
+	usePanePlacement(box, hidden, (rect) => window.life?.placeMaPane(rect))
 
 	// Unmounting closes the connection. It happens when the renderer goes away,
 	// which main also covers, since a crashed renderer cannot say goodbye.
 	useEffect(
 		() => () => {
-			sent.current = undefined
 			window.life?.releaseMaPane()
 		},
 		[],

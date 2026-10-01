@@ -321,7 +321,7 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 /** The renderer measures the pane and is not trusted to send a sane rect. This
  *  only keeps the view inside the window; what keeps it where it belongs is
  *  the renderer re-measuring after every render (components/MaPane.tsx). */
-function clampToWindow(r: PaneRect, window: BrowserWindow): Rectangle {
+export function clampToWindow(r: PaneRect, window: BrowserWindow): Rectangle {
 	const bounds = window.getContentBounds()
 	const x = Math.max(0, Math.round(r.x))
 	const y = Math.max(0, Math.round(r.y))

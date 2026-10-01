@@ -12,8 +12,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 // be an ES module) while src/shared is ESM. Type-only, so nothing is emitted.
 import type { Channel, LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
 import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 'import' }
-import type { Schedule } from '../shared/service.js' with { 'resolution-mode': 'import' }
-import type { BackendStatus } from '../shared/backend.js' with { 'resolution-mode': 'import' }
+import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
 import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
@@ -29,17 +28,14 @@ const api = {
 	 *  link-up and every few quiet minutes, never guessed. */
 	showfile: (): Promise<Channel<Showfile>> => ipcRenderer.invoke('showfile:state'),
 
-	/** The run order, as main last read it from the Planning Center backend:
-	 *  judged by its own reads, never by the console link. */
-	runOrder: (): Promise<Channel<Schedule>> => ipcRenderer.invoke('runOrder:state'),
-	/** Whether the booth is signed in to the backend, as whom, and the pairing
-	 *  QR while one is up. Never a token. */
-	backendStatus: (): Promise<BackendStatus> => ipcRenderer.invoke('backend:status'),
-	/** Operator mode only; main refuses otherwise. */
-	pairBackend: (): void => ipcRenderer.send('backend:pair'),
-	cancelPairing: (): void => ipcRenderer.send('backend:cancel-pairing'),
-	/** Operator mode only. Signs this booth's session out, and only this one. */
-	unpairBackend: (): Promise<boolean> => ipcRenderer.invoke('backend:unpair'),
+	/** The Cue Manager pane (src/main/cue-pane.ts): the visuals app itself,
+	 *  where the run order used to be. Placed like the MA pane. */
+	cuePane: (): Promise<CuePaneReport> => ipcRenderer.invoke('cue-pane:report'),
+	/** Want it at `rect`; null keeps the page but hides it (the column folded). */
+	placeCuePane: (rect: PaneRect | null): void => ipcRenderer.send('cue-pane:place', rect),
+	retryCuePane: (): void => ipcRenderer.send('cue-pane:retry'),
+	/** Operator mode only: sign the app out and forget what it kept. */
+	resetCuePane: (): Promise<boolean> => ipcRenderer.invoke('cue-pane:reset'),
 
 	/** The MA pane (src/main/ma-pane.ts). The renderer says where it goes and
 	 *  which mode the screen is in; what it loads is main's business alone. */

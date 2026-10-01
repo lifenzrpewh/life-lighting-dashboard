@@ -3,12 +3,11 @@ import { useEffect, useState } from 'react'
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
 import type { DeskState } from '../shared/desk.js'
-import type { Schedule } from '../shared/service.js'
 import { SHOW_STALE_AFTER_MS, type Showfile } from '../shared/showfile.js'
-import { RUN_ORDER_STALE_AFTER_MS } from '../shared/backend.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
+import type { CuePaneReport } from '../shared/cue-pane.js'
 import { StatusBar } from './components/StatusBar.js'
-import { FoldedRunOrder, RunOrder } from './components/RunOrder.js'
+import { CuePane, FoldedCuePane } from './components/CuePane.js'
 import { MaPane, paneSummary } from './components/MaPane.js'
 import { SettingsPanel } from './components/SettingsPanel.js'
 import { useMode } from './mode.js'
@@ -16,7 +15,7 @@ import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
 
-type Sources = { link: LinkState; schedule: Channel<Schedule>; showfile: Channel<Showfile> }
+type Sources = { link: LinkState; showfile: Channel<Showfile> }
 
 /** What the app knows with no transport wired: nothing, and it says so.
  *
@@ -26,7 +25,6 @@ type Sources = { link: LinkState; schedule: Channel<Schedule>; showfile: Channel
 function coldSources(now: number): Sources {
 	return {
 		link: { state: 'unreachable', since: now },
-		schedule: unread<Schedule>(),
 		showfile: unread<Showfile>(),
 	}
 }
@@ -101,14 +99,14 @@ export function App() {
 		}
 	}, [])
 
-	// The run order, as main last read it from the backend. Main reads every
-	// 30 s; this only has to keep the age on screen current.
-	const [mainSchedule, setMainSchedule] = useState<Channel<Schedule> | null>(null)
+	// The run order is the Cue Manager itself, in its own pane: real in dev
+	// too, like the MA pane. Polled for its load state and its last input.
+	const [cue, setCue] = useState<CuePaneReport | null>(null)
 	useEffect(() => {
 		const api = window.life
 		if (api === undefined) return
 		let alive = true
-		const poll = () => void api.runOrder().then((c) => alive && setMainSchedule(c))
+		const poll = () => void api.cuePane().then((r) => alive && setCue(r ?? null))
 		poll()
 		const id = setInterval(poll, 1000)
 		return () => {
@@ -153,7 +151,10 @@ export function App() {
 		}
 	}, [])
 
-	const { mode, enter, leave } = useMode(now, pane?.lastInputAt ?? null)
+	// Input in either pane counts: an LD writing notes in the Cue Manager is
+	// as busy as one working the MA.
+	const inputs = [pane?.lastInputAt ?? null, cue?.lastInputAt ?? null].filter((t): t is number => t !== null)
+	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs))
 
 	// The mode is which MA user the pane is (src/renderer/mode.ts). Main does the
 	// login; the renderer only says which. Settings close with operator mode, by
@@ -170,11 +171,8 @@ export function App() {
 					...coldSources(now),
 					...(mainLink === null ? {} : { link: mainLink }),
 					...(mainShowfile === null ? {} : { showfile: mainShowfile }),
-					...(mainSchedule === null ? {} : { schedule: mainSchedule }),
 				}
 
-	// Judged by its own reads, not the console link: null (src/shared/reading.ts).
-	const schedule = readingOf(sources.schedule, now, null, RUN_ORDER_STALE_AFTER_MS)
 	const showfile = readingOf(sources.showfile, now, sources.link, SHOW_STALE_AFTER_MS)
 
 	return (
@@ -184,7 +182,7 @@ export function App() {
 					{scenario === 'real' ? (
 						<>
 							<span className="tracking-widest">DEV — REAL CONSOLE LINK</span>
-							<span className="font-normal">the link, showfile and run order are main's own</span>
+							<span className="font-normal">the link and showfile are main's own; the run order is the real Cue Manager</span>
 						</>
 					) : (
 						<>
@@ -229,11 +227,8 @@ export function App() {
 			    "never covered" is a fact about the layout rather than a rule
 			    someone has to remember. The buttons are the MA's own, in the pane. */}
 			<div className="flex min-h-0 flex-1">
-				{runOrderOpen ? (
-					<RunOrder schedule={schedule} failure={failureOf(sources.schedule)} onFold={() => setRunOrderOpen(false)} />
-				) : (
-					<FoldedRunOrder onOpen={() => setRunOrderOpen(true)} />
-				)}
+				<CuePane report={cue} folded={!runOrderOpen} onFold={() => setRunOrderOpen(false)} now={now} />
+				{!runOrderOpen && <FoldedCuePane onOpen={() => setRunOrderOpen(true)} />}
 				<main className="flex min-w-0 flex-1 flex-col">
 					{/* Always mounted, so the connection survives the settings panel
 					    standing in its place. */}

@@ -9,7 +9,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 
 import { webRemoteUrl } from '../../shared/ma-pane.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
-import { PlanningCenter } from './PlanningCenter.js'
+import { CueManagerSettings } from './CueManagerSettings.js'
 
 type Draft = {
 	consoleHost: string
@@ -182,8 +182,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 				{saved && <span className="text-sm text-state-live">Saved. The MA pane reconnects with these.</span>}
 			</div>
 
-			{/* Below Save and apart from it: pairing acts at once and is not saved. */}
-			<PlanningCenter />
+			{/* Below Save and apart from it: this acts at once and is not saved. */}
+			<CueManagerSettings />
 		</Frame>
 	)
 }

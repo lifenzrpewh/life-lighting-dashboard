@@ -26,9 +26,10 @@
 // `show` verb, on link-up and in quiet gaps every few minutes. Main holds what
 // the console said; the renderer ages it and renders it in the four states.
 //
-// THE RUN ORDER (./backend/backend.ts) comes from the Planning Center backend,
-// on its own reads and its own clock, never the console link. The booth's
-// session lives here, encrypted; pairing and unpairing are operator-only.
+// THE RUN ORDER is the visuals app itself, embedded (./cue-pane.ts), with its
+// own sign-in, cache and offline queue. The dashboard's own read-only run order
+// (./backend/) is retired from the screen as of 2026-10-02 and not started;
+// it stays in the tree until the embed has run a service.
 
 import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
@@ -38,11 +39,10 @@ import { fileURLToPath } from 'node:url'
 import type { Channel, LinkState } from '../shared/reading.js'
 import { unread } from '../shared/reading.js'
 import type { Showfile } from '../shared/showfile.js'
-import type { Schedule } from '../shared/service.js'
-import { startBackend, type BackendHandle } from './backend/backend.js'
 import type { Mode, PaneRect } from '../shared/ma-pane.js'
 import { isLoopback, patchFrom, replyPortOf } from '../shared/settings.js'
 import { createMaPane, type MaPane } from './ma-pane.js'
+import { createCuePane, type CuePane } from './cue-pane.js'
 import { openSettings, type SettingsStore } from './settings.js'
 import type { DeskState } from '../shared/desk.js'
 import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.js'
@@ -56,6 +56,7 @@ const DEV_SERVER = process.env['VITE_DEV_SERVER_URL']
 
 let window: BrowserWindow | null = null
 let maPane: MaPane | null = null
+let cuePane: CuePane | null = null
 let settings: SettingsStore | null = null
 /** The screen's mode, as the renderer last reported it. Main learns it only to
  *  pick the pane's MA user and to keep settings operator-only. It is not a
@@ -63,7 +64,6 @@ let settings: SettingsStore | null = null
 let mode: Mode = 'volunteer'
 let channelB: ChannelBHandle | null = null
 let consoleLink: LinkHandle | null = null
-let backend: BackendHandle | null = null
 const BOOTED_AT = Date.now()
 
 /** What main knows from channel B before the socket has even bound.
@@ -100,13 +100,13 @@ function createWindow(): void {
 	window.once('ready-to-show', () => window?.show())
 
 	if (settings !== null) maPane = createMaPane(window, settings)
+	cuePane = createCuePane(window)
 	// A reloaded renderer boots into volunteer mode. Without this, a crash-and-
 	// reload would leave the pane logged in as the operator under a fresh
 	// volunteer screen, until the renderer got round to saying otherwise.
 	window.webContents.on('did-start-loading', () => {
 		mode = 'volunteer'
 		maPane?.release()
-		backend?.cancelPairing()
 	})
 
 	// A renderer crash mid-service must not leave a dead rectangle in the booth.
@@ -261,26 +261,19 @@ app.whenReady().then(() => {
 		if (!fromKiosk(e) || (next !== 'volunteer' && next !== 'operator')) return
 		mode = next
 		maPane?.setMode(next)
-		// A QR left up would let anyone who scans it within three minutes sign
-		// the booth in as themselves. It goes with operator mode.
-		if (next === 'volunteer') backend?.cancelPairing()
 	})
 
-	// The run order is for every mode; the booth's sign-in is operator business.
-	backend = startBackend({
-		dataDir: app.getPath('userData'),
-		log: (line) => console.log(`[kiosk] ${line}`),
-		error: (line) => console.error(`[kiosk] ${line}`),
+	// The Cue Manager is the same for every mode: the booth device's rights,
+	// held by the app's own backend, are what it may do. Clearing its sign-in
+	// is operator business.
+	ipcMain.handle('cue-pane:report', (e) => (fromKiosk(e) ? cuePane?.report() : undefined))
+	ipcMain.on('cue-pane:place', (e, rect: unknown) => {
+		if (fromKiosk(e)) cuePane?.place(rect === null ? null : asRect(rect))
 	})
-	ipcMain.handle('runOrder:state', () => backend?.schedule() ?? unread<Schedule>())
-	ipcMain.handle('backend:status', (e) => (fromKiosk(e) ? backend?.status() : undefined))
-	ipcMain.on('backend:pair', (e) => {
-		if (fromKiosk(e) && mode === 'operator') backend?.pair()
-	})
-	ipcMain.on('backend:cancel-pairing', (e) => fromKiosk(e) && backend?.cancelPairing())
-	ipcMain.handle('backend:unpair', async (e) => {
+	ipcMain.on('cue-pane:retry', (e) => fromKiosk(e) && cuePane?.retry())
+	ipcMain.handle('cue-pane:reset', async (e) => {
 		if (!fromKiosk(e) || mode !== 'operator') return false
-		await backend?.unpair()
+		await cuePane?.reset()
 		return true
 	})
 
@@ -312,5 +305,4 @@ app.on('window-all-closed', () => {
 // nobody debugging that at 8:50 on a Sunday would suspect the previous run.
 app.on('will-quit', () => {
 	stopOsc()
-	backend?.stop()
 })

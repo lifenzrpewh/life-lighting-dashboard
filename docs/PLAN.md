@@ -254,6 +254,11 @@ the cheap ones pulled forward because one of them may save the architecture.
 └───────────────────────┴────────────────────────────────────────────────────────┘
 ```
 
+> **Superseded 2026-10-02: the left spine is the Cue Manager itself**, embedded like the
+> MA pane (`src/main/cue-pane.ts`), so notes are edited in place and the app's own rules
+> (songs-only, hidden songs, "Changed in PCO") hold. The reasons are in
+> `src/shared/cue-pane.ts`. What follows still holds for the column.
+
 - **The run order is the left spine**, a sibling of the pane and never under it. It is the one thing
   beside the MA that the MA cannot show. It folds to a strip, one tap each way, to give the MA the
   full width; folded is not hidden, so the way back stays on screen.

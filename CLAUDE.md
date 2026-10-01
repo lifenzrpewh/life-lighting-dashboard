@@ -1,8 +1,14 @@
 # LIFE Lighting Dashboard — operating manual
 
-Touchscreen dashboard for grandMA3, beside the console: the Planning Center run
-order next to the console's own web remote, which carries every button and every
-edit. Volunteer-simple, with an operator mode. Electron on Windows.
+Touchscreen dashboard for grandMA3, beside the console: the Cue Manager (the
+visuals app, embedded) next to the console's own web remote, which carries every
+button and every edit. Volunteer-simple, with an operator mode. Electron on Windows.
+
+**Second pivot, 2026-10-02: the visuals app draws the run order.** The dashboard's
+own read-only run order is off the screen; the real Cue Manager sits in its column,
+so notes are edited in place, songs-only and every other rule are the app's own,
+and there is one source of truth. Booth devices may edit (the owner's choice).
+`src/shared/cue-pane.ts` has the reasons.
 
 **Pivot, 2026-09-27: the MA draws the buttons.** The trigger board, bottom rail
 and cue editor are gone; volunteers fire from an MA layout view in the pane and
@@ -42,7 +48,8 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
 | ✅ `src/bridge/showfile.ts` · LifeBridge `show` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap; the old plugin's `unknown verb show` recognised. `docs/MA3_READ_MODEL.md` § The showfile. |
-| ⚠️ `src/backend/` · `src/main/backend/` | The run order from `visuals-song-comms`: QR pairing as a booth device, the session sealed with the OS keystore, a read every 30 s, the last good read kept on disk. Judged by its own reads, not the console link. 21 tests; **not yet read against the live backend** (TODO 1). |
+| ⚠️ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, Settings can clear it. ✅ loads in the kiosk on this Mac, 2026-10-02; signing in and editing there not yet watched. |
+| ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
@@ -268,55 +275,37 @@ installer is the open question**; it decides everything after it (hosting on
 
 ## Next session starts here
 
-**Where things stand (2026-10-01, evening).** Against onPC on this Mac the service
-screen runs end to end: the link is LIVE (a quiet ping, `src/bridge/ping.ts`), the MA
-pane shows the real web remote as `Remote` and recovers by itself, and the showfile
-chip reads the console (amber `ON BASE SHOW Mount Eden Base`, re-read every 5 min in
-a quiet gap). The run order has its key on this Mac and waits only on a booth device
-to pair with. onPC counts as on-console.
+**Where things stand (2026-10-02).** Against onPC on this Mac the MA pane shows the
+real web remote as `Remote` and recovers by itself, and the run order's column holds
+the real Cue Manager. The dashboard's own run order read the live backend once
+(paired as a Central booth device) before it was retired for the embed. The console
+link needs onPC's network interface on 127.0.0.1 again: on 2026-10-01 onPC held no OSC
+socket at all. onPC counts as on-console.
 
 ### TODO, in order
 
-1. **Read the run order live.** Everything below waits on this.
-   - ✅ The anon key is built in (`src/backend/endpoint.ts`, 2026-10-02, the owner's
-     go-ahead): public by design, the same for every booth, so a new booth needs no
-     key file. `backend.json` or `LIFE_BACKEND_ANON_KEY` still overrides, for testing.
-     Only an anon key is accepted, from anywhere; a test fails if the built-in changes.
-   - The booth's QR is marked `kind: 'booth'` in `pair-create`, so the backend can
-     require an admin to approve it, and only as a booth device. Old backends ignore it.
-   - In the Cue Manager, **Admin › Booth devices**: create one for Mount Eden. ✅
-     deployed (`1e670d8`, `0dfe2cc`, `3d89c0b` all live, 2026-10-01); **none exists yet**.
-   - Kiosk, operator mode, Settings › Planning Center › **Pair this booth**. An admin
-     scans it and approves **As a booth device**. Approved as themselves, the booth
-     holds their account: `campusOf` then refuses, because their role covers every
-     campus.
-   - Check: the plan shown, the campus and the device's name in Settings, notes
-     against the right items. Then mark `src/backend/` ✅ in the status table.
-   - In dev the run order is the mock until you press `0` for the real sources.
-   - ✅ **`planStart` settled** (2026-10-01): `sort_date` is the church's wall clock
-     with a fake `Z`, read on the booth's own clock. Evidence in `run-order.ts`.
-   - Pairing is per computer: the session is sealed with that machine's keystore,
-     so the booth PC pairs on its own.
-2. ~~Show the device's name~~ — built 2026-10-01, `profiles.display_name`; the made-up
-   `@devices.invalid` email is hidden. Unseen until a device exists.
-3. **Ask the operator, then use what the backend added on 2026-10-01** (`0dfe2cc`):
-   - `note_values.item_snapshot`: the song, key and arrangement a note was written
-     against. A note whose item has changed since ("Changed in PCO") is exactly
-     what an LD needs flagged on Sunday.
-   - `pco_item_notes`: PCO's own item notes by category, including a **VFX/LX**
-     one. Show it beside the lighting note?
-   - `removed_item_cues`: notes kept when PCO removed their item.
-4. ~~The MA pane's two gaps~~ — built 2026-10-01: load timeout, fresh login when MA's
-   page is stuck, Reload MA beside the pane. `docs/MA3_READ_MODEL.md` § Stuck pages.
-   Still to watch firing: Web Remote off then on, and a console restart.
-5. **For a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web remote,
+1. **Sign the Cue Manager in, and let booths edit.**
+   - Server (visuals-song-comms): give the "Booth device" role `notes.edit` (Option A),
+     mark a QR shown inside the kiosk as a booth's (the pane's user agent carries
+     `LIFEBoothKiosk/1`), and fix `current_user_context()`'s campus filter, which now
+     decides what the booth lists. The prompt is in the 2026-10-02 session.
+   - Kiosk: in the Cue Manager column, **Sign in with a QR code**; an admin approves
+     it as the campus's booth device. Then open today's service, try songs-only, edit
+     a note, and watch it arrive on a phone.
+   - On Windows: whether the touch keyboard comes up for a note on the booth screen.
+2. **The test installer on the booth PC** (`npm run dist:win`). Whether a managed
+   machine runs it unsigned decides hosting, self-update and start at login.
+3. **The MA pane, still to watch firing:** Web Remote off then on, and a console
+   restart. `docs/MA3_READ_MODEL.md` § Stuck pages.
+4. **For a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web remote,
    and whether listening beside onPC works on Windows. Build the volunteer layout
    view on the MA user `Remote`; HOLDING and PRE/POST are its biggest targets.
-6. **Showfile, the write half:** Save As and Load (`docs/PLAN.md` Phase 3). Decide
+5. **Showfile, the write half:** Save As and Load (`docs/PLAN.md` Phase 3). Decide
    first whether MA's own dialog plus SaveGuard is enough. The chip gets its `▸`
    only when there is something for it to open.
-7. **Housekeeping:** `README.md` is stale (pre-desk status, 84 checks, the old
-   design). Bring it in line with this file by linking, not copying.
+6. **Housekeeping:** delete the retired run order (`src/backend/`, `src/main/backend/`,
+   `src/shared/{backend,service}.ts`, its tests and the mock's schedule) once the
+   Cue Manager has run a service. `README.md` is stale; bring it in line by linking.
 
 **Decided, not forgotten (2026-09-30):** no start times and no NOW highlight,
 because the backend stores neither (no plan or item times are synced, and
@@ -325,23 +314,20 @@ the seam. The Cue Manager's own booth mode moves a current item locally, by key
 or tap; we declined that here.
 
 **Seen in `visuals-song-comms`, not ours to fix** (as of `3d89c0b`, confirmed on the
-server 2026-10-01, fixes proposed there and not applied): `is_live` is never cleared;
-`current_user_context()` lost its visible-campus filter in `20260614100000`, so a booth
-device sees every campus's services through it (we are unaffected: the campus comes
-from the account's own `user_roles` row); `upcoming_service_cue_status` counts a song
-twice when it has two notes; its "today" is the UTC date, a day behind New Zealand
-until 1 pm. `pco-sync` is locked down now.
+server 2026-10-01): `is_live` is never cleared; `current_user_context()` lost its
+visible-campus filter in `20260614100000`, so a booth device sees every campus's
+services, which **now matters**, because the booth is the app; `upcoming_service_cue_status`
+counts a song twice when it has two notes; its "today" is the UTC date, a day behind
+New Zealand until 1 pm. `pco-sync` is locked down now.
 
 ### How the pieces work, briefly
 
-**The run order** (`src/backend/` pure and tested, `src/main/backend/` impure).
-It reads `visuals-song-comms` as-is: no new tables, no RPC of its own. Every 30 s:
-permissions, the account's own `user_roles` (the campus), the campus, the
-Lighting field, plans, items, notes. It checks `notes.view` first, because RLS
-answers a forbidden read with `[]`, which would look like "no notes". It is judged
-by its own reads (`readingOf(…, null, …)`), not the console link, so a dead console
-leaves it alone; a dead backend shows the last good read with its age, kept on
-disk across restarts. The session stays in main, sealed with the OS keystore.
+**The run order** is the Cue Manager itself (`src/main/cue-pane.ts`), placed like the
+MA pane (`src/renderer/panePlacement.ts` keeps both native views over their boxes).
+It signs itself in, by emailed code or its own QR, keeps that sign-in and its offline
+queue in a persistent session, and is a picture, not a reading: the app shows its own
+offline banner. Folding the column hides it without reloading, so a half-typed note
+survives. Input in it counts toward operator mode's idle timer.
 
 **The showfile chip.** LifeBridge's `show` verb makes SaveGuard's verdict on the
 console, because the trip mangles names (`docs/MA3_READ_MODEL.md` § The showfile).
