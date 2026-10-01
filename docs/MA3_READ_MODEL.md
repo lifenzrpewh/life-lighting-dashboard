@@ -417,8 +417,10 @@ not disturb it.
 | ✅ What it is | A real **Display** of the station: identical to the MA, interactive (operator-observed 2026-09-27) |
 | ✅ Losing the console | The page shows its own **"disconnected"** (operator-observed 2026-09-27) |
 | 🔬 Address | `http://<station-ip>:8080`, any modern browser |
-| ✅ Web Remote off | onPC still answers on `:8080`, **HTTP 200**, with a white page reading "Remotes are disabled!" (onPC 2.3.2.0, 2026-09-30). A loaded page is not proof the remote is on; the pane reports it as `showing`, and the picture says what is wrong. **Turning Web Remote on does not reach that page**: it stays until reloaded |
-| ✅ Slots full | A client past the limit is **accepted and never answered**: the TCP connection opens, no HTTP response comes, no error (onPC 2.3.2.0, 2026-09-30, one other remote open). Not a refusal, so the pane cannot tell it from a slow console. Freeing the slot made the next request answer in 1 ms |
+| ✅ Web Remote off | onPC still answers on `:8080`, **HTTP 200**, with a white page reading "Remotes are disabled!" (onPC 2.3.2.0, 2026-09-30). A loaded page is not proof the remote is on; the pane reports it as `showing`, and the picture says what is wrong. **Turning Web Remote on does not reach that page**: it stays until reloaded. The pane logs in afresh after 10 s of it (see Stuck pages below) |
+| ✅ Slots full | A client past the limit is **accepted and never answered**: the TCP connection opens, no HTTP response comes, no error (onPC 2.3.2.0, 2026-09-30, one other remote open). Not a refusal, so the pane cannot tell it from a slow console. Freeing the slot made the next request answer in 1 ms. **The other form, 2026-10-01**: the page loads (HTTP 200) and sits on "Connecting to console", its WebSocket (`ws://<host>/?ma=1`) open at TCP and never answered. The pane's 15 s load timeout catches the first form, its stuck-page check the second |
+| ✅ A stuck client stays stuck | A browser that lost the slot went "Disconnected", then sat on "Connecting to console" through its own reload for **5+ minutes**, with nothing else connected (`lsof`: its socket only). A kiosk with its storage cleared then connected **beside it in 10 s** (onPC 2.3.2.0, 2026-10-01). So the slot was free and the client was the stuck thing: a reload is not a way out, a clean login is |
+| 🔬 The page's own recovery | From onPC 2.3.2.0's `web/js`, not watched on a desk. On a dropped socket it retries **once**: `setInterval(OpenConnection(), 2000)` calls the function rather than passing it, so a console that takes longer than an instant to come back leaves it "Disconnected" for good. The overlay text, `#startOverlayText`, says which state it is in: `Connected!`, `Connecting to console`, `Waiting for video signal.`, `Disconnected`, `Remotes are disabled!`, `Maximum connections count reached!…`, `You are black listed!`. Re-enabling a disabled remote reaches only "Waiting for video signal", because video is asked for once, on connecting |
 | ✅ In the pane | The real web remote, as `Remote`, inside the kiosk on onPC 2.3.2.0, 2026-09-30 |
 | 🔬 Switch | Menu › Network (or Station Control) › Web Remote On |
 | 🔬 Login | Logs in as the user **`Remote`** by itself; `?user=<name>&password=<pw>` in the URL logs in as anyone else |
@@ -430,6 +432,20 @@ not disturb it.
 | 🔬 Linked command line | Opt-in, by a button beside the command line. When linked, typing shows on every linked station **logged in with the same user profile**. Leave it off |
 | 🔬 2.5 | Adds QR codes per network interface. Nothing the pane depends on changed |
 
+### Stuck pages: what the pane does about them
+
+`src/main/ma-pane.ts`, built 2026-10-01 on the rows above. Every load gives up after
+**15 s** (`PANE_LOAD_TIMEOUT_MS`) and says the console "took the connection but sent
+nothing back", which points at the slots rather than at Web Remote. While the pane is
+on screen it reads the overlay text every 2 s, from an isolated world so none of the
+page's code runs, and after **10 s** (`PANE_STUCK_MS`) of anything but `Connected!`
+it clears the pane's storage and logs in again. Text it does not recognise is left
+alone, so another version's wording degrades to the old behaviour, not to a reload
+loop. **Reload MA**, in the status bar, does the same on demand. ✅ The read works
+inside the sandboxed view on onPC 2.3.2.0 (`starting` → `connected` in the log); the
+fresh login after 10 s is unit-tested and argued from the rows above, not yet watched
+firing.
+
 ### Still to observe on a desk
 
 Each of these is a claim the pane's design leans on. Run them at the desk before a
@@ -439,7 +455,9 @@ service trusts the pane:
 2. **Login by URL.** `?user=<name>` with no `password` parameter: accepted for a
    passwordless user? And what does the page show when a login is refused?
 3. **Slots.** The kiosk holds one of two. After a kiosk crash-reload, is the old slot
-   freed promptly, or can a reload loop eat both?
+   freed promptly, or can a reload loop eat both? On onPC a quit kiosk's slot was free
+   by the time a fresh kiosk asked, under a minute later (2026-10-01); what stayed stuck
+   was a client, not the slot. A console may differ.
 4. **Silent drop.** Pull the cable rather than switching Web Remote off: how long
    until the page admits "disconnected"? Until then, our link bar is the only warning.
 5. **Touch** through Electron's embedded view on the booth screen.

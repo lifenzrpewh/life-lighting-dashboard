@@ -55,6 +55,8 @@ export function startBackend(options: {
 	const store = openBackendStore(options.dataDir)
 	let session: Session | null = store.loadSession()
 	let campus: string | null = null
+	/** The account's display name, once a read has said. */
+	let displayName: string | null = null
 	let warning: string | null = null
 	let pairing: PairingView | null = null
 	let pairTimer: ReturnType<typeof setInterval> | null = null
@@ -97,6 +99,7 @@ export function startBackend(options: {
 		options.error(`backend: signed out (${why}); pair the booth again in Settings`)
 		session = null
 		campus = null
+		displayName = null
 		warning = null
 		store.clearSession()
 	}
@@ -141,12 +144,16 @@ export function startBackend(options: {
 		const fail = (r: { expired: boolean; failure: Failure }) => ({ result: r.failure, expired: r.expired })
 		const refuse = (detail: string) => ({ result: { ok: false, reason: 'error', at: Date.now(), detail } as Failure, expired: false })
 
-		const [permissions, roles] = await Promise.all([
+		const [permissions, roles, profile] = await Promise.all([
 			get(paths.permissions, s, read.permissions, 'permissions', {}),
 			get(paths.roles(s.userId), s, read.roles, 'roles'),
+			get(paths.profile(s.userId), s, read.profiles, 'profile'),
 		])
 		if (!permissions.ok) return fail(permissions)
 		if (!roles.ok) return fail(roles)
+		// Only for Settings to say who the booth is. A failed read keeps the
+		// last name and costs the run order nothing.
+		if (profile.ok) displayName = profile.value[0]?.display_name?.trim() || null
 		const scope = campusOf(roles.value, permissions.value)
 		if (!scope.ok) return refuse(scope.detail)
 		warning = scope.value.canEdit ? 'this account can also edit notes; the booth only needs notes.view' : null
@@ -300,7 +307,7 @@ export function startBackend(options: {
 		status() {
 			if (!config.ok) return { state: 'unconfigured', detail: config.detail }
 			if (session === null) return { state: 'unpaired', pairing }
-			return { state: 'paired', email: session.email, campus, warning }
+			return { state: 'paired', email: session.email, name: displayName, campus, warning }
 		},
 		schedule: () => channel,
 		pair: () => void startPairing(),
@@ -315,6 +322,7 @@ export function startBackend(options: {
 			if (s !== null && config.ok) await request('/auth/v1/logout?scope=local', s.accessToken, {})
 			session = null
 			campus = null
+			displayName = null
 			warning = null
 			store.clearSession()
 			store.clearSchedule()

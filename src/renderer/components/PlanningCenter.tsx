@@ -11,6 +11,17 @@ import { useEffect, useState } from 'react'
 
 import type { BackendStatus, PairingView } from '../../shared/backend.js'
 
+/** Who the booth is signed in as, in words a person can check. A booth
+ *  device's email is made up (`device-<uuid>@devices.invalid`, device-manage)
+ *  and says nothing, so its name stands alone; a person's name comes with
+ *  their email, which is how an operator spots the wrong approval. */
+function accountName(name: string | null, email: string | null): string {
+	const madeUp = email?.endsWith('@devices.invalid') ?? false
+	if (name !== null) return madeUp || email === null ? name : `${name} (${email})`
+	if (email !== null && !madeUp) return email
+	return madeUp ? 'a booth device' : 'an account with no email'
+}
+
 function Pairing({ pairing, now }: { pairing: PairingView; now: number }) {
 	switch (pairing.phase) {
 		case 'starting':
@@ -107,7 +118,7 @@ export function PlanningCenter() {
 			{status?.state === 'paired' && (
 				<>
 					<p className="text-sm">
-						Signed in as {status.email ?? 'an account with no email'}
+						Signed in as {accountName(status.name, status.email)}
 						{status.campus !== null && `, reading ${status.campus}`}.
 					</p>
 					{status.warning !== null && <p className="text-sm text-warn">{status.warning}</p>}

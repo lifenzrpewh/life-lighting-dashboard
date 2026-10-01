@@ -205,6 +205,9 @@ export function App() {
 				onEnter={enter}
 				onLeave={leave}
 				pane={paneSummary(pane, mode)}
+				onReloadPane={
+					pane?.pane.state === 'showing' || pane?.pane.state === 'connecting' ? () => window.life?.retryMaPane() : null
+				}
 				settingsOpen={settingsOpen}
 				onSettings={() => setSettingsOpen(!settingsOpen)}
 				desk={desk}

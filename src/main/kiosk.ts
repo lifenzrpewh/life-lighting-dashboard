@@ -213,10 +213,28 @@ function asRect(v: unknown): PaneRect | null {
 	return { x: x as number, y: y as number, width: width as number, height: height as number }
 }
 
+// One kiosk per computer. A second would fight the first for the reply port and
+// for one of the console's two web remote slots, and lose both quietly: a
+// startup shortcut that fires twice must not cost the booth its MA pane.
+const primary = app.requestSingleInstanceLock()
+if (!primary) app.quit()
+app.on('second-instance', () => {
+	if (window === null) return
+	if (window.isMinimized()) window.restore()
+	window.focus()
+})
+
 app.whenReady().then(() => {
+	// Quitting is not immediate, and binding ports on the way out is the fight
+	// the lock exists to prevent.
+	if (!primary) return
 	// Boots into volunteer mode, always (docs/PLAN.md, Mode switching). There is
 	// no menu bar to elevate from and no remembered mode across a restart.
-	Menu.setApplicationMenu(null)
+	// macOS keeps Quit alone: with no menu at all, Cmd+Q does nothing and a
+	// full-screen kiosk has no way out. Windows closes on Alt+F4 without one.
+	Menu.setApplicationMenu(
+		process.platform === 'darwin' ? Menu.buildFromTemplate([{ label: app.name, submenu: [{ role: 'quit' }] }]) : null,
+	)
 
 	settings = openSettings()
 	const store = settings

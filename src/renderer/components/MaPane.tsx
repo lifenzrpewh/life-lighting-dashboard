@@ -62,11 +62,17 @@ function Message({ pane, now }: { pane: MaPaneState | null; now: number }) {
 			return <Say head="MA web remote" body={hostOf(pane.url)} />
 		case 'failed': {
 			const wait = Math.max(0, Math.ceil((pane.retryAt - now) / 1000))
+			// A console with every slot taken takes the connection and says
+			// nothing, so silence gets its own words: the fix is somewhere else.
+			const [head, body] =
+				pane.cause === 'no-answer'
+					? [
+							'MA web remote not answering',
+							`${pane.url} took the connection but sent nothing back (${pane.detail}). Usually every web remote slot is in use: close the web remote on another phone or laptop.`,
+						]
+					: ['MA web remote not reachable', `${pane.url} — ${pane.detail}. Is Web Remote on at the console (Menu › Network)?`]
 			return (
-				<Say
-					head="MA web remote not reachable"
-					body={`${pane.url} — ${pane.detail}. Is Web Remote on at the console (Menu › Network)?`}
-				>
+				<Say head={head} body={body}>
 					<div className="mt-5 flex items-center justify-center gap-4 text-sm">
 						<span className="text-booth-dim">{wait > 0 ? `trying again in ${wait}s` : 'trying again…'}</span>
 						<button

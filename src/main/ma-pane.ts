@@ -15,6 +15,11 @@
 //   cookie after the screen has dropped back to volunteer.
 // - Nothing gets out: no preload, sandboxed, locked to the console's origin, no
 //   popups, no permissions, and an in-memory session so nothing is kept on disk.
+// - Nothing is stuck for good. A load that never answers fails after
+//   PANE_LOAD_TIMEOUT_MS, and a page that says something MA never recovers
+//   from by itself (src/shared/ma-pane.ts, RemoteSays) is logged in afresh.
+//   The page is read for that and nothing else: what it says is never shown
+//   as ours, and never taken as proof the console is live.
 //
 // A native view is drawn above the renderer, so no DOM can overlay it. The
 // layout therefore gives the pane a rect of its own, and anything that must be
@@ -23,13 +28,18 @@
 import { WebContentsView, session, type BrowserWindow, type Rectangle } from 'electron'
 
 import {
+	PANE_LOAD_TIMEOUT_MS,
 	PANE_RETRY_MS,
+	PANE_STUCK_MS,
 	isWebRemote,
+	needsReload,
+	remoteSays,
 	webRemoteLogin,
 	webRemoteUrl,
 	type MaPaneReport,
 	type MaPaneState,
 	type Mode,
+	type RemoteSays,
 	type PaneRect,
 } from '../shared/ma-pane.js'
 import type { SettingsStore } from './settings.js'
@@ -42,6 +52,12 @@ const ERR_ABORTED = -3
  *  cursor resting on the pane drifts, and that is not someone working. */
 const ACTIVITY = new Set(['mouseDown', 'mouseWheel', 'rawKeyDown', 'keyDown', 'touchStart', 'gestureTap'])
 
+/** A world of our own inside the page, so reading its overlay runs none of the
+ *  page's code and the page cannot reach ours. */
+const READ_WORLD = 1001
+const READ_OVERLAY = `(() => { const t = document.getElementById('startOverlayText'); return t === null ? null : t.innerText })()`
+const WATCH_MS = 2_000
+
 export type MaPane = {
 	report(): MaPaneReport
 	/** Want the pane, at `rect`. Null keeps the connection but hides the pane,
@@ -51,6 +67,7 @@ export type MaPane = {
 	setMode(mode: Mode): void
 	/** Stop wanting the pane, close its connection, and forget the mode. */
 	release(): void
+	/** Try now, when it failed; Reload MA, a fresh login, otherwise. */
 	retry(): void
 }
 
@@ -76,6 +93,12 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 	let rect: Rectangle | null = null
 	let lastInputAt: number | null = null
 	let retryTimer: ReturnType<typeof setTimeout> | null = null
+	let loadTimer: ReturnType<typeof setTimeout> | null = null
+	/** Since when the page has said something it will not leave by itself. */
+	let stuckSince: number | null = null
+	/** Counts loads, so an overlay read cannot land on the page after it. */
+	let loads = 0
+	let lastSays: RemoteSays | null = null
 
 	/** Where this mode's user logs in, from settings as they are right now. With
 	 *  no operator user set, operator mode stays on the volunteer user: the view
@@ -92,6 +115,26 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 	const clearRetry = () => {
 		if (retryTimer !== null) clearTimeout(retryTimer)
 		retryTimer = null
+	}
+
+	const clearLoadTimer = () => {
+		if (loadTimer !== null) clearTimeout(loadTimer)
+		loadTimer = null
+	}
+
+	/** Load the login, giving up after PANE_LOAD_TIMEOUT_MS. */
+	const load = (login: string) => {
+		clearLoadTimer()
+		stuckSince = null
+		loadTimer = setTimeout(() => {
+			loadTimer = null
+			wc.stop()
+			fail(`no answer in ${PANE_LOAD_TIMEOUT_MS / 1000} s`, 'no-answer')
+		}, PANE_LOAD_TIMEOUT_MS)
+		wc.loadURL(login).catch(() => {
+			// Reported through did-fail-load, which carries the reason; the
+			// rejection here is the same failure a second time.
+		})
 	}
 
 	/** Visible only when wanted, placed, and actually showing the console. */
@@ -116,10 +159,7 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 		const { url, user, login } = target
 		state = { state: 'connecting', url, user, since: Date.now() }
 		apply()
-		wc.loadURL(login).catch(() => {
-			// Reported through did-fail-load, which carries the reason; the
-			// rejection here is the same failure a second time.
-		})
+		load(login)
 	}
 
 	/** Log in afresh: clear the session first, so nothing of the last user
@@ -131,14 +171,48 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 		})
 	}
 
-	const fail = (detail: string) => {
+	function fail(detail: string, cause: 'error' | 'no-answer' = 'error') {
+		clearLoadTimer()
 		if (target === null || !wanted) return
 		const at = Date.now()
-		state = { state: 'failed', url: target.url, user: target.user, at, detail, retryAt: at + PANE_RETRY_MS }
+		state = { state: 'failed', url: target.url, user: target.user, at, cause, detail, retryAt: at + PANE_RETRY_MS }
 		apply()
 		clearRetry()
 		retryTimer = setTimeout(connect, PANE_RETRY_MS)
 	}
+
+	/** While the pane is on screen, ask the page what it says, and log in
+	 *  afresh once it has said something unrecoverable for PANE_STUCK_MS.
+	 *  Afresh, not a reload: ✅ onPC 2.3.2.0, 2026-10-01, a browser stuck on
+	 *  "Disconnected" stayed locked out through its own reload for 5+ minutes
+	 *  with nothing else connected, while a clean client got in at once. */
+	const watch = setInterval(() => {
+		if (!wanted || rect === null || state.state !== 'showing' || target === null || loadTimer !== null) {
+			stuckSince = null
+			return
+		}
+		const asked = loads
+		wc.executeJavaScriptInIsolatedWorld(READ_WORLD, [{ code: READ_OVERLAY }])
+			.then((text: unknown) => {
+				if (asked !== loads || state.state !== 'showing') return
+				const says = remoteSays(typeof text === 'string' ? text : null)
+				if (says !== lastSays) console.log(`[kiosk] MA pane: the web remote says "${says}"`)
+				lastSays = says
+				if (!needsReload(says)) {
+					stuckSince = null
+					return
+				}
+				const now = Date.now()
+				if (stuckSince === null) stuckSince = now
+				if (now - stuckSince < PANE_STUCK_MS) return
+				console.log(`[kiosk] MA pane: the web remote has said "${says}" for ${Math.round((now - stuckSince) / 1000)} s; logging in afresh`)
+				stuckSince = null
+				reconnect()
+			})
+			.catch(() => {
+				// A page mid-navigation cannot be read. The next tick asks again.
+			})
+	}, WATCH_MS)
 
 	// A 4xx/5xx still "finishes loading", so the status is caught here, where it
 	// is known, and did-finish-load below only promotes a load that got this far.
@@ -147,10 +221,14 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 		httpFailure = target !== null && isWebRemote(navigatedTo, target.url) && code >= 400 ? `HTTP ${code} ${text}` : null
 	})
 	wc.on('did-finish-load', () => {
-		if (target === null || !wanted || state.state !== 'connecting') return
+		loads += 1
+		stuckSince = null
+		if (target === null || !wanted) return
 		// A release loads about:blank, which also finishes. Only the console counts.
 		if (!isWebRemote(wc.getURL(), target.url)) return
+		clearLoadTimer()
 		if (httpFailure !== null) return fail(httpFailure)
+		if (state.state !== 'connecting') return
 		state = { state: 'showing', url: target.url, user: target.user, since: Date.now() }
 		apply()
 	})
@@ -184,6 +262,8 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 
 	window.on('closed', () => {
 		clearRetry()
+		clearLoadTimer()
+		clearInterval(watch)
 		wc.close()
 	})
 
@@ -219,6 +299,7 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 			rect = null
 			mode = 'volunteer'
 			clearRetry()
+			clearLoadTimer()
 			apply()
 			target = resolve()
 			idle()
@@ -228,7 +309,11 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 		},
 
 		retry() {
-			if (wanted && state.state === 'failed') connect()
+			if (!wanted || state.state === 'no-address') return
+			// Try now retries the same load. Reload MA logs in afresh, for the
+			// reason above the watch: a reload is not a way out of a stuck page.
+			if (state.state === 'failed') connect()
+			else reconnect()
 		},
 	}
 }

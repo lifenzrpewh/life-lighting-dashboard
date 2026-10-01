@@ -7,6 +7,10 @@ import {
 	isWebRemote,
 	operatorExpired,
 	OPERATOR_IDLE_MS,
+	remoteSays,
+	needsReload,
+	PANE_LOAD_TIMEOUT_MS,
+	PANE_STUCK_MS,
 } from '../dist/src/shared/ma-pane.js'
 
 test('a console address becomes its web remote, with no credentials', () => {
@@ -69,4 +73,39 @@ test('operator mode lasts 15 idle minutes, not one moment less', () => {
 	const t = 1_000_000
 	assert.ok(!operatorExpired(t, t + OPERATOR_IDLE_MS - 1))
 	assert.ok(operatorExpired(t, t + OPERATOR_IDLE_MS))
+})
+
+test('the web remote overlay reads as what MA itself says, in onPC 2.3.2.0 words', () => {
+	// Every string here is one MA's own remoteState.js writes.
+	const cases = [
+		['Connected!', 'connected'],
+		['Connecting to console', 'starting'],
+		['Waiting for video signal.', 'starting'],
+		['Video paused.', 'paused'],
+		['Disconnected', 'disconnected'],
+		['Remotes are disabled!', 'disabled'],
+		['Maximum connections count reached! To connect please unconnect another remote.', 'full'],
+		['You are black listed!', 'refused'],
+	]
+	for (const [text, says] of cases) assert.equal(remoteSays(text), says, text)
+})
+
+test('an overlay it does not know is unread, never taken for connected', () => {
+	// Another version's words, or not the web remote at all. Not ours to judge,
+	// so it neither counts as healthy nor triggers a reload.
+	for (const text of [null, '', 'Verbunden', 'Connection lost']) {
+		assert.equal(remoteSays(text), 'unread', String(text))
+		assert.equal(needsReload(remoteSays(text)), false, String(text))
+	}
+})
+
+test('only the states MA never leaves by itself ask for a reload', () => {
+	assert.equal(needsReload('connected'), false)
+	assert.equal(needsReload('paused'), false)
+	for (const says of ['starting', 'disconnected', 'disabled', 'full', 'refused']) assert.equal(needsReload(says), true, says)
+})
+
+test('a load gives up well before a person would, and a stuck page waits out MA\'s own retry', () => {
+	assert.ok(PANE_LOAD_TIMEOUT_MS >= 5_000 && PANE_LOAD_TIMEOUT_MS <= 30_000)
+	assert.ok(PANE_STUCK_MS >= 5_000)
 })

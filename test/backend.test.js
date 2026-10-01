@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { pairUrl, readPairCreated, readPairPoll } from '../dist/src/backend/pairing.js'
-import { campusOf, localDay, paths, pickPlan, read, toService } from '../dist/src/backend/run-order.js'
+import { campusOf, paths, pickPlan, planStart, read, toService } from '../dist/src/backend/run-order.js'
 import { apiKeyRole, needsRefresh, REFRESH_AHEAD_MS, sessionFrom, sessionFromDisk } from '../dist/src/backend/session.js'
 import { RUN_ORDER_POLL_MS, RUN_ORDER_STALE_AFTER_MS, RUN_ORDER_TIMEOUT_MS } from '../dist/src/shared/backend.js'
 import { readingOf, record, unread } from '../dist/src/shared/reading.js'
@@ -11,14 +11,16 @@ const CAMPUS = '3f2b8c1e-0d4a-4b6e-9a5f-1c2d3e4f5a6b'
 const FIELD = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'
 const USER = '11111111-2222-4333-8444-555555555555'
 
-/** A plan at a local wall-clock time, as the backend's rows carry it. */
+const pad = (n) => String(n).padStart(2, '0')
+
+/** A plan at a local wall-clock time, as the backend's rows carry it: PCO
+ *  writes the church's own clock with a `Z` on the end (planStart). */
 function plan(id, y, mo, d, h, mi, type = 'Mount Eden 9:30am', title = null) {
-	const at = new Date(y, mo - 1, d, h, mi)
 	return {
 		id,
 		title,
-		sort_date: localDay(at.getTime()),
-		starts: at.toISOString(),
+		sort_date: `${y}-${pad(mo)}-${pad(d)}`,
+		starts: `${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:00Z`,
 		pco_service_types: { name: type, visible: true },
 	}
 }
@@ -108,6 +110,33 @@ test('yesterday\'s plan is not today\'s, and nothing ahead is null', () => {
 })
 
 // --- the service -------------------------------------------------------------
+
+test('PCO\'s sort_date is the church\'s wall clock, whatever the Z says', () => {
+	// The real row, 2026-10-01: Central AM, plan 90226424, a 9:00 service. PCO's
+	// own plan_times has it at 2026-10-03T20:00:00Z. Run in Auckland, where the
+	// old reading (a true instant) put it at 22:00 the evening before.
+	const tz = process.env.TZ
+	process.env.TZ = 'Pacific/Auckland'
+	try {
+		const central = { ...plan('90226424', 2026, 10, 4, 9, 0), starts: '2026-10-04T09:00:00Z' }
+		assert.equal(planStart(central), Date.parse('2026-10-03T20:00:00Z'))
+		assert.equal(new Date(planStart(central)).getHours(), 9)
+		// Either side of the daylight-saving change, 09:00Z is still 9:00.
+		const nzst = { ...central, starts: '2026-09-20T09:00:00Z' }
+		assert.equal(planStart(nzst), Date.parse('2026-09-19T21:00:00Z'))
+		// Picked on its own morning, not the evening before.
+		assert.equal(pickPlan([central], Date.parse('2026-10-03T19:30:00Z'))?.id, '90226424')
+		assert.equal(pickPlan([central], Date.parse('2026-10-03T08:00:00Z'))?.id, '90226424')
+	} finally {
+		if (tz === undefined) delete process.env.TZ
+		else process.env.TZ = tz
+	}
+})
+
+test('a start PCO did not write is no start, never a guess', () => {
+	for (const starts of [null, '', 'soon', '2026-10-04']) assert.equal(planStart({ ...plan('p', 2026, 10, 4, 9, 0), starts }), null, String(starts))
+	assert.equal(new Date(planStart({ ...plan('p', 2026, 10, 4, 9, 0), starts: '2026-10-04T18:30' })).getMinutes(), 30)
+})
 
 test('rows become the service, in PCO order, with PCO\'s own kinds', () => {
 	const p = plan('p1', 2026, 10, 4, 9, 30, 'Mount Eden 9:30am', '  ')

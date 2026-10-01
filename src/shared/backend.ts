@@ -39,6 +39,9 @@ export type BackendStatus =
 			state: 'paired'
 			/** The account the booth signed in as. */
 			email: string | null
+			/** Its display name, once a read has said: for a booth device, the
+			 *  name it was created with. */
+			name: string | null
 			/** The campus the account is scoped to, once a read has said. */
 			campus: string | null
 			/** Something about the account worth fixing, e.g. that it can also

@@ -1,6 +1,7 @@
 // Top band: READ-ONLY. Status where you look; actions where your hand rests.
-// Nothing in here fires, stores, or deletes anything. The mode chip and, in
-// operator mode, Settings are the only controls, and neither touches the show.
+// Nothing in here fires, stores, or deletes anything. The mode chip, Reload MA
+// and, in operator mode, Settings are the only controls, and none touches the
+// show: Reload MA only loads the web remote's page again.
 
 import type { LinkState, Reading } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
@@ -118,6 +119,7 @@ export function StatusBar({
 	onEnter,
 	onLeave,
 	pane,
+	onReloadPane,
 	settingsOpen,
 	onSettings,
 	desk,
@@ -131,6 +133,8 @@ export function StatusBar({
 	onLeave: () => void
 	/** The MA pane's own status, in a few words (paneSummary). */
 	pane: string
+	/** Reload the MA pane; null when there is no page to reload. */
+	onReloadPane: (() => void) | null
 	settingsOpen: boolean
 	onSettings: () => void
 	/** What channel B has heard: an observation, beside the link's verdict. */
@@ -149,6 +153,18 @@ export function StatusBar({
 			<DeskPill desk={desk} now={now} />
 			<span className="text-booth-dim">{date}</span>
 			<span className="min-w-0 truncate text-booth-dim">MA · {pane}</span>
+			{/* Beside the pane, never over it. The pane reloads itself when MA's
+			    page is stuck in a state it never leaves; this is for whatever that
+			    does not recognise. It reconnects the picture and fires nothing. */}
+			{onReloadPane !== null && (
+				<button
+					type="button"
+					onClick={onReloadPane}
+					className="rounded border border-booth-edge px-3 py-1 text-xs whitespace-nowrap text-booth-dim active:scale-[0.98]"
+				>
+					Reload MA
+				</button>
+			)}
 			<span className="ml-auto text-2xl font-medium tabular-nums">{clock}</span>
 			{/* Boots into volunteer, always, and never remembers otherwise. */}
 			<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />

@@ -34,7 +34,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
 | ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. Channel B is wired (the "desk heard" pill); the link still reports UNREACHABLE because nothing round-trips yet. |
-| ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Exercised end to end 2026-09-27 against a local stand-in on `:8080`, **not a desk**. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
+| ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Real web remote on onPC 2.3.2.0, **not a desk**. Never stuck for good (2026-10-01): a 15 s load timeout, and a fresh login after 10 s of MA's own overlay saying something it never recovers from (✅ the read works in the sandbox; the fresh login is unit-tested, not watched firing). **Reload MA** beside it. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
 | ⚠️ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. Verified locally on macOS Keychain; DPAPI on Windows unexercised. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
 | ✅ `src/bridge/osc.ts` | OSC 1.0 decoder. An unknown type tag fails the **whole message**, not just that argument — OSC args are positional, so skipping one reads every later value at the wrong offset and a fader level becomes whatever four bytes sit there. |
@@ -250,36 +250,45 @@ npm run scan   # regenerate export-blacklist.json
 Tests read `~/MALightingTechnology/gma3_library/datapools/sequences` and skip if
 absent. ~50 s, because five real exports are 45 MB each.
 
+**On the booth PC (Windows)**, from a checkout, not an installer: `npm start` is proven
+on that box, an unsigned installer on a managed machine is not. In `scripts/windows/`:
+`kiosk.cmd` runs the build already there (building only if there is none), restarts
+after a crash, and logs to `%APPDATA%\life-lighting-dashboard\kiosk.log`;
+`install-startup.cmd` makes it start at login; `update.cmd` pulls and rebuilds, by
+hand, never before a service. One kiosk per computer: a second launch only focuses
+the first. ⚠️ None of the three has run on Windows yet.
+
 ## Next session starts here
 
-**Where things stand (2026-10-01).** Against onPC on this Mac the service screen
-runs end to end: the link is LIVE (a quiet ping, `src/bridge/ping.ts`), the MA
-pane shows the real web remote as `Remote`, and the showfile chip reads the
-console (amber `ON BASE SHOW Mount Eden Base`, re-read every 5 min in a quiet
-gap). The run order now has a source, the Planning Center backend, built and
-tested but **not yet read live**. onPC counts as on-console.
+**Where things stand (2026-10-01, evening).** Against onPC on this Mac the service
+screen runs end to end: the link is LIVE (a quiet ping, `src/bridge/ping.ts`), the MA
+pane shows the real web remote as `Remote` and recovers by itself, and the showfile
+chip reads the console (amber `ON BASE SHOW Mount Eden Base`, re-read every 5 min in
+a quiet gap). The run order has its key on this Mac and waits only on a booth device
+to pair with. onPC counts as on-console.
 
 ### TODO, in order
 
 1. **Read the run order live.** Everything below waits on this.
-   - Put the anon key in `~/Library/Application Support/life-lighting-dashboard/backend.json`
-     as `{"anonKey": "..."}`. `config.ts` refuses any other role's key. The URL is
-     built in (`https://visuals.prodapps.life`; ✅ probed, no Cloudflare Access).
-   - In the Cue Manager, **Admin › Booth devices**: create one for Mount Eden
-     (visuals-song-comms `1e670d8`, 2026-10-01: a real device identity with a
-     read-only `device` role, `notes.view` + `embeds.view`, scoped to one campus).
+   - ✅ The anon key is in `~/Library/Application Support/life-lighting-dashboard/backend.json`
+     on this Mac (2026-10-01; the backend accepts it). `config.ts` refuses any other
+     role's key. The URL is built in (`https://visuals.prodapps.life`). A booth PC
+     needs its own copy, in `%APPDATA%\life-lighting-dashboard\backend.json`.
+   - In the Cue Manager, **Admin › Booth devices**: create one for Mount Eden. ✅
+     deployed (`1e670d8`, `0dfe2cc`, `3d89c0b` all live, 2026-10-01); **none exists yet**.
    - Kiosk, operator mode, Settings › Planning Center › **Pair this booth**. An admin
      scans it and approves **As a booth device**. Approved as themselves, the booth
      holds their account: `campusOf` then refuses, because their role covers every
      campus.
-   - Check: the plan shown, the campus in Settings, notes against the right items.
-     Then mark `src/backend/` ✅ in the status table.
-   - ⚠️ **Settle `planStart`** in `src/backend/run-order.ts`: is PCO's `sort_date` a
-     true UTC instant, or local time labelled `Z`? A 9:30 service tells you at a
-     glance. It decides which day, and which service, the booth picks.
-2. **Show the device's name, not its address.** A booth device's email is
-   `device-<uuid>@devices.invalid`; Settings shows it as-is. `profiles.display_name`
-   holds the name and any signed-in user can read profiles.
+   - Check: the plan shown, the campus and the device's name in Settings, notes
+     against the right items. Then mark `src/backend/` ✅ in the status table.
+   - In dev the run order is the mock until you press `0` for the real sources.
+   - ✅ **`planStart` settled** (2026-10-01): `sort_date` is the church's wall clock
+     with a fake `Z`, read on the booth's own clock. Evidence in `run-order.ts`.
+   - Pairing is per computer: the session is sealed with that machine's keystore,
+     so the booth PC pairs on its own.
+2. ~~Show the device's name~~ — built 2026-10-01, `profiles.display_name`; the made-up
+   `@devices.invalid` email is hidden. Unseen until a device exists.
 3. **Ask the operator, then use what the backend added on 2026-10-01** (`0dfe2cc`):
    - `note_values.item_snapshot`: the song, key and arrangement a note was written
      against. A note whose item has changed since ("Changed in PCO") is exactly
@@ -287,11 +296,9 @@ tested but **not yet read live**. onPC counts as on-console.
    - `pco_item_notes`: PCO's own item notes by category, including a **VFX/LX**
      one. Show it beside the lighting note?
    - `removed_item_cues`: notes kept when PCO removed their item.
-4. **The MA pane's two gaps** (2026-09-30, unbuilt). It never leaves `showing`, so
-   "Remotes are disabled!" stays after the LD turns Web Remote on; and it has no load
-   timeout, so a full slot (onPC answers with silence) leaves it `connecting`
-   forever. Both need a way back that sits beside the pane, never over it.
-   `docs/MA3_READ_MODEL.md` § Web remote.
+4. ~~The MA pane's two gaps~~ — built 2026-10-01: load timeout, fresh login when MA's
+   page is stuck, Reload MA beside the pane. `docs/MA3_READ_MODEL.md` § Stuck pages.
+   Still to watch firing: Web Remote off then on, and a console restart.
 5. **For a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web remote,
    and whether listening beside onPC works on Windows. Build the volunteer layout
    view on the MA user `Remote`; HOLDING and PRE/POST are its biggest targets.
@@ -307,10 +314,13 @@ because the backend stores neither (no plan or item times are synced, and
 the seam. The Cue Manager's own booth mode moves a current item locally, by key
 or tap; we declined that here.
 
-**Seen in `visuals-song-comms`, not ours to fix** (as of `3d89c0b`): `is_live` is
-never cleared; `current_user_context()` lost its visible-campus filter; and
-`upcoming_service_cue_status` counts a song twice when it has two notes. Its "today"
-is the UTC date, a day behind New Zealand until 1 pm. `pco-sync` is locked down now.
+**Seen in `visuals-song-comms`, not ours to fix** (as of `3d89c0b`, confirmed on the
+server 2026-10-01, fixes proposed there and not applied): `is_live` is never cleared;
+`current_user_context()` lost its visible-campus filter in `20260614100000`, so a booth
+device sees every campus's services through it (we are unaffected: the campus comes
+from the account's own `user_roles` row); `upcoming_service_cue_status` counts a song
+twice when it has two notes; its "today" is the UTC date, a day behind New Zealand
+until 1 pm. `pco-sync` is locked down now.
 
 ### How the pieces work, briefly
 

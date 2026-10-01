@@ -45,6 +45,10 @@ export const paths = {
 	/** The account's own role rows; RLS lets a user read its own. */
 	roles: (userId: string) => rest('user_roles', { select: 'campus_id', user_id: `eq.${checked(userId, UUID, 'user id')}` }),
 	campus: (campusId: string) => rest('campuses', { select: 'id,name', id: `eq.${checked(campusId, UUID, 'campus id')}` }),
+	/** The account's name. A booth device's is the name it was created with
+	 *  (device-manage); its email is a made-up `device-<uuid>@devices.invalid`.
+	 *  RLS lets any signed-in user read profiles. */
+	profile: (userId: string) => rest('profiles', { select: 'display_name', id: `eq.${checked(userId, UUID, 'user id')}` }),
 	/** The campus's own Lighting field and any global one (`fieldDefs.ts` in the PWA). */
 	fields: (campusId: string) =>
 		rest('field_definitions', {
@@ -82,6 +86,7 @@ export const paths = {
 
 export type RoleRow = { campus_id: string | null }
 export type CampusRow = { id: string; name: string }
+export type ProfileRow = { display_name: string | null }
 export type FieldRow = { id: string }
 export type PlanRow = {
 	id: string
@@ -118,6 +123,7 @@ export const read = {
 	},
 	roles: (body: unknown) => rowsOf<RoleRow>(body, 'roles', (r) => isStrOrNull(r['campus_id'])),
 	campuses: (body: unknown) => rowsOf<CampusRow>(body, 'campus', (r) => isStr(r['id']) && isStr(r['name'])),
+	profiles: (body: unknown) => rowsOf<ProfileRow>(body, 'profile', (r) => isStrOrNull(r['display_name'])),
 	fields: (body: unknown) => rowsOf<FieldRow>(body, 'fields', (r) => isStr(r['id'])),
 	plans: (body: unknown) =>
 		rowsOf<PlanRow>(body, 'plans', (r) => {
@@ -185,16 +191,31 @@ export function localDay(ms: number): string {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+/** PCO's `sort_date` as written: a wall-clock time, with or without seconds,
+ *  and whatever zone suffix follows ignored. */
+const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/
+
 /** When a plan starts, from PCO's own `sort_date`.
  *
- *  ⚠️ UNVERIFIED: read as a true instant, so the day and time are this
- *  computer's local ones. Whether PCO writes that timestamp in UTC, or in the
- *  church's local time with a `Z` on the end, has not been checked against a
- *  real plan. If it is the second, a 9:30 service reads as 22:30 the evening
- *  before, and this is the one function to change. */
+ *  ✅ 2026-10-01: it is the church's wall-clock time with a `Z` stuck on the
+ *  end, NOT a UTC instant. Central AM on 4 Oct 2026 (plan 90226424, a 9:00
+ *  service) reads `2026-10-04T09:00:00Z`, while PCO's own plan_times puts that
+ *  service at `2026-10-03T20:00:00Z`; it reads 09:00Z either side of the
+ *  daylight-saving change; and PCO documents `sort_date` as returned "in the
+ *  time zone specified in your organization's localization settings"
+ *  (Pacific/Auckland). Read as a true instant, a 9:00 service landed at 22:00
+ *  the evening before, a day early.
+ *
+ *  So the `Z` is dropped and the time read on this computer's own clock. The
+ *  booth is in the church, so its zone is the church's, and that is a fact
+ *  the computer already has rather than a setting. */
 export function planStart(plan: PlanRow): number | null {
 	if (plan.starts === null) return null
-	const at = Date.parse(plan.starts)
+	const m = WALL_CLOCK.exec(plan.starts)
+	if (m === null) return null
+	const [y, mo, d, h, mi, sec] = m.slice(1).map((v) => (v === undefined ? 0 : Number(v)))
+	if (y === undefined || mo === undefined || d === undefined || h === undefined || mi === undefined) return null
+	const at = new Date(y, mo - 1, d, h, mi, sec ?? 0).getTime()
 	return Number.isFinite(at) ? at : null
 }
 
