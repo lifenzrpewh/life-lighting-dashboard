@@ -258,6 +258,14 @@ after a crash, and logs to `%APPDATA%\life-lighting-dashboard\kiosk.log`;
 hand, never before a service. One kiosk per computer: a second launch only focuses
 the first. ⚠️ None of the three has run on Windows yet.
 
+**The installer (the way forward).** `npm run dist:win` builds
+`release/LIFE-Lighting-Dashboard-Setup-<version>.exe` on this Mac: per-user, no admin
+rights, unsigned, default icon, key built in. The same build packaged for macOS
+(`npx electron-builder --mac --dir`) ran here 2026-10-02: renderer, preload and MA
+pane all load from the asar. ⚠️ **Whether the managed booth PC will run an unsigned
+installer is the open question**; it decides everything after it (hosting on
+`visuals.prodapps.life`, self-update, start at login).
+
 ## Next session starts here
 
 **Where things stand (2026-10-01, evening).** Against onPC on this Mac the service
