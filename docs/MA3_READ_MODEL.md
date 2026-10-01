@@ -344,10 +344,61 @@ every address. Menu › Network › interface `127.0.0.1` fixed it at once.
 needed. The same file carries the session (`Mount Eden Main Auditorium`), so this
 Mac rejoins the live show whenever it is on the booth network.
 
+### What survives `SendOSC`'s string — ✅ onPC 2.3.2.0, 2026-09-30
+
+Each of these returned `OK` whether or not the payload arrived intact, so none
+of them can be seen from the console side.
+
+- **A comma ends the value.** `SendOSC 3 "/probe/sep,s,a|b, c;d"` arrived as
+  `a|b`. SendOSC splits its string on every comma and drops whatever lies past
+  the declared types. `oscSafe` in LifeBridge now turns `,` into `;`. Until
+  then the probe's own `via GetVar(UserVars(), n)` detail was being cut short.
+- **`; | / . ( ) ' & +` all arrive intact** (one message, byte for byte).
+- **`$` variables do not expand inside the quotes.** `"/probe/base,s,$SGV2_BaseShow"`
+  arrived as the literal text `$SGV2_BaseShow`.
+- **Outside the quotes they expand as text, then split on spaces.**
+  `SendOSC 3 "/probe/a,s,"$SGV2_BaseShow` arrived as `Mount`: the variable holds
+  `Mount Eden Base`, and only the first word stayed attached to the string.
+  `"/probe/b,s,"$VERSION` produced nothing at all. So the command line cannot
+  carry a name with spaces in it, and the showfile name needs the plugin.
+
+### The showfile — LifeBridge `show`
+
+`Call Plugin "LifeBridge" "show"` over channel A; LifeBridge reads
+`Root().manetsocket.showfile` and `GetVar(UserVars(), "SGV2_BaseShow")`, runs
+SaveGuard's `normalise` and `baseShowName` on them line for line, compares them
+**on the console**, and answers with one message:
+
+```
+/life/show ,s "2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base"
+/life/show ,s "<version>|other|<uservar|default>|<name>|<base>"
+/life/show ,s "<version>|unreadable"
+```
+
+The verdict is made there because the trip mangles the names (ASCII only, no
+commas), and the chip must agree with SaveGuard, which sees them unmangled.
+`default` means the show has no `SGV2_BaseShow` and SaveGuard's own
+`LIFE Basefile Master` applies. Decoded by `readShow` in
+`src/bridge/channel-c.ts`; asked on link-up and then at most every 5 min, only
+in a quiet gap (`src/bridge/showfile.ts`). Two command lines per ask, about 0.4
+a minute on a quiet console.
+
+✅ **The answer, onPC 2.3.2.0 on "Mount Eden Base", 2026-09-30**, after deleting
+and re-importing LifeBridge: `2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base`,
+byte for byte what the harness asserts. The kiosk asked it on link-up and drew
+the amber `ON BASE SHOW Mount Eden Base`, then asked again **5:04 later**, in the
+first quiet gap past the 5-minute mark: two asks in five minutes, four lines.
+
+✅ **An out-of-date plugin says so.** Asked of the 30 September build, which has
+no `show`, onPC answered `/life/error ,s "unknown verb show"`. The dashboard
+reads that exact string as "delete LifeBridge and import it again", so the
+stale-import trap above shows up on the chip rather than as a silent `?`.
+
 ## UserVars
 
 `GetVar(UserVars(), "SGV2_BaseShow")` ✅ — the form `BaseFileSaver.lua` uses.
-`UserVars():Get(name)` ❌ returns empty.
+`UserVars():Get(name)` ❌ returns empty. `$SGV2_BaseShow` on the command line
+expands, but only outside quotes and only to its first word (above).
 
 On "Mount Eden Base", `SGV2_BaseShow` = `Mount Eden Base` — the campus show names
 *itself* as its base, so SaveGuard would refuse an in-place save there. Worth

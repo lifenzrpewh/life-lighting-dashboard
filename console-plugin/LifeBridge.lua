@@ -231,8 +231,13 @@ local function oscSafe(s)
   -- b\0\20 -- SendOSC does not carry UTF-8 through the command line intact. We
   -- strip rather than escape, for the same reason as the quote above: escaping
   -- still returns OK and still corrupts, so the damage would be invisible.
+  --
+  -- No commas. ✅ 2026-09-30, onPC 2.3.2.0: SendOSC splits its string on every
+  -- comma, so `a|b, c` arrived as `a|b` and the rest was dropped, again with OK.
+  -- A semicolon stands in: `; | / . ( ) ' & +` all arrived intact.
   return (tostring(s)
     :gsub('"', "'")
+    :gsub(',', ';')
     :gsub('%c', ' ')
     :gsub('[\128-\255]+', '-'))
 end
@@ -564,6 +569,65 @@ local function pingVerb(echo)
   sendOsc('/ping', 's', oscSafe(sformat('%s|%s', consoleVersion, echo or '')))
 end
 
+-- SaveGuard's fallback base name, mirrored so that the verdict below is the one
+-- SaveGuard reaches. It applies only to a show with no SGV2_BaseShow, one the
+-- Showfile Generator never ran on. Keep it in step with BASE_SHOW_NAME in the
+-- Show Creator's plugin/SaveGuard.lua.
+local SAVEGUARD_DEFAULT_BASE = 'LIFE Basefile Master'
+
+--- SaveGuard.lua's baseShowName(), line for line, plus where the answer came
+--- from, so the dashboard can say when it is SaveGuard's default and not the
+--- show's own.
+local function baseShowName()
+  local ok, v = pcall(function() return GetVar(UserVars(), 'SGV2_BaseShow') end)
+  if ok and v ~= nil and tostring(v) ~= '' then return tostring(v), 'uservar' end
+  return SAVEGUARD_DEFAULT_BASE, 'default'
+end
+
+--- SaveGuard.lua's normalise(), line for line: any path and the .show
+--- extension off the live showfile string.
+local function normaliseShowName(raw)
+  if type(raw) ~= 'string' or raw == '' then return nil end
+  return raw:match('([^/\\]+)%.show$')
+    or raw:match('([^/\\]+)$')
+    or raw
+end
+
+--- One field of a `|`-separated reply.
+local function fieldSafe(s)
+  return (oscSafe(s):gsub('|', '/'))
+end
+
+--- `show` — the loaded showfile, and whether it is the base show.
+---
+--- WHY THE VERDICT IS MADE HERE: SaveGuard refuses an in-place save on the base
+--- show, and the dashboard's ON BASE SHOW must agree with it exactly. The names
+--- cannot be compared at the far end, because the trip mangles them: oscSafe
+--- rewrites non-ASCII, quotes and commas. So both are read and compared here,
+--- as SaveGuard compares them, and the names travel only to be displayed.
+---
+--- One message, one line on the command line after the `Call Plugin` itself:
+---   /show ,s "<version>|base|<from>|<name>|<base>"    on the base show
+---   /show ,s "<version>|other|<from>|<name>|<base>"   on any other
+---   /show ,s "<version>|unreadable"                   no showfile name
+--- where <from> is `uservar` (SGV2_BaseShow) or `default` (SaveGuard's own).
+---
+--- Read-only, like everything here. No Printf either: the command line is the
+--- LD's, and this runs on every link-up and every few quiet minutes.
+local function showVerb()
+  pcall(probeVersion)
+  local raw
+  pcall(function() raw = Root().manetsocket.showfile end)
+  local name = normaliseShowName(raw)
+  if name == nil then
+    sendOsc('/show', 's', fieldSafe(consoleVersion) .. '|unreadable')
+    return
+  end
+  local base, from = baseShowName()
+  sendOsc('/show', 's', sformat('%s|%s|%s|%s|%s', fieldSafe(consoleVersion),
+    name == base and 'base' or 'other', from, fieldSafe(name), fieldSafe(base)))
+end
+
 --- Try each address accessor and report which one answers.
 local function addressOf(obj)
   local attempts = {
@@ -648,6 +712,8 @@ local function main(...)
   end
 
   if verb == 'ping' then return pingVerb(rest) end
+
+  if verb == 'show' then return showVerb() end
 
   if verb == 'pool' then
     log('pool probe — READ-ONLY, resolving object addresses')

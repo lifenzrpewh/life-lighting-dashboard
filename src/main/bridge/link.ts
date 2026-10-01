@@ -7,13 +7,21 @@
 // THE RULE THIS FILE ENFORCES: the link is LIVE only on evidence from the console
 // itself. An echo of our own ping, or anything else it says under our prefix.
 // Never a send that did not error, and never an address that resolves.
+//
+// The showfile read (../../bridge/showfile.ts) rides here too, because its
+// moments to ask are the link's: when it comes up, and in the quiet gaps where a
+// ping goes out anyway. It never decides the link. A console with a stale or
+// missing LifeBridge still pings green, as it must, and says what is wrong with
+// the plugin on the showfile chip instead.
 
 import { performance } from 'node:perf_hooks'
 
-import { readPing } from '../../bridge/channel-c.js'
+import { readPing, readShow } from '../../bridge/channel-c.js'
 import type { OscMessage } from '../../bridge/osc.js'
 import { createLinkTracker, pingCommand, type PingStats } from '../../bridge/ping.js'
-import type { LinkState } from '../../shared/reading.js'
+import { createShowfileReader, showCommand, type AskMoment } from '../../bridge/showfile.js'
+import type { Channel, LinkState, ReadResult } from '../../shared/reading.js'
+import type { Showfile } from '../../shared/showfile.js'
 import { createCommandSender, type CommandSender } from './osc-out.js'
 
 /** Epoch-scaled but monotonic: wall time at startup, plus a clock that never
@@ -21,12 +29,27 @@ import { createCommandSender, type CommandSender } from './osc-out.js'
  *  reads as a time of day. */
 const clock = () => performance.timeOrigin + performance.now()
 
+/** A moment on `clock`, as the same moment on the wall clock the renderer ages
+ *  things by. The monotonic clock stops while the computer sleeps, so the two
+ *  drift apart, and a read stamped with one and aged by the other would come
+ *  out the wrong age. Converting the age, not the stamp, keeps it true. */
+const onWallClock = (at: number) => Date.now() - (clock() - at)
+
+function wallChannel<T>(channel: Channel<T>): Channel<T> {
+	const latest: ReadResult<T> | null = channel.latest && { ...channel.latest, at: onWallClock(channel.latest.at) }
+	const lastOk = channel.lastOk && { ...channel.lastOk, at: onWallClock(channel.lastOk.at) }
+	return { latest, lastOk }
+}
+
 /** How often to ask ping.ts whether a ping is due. Local and cheap: nothing goes
  *  to the console unless one is. Fine-grained so a miss is confirmed promptly. */
 const TICK_MS = 250
 
 export type LinkHandle = {
 	link(): LinkState
+	/** What the console has said about its showfile, stamped on the wall clock
+	 *  for the renderer to age. */
+	showfile(): Channel<Showfile>
 	/** Offer a message off the reply port: an echo, or other proof of life. */
 	offer(message: OscMessage): void
 	stats(): PingStats
@@ -45,17 +68,36 @@ export function startLink(options: {
 	/** The link went live or down. For the log: a booth log that says when the
 	 *  console went away is worth more than one that says nothing. */
 	onChange?: (link: LinkState) => void
+	/** Something new about the showfile: a read, a failure, a timeout. For the
+	 *  log, like onChange. */
+	onShowfile?: (result: ReadResult<Showfile>) => void
 }): LinkHandle {
 	const tracker = createLinkTracker(options.session, clock())
+	const showfile = createShowfileReader()
 	const ours = `/${options.prefix}/`
 	let sender: CommandSender | null = null
 	let timer: ReturnType<typeof setInterval> | null = null
 	let lastState = tracker.link(clock()).state
+	let lastShow = showfile.channel(clock()).latest
+
+	const askShow = (moment: AskMoment) => {
+		const now = clock()
+		if (sender === null || !showfile.due(now, moment)) return
+		sender.send(showCommand())
+		showfile.asked(now)
+	}
 
 	const check = () => {
-		const now = tracker.link(clock())
-		if (now.state !== lastState) options.onChange?.(now)
-		lastState = now.state
+		const now = clock()
+		const link = tracker.link(now)
+		if (link.state !== lastState) {
+			options.onChange?.(link)
+			if (link.state === 'live') askShow('link-up')
+		}
+		lastState = link.state
+		const latest = showfile.channel(now).latest
+		if (latest !== lastShow && latest !== null) options.onShowfile?.(latest)
+		lastShow = latest
 	}
 
 	if (options.host !== null) {
@@ -68,7 +110,13 @@ export function startLink(options: {
 		sender = target
 		const tick = () => {
 			const now = clock()
-			if (tracker.due(now)) target.send(pingCommand(tracker.send(now)))
+			if (tracker.due(now)) {
+				// Read before the ping goes out: a live link with no miss to confirm
+				// means this ping is here because the console has been quiet.
+				const quiet = tracker.link(now).state === 'live' && tracker.stats().misses === 0
+				target.send(pingCommand(tracker.send(now)))
+				if (quiet) askShow('quiet-gap')
+			}
 			check()
 		}
 		tick()
@@ -78,12 +126,15 @@ export function startLink(options: {
 
 	return {
 		link: () => tracker.link(clock()),
+		showfile: () => wallChannel(showfile.channel(clock())),
 		offer(message) {
 			// An echo that matches nothing (late, or another run's) is not a round
 			// trip, but it did come from the console, so it still counts as heard.
 			const read = readPing(message, options.prefix)
 			const answered = read.ok && tracker.answer(read.reply.echo, clock()).ok
 			if (!answered && message.address.startsWith(ours)) tracker.heard(clock())
+			const show = readShow(message, options.prefix)
+			if (show.ok) showfile.reply(show.reply, clock())
 			check()
 		},
 		stats: () => tracker.stats(),

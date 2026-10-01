@@ -164,6 +164,12 @@ the console going away — independently.**
 volunteer permission only. Operator mode is a separate elevation, so a permanently-logged-in kiosk
 can never be the thing that authorises a destructive write.
 
+> ✅ **Booth devices (visuals-song-comms, 2026-10-01).** Pairing used to sign the booth in as
+> *whoever approved the QR*, with their rights. Now an admin creates a booth device (Admin › Booth
+> devices: a read-only `device` role, `notes.view` + `embeds.view`, scoped to one campus) and
+> approves the QR "As a booth device". The kiosk side is unchanged; the booth reads its campus from
+> the device's role, and revoking the device signs it out. Sign-out in the PWA is per-device now.
+
 ---
 
 ## The console plugin — `LifeBridge`
@@ -290,9 +296,10 @@ code-review item. This exists because `ma3-mcp/server.py:184` is literally
 `send(...) or "No groups found"`, and that one line makes a slow desk look like an empty show.
 **Boot state is UNKNOWN, not off.**
 
-> ⚠️ **Known wrinkle.** The run order is still derived against the *console* link, so a dead console
-> blanks PCO data that Supabase may well have. It should be judged against its own source's link.
-> Fix it when the Supabase client lands (it is the first App-track step).
+> ✅ **Known wrinkle, fixed 2026-09-30.** The run order was derived against the *console* link, so a
+> dead console blanked PCO data the backend still had. It is now judged by its own reads: a failing
+> backend ages it to STALE with the last good read (kept on disk across a restart), and a dead
+> console leaves it alone.
 
 ### Settings — the facts no show knows
 
@@ -323,6 +330,13 @@ What not building it gave up, and who owns each now:
 ### Phase 3 — Showfile
 
 A **chip in the status bar**, not a panel, opening to a sheet.
+
+> ✅ **The read half is built** (2026-09-30, LIVE against onPC 2.3.2.0). LifeBridge's `show` verb
+> makes the base-show verdict on the console, with SaveGuard's own rules, because the names are
+> mangled in transit and the chip must agree with the guard. It asks on link-up, then at most every
+> 5 minutes, only in a quiet gap: about 0.4 command lines a minute, none while the LD works (the
+> operator's choice). A name unrefreshed past that renders STALE with its age. The sheet below is
+> not built, so the chip opens nothing yet.
 
 - Base-show detection compares the loaded name against `SGV2_BaseShow`, normalised exactly as
   `SaveGuard.lua` does. On a match the chip turns amber and reads `ON BASE SHOW` **permanently** —

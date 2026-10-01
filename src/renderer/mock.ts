@@ -13,7 +13,8 @@
 
 import type { Channel, LinkState } from '../shared/reading.js'
 import { record, unread } from '../shared/reading.js'
-import type { Service } from '../shared/service.js'
+import type { Schedule, Service } from '../shared/service.js'
+import type { Showfile } from '../shared/showfile.js'
 
 export type Scenario = 'healthy' | 'stale' | 'silent' | 'unreachable' | 'cold'
 
@@ -30,29 +31,42 @@ export const SCENARIO_LABEL: Record<Scenario, string> = {
 const SERVICE: Service = {
 	date: '2026-09-21',
 	campus: 'Mount Eden',
+	serviceType: 'Mount Eden 9:30am',
 	planTitle: 'Sunday Morning',
-	nowItemId: 'itm-3',
+	// The backend has no current item yet (src/shared/service.ts), so neither
+	// does the mock: it must not show a highlight the real thing cannot.
+	nowItemId: null,
 	items: [
-		{ pcoItemId: 'itm-1', title: 'Countdown', kind: 'segment', startsAt: '10:02', lengthSec: 180, lightingNote: null },
-		{ pcoItemId: 'itm-2', title: 'Welcome', kind: 'segment', startsAt: '10:05', lengthSec: 420, lightingNote: null },
-		{
-			pcoItemId: 'itm-3',
-			title: 'Great Are You',
-			kind: 'song',
-			startsAt: '10:07',
-			lengthSec: 270,
-			lightingNote: 'band only, no movers',
-		},
-		{ pcoItemId: 'itm-4', title: 'Message', kind: 'teaching', startsAt: '10:12', lengthSec: null, lightingNote: 'flat and bright, hold through' },
-		{ pcoItemId: 'itm-5', title: 'Response', kind: 'song', startsAt: '10:40', lengthSec: 360, lightingNote: null },
+		{ pcoItemId: 'itm-1', title: 'Countdown', kind: 'media', lengthSec: 300, lightingNote: null },
+		{ pcoItemId: 'itm-2', title: 'Worship', kind: 'header', lengthSec: null, lightingNote: null },
+		{ pcoItemId: 'itm-3', title: 'Great Are You', kind: 'song', lengthSec: 270, lightingNote: 'band only, no movers' },
+		{ pcoItemId: 'itm-4', title: 'Welcome', kind: 'item', lengthSec: 420, lightingNote: null },
+		{ pcoItemId: 'itm-5', title: 'Message', kind: 'header', lengthSec: null, lightingNote: null },
+		{ pcoItemId: 'itm-6', title: 'Message', kind: 'item', lengthSec: null, lightingNote: 'flat and bright, hold through' },
+		{ pcoItemId: 'itm-7', title: 'Response', kind: 'song', lengthSec: 360, lightingNote: null },
 	],
 }
+
+const SCHEDULE: Schedule = { campus: 'Mount Eden', service: SERVICE }
+
+/** Mount Eden Base names itself as its base (docs/MA3_READ_MODEL.md § UserVars),
+ *  so the healthy desk is the one where the chip is amber. */
+const ON_BASE: Showfile = {
+	name: 'Mount Eden Base',
+	base: 'Mount Eden Base',
+	baseFrom: 'uservar',
+	onBase: true,
+	version: '2.3.2.0',
+}
+
+const SERVICE_SHOW: Showfile = { ...ON_BASE, name: 'Mount Eden 260921 AM', onBase: false }
 
 const MINUTE = 60_000
 
 export type MockState = {
 	link: LinkState
-	service: Channel<Service>
+	schedule: Channel<Schedule>
+	showfile: Channel<Showfile>
 }
 
 /** Build the whole app state for one scenario, at time `now`.
@@ -69,32 +83,43 @@ export function mockState(scenario: Scenario, now: number): MockState {
 		case 'healthy':
 			return {
 				link: live,
-				service: record(unread<Service>(), { ok: true, value: SERVICE, at: now }),
+				schedule: record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now }),
+				showfile: record(unread<Showfile>(), { ok: true, value: ON_BASE, at: now - MINUTE }),
 			}
 
 		case 'stale':
 			// Read fine, four minutes ago. Values show WITH their age.
+			// The showfile read on its own, slower cadence: nine minutes is past
+			// its threshold, as it would be on a console worked nonstop.
 			return {
 				link: live,
-				service: record(unread<Service>(), { ok: true, value: SERVICE, at: now - 4 * MINUTE }),
+				schedule: record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now - 4 * MINUTE }),
+				showfile: record(unread<Showfile>(), { ok: true, value: SERVICE_SHOW, at: now - 9 * MINUTE }),
 			}
 
 		case 'silent': {
 			// The case the Channel shape exists for: good read, then timeouts. The
 			// last known values are held and aged rather than blanked.
 			const svc = record(
-				record(unread<Service>(), { ok: true, value: SERVICE, at: now - 6 * MINUTE }),
+				record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now - 6 * MINUTE }),
 				{ ok: false, reason: 'timeout', at: now },
 			)
-			return { link: live, service: svc }
+			const show = record(
+				record(unread<Showfile>(), { ok: true, value: ON_BASE, at: now - 6 * MINUTE }),
+				{ ok: false, reason: 'timeout', at: now },
+			)
+			return { link: live, schedule: svc, showfile: show }
 		}
 
 		case 'unreachable':
-			// Fresh values in hand, and every one of them drops to UNKNOWN anyway,
-			// together, because the link outranks the value's own freshness.
+			// Fresh values in hand, and every console reading drops to UNKNOWN
+			// anyway, together, because the link outranks the value's own
+			// freshness. The run order does not: it comes from the backend, which
+			// a dead console says nothing about, so it stays as read.
 			return {
 				link: dead,
-				service: record(unread<Service>(), { ok: true, value: SERVICE, at: now }),
+				schedule: record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now }),
+				showfile: record(unread<Showfile>(), { ok: true, value: ON_BASE, at: now }),
 			}
 
 		case 'cold':
@@ -106,6 +131,6 @@ export function mockState(scenario: Scenario, now: number): MockState {
 			// ("Boot state is UNKNOWN, not off") — is with the desk answering and
 			// the first snapshot still in flight. That is a real moment, every
 			// single boot, and it needs to be a moment you can look at.
-			return { link: live, service: unread<Service>() }
+			return { link: live, schedule: unread<Schedule>(), showfile: unread<Showfile>() }
 	}
 }

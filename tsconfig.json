@@ -13,5 +13,5 @@
 		"declaration": true,
 		"skipLibCheck": true
 	},
-	"include": ["src/shared/**/*.ts", "src/bridge/**/*.ts"]
+	"include": ["src/shared/**/*.ts", "src/bridge/**/*.ts", "src/backend/**/*.ts"]
 }

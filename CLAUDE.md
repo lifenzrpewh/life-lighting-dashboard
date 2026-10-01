@@ -30,7 +30,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `spikes/scan-exports.mjs` | Derives `export-blacklist.json`. No desk needed. |
 | ✅ `console-plugin/LifeBridge.lua` | Probe v1, run on the console 2026-09-21 — pushed 14 results back over `SendOSC`. Read-only on the show. `OSC_ENTRY = 3`. |
 | ✅ `scripts/build-plugin-xml.mjs` | Embeds the Lua into a self-contained importable XML. Round-trip verified before the file lands. |
-| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 153 checks. |
+| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 225 checks. |
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
 | ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. Channel B is wired (the "desk heard" pill); the link still reports UNREACHABLE because nothing round-trips yet. |
@@ -41,6 +41,8 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
+| ✅ `src/bridge/showfile.ts` · LifeBridge `show` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap; the old plugin's `unknown verb show` recognised. `docs/MA3_READ_MODEL.md` § The showfile. |
+| ⚠️ `src/backend/` · `src/main/backend/` | The run order from `visuals-song-comms`: QR pairing as a booth device, the session sealed with the OS keystore, a read every 30 s, the last good read kept on disk. Judged by its own reads, not the console link. 21 tests; **not yet read against the live backend** (TODO 1). |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
@@ -185,6 +187,8 @@ and a station that falls out of session keeps answering confidently and wrongly.
 - **Deleting a recipe line renumbers the survivors.** Never cache a line index.
 - **Show names truncate silently at 31 characters.**
 - **`GetVar(UserVars(), n)` works; `UserVars():Get(n)` does not.**
+- **A comma inside a `SendOSC` string ends it**, and the console still says `OK`.
+  `oscSafe` turns `,` into `;`. `docs/MA3_READ_MODEL.md` § What survives.
 
 ## grandMA3 versions
 
@@ -207,7 +211,7 @@ touchscreen, so a Windows checkout is a first-class case, not a courtesy.
 | | |
 |---|---|
 | **Node** | `^22.20` (see `engines`) |
-| **Lua** | any 5.x on PATH. `npm test` runs the 153-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
+| **Lua** | any 5.x on PATH. `npm test` runs the 225-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
 | **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so. **Present but empty** (MA3 installed, exports not copied across: the normal state on a fresh Windows box) makes three tests *fail* rather than skip (`expected a large corpus, got 0`), because `findLibrary` only asks whether the directory exists, not whether it holds anything |
 
 `scripts/deploy-plugin.sh` is bash and needs Git Bash or WSL on Windows. It is
@@ -248,29 +252,82 @@ absent. ~50 s, because five real exports are 45 MB each.
 
 ## Next session starts here
 
-**Where things stand (2026-09-30).** The service screen runs end to end against
-onPC on this Mac: the link is LIVE (a quiet ping, `src/bridge/ping.ts`) and the MA
-pane shows the real web remote as `Remote`. onPC counts as on-console.
+**Where things stand (2026-10-01).** Against onPC on this Mac the service screen
+runs end to end: the link is LIVE (a quiet ping, `src/bridge/ping.ts`), the MA
+pane shows the real web remote as `Remote`, and the showfile chip reads the
+console (amber `ON BASE SHOW Mount Eden Base`, re-read every 5 min in a quiet
+gap). The run order now has a source, the Planning Center backend, built and
+tested but **not yet read live**. onPC counts as on-console.
 
-**Next: showfile info (Phase 3, the read half).** The `Showfile ▸` chip in
-`src/renderer/components/StatusBar.tsx` is still static text. Wanted: the loaded
-show's name, and a permanent amber `ON BASE SHOW` when it matches `SGV2_BaseShow`,
-normalised exactly as `SaveGuard.lua` does (Show Creator `plugin/`). Both reads
-are ✅ in `docs/MA3_READ_MODEL.md` § UserVars: `Root().manetsocket.showfile` and
-`GetVar(UserVars(), "SGV2_BaseShow")`. On Mount Eden Base both read `Mount Eden
-Base`: that show names itself as its base, so the chip should be amber there.
-- **Try first, costs nothing to test:** does the command line expand a variable
-  inside `SendOSC`? If so, the quiet ping could carry the name with no extra line
-  and no plugin. ⚠️ Untried; `$` expansion of system and user variables is not
-  observed anywhere in these docs.
-- **Otherwise a `show` verb in LifeBridge**, read-only, `SendOSC` only (the
-  harness enforces it). Deploying it: copy `console-plugin/LifeBridge.xml` into
-  `gma3_library/datapools/plugins/`, then **delete** the plugin and import.
+### TODO, in order
+
+1. **Read the run order live.** Everything below waits on this.
+   - Put the anon key in `~/Library/Application Support/life-lighting-dashboard/backend.json`
+     as `{"anonKey": "..."}`. `config.ts` refuses any other role's key. The URL is
+     built in (`https://visuals.prodapps.life`; ✅ probed, no Cloudflare Access).
+   - In the Cue Manager, **Admin › Booth devices**: create one for Mount Eden
+     (visuals-song-comms `1e670d8`, 2026-10-01: a real device identity with a
+     read-only `device` role, `notes.view` + `embeds.view`, scoped to one campus).
+   - Kiosk, operator mode, Settings › Planning Center › **Pair this booth**. An admin
+     scans it and approves **As a booth device**. Approved as themselves, the booth
+     holds their account: `campusOf` then refuses, because their role covers every
+     campus.
+   - Check: the plan shown, the campus in Settings, notes against the right items.
+     Then mark `src/backend/` ✅ in the status table.
+   - ⚠️ **Settle `planStart`** in `src/backend/run-order.ts`: is PCO's `sort_date` a
+     true UTC instant, or local time labelled `Z`? A 9:30 service tells you at a
+     glance. It decides which day, and which service, the booth picks.
+2. **Show the device's name, not its address.** A booth device's email is
+   `device-<uuid>@devices.invalid`; Settings shows it as-is. `profiles.display_name`
+   holds the name and any signed-in user can read profiles.
+3. **Ask the operator, then use what the backend added on 2026-10-01** (`0dfe2cc`):
+   - `note_values.item_snapshot`: the song, key and arrangement a note was written
+     against. A note whose item has changed since ("Changed in PCO") is exactly
+     what an LD needs flagged on Sunday.
+   - `pco_item_notes`: PCO's own item notes by category, including a **VFX/LX**
+     one. Show it beside the lighting note?
+   - `removed_item_cues`: notes kept when PCO removed their item.
+4. **The MA pane's two gaps** (2026-09-30, unbuilt). It never leaves `showing`, so
+   "Remotes are disabled!" stays after the LD turns Web Remote on; and it has no load
+   timeout, so a full slot (onPC answers with silence) leaves it `connecting`
+   forever. Both need a way back that sits beside the pane, never over it.
+   `docs/MA3_READ_MODEL.md` § Web remote.
+5. **For a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web remote,
+   and whether listening beside onPC works on Windows. Build the volunteer layout
+   view on the MA user `Remote`; HOLDING and PRE/POST are its biggest targets.
+6. **Showfile, the write half:** Save As and Load (`docs/PLAN.md` Phase 3). Decide
+   first whether MA's own dialog plus SaveGuard is enough. The chip gets its `▸`
+   only when there is something for it to open.
+7. **Housekeeping:** `README.md` is stale (pre-desk status, 84 checks, the old
+   design). Bring it in line with this file by linking, not copying.
+
+**Decided, not forgotten (2026-09-30):** no start times and no NOW highlight,
+because the backend stores neither (no plan or item times are synced, and
+`pco_plans.is_live` is set but never cleared). `nowItemId` stays in the type as
+the seam. The Cue Manager's own booth mode moves a current item locally, by key
+or tap; we declined that here.
+
+**Seen in `visuals-song-comms`, not ours to fix** (as of `3d89c0b`): `is_live` is
+never cleared; `current_user_context()` lost its visible-campus filter; and
+`upcoming_service_cue_status` counts a song twice when it has two notes. Its "today"
+is the UTC date, a day behind New Zealand until 1 pm. `pco-sync` is locked down now.
+
+### How the pieces work, briefly
+
+**The run order** (`src/backend/` pure and tested, `src/main/backend/` impure).
+It reads `visuals-song-comms` as-is: no new tables, no RPC of its own. Every 30 s:
+permissions, the account's own `user_roles` (the campus), the campus, the
+Lighting field, plans, items, notes. It checks `notes.view` first, because RLS
+answers a forbidden read with `[]`, which would look like "no notes". It is judged
+by its own reads (`readingOf(…, null, …)`), not the console link, so a dead console
+leaves it alone; a dead backend shows the last good read with its age, kept on
+disk across restarts. The session stays in main, sealed with the OS keystore.
+
+**The showfile chip.** LifeBridge's `show` verb makes SaveGuard's verdict on the
+console, because the trip mangles names (`docs/MA3_READ_MODEL.md` § The showfile).
+- **Deploying LifeBridge:** `npm run build:plugin`, copy `console-plugin/LifeBridge.xml`
+  into `gma3_library/datapools/plugins/`, then **delete** the plugin and import.
   Importing over it keeps the old code running.
-- Every ask is a line on the console's command line, so read on link-up and not
-  on a timer. Render it with the four states: UNKNOWN until read, never a
-  guessed name. Save As and Load are a separate decision, still open: MA's own
-  dialog plus SaveGuard may be enough.
 
 **Testing against onPC on this Mac.** The dashboard's settings are already right:
 console `127.0.0.1`, OSC 8003, replies 8004. In onPC:
@@ -282,33 +339,13 @@ console `127.0.0.1`, OSC 8003, replies 8004. In onPC:
 Then `npm run dev` and press `0` for the real link. `lsof -nP -iUDP` shows onPC's
 sockets directly. Keep this Mac off the booth network while testing: it is set
 to rejoin the live session. Details in `docs/MA3_READ_MODEL.md` § The link ping.
+Operator mode is a 3 s hold on the mode chip.
 
-**The MA pane has two gaps the desk showed (2026-09-30), both unbuilt.** It never
-leaves `showing` once a page loads, so "Remotes are disabled!" stays after the LD
-turns Web Remote on; and it has no load timeout, so a full slot, which onPC answers
-with silence, leaves it `connecting` indefinitely. Both need a way back that sits
-beside the pane, never over it. `docs/MA3_READ_MODEL.md` § Web remote.
-
-**Still for a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web
-remote (rights, URL login, the two-slot limit across a crash-reload, silent-drop
-timing, touch, render cost), and whether listening beside onPC works on Windows.
-Build the volunteer layout view on the MA user `Remote`; HOLDING and PRE/POST are
-its biggest targets (`docs/PLAN.md`, Phase 1).
-
-**App track — give the run order a real source.** Supabase client in `src/main`
-reading `note_values` / `lighting_cues` into `Service`. Main owns state truth; the
-renderer asks main and forms no opinion of its own. **Give the run order its own
-link while there**: it is still derived against the console link, so a dead
-console blanks PCO data (PLAN, "Known wrinkle").
-
-**Console track — keep it small.** The link and showfile info are all the MA pane
-leaves it. The `pool` verb waits until something needs that join. Keep the
-probe's guarantees: read-only on the show except an allow-listed Save As, no
-generic `cmd` verb in the shipped build, results that fail rather than return a
+**Console track — keep it small.** The link and showfile info were all the MA pane
+left it, and both are built. The `pool` verb waits until something needs that join.
+Keep the probe's guarantees: read-only on the show except an allow-listed Save As,
+no generic `cmd` verb in the shipped build, results that fail rather than return a
 plausible value.
-
-**Housekeeping:** `README.md` is stale (pre-desk status, 84 checks, the old
-design). Bring it in line with this file by linking, not copying.
 
 **Do not** make the shell fall back to plausible data while sources are missing.
 `readingOf` returning UNKNOWN with nothing wired is the design working, not a gap

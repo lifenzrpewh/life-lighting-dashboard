@@ -81,16 +81,35 @@ export function record<T>(channel: Channel<T>, result: ReadResult<T>): Channel<T
  *  `link` comes first in the precedence order on purpose: when the desk is
  *  unreachable, every element drops to UNKNOWN together, at the same instant. A
  *  board where half the tiles kept showing confident numbers through a dead link
- *  would be the exact failure this app exists to prevent. */
-export function readingOf<T>(channel: Channel<T>, now: number, link: LinkState): Reading<T> {
-	if (link.state === 'unreachable') return { state: 'unknown', why: 'unreachable' }
+ *  would be the exact failure this app exists to prevent.
+ *
+ *  `staleAfterMs` is for a value read on a slower cadence than the snapshot,
+ *  whose threshold must be derived from that cadence the same way: the
+ *  showfile's is SHOW_STALE_AFTER_MS in ./showfile.ts.
+ *
+ *  `link` is null for a value that does not come over the console at all: the
+ *  run order, from the Planning Center backend. Its own reads say whether it is
+ *  current, so a failing backend ages it to STALE while a dead console leaves it
+ *  alone. Judging it by the console link blanked PCO data the backend still had
+ *  (docs/PLAN.md, the known wrinkle). */
+export function readingOf<T>(
+	channel: Channel<T>,
+	now: number,
+	link: LinkState | null,
+	staleAfterMs = STALE_AFTER_MS,
+): Reading<T> {
+	if (link?.state === 'unreachable') return { state: 'unknown', why: 'unreachable' }
 
 	const { latest, lastOk } = channel
-	if (latest === null) return { state: 'unknown', why: 'never-read' }
+	// No attempt yet this run. A value kept from an earlier run (the run order's
+	// disk cache) is shown as what it is, old, from the first frame.
+	if (latest === null) {
+		return lastOk === null ? { state: 'unknown', why: 'never-read' } : { state: 'stale', value: lastOk.value, ageMs: now - lastOk.at }
+	}
 
 	if (latest.ok) {
 		const ageMs = now - latest.at
-		return ageMs < STALE_AFTER_MS
+		return ageMs < staleAfterMs
 			? { state: 'live', value: latest.value }
 			: { state: 'stale', value: latest.value, ageMs }
 	}

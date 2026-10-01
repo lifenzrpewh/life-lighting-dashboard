@@ -11,35 +11,42 @@
 
 import type { Reading } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
-import type { Service, ServiceItem } from '../../shared/service.js'
+import type { Schedule, Service, ServiceItem } from '../../shared/service.js'
 import { formatLength } from '../../shared/service.js'
 import { Unknown, formatAge, staleContent, stateClass } from './vocabulary.js'
 
-function Row({ item, isNow }: { item: ServiceItem; isNow: boolean }) {
-	const length = formatLength(item.lengthSec)
+/** "2026-09-21" as "Sun 21 Sep", on this computer's calendar. */
+function formatDay(iso: string): string {
+	const [y, m, d] = iso.split('-').map(Number)
+	if (y === undefined || m === undefined || d === undefined) return iso
+	return new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
+}
 
-	if (!isNow) {
+function Row({ item, isNow }: { item: ServiceItem; isNow: boolean }) {
+	// A PCO header divides the run order into sections; it is not an item.
+	if (item.kind === 'header') {
 		return (
-			<li className="flex items-baseline gap-3 px-4 py-3 text-booth-dim">
-				<span className="text-xs">▸</span>
-				<span className="flex-1 truncate">{item.title}</span>
-				<span className="tabular-nums text-sm">{item.startsAt}</span>
+			<li className="px-4 pt-5 pb-1 text-xs font-semibold uppercase tracking-widest text-booth-dim">
+				{item.title}
 			</li>
 		)
 	}
 
+	const length = formatLength(item.lengthSec)
 	return (
-		<li className="mx-2 my-2 rounded border-2 border-booth-ink/70 bg-booth-bg px-4 py-4">
-			<div className="flex items-baseline gap-2 text-xs uppercase tracking-widest text-booth-dim">
-				<span>Now</span>
-				<span>·</span>
-				<span>{item.kind}</span>
-				{length !== null && <span className="ml-auto tabular-nums">{length}</span>}
+		<li className={isNow ? 'mx-2 my-1 rounded border-2 border-booth-ink/70 px-3 py-3' : 'px-4 py-3'}>
+			<div className="flex items-baseline gap-3">
+				<span className={`flex-1 truncate ${item.kind === 'song' ? '' : 'text-booth-dim'}`}>
+					{item.title === '' ? 'Untitled' : item.title}
+				</span>
+				{/* No start times: the backend syncs none (src/shared/service.ts). */}
+				{length !== null && <span className="text-sm tabular-nums text-booth-dim">{length}</span>}
 			</div>
-			<div className="mt-1 text-xl font-medium">{item.title}</div>
-			{/* Written in the Visuals App during the week, read here on Sunday. */}
+			{/* Written in the Visuals App during the week, read here on Sunday.
+			    Every row that has one shows it: there is no current item to single
+			    out yet. */}
 			{item.lightingNote !== null && (
-				<p className="mt-2 border-l-2 border-booth-edge pl-3 text-sm text-booth-ink/80 italic">
+				<p className="mt-1 border-l-2 border-booth-edge pl-3 text-sm whitespace-pre-line text-booth-ink/80 italic">
 					“{item.lightingNote}”
 				</p>
 			)}
@@ -47,17 +54,46 @@ function Row({ item, isNow }: { item: ServiceItem; isNow: boolean }) {
 	)
 }
 
-function List({ service, ageMs }: { service: Service; ageMs: number | null }) {
+function Plan({ service }: { service: Service }) {
+	return (
+		<div className="border-b border-booth-edge px-4 py-3">
+			<div className="text-sm">
+				{formatDay(service.date)} · {service.serviceType}
+			</div>
+			{service.planTitle !== null && <div className="text-xs text-booth-dim">{service.planTitle}</div>}
+		</div>
+	)
+}
+
+function List({ schedule, ageMs, failure }: { schedule: Schedule; ageMs: number | null; failure: string | null }) {
+	const { service } = schedule
 	return (
 		<>
 			{ageMs !== null && (
-				<p className="px-4 pb-2 text-xs text-state-stale">run order {formatAge(ageMs)}</p>
+				<p className="px-4 pt-2 text-xs text-state-stale">
+					run order {formatAge(ageMs)}
+					{failure !== null && ` · ${failure}`}
+				</p>
 			)}
-			<ul className={`overflow-y-auto ${ageMs === null ? '' : staleContent}`}>
-				{service.items.map((item) => (
-					<Row key={item.pcoItemId} item={item} isNow={item.pcoItemId === service.nowItemId} />
-				))}
-			</ul>
+			<div className={`flex min-h-0 flex-1 flex-col ${ageMs === null ? '' : staleContent}`}>
+				{service === null ? (
+					// An answer, not a failure: the backend has no plan ahead for
+					// this campus. Not an empty list, which would read as a service
+					// with nothing in it.
+					<p className="px-6 py-8 text-center text-sm text-booth-dim">
+						No plan ahead for {schedule.campus} in Planning Center.
+					</p>
+				) : (
+					<>
+						<Plan service={service} />
+						<ul className="overflow-y-auto pb-4">
+							{service.items.map((item) => (
+								<Row key={item.pcoItemId} item={item} isNow={item.pcoItemId === service.nowItemId} />
+							))}
+						</ul>
+					</>
+				)}
+			</div>
 		</>
 	)
 }
@@ -78,11 +114,20 @@ export function FoldedRunOrder({ onOpen }: { onOpen: () => void }) {
 	)
 }
 
-export function RunOrder({ service, onFold }: { service: Reading<Service>; onFold: () => void }) {
+export function RunOrder({
+	schedule,
+	failure,
+	onFold,
+}: {
+	schedule: Reading<Schedule>
+	/** Why the last read failed, in words someone can act on, if it did. */
+	failure: string | null
+	onFold: () => void
+}) {
 	return (
 		<nav
 			className={`flex w-[22rem] shrink-0 flex-col border-r-2 bg-booth-panel ${
-				stateClass[service.state]
+				stateClass[schedule.state]
 			}`}
 		>
 			<div className="flex items-center gap-3 border-b border-booth-edge py-1 pl-4 pr-1">
@@ -98,16 +143,16 @@ export function RunOrder({ service, onFold }: { service: Reading<Service>; onFol
 				</button>
 			</div>
 
-			{matchReading(service, {
-				live: (s) => <List service={s} ageMs={null} />,
-				stale: (s, ageMs) => <List service={s} ageMs={ageMs} />,
+			{matchReading(schedule, {
+				live: (s) => <List schedule={s} ageMs={null} failure={null} />,
+				stale: (s, ageMs) => <List schedule={s} ageMs={ageMs} failure={failure} />,
 				// NOT an empty list. A run order we could not read renders as a
 				// question, because "no items" is a claim about the service and this
 				// is a fact about us.
 				unknown: (why) => (
 					<div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
 						<Unknown why={why} />
-						<p className="text-xs text-booth-dim">The run order has not been read.</p>
+						<p className="text-xs text-booth-dim">{failure ?? 'The run order has not been read.'}</p>
 					</div>
 				),
 			})}

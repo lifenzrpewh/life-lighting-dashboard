@@ -227,6 +227,10 @@ do
   for _, cmd in ipairs(c) do
     local _, body = cmd:match('^SendOSC (%d+) "(.*)"$')
     check('rich: payload carries no bare quote', body == nil or body:find('"') == nil, cmd)
+    -- SendOSC splits on every comma and drops what follows the last type
+    -- (✅ 2026-09-30). `address,type,value` has two; a third cuts the value.
+    check('rich: payload has no comma past the type tag',
+      body == nil or select(2, body:gsub(',', '')) == 2, cmd)
   end
 end
 
@@ -312,6 +316,92 @@ do
   check('ping: writes no file', next(files) == nil)
   check('ping: runs no probes', table.concat(p, '\n'):find('PASS', 1, true) == nil,
     table.concat(p, '\n'))
+end
+
+-- 4b. `show` — the loaded showfile, and SaveGuard's verdict on it.
+--     The verdict must be SaveGuard's exactly, so these mirror its rules: path
+--     and `.show` stripped, the UserVar or else SaveGuard's own default, and an
+--     exact, case-sensitive comparison.
+local function showEnvironment(showfile, baseVar)
+  return function()
+    installCommon(mockSequence())
+    _G.Root = function() return { manetsocket = { showfile = showfile }, Version = '2.3.2.0' } end
+    _G.GetVar = function(_, k)
+      if k == 'SGV2_BaseShow' then return baseVar end
+      return nil
+    end
+  end
+end
+
+--- The one reply, split into its fields. Nil unless exactly one `/show`.
+local function showFields(c)
+  if #c ~= 1 then return nil end
+  local body = c[1]:match('^SendOSC %d+ "/show,s,(.*)"$')
+  if body == nil then return nil end
+  local fields = {}
+  for part in (body .. '|'):gmatch('([^|]*)|') do fields[#fields + 1] = part end
+  return fields
+end
+
+local function checkShow(label, setup, want)
+  local ok, err, c, p = run(setup, '^/Users/Shared/LIFE/', {}, 'show')
+  check('show ' .. label .. ': does not throw', ok, tostring(err))
+  local f = showFields(c)
+  check('show ' .. label .. ': one /show message, SendOSC only', f ~= nil, table.concat(c, '\n'))
+  check('show ' .. label .. ': writes no file', next(files) == nil)
+  -- A Printf is a line on the LD's command line, on every link-up.
+  check('show ' .. label .. ': prints nothing', #p == 0, table.concat(p, '\n'))
+  if f then
+    local got = table.concat(f, '|')
+    check('show ' .. label .. ': reads ' .. want, got == want, got)
+  end
+end
+
+checkShow('on base', showEnvironment('Mount Eden Base', 'Mount Eden Base'),
+  '2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base')
+checkShow('elsewhere', richEnvironment,
+  '2.3.2.0|other|uservar|Sunday 21 Sep|LIFE Basefile Master')
+checkShow('path stripped', showEnvironment('/Users/lx/MALightingTechnology/shows/Mount Eden Base.show', 'Mount Eden Base'),
+  '2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base')
+checkShow('windows path stripped', showEnvironment('C:\\ProgramData\\shows\\Mount Eden Base.show', 'Mount Eden Base'),
+  '2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base')
+-- No SGV2_BaseShow: the generator never ran. SaveGuard falls back to its own
+-- name, so the verdict must too, and say that it did.
+checkShow('saveguard default', showEnvironment('LIFE Basefile Master', nil),
+  '2.3.2.0|base|default|LIFE Basefile Master|LIFE Basefile Master')
+checkShow('empty uservar is absent', showEnvironment('Sunday 21 Sep', ''),
+  '2.3.2.0|other|default|Sunday 21 Sep|LIFE Basefile Master')
+checkShow('case counts', showEnvironment('mount eden base', 'Mount Eden Base'),
+  '2.3.2.0|other|uservar|mount eden base|Mount Eden Base')
+checkShow('no name', showEnvironment(nil, 'Mount Eden Base'), '2.3.2.0|unreadable')
+checkShow('empty name', showEnvironment('', 'Mount Eden Base'), '2.3.2.0|unreadable')
+-- Every accessor raising: an honest `unreadable`, not a throw and not a guess.
+checkShow('hostile', hostileEnvironment, 'unknown|unreadable')
+
+-- A name the trip would mangle. The verdict is made on the raw strings, so it
+-- survives; the names arrive ASCII, with no comma to cut them and no `|` to
+-- shift a field.
+do
+  local odd = 'T\196\129maki, 28 Sep | "late"'
+  local ok, err, c = run(showEnvironment(odd, odd), '^/Users/Shared/LIFE/', {}, 'show')
+  check('show mangled: does not throw', ok, tostring(err))
+  local f = showFields(c)
+  check('show mangled: still five fields', f ~= nil and #f == 5, table.concat(c, '\n'))
+  if f then
+    check('show mangled: verdict made before mangling', f[2] == 'base', f[2])
+    check('show mangled: name is ASCII, comma-free, pipe-free',
+      f[4]:find('[\128-\255,|"]') == nil, f[4])
+  end
+end
+
+-- Called twice on one loaded chunk, as a console does: the same one message.
+do
+  local ok, firstCmds, c = runTwice(showEnvironment('Mount Eden Base', 'Mount Eden Base'),
+    '^/Users/Shared/LIFE/', { 'show' }, { 'show' })
+  check('show twice: neither call throws', ok)
+  check('show twice: one message each', firstCmds == 1 and #c == 2,
+    string.format('first %d, total %d', firstCmds, #c))
+  check('show twice: the same message', c[1] == c[2], table.concat(c, '\n'))
 end
 
 -- 5. `pool` — resolving what a channel B address points at.

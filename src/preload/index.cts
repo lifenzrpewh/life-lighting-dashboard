@@ -10,7 +10,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 // `resolution-mode` because this file is CommonJS (a sandboxed preload cannot
 // be an ES module) while src/shared is ESM. Type-only, so nothing is emitted.
-import type { LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
+import type { Channel, LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
+import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 'import' }
+import type { Schedule } from '../shared/service.js' with { 'resolution-mode': 'import' }
+import type { BackendStatus } from '../shared/backend.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
 import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
@@ -20,6 +23,23 @@ const api = {
 	 *  the pings main sends, never inferred from channel B traffic. See the
 	 *  header of src/main/kiosk.ts. */
 	linkState: (): Promise<LinkState> => ipcRenderer.invoke('link:state'),
+
+	/** What the console has said about its loaded showfile (LifeBridge's `show`
+	 *  verb), for the renderer to age and render in the four states. Read on
+	 *  link-up and every few quiet minutes, never guessed. */
+	showfile: (): Promise<Channel<Showfile>> => ipcRenderer.invoke('showfile:state'),
+
+	/** The run order, as main last read it from the Planning Center backend:
+	 *  judged by its own reads, never by the console link. */
+	runOrder: (): Promise<Channel<Schedule>> => ipcRenderer.invoke('runOrder:state'),
+	/** Whether the booth is signed in to the backend, as whom, and the pairing
+	 *  QR while one is up. Never a token. */
+	backendStatus: (): Promise<BackendStatus> => ipcRenderer.invoke('backend:status'),
+	/** Operator mode only; main refuses otherwise. */
+	pairBackend: (): void => ipcRenderer.send('backend:pair'),
+	cancelPairing: (): void => ipcRenderer.send('backend:cancel-pairing'),
+	/** Operator mode only. Signs this booth's session out, and only this one. */
+	unpairBackend: (): Promise<boolean> => ipcRenderer.invoke('backend:unpair'),
 
 	/** The MA pane (src/main/ma-pane.ts). The renderer says where it goes and
 	 *  which mode the screen is in; what it loads is main's business alone. */

@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
 import type { DeskState } from '../shared/desk.js'
-import type { Service } from '../shared/service.js'
+import type { Schedule } from '../shared/service.js'
+import { SHOW_STALE_AFTER_MS, type Showfile } from '../shared/showfile.js'
+import { RUN_ORDER_STALE_AFTER_MS } from '../shared/backend.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import { StatusBar } from './components/StatusBar.js'
 import { FoldedRunOrder, RunOrder } from './components/RunOrder.js'
@@ -14,7 +16,7 @@ import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
 
-type Sources = { link: LinkState; service: Channel<Service> }
+type Sources = { link: LinkState; schedule: Channel<Schedule>; showfile: Channel<Showfile> }
 
 /** What the app knows with no transport wired: nothing, and it says so.
  *
@@ -24,8 +26,16 @@ type Sources = { link: LinkState; service: Channel<Service> }
 function coldSources(now: number): Sources {
 	return {
 		link: { state: 'unreachable', since: now },
-		service: unread<Service>(),
+		schedule: unread<Schedule>(),
+		showfile: unread<Showfile>(),
 	}
+}
+
+/** The console's own words for a failed read, if the newest attempt failed
+ *  with some. A timeout has none: the `?` and "no answer" say it all. */
+function failureOf<T>(channel: Channel<T>): string | null {
+	const latest = channel.latest
+	return latest !== null && !latest.ok && latest.reason === 'error' ? latest.detail : null
 }
 
 export function App() {
@@ -66,6 +76,39 @@ export function App() {
 		if (api === undefined) return
 		let alive = true
 		const poll = () => void api.linkState().then((l) => alive && setMainLink(l))
+		poll()
+		const id = setInterval(poll, 1000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
+	// The showfile, as main holds it: what LifeBridge's `show` verb said, stamped
+	// on the wall clock so the age derived here is true. Polled like the link;
+	// it changes rarely, but its age is shown and must not lag.
+	const [mainShowfile, setMainShowfile] = useState<Channel<Showfile> | null>(null)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.showfile().then((c) => alive && setMainShowfile(c))
+		poll()
+		const id = setInterval(poll, 1000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
+	// The run order, as main last read it from the backend. Main reads every
+	// 30 s; this only has to keep the age on screen current.
+	const [mainSchedule, setMainSchedule] = useState<Channel<Schedule> | null>(null)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.runOrder().then((c) => alive && setMainSchedule(c))
 		poll()
 		const id = setInterval(poll, 1000)
 		return () => {
@@ -123,9 +166,16 @@ export function App() {
 	const sources: Sources =
 		DEV && scenario !== 'real'
 			? mockState(scenario, now)
-			: { ...coldSources(now), ...(mainLink === null ? {} : { link: mainLink }) }
+			: {
+					...coldSources(now),
+					...(mainLink === null ? {} : { link: mainLink }),
+					...(mainShowfile === null ? {} : { showfile: mainShowfile }),
+					...(mainSchedule === null ? {} : { schedule: mainSchedule }),
+				}
 
-	const service = readingOf(sources.service, now, sources.link)
+	// Judged by its own reads, not the console link: null (src/shared/reading.ts).
+	const schedule = readingOf(sources.schedule, now, null, RUN_ORDER_STALE_AFTER_MS)
+	const showfile = readingOf(sources.showfile, now, sources.link, SHOW_STALE_AFTER_MS)
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
@@ -134,7 +184,7 @@ export function App() {
 					{scenario === 'real' ? (
 						<>
 							<span className="tracking-widest">DEV — REAL CONSOLE LINK</span>
-							<span className="font-normal">the link is main's own ping; the run order has no source yet</span>
+							<span className="font-normal">the link, showfile and run order are main's own</span>
 						</>
 					) : (
 						<>
@@ -158,13 +208,15 @@ export function App() {
 				settingsOpen={settingsOpen}
 				onSettings={() => setSettingsOpen(!settingsOpen)}
 				desk={desk}
+				showfile={showfile}
+				showfileFailure={failureOf(sources.showfile)}
 			/>
 
 			{/* Above the pane, never over it: a native view cannot be overlaid. */}
 			{sources.link.state === 'unreachable' && (
 				<div className="border-b border-state-unreachable/40 bg-state-unreachable/15 px-6 py-2 text-sm">
 					<span className="text-state-unreachable">
-						No console link — readings here are unknown, and the dashboard can't confirm the MA picture is current.
+						No console link — console readings are unknown, and the dashboard can't confirm the MA picture is current.
 					</span>{' '}
 					<span className="text-booth-dim">The web remote shows its own “disconnected” once it notices.</span>
 				</div>
@@ -175,7 +227,7 @@ export function App() {
 			    someone has to remember. The buttons are the MA's own, in the pane. */}
 			<div className="flex min-h-0 flex-1">
 				{runOrderOpen ? (
-					<RunOrder service={service} onFold={() => setRunOrderOpen(false)} />
+					<RunOrder schedule={schedule} failure={failureOf(sources.schedule)} onFold={() => setRunOrderOpen(false)} />
 				) : (
 					<FoldedRunOrder onOpen={() => setRunOrderOpen(true)} />
 				)}

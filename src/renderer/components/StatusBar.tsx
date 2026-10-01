@@ -2,11 +2,13 @@
 // Nothing in here fires, stores, or deletes anything. The mode chip and, in
 // operator mode, Settings are the only controls, and neither touches the show.
 
-import type { LinkState } from '../../shared/reading.js'
+import type { LinkState, Reading } from '../../shared/reading.js'
+import { matchReading } from '../../shared/reading.js'
 import type { Mode } from '../../shared/ma-pane.js'
+import type { Showfile } from '../../shared/showfile.js'
 import { ModeChip } from './ModeChip.js'
 import type { DeskState } from '../../shared/desk.js'
-import { formatAge } from './vocabulary.js'
+import { Unknown, formatAge, staleContent, stateClass } from './vocabulary.js'
 
 /** What channel B has actually heard — an OBSERVATION, sat deliberately apart
  *  from the link pill's VERDICT.
@@ -66,6 +68,49 @@ function LinkPill({ link }: { link: LinkState }) {
 	)
 }
 
+/** The loaded showfile, in the four states. On the base show it is amber and
+ *  reads ON BASE SHOW for as long as that is true: a state, not a dialog to
+ *  dismiss (docs/PLAN.md, Phase 3). The verdict is SaveGuard's, made on the
+ *  console; this only shows it.
+ *
+ *  No ▸ yet. The sheet it will open (Save As, Load) is not built, and an arrow
+ *  on something that does nothing when tapped teaches people to stop trying. */
+function ShowfileChip({ showfile, failure }: { showfile: Reading<Showfile>; failure: string | null }) {
+	return matchReading(showfile, {
+		live: (show) => <ShowName show={show} ageMs={null} />,
+		stale: (show, ageMs) => <ShowName show={show} ageMs={ageMs} />,
+		unknown: (why) => (
+			<span className={`flex min-w-0 items-center gap-2 rounded border px-3 py-1 ${stateClass.unknown}`}>
+				<span className="text-booth-dim">Showfile</span>
+				<Unknown why={why} />
+				{/* What went wrong, when the console said: an out-of-date plugin is
+				    something the LD can fix, and "read failed" alone does not say how. */}
+				{why === 'error' && failure !== null && <span className="truncate text-xs text-booth-dim">{failure}</span>}
+			</span>
+		),
+	})
+}
+
+function ShowName({ show, ageMs }: { show: Showfile; ageMs: number | null }) {
+	const stale = ageMs !== null
+	// Amber belongs to ON BASE SHOW (theme.css). STALE keeps its own marks on
+	// top: the dashed border, the dimmed name, the age at full strength.
+	const frame = show.onBase
+		? `border-warn bg-warn/15 ${stale ? 'border-dashed' : 'border-solid'}`
+		: stale
+			? stateClass.stale
+			: stateClass.live
+	return (
+		<span className={`flex min-w-0 items-center gap-2 rounded border px-3 py-1 ${frame}`}>
+			<span className={`flex min-w-0 items-center gap-2 ${stale ? staleContent : ''}`}>
+				{show.onBase && <span className="font-semibold tracking-widest whitespace-nowrap text-warn">ON BASE SHOW</span>}
+				<span className="truncate">{show.name}</span>
+			</span>
+			{stale && <span className="text-xs whitespace-nowrap text-state-stale">{formatAge(ageMs)}</span>}
+		</span>
+	)
+}
+
 export function StatusBar({
 	link,
 	now,
@@ -76,6 +121,8 @@ export function StatusBar({
 	settingsOpen,
 	onSettings,
 	desk,
+	showfile,
+	showfileFailure,
 }: {
 	link: LinkState
 	now: number
@@ -88,6 +135,9 @@ export function StatusBar({
 	onSettings: () => void
 	/** What channel B has heard: an observation, beside the link's verdict. */
 	desk: DeskState | null
+	showfile: Reading<Showfile>
+	/** Why the last showfile read failed, in the console's words, if it did. */
+	showfileFailure: string | null
 }) {
 	const clock = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 	// Today, from the same clock the ages derive from — not a literal, and not
@@ -113,7 +163,7 @@ export function StatusBar({
 					SETTINGS
 				</button>
 			)}
-			<span className="text-booth-dim">Showfile ▸</span>
+			<ShowfileChip showfile={showfile} failure={showfileFailure} />
 		</header>
 	)
 }

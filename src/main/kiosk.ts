@@ -21,13 +21,25 @@
 // in a row make it UNREACHABLE. Anything the console says counts as proof it is
 // there, so a console someone is working is never asked at all: every ask is a
 // line on its command line. ✅ LIVE against onPC 2.3.2.0, 2026-09-30.
+//
+// THE SHOWFILE (../bridge/showfile.ts) is read over the same link: LifeBridge's
+// `show` verb, on link-up and in quiet gaps every few minutes. Main holds what
+// the console said; the renderer ages it and renders it in the four states.
+//
+// THE RUN ORDER (./backend/backend.ts) comes from the Planning Center backend,
+// on its own reads and its own clock, never the console link. The booth's
+// session lives here, encrypted; pairing and unpairing are operator-only.
 
 import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import type { LinkState } from '../shared/reading.js'
+import type { Channel, LinkState } from '../shared/reading.js'
+import { unread } from '../shared/reading.js'
+import type { Showfile } from '../shared/showfile.js'
+import type { Schedule } from '../shared/service.js'
+import { startBackend, type BackendHandle } from './backend/backend.js'
 import type { Mode, PaneRect } from '../shared/ma-pane.js'
 import { isLoopback, patchFrom, replyPortOf } from '../shared/settings.js'
 import { createMaPane, type MaPane } from './ma-pane.js'
@@ -51,6 +63,7 @@ let settings: SettingsStore | null = null
 let mode: Mode = 'volunteer'
 let channelB: ChannelBHandle | null = null
 let consoleLink: LinkHandle | null = null
+let backend: BackendHandle | null = null
 const BOOTED_AT = Date.now()
 
 /** What main knows from channel B before the socket has even bound.
@@ -93,6 +106,7 @@ function createWindow(): void {
 	window.webContents.on('did-start-loading', () => {
 		mode = 'volunteer'
 		maPane?.release()
+		backend?.cancelPairing()
 	})
 
 	// A renderer crash mid-service must not leave a dead rectangle in the booth.
@@ -117,6 +131,12 @@ function createWindow(): void {
  *  unreachable since boot before the link has even started. */
 function linkState(): LinkState {
 	return consoleLink?.link() ?? { state: 'unreachable', since: BOOTED_AT }
+}
+
+/** What the console has said about its showfile: nothing, before the link has
+ *  even started. */
+function showfileState(): Channel<Showfile> {
+	return consoleLink?.showfile() ?? unread<Showfile>()
 }
 
 /** The OSC settings the sockets were last started with, to tell whether a
@@ -147,6 +167,17 @@ function startOsc(store: SettingsStore): void {
 		},
 		onChange: (link) =>
 			console.log(link.state === 'live' ? `[kiosk] console link live, ${link.roundTripMs.toFixed(0)} ms` : '[kiosk] console link unreachable'),
+		onShowfile: (r) => {
+			if (r.ok) {
+				const { name, base, baseFrom, onBase, version } = r.value
+				const against = baseFrom === 'default' ? `SaveGuard's default "${base}"` : `"${base}"`
+				console.log(`[kiosk] showfile "${name}"${onBase ? ' ON BASE SHOW' : ''} (base ${against}, MA ${version})`)
+			} else if (r.reason === 'timeout') {
+				console.error('[kiosk] showfile: LifeBridge did not answer `show`. Is it imported on the console?')
+			} else {
+				console.error(`[kiosk] showfile: ${r.detail}`)
+			}
+		},
 	})
 	// onPC on this computer holds the reply port on every address, so listen on
 	// loopback exactly, beside it (./bridge/osc-in.ts, at the bind).
@@ -192,6 +223,7 @@ app.whenReady().then(() => {
 
 	ipcMain.handle('link:state', () => linkState())
 	ipcMain.handle('desk:state', () => channelB?.deskState() ?? noDesk(replyPortOf(store.current())))
+	ipcMain.handle('showfile:state', () => showfileState())
 
 	// Started before the window exists, so the first thing the renderer asks for
 	// already has whatever the desk has said in the meantime.
@@ -211,6 +243,27 @@ app.whenReady().then(() => {
 		if (!fromKiosk(e) || (next !== 'volunteer' && next !== 'operator')) return
 		mode = next
 		maPane?.setMode(next)
+		// A QR left up would let anyone who scans it within three minutes sign
+		// the booth in as themselves. It goes with operator mode.
+		if (next === 'volunteer') backend?.cancelPairing()
+	})
+
+	// The run order is for every mode; the booth's sign-in is operator business.
+	backend = startBackend({
+		dataDir: app.getPath('userData'),
+		log: (line) => console.log(`[kiosk] ${line}`),
+		error: (line) => console.error(`[kiosk] ${line}`),
+	})
+	ipcMain.handle('runOrder:state', () => backend?.schedule() ?? unread<Schedule>())
+	ipcMain.handle('backend:status', (e) => (fromKiosk(e) ? backend?.status() : undefined))
+	ipcMain.on('backend:pair', (e) => {
+		if (fromKiosk(e) && mode === 'operator') backend?.pair()
+	})
+	ipcMain.on('backend:cancel-pairing', (e) => fromKiosk(e) && backend?.cancelPairing())
+	ipcMain.handle('backend:unpair', async (e) => {
+		if (!fromKiosk(e) || mode !== 'operator') return false
+		await backend?.unpair()
+		return true
 	})
 
 	ipcMain.handle('settings:get', (e) => (fromKiosk(e) ? settings?.view() : undefined))
@@ -239,4 +292,7 @@ app.on('window-all-closed', () => {
 // Release the OSC port explicitly. A socket left bound by a half-exited process
 // is the kind of thing that makes the NEXT launch look like a dead desk, and
 // nobody debugging that at 8:50 on a Sunday would suspect the previous run.
-app.on('will-quit', () => stopOsc())
+app.on('will-quit', () => {
+	stopOsc()
+	backend?.stop()
+})

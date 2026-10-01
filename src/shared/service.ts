@@ -14,18 +14,21 @@
 
 import type { Reading } from './reading.js'
 
-/** PCO item types, narrowed to what changes how a row renders. `other` is the
- *  honest bucket — a type we have not taught the board about is not an error and
- *  must not be dropped from the run order. */
-export type ItemKind = 'song' | 'teaching' | 'segment' | 'other'
+/** PCO's own item types, as `pco_items.item_type` stores them. A `header` is a
+ *  section divider ("Worship", "Message"), not an item. `other` is the honest
+ *  bucket: a type we have not taught the board about is not an error and must
+ *  not be dropped from the run order. Nothing here is invented: PCO has no
+ *  "teaching", so the board does not either. */
+export type ItemKind = 'song' | 'header' | 'media' | 'item' | 'other'
 
 export type ServiceItem = {
 	/** PCO's own id. The join key for lighting notes — never a local index. */
 	pcoItemId: string
 	title: string
 	kind: ItemKind
-	/** Local wall-clock start, "HH:MM", as PCO's plan times give it. */
-	startsAt: string
+	/** No start time. The backend syncs no plan or item times, only lengths
+	 *  (2026-09-30), and a time summed from lengths would be a guess shown as a
+	 *  fact. Lengths only, by the operator's choice, until the sync carries times. */
 	/** null means PCO carries no length for this item, which is common for
 	 *  segments. It is NOT zero, and must not render as 0:00. */
 	lengthSec: number | null
@@ -38,16 +41,30 @@ export type Service = {
 	/** ISO date of the service, e.g. "2026-09-21". */
 	date: string
 	campus: string
-	/** PCO plan title, e.g. "Sunday Morning". */
-	planTitle: string
+	/** The PCO service type, e.g. "Mount Eden 9:30am": what tells two plans on
+	 *  one day apart. */
+	serviceType: string
+	/** PCO plan title, e.g. "Sunday Morning". Often unset in PCO, and then null
+	 *  rather than an empty string. */
+	planTitle: string | null
 	items: ServiceItem[]
 	/** The item PCO says is current. May be null before the plan starts.
+	 *
+	 *  ⚠️ NO SOURCE YET: always null from the backend. It stores no current item
+	 *  (`pco_plans.is_live` is set and never cleared), so there is no highlight
+	 *  until one is chosen (2026-09-30). Kept as the seam for it.
 	 *
 	 *  ⚠️ ADVANCING THIS FIRES NOTHING. Auto-firing a look because someone
 	 *  advanced PCO during a prayer is the worst thing this app could do
 	 *  (docs/PLAN.md, Phase 1). It moves the highlight and nothing else. */
 	nowItemId: string | null
 }
+
+/** What the backend says a campus has next: the run order's reading.
+ *  `service` null means no plan in the sync window (90 days). That is an
+ *  answer, not a failure, and not an empty run order either: the spine says
+ *  there is no plan, rather than listing nothing. */
+export type Schedule = { campus: string; service: Service | null }
 
 /** What the screen actually consumes. Every field is separately honest about
  *  whether it is known, because they fail independently: Supabase can be
