@@ -1,28 +1,22 @@
-// Where the backend is, and the key that lets anyone ask it anything at all.
+// The backend this booth reads, and the key it asks with.
 //
-// WHY THIS IS NOT A SETTING: it is the same for every booth. One backend serves
-// every campus (`visuals-song-comms`), and the anon key is public by design: the
-// PWA ships it to every browser, and RLS is what actually decides what a caller
-// may read. So it is not per-booth configuration, and it is not a secret. It is
-// kept out of git only because it did not come with this repo.
+// Built in (../../backend/endpoint.ts): the same for every booth, and public.
+// `LIFE_BACKEND_ANON_KEY`, or `backend.json` beside the settings
+// (`{ "anonKey": "eyJ...", "url": "https://..." }`), points one computer at
+// another backend, for testing. A booth never needs either.
 //
-// THE RULE THIS FILE ENFORCES: only an `anon` key is accepted. The service-role
-// key looks the same and bypasses RLS entirely.
+// THE RULE THIS FILE ENFORCES: only an `anon` key is accepted, wherever it came
+// from. The service-role key looks the same and bypasses RLS entirely.
 
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { BACKEND_ANON_KEY, BACKEND_URL } from '../../backend/endpoint.js'
 import { apiKeyRole } from '../../backend/session.js'
-
-/** The PWA and the Supabase API, same-origin behind Caddy (visuals-song-comms
- *  CLAUDE.md). ✅ 2026-09-30: answers directly, no Cloudflare Access in front;
- *  Kong wants only the `apikey` header. */
-export const BACKEND_URL = 'https://visuals.prodapps.life'
 
 export type BackendConfig = { ok: true; url: string; anonKey: string } | { ok: false; detail: string }
 
-/** The key from `LIFE_BACKEND_ANON_KEY`, or else `backend.json` beside the
- *  settings (`{ "anonKey": "eyJ..." }`, optionally `"url"`). */
+/** The built-in backend, unless this computer has been pointed elsewhere. */
 export function backendConfig(dataDir: string): BackendConfig {
 	const file = path.join(dataDir, 'backend.json')
 	let fromFile: Record<string, unknown> = {}
@@ -33,10 +27,10 @@ export function backendConfig(dataDir: string): BackendConfig {
 		if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return { ok: false, detail: `${file} is unreadable: ${String(e)}` }
 	}
 
-	const key = process.env['LIFE_BACKEND_ANON_KEY'] ?? fromFile['anonKey']
+	const key = process.env['LIFE_BACKEND_ANON_KEY'] ?? fromFile['anonKey'] ?? BACKEND_ANON_KEY
 	const url = typeof fromFile['url'] === 'string' ? fromFile['url'] : BACKEND_URL
 	if (typeof key !== 'string' || key.trim() === '') {
-		return { ok: false, detail: `no backend key: put {"anonKey": "..."} in ${file}` }
+		return { ok: false, detail: `the backend key in ${file} is empty` }
 	}
 	const role = apiKeyRole(key.trim())
 	if (role !== 'anon') {

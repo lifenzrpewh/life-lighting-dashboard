@@ -275,7 +275,11 @@ export function startBackend(options: {
 			return
 		}
 		pairing = { phase: 'starting' }
-		const reply = await request('/functions/v1/pair-create', null, {})
+		// A booth's QR, not a person's: the backend lets only an admin approve
+		// it, and only as a booth device. A backend that predates the field
+		// ignores it, and the old rules hold (campusOf still refuses an
+		// every-campus account).
+		const reply = await request('/functions/v1/pair-create', null, { kind: 'booth' })
 		if (!reply.ok) {
 			pairing = { phase: 'failed', detail: `pairing: ${reply.detail}` }
 			return

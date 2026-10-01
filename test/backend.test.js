@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { pairUrl, readPairCreated, readPairPoll } from '../dist/src/backend/pairing.js'
 import { campusOf, paths, pickPlan, planStart, read, toService } from '../dist/src/backend/run-order.js'
 import { apiKeyRole, needsRefresh, REFRESH_AHEAD_MS, sessionFrom, sessionFromDisk } from '../dist/src/backend/session.js'
+import { BACKEND_ANON_KEY, BACKEND_URL } from '../dist/src/backend/endpoint.js'
 import { RUN_ORDER_POLL_MS, RUN_ORDER_STALE_AFTER_MS, RUN_ORDER_TIMEOUT_MS } from '../dist/src/shared/backend.js'
 import { readingOf, record, unread } from '../dist/src/shared/reading.js'
 
@@ -204,6 +205,13 @@ test('the run order goes stale after two missed reads and the third\'s timeout',
 
 const jwt = (payload) =>
 	['{"alg":"HS256"}', JSON.stringify(payload), 'sig'].map((p, i) => (i < 2 ? Buffer.from(p).toString('base64url') : p)).join('.')
+
+test('the built-in key is the public anon key, never one that bypasses RLS', () => {
+	// Every booth ships with it. A service-role key here would hand every
+	// booth the whole database.
+	assert.equal(apiKeyRole(BACKEND_ANON_KEY), 'anon')
+	assert.equal(new URL(BACKEND_URL).protocol, 'https:')
+})
 
 test('only an anon key is an anon key', () => {
 	assert.equal(apiKeyRole(jwt({ role: 'anon', iss: 'supabase' })), 'anon')

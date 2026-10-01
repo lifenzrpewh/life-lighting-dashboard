@@ -270,10 +270,12 @@ to pair with. onPC counts as on-console.
 ### TODO, in order
 
 1. **Read the run order live.** Everything below waits on this.
-   - ✅ The anon key is in `~/Library/Application Support/life-lighting-dashboard/backend.json`
-     on this Mac (2026-10-01; the backend accepts it). `config.ts` refuses any other
-     role's key. The URL is built in (`https://visuals.prodapps.life`). A booth PC
-     needs its own copy, in `%APPDATA%\life-lighting-dashboard\backend.json`.
+   - ✅ The anon key is built in (`src/backend/endpoint.ts`, 2026-10-02, the owner's
+     go-ahead): public by design, the same for every booth, so a new booth needs no
+     key file. `backend.json` or `LIFE_BACKEND_ANON_KEY` still overrides, for testing.
+     Only an anon key is accepted, from anywhere; a test fails if the built-in changes.
+   - The booth's QR is marked `kind: 'booth'` in `pair-create`, so the backend can
+     require an admin to approve it, and only as a booth device. Old backends ignore it.
    - In the Cue Manager, **Admin › Booth devices**: create one for Mount Eden. ✅
      deployed (`1e670d8`, `0dfe2cc`, `3d89c0b` all live, 2026-10-01); **none exists yet**.
    - Kiosk, operator mode, Settings › Planning Center › **Pair this booth**. An admin
