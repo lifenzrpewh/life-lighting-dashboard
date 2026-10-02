@@ -46,18 +46,22 @@ depends on the multiview, measure Arena's output frame rate with and without the
 dashboard receiving the feed. A dropped frame on the LED wall costs more than anything
 the dashboard adds.
 
+## Answered (owner, 2026-10-02)
+
+- **Labels on the multiview:** not needed; if wanted, they are done in Arena.
+- **Firing clips:** not normally, because the Arena op runs two monitors. Later, an
+  optional trigger screen that mimics a basic Arena interface, for single-screen
+  operation.
+- **Briefs are view-only at the booth.** Editing happens on a laptop, so no Google
+  sign-in in the kiosk; a brief shared as "anyone with the link" is enough.
+- **Rename the app and repo**: yes. Not done yet.
+
 ## Open questions
 
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
-- **Labels on the multiview:** Arena composites the tiles, so the dashboard does not
-  know which tile is which layer. Label inside Arena, or read it from somewhere?
-- **Firing clips:** is Arena's own remote page wanted as a slot too, or is Arena's own
-  UI on the same machine enough?
-- **Google sign-in** in an embedded view is often blocked; a brief shared as "anyone
-  with the link" avoids it. Do briefs need editing from the booth?
-- **The name:** renaming the app and repo, and what a lighting-only station keeps.
+- **The rename:** the new name, and what a lighting-only station keeps.
 
 ## The first spike
 
