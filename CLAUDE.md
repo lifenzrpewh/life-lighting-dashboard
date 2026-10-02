@@ -292,7 +292,7 @@ on-console.
 0. **Arena, next piece.** Piece 2 (what plays) is built as data and waits for a
    screen. `docs/VISUALS_DASHBOARD.md` has the pieces in order. Piece 3 (the clip
    countdown) needs a video file connected, and this box lacks the show's media
-   (`I:VFX Media Renamed`); piece 4 (two slots) is the screen piece 2 waits for.
+   (`I:\VFX Media Renamed`); piece 4 (two slots) is the screen piece 2 waits for.
    Arena runs on the Windows box; QLab is parked (`docs/QLAB.md`, no Mac).
 0. **A showfile read that stays off the command line (research).** The watcher
    pushes a Save As or base change within a second, but a Load ends it, so the new
