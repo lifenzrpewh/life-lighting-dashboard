@@ -48,6 +48,7 @@ import { createMaPane, type MaPane } from './ma-pane.js'
 import { createCuePane, type CuePane } from './cue-pane.js'
 import { openSettings, type SettingsStore } from './settings.js'
 import type { DeskState } from '../shared/desk.js'
+import type { TimerSources } from '../shared/timer.js'
 import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.js'
 import { startLink, type LinkHandle } from './bridge/link.js'
 import { startTimers, type TimersHandle } from './timers.js'
@@ -259,7 +260,10 @@ app.whenReady().then(() => {
 	ipcMain.handle('link:state', () => linkState())
 	ipcMain.handle('desk:state', () => channelB?.deskState() ?? noDesk(replyPortOf(store.current())))
 	ipcMain.handle('showfile:state', () => showfileState())
-	ipcMain.handle('timers:state', () => timers?.sources() ?? { ontime: null, propresenter: null })
+	ipcMain.handle('timers:state', (): TimerSources => ({
+		...(timers?.sources() ?? { ontime: null, propresenter: null }),
+		proPresenterTimer: store.current().proPresenterTimer,
+	}))
 
 	// Started before the window exists, so the first thing the renderer asks for
 	// already has whatever the desk has said in the meantime.

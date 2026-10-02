@@ -5,7 +5,7 @@ import { decodeOnTimePoll } from '../dist/src/bridge/ontime.js'
 import { decodeProPresenter, parseProPresenterTime } from '../dist/src/bridge/propresenter.js'
 import { record, unread } from '../dist/src/shared/reading.js'
 import { DEFAULT_SETTINGS, applyPatch, fromDisk, patchFrom } from '../dist/src/shared/settings.js'
-import { TIMER_STALE_AFTER_MS, chooseTimer, formatCountdown, onTimeRemaining } from '../dist/src/shared/timer.js'
+import { TIMER_STALE_AFTER_MS, chooseTimer, formatCountdown, onTimeRemaining, proPresenterShown } from '../dist/src/shared/timer.js'
 
 const T0 = 1_000_000
 
@@ -63,18 +63,53 @@ test('ProPresenter: time strings, signed, with or without a fraction', () => {
 	assert.equal(parseProPresenterTime(''), null)
 })
 
-test('ProPresenter: the first counting timer, and the stage message', () => {
-	const timers = [
-		{ id: { uuid: 'x', name: 'Countdown Timer', index: 0 }, time: '00:00:01', state: 'stopped' },
-		{ id: { uuid: 'y', name: 'Countdown To Time', index: 1 }, time: '-00:00:02', state: 'overrun' },
-		{ id: { uuid: 'z', name: 'Elapsed Timer', index: 2 }, time: '00:21:43', state: 'running' },
-	]
-	const r = decodeProPresenter(timers, ' Wrap up ')
+const PP_TIMERS = [
+	{ id: { uuid: 'x', name: 'Countdown Timer', index: 0 }, time: '00:00:01', state: 'stopped' },
+	{ id: { uuid: 'y', name: 'Countdown To Time', index: 1 }, time: '-00:00:02', state: 'overrun' },
+	{ id: { uuid: 'z', name: 'Elapsed Timer', index: 2 }, time: '00:21:43', state: 'running' },
+]
+
+test('ProPresenter: every timer in its order, and the stage message', () => {
+	const r = decodeProPresenter(PP_TIMERS, ' Wrap up ')
 	assert.deepEqual(r, {
 		ok: true,
-		value: { timer: { name: 'Countdown To Time', seconds: -2, state: 'overrunning' }, message: 'Wrap up' },
+		value: {
+			timers: [
+				{ name: 'Countdown Timer', seconds: 1, state: 'stopped' },
+				{ name: 'Countdown To Time', seconds: -2, state: 'overrunning' },
+				{ name: 'Elapsed Timer', seconds: 1303, state: 'running' },
+			],
+			message: 'Wrap up',
+		},
 	})
-	assert.deepEqual(decodeProPresenter([], ''), { ok: true, value: { timer: null, message: null } })
+	assert.deepEqual(decodeProPresenter([], ''), { ok: true, value: { timers: [], message: null } })
+})
+
+test('ProPresenter 18.2 as seen 2026-10-02: a countdown that may not overrun ends complete', () => {
+	const r = decodeProPresenter(
+		[
+			{ id: { uuid: '8807759a', name: 'Segment Countdown', index: 0 }, time: '00:00:00', state: 'complete' },
+			{ id: { uuid: 'bec33532', name: 'PreShow Countdown', index: 1 }, time: '05:00:00', state: 'stopped' },
+		],
+		'Timer to Message',
+	)
+	assert.ok(r.ok)
+	assert.deepEqual(proPresenterShown(r.value, null), { kind: 'idle' }, 'complete is not counting')
+})
+
+test('the chip follows the first counting timer unless one is named', () => {
+	const r = decodeProPresenter(PP_TIMERS, '')
+	assert.ok(r.ok)
+	assert.equal(proPresenterShown(r.value, null).timer.name, 'Countdown To Time')
+	assert.equal(proPresenterShown(r.value, 'Elapsed Timer').timer.name, 'Elapsed Timer')
+	assert.deepEqual(proPresenterShown(r.value, 'Countdown Timer'), { kind: 'idle' }, 'named and stopped: nothing counting')
+})
+
+test('a named timer ProPresenter does not have is missing, never another timer', () => {
+	const r = decodeProPresenter(PP_TIMERS, '')
+	assert.ok(r.ok)
+	assert.deepEqual(proPresenterShown(r.value, 'Service Countdown'), { kind: 'missing', name: 'Service Countdown' })
+	assert.deepEqual(proPresenterShown(r.value, 'elapsed timer'), { kind: 'missing', name: 'elapsed timer' }, 'exact, as listed')
 })
 
 test('ProPresenter: a time it cannot read fails the read, not shown as zero', () => {
@@ -89,43 +124,48 @@ test('ProPresenter: a time it cannot read fails the read, not shown as zero', ()
 
 const RUNNING = { playback: 'play', nowTitle: 'A', nextTitle: 'B', remainingMs: 1000 }
 const STOPPED = { ...RUNNING, playback: 'stop' }
-const PP = { timer: null, message: 'Hi' }
+const PP = { timers: [], message: 'Hi' }
 
 test('OnTime is shown whenever an event is running there', () => {
-	const v = chooseTimer({ ontime: channelOf(RUNNING), propresenter: channelOf(PP) }, T0)
+	const v = chooseTimer({ ontime: channelOf(RUNNING), propresenter: channelOf(PP), proPresenterTimer: null }, T0)
 	assert.equal(v.kind, 'ontime')
 })
 
 test('otherwise ProPresenter, alone', () => {
-	const v = chooseTimer({ ontime: channelOf(STOPPED), propresenter: channelOf(PP) }, T0)
+	const v = chooseTimer({ ontime: channelOf(STOPPED), propresenter: channelOf(PP), proPresenterTimer: null }, T0)
 	assert.equal(v.kind, 'propresenter')
 	assert.equal(v.ontimeAside, null)
 })
 
 test('an OnTime that cannot be read is said beside ProPresenter, not taken as idle', () => {
 	const failed = record(unread(), { ok: false, reason: 'timeout', at: T0 })
-	const v = chooseTimer({ ontime: failed, propresenter: channelOf(PP) }, T0)
+	const v = chooseTimer({ ontime: failed, propresenter: channelOf(PP), proPresenterTimer: null }, T0)
 	assert.equal(v.kind, 'propresenter')
 	assert.deepEqual(v.ontimeAside, { state: 'unknown', why: 'timeout' })
 })
 
 test('an OnTime gone quiet after saying stopped is said too, with its age', () => {
 	const quiet = record(channelOf(STOPPED), { ok: false, reason: 'timeout', at: T0 + 2_000 })
-	const v = chooseTimer({ ontime: quiet, propresenter: channelOf(PP, T0 + 4_000) }, T0 + 4_000)
+	const v = chooseTimer({ ontime: quiet, propresenter: channelOf(PP, T0 + 4_000), proPresenterTimer: null }, T0 + 4_000)
 	assert.equal(v.kind, 'propresenter')
 	assert.deepEqual(v.ontimeAside, { state: 'stale', ageMs: 4_000 })
 })
 
 test('a stale OnTime that last said running is still OnTime, aged', () => {
-	const v = chooseTimer({ ontime: channelOf(RUNNING), propresenter: channelOf(PP, T0 + 10_000) }, T0 + TIMER_STALE_AFTER_MS + 1)
+	const v = chooseTimer({ ontime: channelOf(RUNNING), propresenter: channelOf(PP, T0 + 10_000), proPresenterTimer: null }, T0 + TIMER_STALE_AFTER_MS + 1)
 	assert.equal(v.kind, 'ontime')
 	assert.equal(v.reading.state, 'stale')
 })
 
+test('the named timer travels with the ProPresenter view', () => {
+	const v = chooseTimer({ ontime: null, propresenter: channelOf(PP), proPresenterTimer: 'Game Timer' }, T0)
+	assert.equal(v.wanted, 'Game Timer')
+})
+
 test('one program set up is shown alone; none set up shows nothing', () => {
-	assert.equal(chooseTimer({ ontime: channelOf(STOPPED), propresenter: null }, T0).kind, 'ontime')
-	assert.equal(chooseTimer({ ontime: null, propresenter: channelOf(PP) }, T0).kind, 'propresenter')
-	assert.equal(chooseTimer({ ontime: null, propresenter: null }, T0).kind, 'none')
+	assert.equal(chooseTimer({ ontime: channelOf(STOPPED), propresenter: null, proPresenterTimer: null }, T0).kind, 'ontime')
+	assert.equal(chooseTimer({ ontime: null, propresenter: channelOf(PP), proPresenterTimer: null }, T0).kind, 'propresenter')
+	assert.equal(chooseTimer({ ontime: null, propresenter: null, proPresenterTimer: null }, T0).kind, 'none')
 })
 
 test('countdowns read as people read them', () => {
@@ -161,4 +201,19 @@ test('settings: the timer fields survive the disk and the IPC boundary', () => {
 	assert.equal(s.onTimePort, 4002)
 	assert.equal(s.proPresenterPort, 1025)
 	assert.equal(patchFrom({ onTimePort: '4001' }), null, 'a known key of the wrong type rejects the patch')
+})
+
+test('settings: the ProPresenter timer is named, or blank for whichever runs', () => {
+	assert.equal(DEFAULT_SETTINGS.proPresenterTimer, null)
+	const named = applyPatch(DEFAULT_SETTINGS, { proPresenterTimer: 'Segment Countdown' })
+	assert.ok(named.ok)
+	assert.equal(named.settings.proPresenterTimer, 'Segment Countdown')
+	const blank = applyPatch(named.settings, { proPresenterTimer: '  ' })
+	assert.ok(blank.ok)
+	assert.equal(blank.settings.proPresenterTimer, null)
+	assert.equal(applyPatch(DEFAULT_SETTINGS, { proPresenterTimer: 'a\nb' }).ok, false)
+	assert.equal(fromDisk({ proPresenterTimer: 'Game Timer' }).proPresenterTimer, 'Game Timer')
+	assert.equal(fromDisk({ proPresenterTimer: 7 }).proPresenterTimer, null)
+	assert.equal(patchFrom({ proPresenterTimer: 7 }), null)
+	assert.deepEqual(patchFrom({ proPresenterTimer: null }), { proPresenterTimer: null })
 })

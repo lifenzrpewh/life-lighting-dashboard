@@ -21,6 +21,8 @@ type Draft = {
 	onTimePort: string
 	proPresenterHost: string
 	proPresenterPort: string
+	/** Blank means whichever timer is running first. */
+	proPresenterTimer: string
 	volunteerUser: string
 	operatorUser: string
 	volunteerPassword: string
@@ -38,6 +40,7 @@ const draftOf = (v: SettingsView): Draft => ({
 	onTimePort: String(v.onTimePort),
 	proPresenterHost: v.proPresenterHost ?? '',
 	proPresenterPort: v.proPresenterPort === null ? '' : String(v.proPresenterPort),
+	proPresenterTimer: v.proPresenterTimer ?? '',
 	volunteerUser: v.volunteerUser,
 	operatorUser: v.operatorUser ?? '',
 	volunteerPassword: '',
@@ -59,6 +62,7 @@ function patchOf(d: Draft): SettingsPatch {
 		onTimePort: portOf(d.onTimePort),
 		proPresenterHost: d.proPresenterHost,
 		proPresenterPort: d.proPresenterPort.trim() === '' ? null : portOf(d.proPresenterPort),
+		proPresenterTimer: d.proPresenterTimer === '' ? null : d.proPresenterTimer,
 		volunteerUser: d.volunteerUser,
 		operatorUser: d.operatorUser === '' ? null : d.operatorUser,
 	}
@@ -81,6 +85,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 			setDraft(draftOf(v))
 		})
 	useEffect(() => void load(), [])
+	const proPresenterNames = useProPresenterNames()
 
 	if (window.life === undefined) return <Frame onClose={onClose}>Settings exist only inside the kiosk.</Frame>
 	if (view === null || draft === null) return <Frame onClose={onClose}>Reading settings…</Frame>
@@ -152,7 +157,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 			<Section title="Countdown">
 				<p className="text-sm text-booth-dim">
 					The timer beside the clock. OnTime is shown whenever an event is running there; otherwise ProPresenter’s
-					running timer and stage message. Leave an address blank to not use that program.
+					timer and stage message. Leave an address blank to not use that program.
 				</p>
 				<div className="grid grid-cols-2 gap-4">
 					<Field label="OnTime address" error={errors.onTimeHost}>
@@ -172,6 +177,29 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 						<Input value={draft.proPresenterPort} onChange={(v) => set({ proPresenterPort: v })} inputMode="numeric" />
 					</Field>
 				</div>
+				<Field
+					label="ProPresenter timer"
+					error={errors.proPresenterTimer}
+					hint={
+						proPresenterNames === null
+							? 'ProPresenter’s timers are listed here once it is answering.'
+							: 'When more than one runs at once, the chip follows this one.'
+					}
+				>
+					<Select
+						value={draft.proPresenterTimer}
+						onChange={(v) => set({ proPresenterTimer: v })}
+						options={[
+							{ value: '', label: 'Whichever is running' },
+							...(proPresenterNames ?? []).map((name) => ({ value: name, label: name })),
+							// The saved choice stays offered when ProPresenter does not list it,
+							// so opening settings never changes it quietly.
+							...(draft.proPresenterTimer !== '' && !(proPresenterNames ?? []).includes(draft.proPresenterTimer)
+								? [{ value: draft.proPresenterTimer, label: `${draft.proPresenterTimer} (not in ProPresenter now)` }]
+								: []),
+						]}
+					/>
+				</Field>
 			</Section>
 
 			<Section title="MA users">
@@ -294,6 +322,52 @@ function Input({
 			className="h-12 rounded border border-booth-edge bg-booth-panel px-4 text-lg outline-none focus:border-booth-ink disabled:opacity-50"
 		/>
 	)
+}
+
+function Select({
+	value,
+	onChange,
+	options,
+}: {
+	value: string
+	onChange: (v: string) => void
+	options: Array<{ value: string; label: string }>
+}) {
+	return (
+		<select
+			value={value}
+			onChange={(e) => onChange(e.target.value)}
+			className="h-12 rounded border border-booth-edge bg-booth-panel px-4 text-lg outline-none focus:border-booth-ink"
+		>
+			{options.map((o) => (
+				<option key={o.value} value={o.value}>
+					{o.label}
+				</option>
+			))}
+		</select>
+	)
+}
+
+/** The timer names ProPresenter last listed, or null when it has not answered.
+ *  Asked of main, which already polls ProPresenter: the panel opens no
+ *  connection of its own. */
+function useProPresenterNames(): string[] | null {
+	const [names, setNames] = useState<string[] | null>(null)
+	useEffect(() => {
+		let alive = true
+		const ask = () =>
+			void window.life?.timers().then((t) => {
+				const last = t.propresenter?.lastOk?.value.timers
+				if (alive) setNames(last === undefined ? null : [...new Set(last.map((x) => x.name))])
+			})
+		ask()
+		const id = setInterval(ask, 2_000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+	return names
 }
 
 function User(p: {

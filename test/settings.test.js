@@ -62,6 +62,7 @@ test('a corrupt file costs only the bad values', () => {
 		onTimePort: 4001,
 		proPresenterHost: null,
 		proPresenterPort: null,
+		proPresenterTimer: null,
 	})
 	assert.deepEqual(fromDisk('garbage'), DEFAULT_SETTINGS)
 })

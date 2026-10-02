@@ -49,7 +49,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
 | ✅ `src/bridge/showfile.ts` · LifeBridge `show` · `watch` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap. **Watched since 2026-10-02**: the ask is `watch`, and LifeBridge then pushes any change within a second (the chip went amber 1.8 s after a base change, in the kiosk). A Load ends the watcher, so a Load still waits for the next link-up or ask. An older plugin's `unknown verb watch` falls back to `show`. `docs/MA3_READ_MODEL.md` § The showfile, watched. |
 | ✅ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, Settings can clear it. **Working on this Mac, 2026-10-02 (owner-observed):** signed in by the app's own QR as a booth device, songs-only and note editing both work. Server side: `visuals-song-comms` `2675660` (booth devices edit), migrations `20261002090000_pairing_kind` and `20261002100000_booth_device_edit`. Not yet on Windows. |
-| 🔬 `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's running timer and stage message (`/v1/timers/current`, `/v1/stage/message`) otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. Shapes researched from OnTime's source (v4.14) and ProPresenter's OpenAPI spec, 2026-10-02; **the kiosk ran end to end against stand-ins in those shapes** (both phases, and both going away), **not yet against a real OnTime or ProPresenter.** Addresses are in Settings › Countdown. |
+| ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer and stage message (`/v1/timers/current`, `/v1/stage/message`) otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is Settings › Countdown, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
@@ -286,10 +286,8 @@ on-console.
 
 ### TODO, in order
 
-0. **The countdown against the real programs.** Settings › Countdown: OnTime's
-   address (port 4001), ProPresenter's address and the port its Network settings
-   show, with Enable Network on. Watch an OnTime event start and stop, and a
-   ProPresenter timer and stage message. Then move the 🔬 row above to ✅.
+0. **Arena.** Being broken into pieces: `docs/VISUALS_DASHBOARD.md`. Arena 7.28
+   answers on the Windows box (Preferences › Web Server, `:8080`).
 0. **A showfile read that stays off the command line (research).** The watcher
    pushes a Save As or base change within a second, but a Load ends it, so the new
    name waits for the next ask: once a quiet minute now (was 5 min, the owner's
@@ -370,7 +368,8 @@ to paper over — see the header of `src/shared/reading.ts`.
 
 ## External files that matter
 
-In this repo: `docs/PLAN.md`, `docs/MA3_READ_MODEL.md`, and the raw probe report
+In this repo: `docs/PLAN.md`, `docs/MA3_READ_MODEL.md`, `docs/VISUALS_DASHBOARD.md`,
+`docs/QLAB.md` (the video countdown, researched and parked: no Mac), and the raw probe report
 at `/Users/Shared/LIFE/LifeBridge-probe.txt` (not in git — regenerate by running
 the plugin).
 

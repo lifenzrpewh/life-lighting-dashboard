@@ -28,7 +28,9 @@ import {
 } from '../shared/timer.js'
 
 export type TimersHandle = {
-	sources(): TimerSources
+	/** The programs' channels. Which ProPresenter timer to follow is a setting
+	 *  the caller adds, so naming one needs no restart and loses no reading. */
+	sources(): Pick<TimerSources, 'ontime' | 'propresenter'>
 	stop(): void
 }
 

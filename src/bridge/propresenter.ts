@@ -1,12 +1,15 @@
 // ProPresenter's timers and stage message, off its REST API (7.9 and later).
 //
-// 🔬 RESEARCHED 2026-10-02 against openapi.propresenter.com, not yet against a
-// running ProPresenter:
+// ✅ VERIFIED 2026-10-02 against ProPresenter 18.2 on Windows, from the shapes
+// researched in openapi.propresenter.com:
 // - `GET /v1/timers/current` → `[{ id: { uuid, name, index }, time, state }]`,
-//   `time` a string such as `00:05:00`, `-00:00:02` or `00:00:01.00`, `state`
-//   one of stopped, running, complete, overrunning, overran. The spec's own
-//   example also says `overrun`, so that is read as overrunning.
+//   every timer whether running or not, `time` a string such as `00:03:38`.
+//   Seen: running, stopped, and complete (a countdown that may not overrun
+//   ends `00:00:00` complete). Not yet seen: overrunning, overran, and the
+//   `-00:00:02` and `.00` forms; the spec's own example also says `overrun`,
+//   so that is read as overrunning.
 // - `GET /v1/stage/message` → a JSON string, `""` when no message is up.
+// - `GET /v1/version` is 404 on 18.2. Nothing here depends on it.
 //
 // THE RULE THIS FILE ENFORCES: as in ./ontime.ts, a reply of the wrong shape
 // fails whole. A time string that does not parse fails the read; it is never
@@ -33,9 +36,6 @@ export function parseProPresenterTime(text: string): number | null {
 	return m[1] === '-' ? -seconds : seconds
 }
 
-/** A timer is worth showing while it is counting: running, or running over. */
-const counting = (t: ProPresenterTimer) => t.state === 'running' || t.state === 'overrunning'
-
 export function decodeProPresenter(timers: unknown, message: unknown): Decoded<ProPresenterNow> {
 	if (!Array.isArray(timers)) return { ok: false, detail: 'the timers reply is not a list' }
 	const read: ProPresenterTimer[] = []
@@ -53,5 +53,5 @@ export function decodeProPresenter(timers: unknown, message: unknown): Decoded<P
 	}
 	if (typeof message !== 'string') return { ok: false, detail: 'the stage message is not text' }
 	const text = message.trim()
-	return { ok: true, value: { timer: read.find(counting) ?? null, message: text === '' ? null : text } }
+	return { ok: true, value: { timers: read, message: text === '' ? null : text } }
 }

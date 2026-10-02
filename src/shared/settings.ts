@@ -43,6 +43,11 @@ export type Settings = {
 	 *  which it picks itself, so there is no default to offer. */
 	proPresenterHost: string | null
 	proPresenterPort: number | null
+	/** Which ProPresenter timer the chip follows, by its name there. Null: the
+	 *  first one counting. A booth can run several timers at once, and which
+	 *  one counts to the next thing is a habit of the people, not a fact any
+	 *  program holds, so it passes the test above. */
+	proPresenterTimer: string | null
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -73,6 +78,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	onTimePort: DEFAULT_ONTIME_PORT,
 	proPresenterHost: null,
 	proPresenterPort: null,
+	proPresenterTimer: null,
 }
 
 /** What the renderer is shown. Passwords appear only as whether they exist. */
@@ -104,6 +110,15 @@ function userError(name: string): string | null {
 	if (name.trim() === '') return 'A user name is needed.'
 	if (name !== name.trim()) return 'No spaces at the start or end.'
 	if (name.length > USER_MAX) return `At most ${USER_MAX} characters.`
+	if (/[\u0000-\u001f\u007f]/.test(name)) return 'Letters, numbers and punctuation only.'
+	return null
+}
+
+const TIMER_NAME_MAX = 128
+
+function timerNameError(name: string): string | null {
+	if (name.trim() === '') return 'A timer name is needed.'
+	if (name.length > TIMER_NAME_MAX) return `At most ${TIMER_NAME_MAX} characters.`
 	if (/[\u0000-\u001f\u007f]/.test(name)) return 'Letters, numbers and punctuation only.'
 	return null
 }
@@ -165,6 +180,17 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 	if (next.proPresenterHost !== null && next.proPresenterPort === null && errors.proPresenterPort === undefined) {
 		errors.proPresenterPort = 'ProPresenter picks its own port: copy it from ProPresenter’s Network settings.'
 	}
+	if (patch.proPresenterTimer !== undefined) {
+		// Kept as typed, not trimmed: it is compared exactly against the names
+		// ProPresenter sends, and the panel offers those names to pick from.
+		const name = patch.proPresenterTimer
+		if (name === null || name.trim() === '') next.proPresenterTimer = null
+		else {
+			const e = timerNameError(name)
+			if (e === null) next.proPresenterTimer = name
+			else errors.proPresenterTimer = e
+		}
+	}
 	if (patch.volunteerUser !== undefined) {
 		const e = userError(patch.volunteerUser)
 		if (e === null) next.volunteerUser = patch.volunteerUser
@@ -203,6 +229,7 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['onTimePort'] === 'number' && isPort(r['onTimePort'])) out.onTimePort = r['onTimePort']
 	if (typeof r['proPresenterHost'] === 'string' && isConsoleHost(r['proPresenterHost'])) out.proPresenterHost = r['proPresenterHost']
 	if (typeof r['proPresenterPort'] === 'number' && isPort(r['proPresenterPort'])) out.proPresenterPort = r['proPresenterPort']
+	if (typeof r['proPresenterTimer'] === 'string' && timerNameError(r['proPresenterTimer']) === null) out.proPresenterTimer = r['proPresenterTimer']
 	return out
 }
 
@@ -225,6 +252,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['onTimePort', num],
 		['proPresenterHost', strOrNull],
 		['proPresenterPort', (v) => v === null || num(v)],
+		['proPresenterTimer', strOrNull],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

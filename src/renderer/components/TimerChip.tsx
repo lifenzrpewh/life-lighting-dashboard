@@ -13,6 +13,7 @@ import {
 	formatCountdown,
 	onTimeRunning,
 	onTimeRemaining,
+	proPresenterShown,
 	type OnTimeAside,
 	type OnTimeNow,
 	type ProPresenterNow,
@@ -53,8 +54,8 @@ export function TimerChip({ sources }: { sources: TimerSources | null }) {
 			})
 		case 'propresenter':
 			return matchReading(view.reading, {
-				live: (v) => <ProPresenter value={v} ageMs={null} ontime={view.ontimeAside} />,
-				stale: (v, ageMs) => <ProPresenter value={v} ageMs={ageMs} ontime={view.ontimeAside} />,
+				live: (v) => <ProPresenter value={v} wanted={view.wanted} ageMs={null} ontime={view.ontimeAside} />,
+				stale: (v, ageMs) => <ProPresenter value={v} wanted={view.wanted} ageMs={ageMs} ontime={view.ontimeAside} />,
 				unknown: (why) => (
 					<Frame source="ProPresenter" ageMs={null} unknown note={view.ontimeAside}>
 						<Unknown why={why} />
@@ -76,7 +77,7 @@ function OnTime({ value, remaining, ageMs }: { value: OnTimeNow; remaining: numb
 	// the rundown there is none, and it counts to the end of this one.
 	const label =
 		value.nextTitle !== null
-			? value.nextTitle || 'Untitled event'
+			? `Next: “${value.nextTitle || 'Untitled event'}”`
 			: value.nowTitle !== null
 				? `End of ${value.nowTitle || 'this event'}`
 				: 'End of rundown'
@@ -88,20 +89,47 @@ function OnTime({ value, remaining, ageMs }: { value: OnTimeNow; remaining: numb
 	)
 }
 
-function ProPresenter({ value, ageMs, ontime }: { value: ProPresenterNow; ageMs: number | null; ontime: OnTimeAside }) {
+function ProPresenter({
+	value,
+	wanted,
+	ageMs,
+	ontime,
+}: {
+	value: ProPresenterNow
+	wanted: string | null
+	ageMs: number | null
+	ontime: OnTimeAside
+}) {
+	const shown = proPresenterShown(value, wanted)
 	return (
 		<Frame source="ProPresenter" ageMs={ageMs} note={ontime}>
-			{value.timer !== null && <Countdown label={value.timer.name || 'Timer'} ms={value.timer.seconds * 1000} />}
-			{value.message !== null && <span className="max-w-[24rem] truncate text-sm">{value.message}</span>}
-			{value.timer === null && value.message === null && <span className="text-sm text-booth-dim">no timer running</span>}
+			{/* The number alone: which timer it is was chosen in settings, and its
+			    name in the bar was clutter (the owner's call, 2026-10-02). */}
+			{shown.kind === 'timer' && <Countdown label={null} ms={shown.timer.seconds * 1000} />}
+			{/* Said, not hidden: the booth asked for this timer, and an empty chip
+			    would read as "nothing running" when it is "renamed or deleted". */}
+			{shown.kind === 'missing' && (
+				<span className="max-w-[20rem] truncate text-sm text-booth-dim">no timer “{shown.name}” in ProPresenter</span>
+			)}
+			{value.message !== null && (
+				<span className="flex min-w-0 items-baseline gap-2 text-sm">
+					<span className="whitespace-nowrap text-booth-dim">Stage Message:</span>
+					<span className="max-w-[24rem] truncate">{value.message}</span>
+				</span>
+			)}
+			{shown.kind === 'idle' && value.message === null && <span className="text-sm text-booth-dim">no timer running</span>}
 		</Frame>
 	)
 }
 
-function Countdown({ label, ms }: { label: string; ms: number | null }) {
+/** Red once it passes zero and counts up, from either program (the owner's
+ *  call, 2026-10-02): the number and its label both, so it reads across the
+ *  booth. Zero itself is not yet over. */
+function Countdown({ label, ms }: { label: string | null; ms: number | null }) {
+	const over = ms !== null && ms < 0
 	return (
-		<span className="flex min-w-0 items-baseline gap-3">
-			<span className="max-w-[20rem] truncate text-sm">{label}</span>
+		<span className={`flex min-w-0 items-baseline gap-3 ${over ? 'text-overtime' : ''}`}>
+			{label !== null && <span className="max-w-[20rem] truncate text-sm">{label}</span>}
 			<span className="text-2xl font-medium tabular-nums">{ms === null ? '–:––' : formatCountdown(ms)}</span>
 		</span>
 	)

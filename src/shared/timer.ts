@@ -65,8 +65,9 @@ export type ProPresenterTimer = {
 }
 
 export type ProPresenterNow = {
-	/** The timer to show: the first one running, or null if none is. */
-	timer: ProPresenterTimer | null
+	/** Every timer ProPresenter has, in its own order. Which one the chip shows
+	 *  is `proPresenterShown`'s call, so the settings panel can list them all. */
+	timers: ProPresenterTimer[]
 	/** The stage display message, or null when none is up. */
 	message: string | null
 }
@@ -76,6 +77,34 @@ export type ProPresenterNow = {
 export type TimerSources = {
 	ontime: Channel<OnTimeNow> | null
 	propresenter: Channel<ProPresenterNow> | null
+	/** The ProPresenter timer to follow, by name, from settings. Null: the
+	 *  first one counting. */
+	proPresenterTimer: string | null
+}
+
+/** A timer is worth showing while it is counting: running, or running over. */
+export const counting = (t: ProPresenterTimer) => t.state === 'running' || t.state === 'overrunning'
+
+/** Which ProPresenter timer the chip shows. A booth can have several timers
+ *  running at once (a service countdown and a game timer, say), so the timer
+ *  can be named in settings (the owner's call, 2026-10-02).
+ *
+ *  A named timer that ProPresenter does not have is `missing`, said as such. It
+ *  never falls back to whichever timer happens to be running: a countdown to
+ *  the wrong thing, shown under the right place, would be believed. */
+export type ProPresenterShown =
+	| { kind: 'timer'; timer: ProPresenterTimer }
+	| { kind: 'idle' }
+	| { kind: 'missing'; name: string }
+
+export function proPresenterShown(now: ProPresenterNow, wanted: string | null): ProPresenterShown {
+	if (wanted === null) {
+		const first = now.timers.find(counting)
+		return first === undefined ? { kind: 'idle' } : { kind: 'timer', timer: first }
+	}
+	const named = now.timers.find((t) => t.name === wanted)
+	if (named === undefined) return { kind: 'missing', name: wanted }
+	return counting(named) ? { kind: 'timer', timer: named } : { kind: 'idle' }
 }
 
 /** What the chip shows. */
@@ -86,6 +115,8 @@ export type TimerView =
 	| {
 			kind: 'propresenter'
 			reading: Reading<ProPresenterNow>
+			/** The timer to follow, carried for `proPresenterShown`. */
+			wanted: string | null
 			/** What OnTime is, when it is not answering: null when it is not set
 			 *  up, or is answering with nothing running. */
 			ontimeAside: OnTimeAside
@@ -105,6 +136,7 @@ export function chooseTimer(sources: TimerSources, now: number): TimerView {
 		return {
 			kind: 'propresenter',
 			reading: readingOf(sources.propresenter, now, null, TIMER_STALE_AFTER_MS),
+			wanted: sources.proPresenterTimer,
 			ontimeAside:
 				ontime?.state === 'unknown'
 					? { state: 'unknown', why: ontime.why }

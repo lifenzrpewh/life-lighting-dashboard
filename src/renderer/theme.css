@@ -18,6 +18,10 @@
 	/* Amber is reserved for "you must look at this": the unconfirmed-cook strip
 	   and ON BASE SHOW. Nothing decorative may use it. */
 	--color-warn: #f59e0b;
+
+	/* A countdown past zero, counting up. Its own token, not the state red: a
+	   link going UNREACHABLE and a song running long are different news. */
+	--color-overtime: #ef4444;
 }
 
 /* The mode chip's hold, filling left to right so a held finger can see it is
