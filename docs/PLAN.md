@@ -267,8 +267,10 @@ the cheap ones pulled forward because one of them may save the architecture.
   old rail stood for moves into that view: **HOLDING and PRE/POST are its biggest targets**, in
   easiest reach. That is now a rule for the layout view, not for our code.
 - **Nothing in the app fires anything.** Advancing PCO moves the highlight and nothing else.
-- **The status bar is read-only**: link, date, the pane's status (`MA · <host> · <user>`, never
-  "live"), clock, the mode chip, Settings in operator mode, and Showfile.
+- **The status bar is read-only** and keeps only what a volunteer acts on: link, Showfile, the
+  countdown, clock, the mode chip, and **Connections**, whose dot is the worst of every connection
+  that is set up. The pane's status (`MA · <host> · <user>`, never "live") and channel B's traffic
+  moved into the Console row there (2026-10-02).
 
 **The MA pane** (`src/main/ma-pane.ts`, `src/renderer/components/MaPane.tsx`):
 
@@ -306,12 +308,19 @@ code-review item. This exists because `ma3-mcp/server.py:184` is literally
 > backend ages it to STALE with the last good read (kept on disk across a restart), and a dead
 > console leaves it alone.
 
-### Settings — the facts no show knows
+### Connections — the facts no show knows, beside their status
 
 *Resist configuration* still holds: anything the show can describe about itself is read from the
 show. Settings hold only what no show knows: the **console address**, the **web remote port**
 (8080), the **volunteer MA user** (`Remote` by default, which needs no password) and the **operator
-MA user**, each with an optional password. Operator mode only; the panel stands in the pane's place.
+MA user**, each with an optional password. The panel stands in the pane's place.
+
+Since 2026-10-02 these live in the **Connections** tab (`src/renderer/components/ConnectionsPanel.tsx`),
+not a Settings form: one row per connection (Console, OnTime, ProPresenter, Arena, Cue Manager),
+each with its status in one word (`src/shared/connections.ts`), tapping open to its few fields and
+its own Save. **Everyone sees it; only operator mode edits**, so a volunteer can say what is down
+and cannot move an address by accident. A connection not set up is `off`, never `down`: a
+lighting-only booth has no Arena, and a red dot for it would teach people to ignore the dot.
 
 Passwords are write-only from the screen, encrypted at rest with the OS keystore (DPAPI on Windows),
 and never saved in the clear: with no keystore, none can be saved at all. A save is all-or-nothing

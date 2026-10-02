@@ -13,6 +13,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Channel, LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
 import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 'import' }
 import type { TimerSources } from '../shared/timer.js' with { 'resolution-mode': 'import' }
+import type { ArenaSource } from '../shared/arena.js' with { 'resolution-mode': 'import' }
 import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
@@ -32,6 +33,10 @@ const api = {
 	/** What OnTime and ProPresenter last said, for the countdown chip. A source
 	 *  is null when settings name no address for it. */
 	timers: (): Promise<TimerSources> => ipcRenderer.invoke('timers:state'),
+
+	/** Whether Arena's web server answers, and which Arena. Null when settings
+	 *  name no Arena. */
+	arena: (): Promise<ArenaSource> => ipcRenderer.invoke('arena:state'),
 
 	/** The Cue Manager pane (src/main/cue-pane.ts): the visuals app itself,
 	 *  where the run order used to be. Placed like the MA pane. */

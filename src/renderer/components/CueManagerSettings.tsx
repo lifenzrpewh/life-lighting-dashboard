@@ -1,4 +1,4 @@
-// The Cue Manager's sign-in, in Settings (operator mode only).
+// The Cue Manager's sign-out, in its Connections row (operator mode only).
 //
 // The app signs itself in, in its own column: an emailed code, or its own QR,
 // which an admin approves as a booth device. All this panel can do is undo
@@ -15,12 +15,7 @@ export function CueManagerSettings() {
 	const button = 'h-12 rounded border-2 px-6 text-base active:scale-[0.98]'
 
 	return (
-		<section className="flex flex-col gap-4 border-t border-booth-edge pt-8">
-			<h3 className="text-lg">Cue Manager</h3>
-			<p className="text-sm text-booth-dim">
-				The run order is the Cue Manager itself. To sign this booth in, use “Sign in with a QR code” in its column; an
-				admin scans it and approves it as this campus’s booth device.
-			</p>
+		<section className="flex flex-col gap-4">
 			{confirming ? (
 				<div className="flex flex-wrap items-center gap-4">
 					<span className="text-sm">

@@ -39,6 +39,46 @@ depending on what is running. Lighting is one layout among several.
 - **NDI is the fallback** if texture sharing proves fragile: one route on both OSes and
   across machines, but it encodes and decodes on the CPU.
 
+## Seen on Arena (2026-10-02, Arena 7.28.0, Windows)
+
+✅ observed with `curl` and a websocket listener on the Windows box. The shipped code
+reads only `/api/v1/product` so far.
+
+- **`GET /api/v1/product`** → `{"name":"Arena","major":7,"minor":28,"micro":0,"revision":24303}`.
+  The link check (`src/bridge/arena.ts`, `src/main/arena.ts`), every 2 s.
+- **`GET /api/v1/composition` is 1.27 MB.** 10 layers, 9 columns, 2 decks, 3 layer groups.
+  Far too heavy to poll; fetched once at most.
+- **LIFE's layers mirror the lighting vocabulary:** PRE & POST, HOLD BG, PLAYBACK, HOLD FG,
+  VFX 1–6 (show "OH2026", deck "TILL THE WALLS").
+- **A clip** carries `connected` (`Empty` · `Disconnected` · `Previewing` · `Connected` ·
+  `Connected & previewing`), a `thumbnail` path (`/api/v1/composition/clips/by-id/<id>/thumbnail`),
+  and, once connected, `transport`: `position` in **milliseconds** (`max` = duration × 1000),
+  `controls.duration` in **seconds**, `playmode` (`Loop` · `Bounce` · `Random` ·
+  `Play Once & Clear` · `Play Once & Hold`), `playdirection`, `speed`. An empty clip's
+  `transport` is null. Only a generator (Solid Color) was seen connected, not a video file.
+- **The websocket, `ws://<host>:8080/api/v1`:** on connect it sends the whole composition
+  once (the same 1.27 MB), then `sources_update` and `effects_update`, then **nothing** while
+  idle, even with a clip playing.
+- **Values come by subscription:** `{"action":"subscribe","parameter":"/parameter/by-id/<id>"}`
+  → one `parameter_subscribed`, then `parameter_update` at the composition frame rate,
+  **~50/s** for a clip's position. Coalesce before the renderer, as channel B does.
+- **Not yet known:** whether a clip connecting or disconnecting is pushed unasked, or must be
+  subscribed per clip. One 60 s listen saw nothing, but Arena was not touched during it, so
+  it proves nothing yet. This decides how piece 2 learns what plays.
+
+## The pieces, in order (agreed 2026-10-02)
+
+1. ✅ **Arena link.** A row in Connections, `Arena 7.28`, offered only when set up.
+2. **Live status.** What plays on each layer (name, thumbnail, layer level, bypass),
+   composition master, deck. Over the websocket. Starts with the open question above.
+3. **Clip countdown.** Time left on the clip playing in PLAYBACK, in the countdown chip,
+   hidden when nothing plays, red past zero. Needs a video file seen in `transport` first:
+   what a Loop reports is not a countdown.
+4. **Two-slot layout.** Any two views side by side, offering only what answers.
+5. **Multiview spike** (below). Riskiest; independent of 1–4.
+6. **Brief slot.** Waits on where a brief's link lives.
+7. Later: the trigger screen, and the rename.
+
 ## The risk to measure first
 
 The dashboard would share a GPU with the machine playing the show. Before any feature

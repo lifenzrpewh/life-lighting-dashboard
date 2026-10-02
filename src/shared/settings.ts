@@ -9,12 +9,13 @@
 //
 // The OSC ports pass that test only because of the order things happen in: the
 // show does know them, in its OSC entry, but nothing can be read from the show
-// until they are already right. OnTime and ProPresenter pass it plainly: they
-// are other computers, and no show knows where they are.
+// until they are already right. OnTime, ProPresenter and Arena pass it plainly:
+// they are other computers, and no show knows where they are.
 //
 // Passwords are write-only from the renderer's side. `SettingsView` says
 // whether one is set and never what it is; main keeps them encrypted at rest.
 
+import { DEFAULT_ARENA_PORT } from './arena.js'
 import { DEFAULT_REMOTE_USER, DEFAULT_WEB_REMOTE_PORT, isConsoleHost, isPort } from './ma-pane.js'
 
 export type Settings = {
@@ -48,6 +49,10 @@ export type Settings = {
 	 *  one counts to the next thing is a habit of the people, not a fact any
 	 *  program holds, so it passes the test above. */
 	proPresenterTimer: string | null
+	/** Resolume Arena's web server. Null host: no Arena. Often this very
+	 *  computer, 127.0.0.1, because the visuals station runs on Arena's machine. */
+	arenaHost: string | null
+	arenaPort: number
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -79,6 +84,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	proPresenterHost: null,
 	proPresenterPort: null,
 	proPresenterTimer: null,
+	arenaHost: null,
+	arenaPort: DEFAULT_ARENA_PORT,
 }
 
 /** What the renderer is shown. Passwords appear only as whether they exist. */
@@ -191,6 +198,16 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 			else errors.proPresenterTimer = e
 		}
 	}
+	if (patch.arenaHost !== undefined) {
+		const host = patch.arenaHost === null ? '' : patch.arenaHost.trim()
+		if (host === '') next.arenaHost = null
+		else if (isConsoleHost(host)) next.arenaHost = host
+		else errors.arenaHost = hostError
+	}
+	if (patch.arenaPort !== undefined) {
+		if (isPort(patch.arenaPort)) next.arenaPort = patch.arenaPort
+		else errors.arenaPort = `A whole number from 1 to 65535. Arena uses ${DEFAULT_ARENA_PORT}.`
+	}
 	if (patch.volunteerUser !== undefined) {
 		const e = userError(patch.volunteerUser)
 		if (e === null) next.volunteerUser = patch.volunteerUser
@@ -230,6 +247,8 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['proPresenterHost'] === 'string' && isConsoleHost(r['proPresenterHost'])) out.proPresenterHost = r['proPresenterHost']
 	if (typeof r['proPresenterPort'] === 'number' && isPort(r['proPresenterPort'])) out.proPresenterPort = r['proPresenterPort']
 	if (typeof r['proPresenterTimer'] === 'string' && timerNameError(r['proPresenterTimer']) === null) out.proPresenterTimer = r['proPresenterTimer']
+	if (typeof r['arenaHost'] === 'string' && isConsoleHost(r['arenaHost'])) out.arenaHost = r['arenaHost']
+	if (typeof r['arenaPort'] === 'number' && isPort(r['arenaPort'])) out.arenaPort = r['arenaPort']
 	return out
 }
 
@@ -253,6 +272,8 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['proPresenterHost', strOrNull],
 		['proPresenterPort', (v) => v === null || num(v)],
 		['proPresenterTimer', strOrNull],
+		['arenaHost', strOrNull],
+		['arenaPort', num],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

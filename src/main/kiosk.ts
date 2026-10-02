@@ -52,6 +52,8 @@ import type { TimerSources } from '../shared/timer.js'
 import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.js'
 import { startLink, type LinkHandle } from './bridge/link.js'
 import { startTimers, type TimersHandle } from './timers.js'
+import { startArena, type ArenaHandle } from './arena.js'
+import type { ArenaSource } from '../shared/arena.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -70,6 +72,7 @@ let mode: Mode = 'volunteer'
 let channelB: ChannelBHandle | null = null
 let consoleLink: LinkHandle | null = null
 let timers: TimersHandle | null = null
+let arena: ArenaHandle | null = null
 const BOOTED_AT = Date.now()
 
 /** What main knows from channel B before the socket has even bound.
@@ -215,6 +218,18 @@ function startTimerPolls(store: SettingsStore): void {
 	timers = startTimers(s)
 }
 
+/** The Arena settings its poller was last started with. */
+let arenaKey = ''
+
+function startArenaPoll(store: SettingsStore): void {
+	const s = store.current()
+	const key = JSON.stringify([s.arenaHost, s.arenaPort])
+	if (key === arenaKey) return
+	arenaKey = key
+	arena?.stop()
+	arena = startArena(s)
+}
+
 function stopOsc(): void {
 	consoleLink?.stop()
 	consoleLink = null
@@ -260,6 +275,7 @@ app.whenReady().then(() => {
 	ipcMain.handle('link:state', () => linkState())
 	ipcMain.handle('desk:state', () => channelB?.deskState() ?? noDesk(replyPortOf(store.current())))
 	ipcMain.handle('showfile:state', () => showfileState())
+	ipcMain.handle('arena:state', (): ArenaSource => arena?.source() ?? null)
 	ipcMain.handle('timers:state', (): TimerSources => ({
 		...(timers?.sources() ?? { ontime: null, propresenter: null }),
 		proPresenterTimer: store.current().proPresenterTimer,
@@ -271,6 +287,8 @@ app.whenReady().then(() => {
 	store.onChange(() => startOsc(store))
 	startTimerPolls(store)
 	store.onChange(() => startTimerPolls(store))
+	startArenaPoll(store)
+	store.onChange(() => startArenaPoll(store))
 
 	// Only the kiosk's own renderer may move the pane. The pane's page has no
 	// preload and so no way to send, but the check costs nothing.
@@ -330,4 +348,5 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
 	stopOsc()
 	timers?.stop()
+	arena?.stop()
 })

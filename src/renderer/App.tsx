@@ -6,13 +6,15 @@ import type { DeskState } from '../shared/desk.js'
 import { SHOW_STALE_AFTER_MS, type Showfile } from '../shared/showfile.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import type { CuePaneReport } from '../shared/cue-pane.js'
-import type { TimerSources } from '../shared/timer.js'
+import { TIMER_STALE_AFTER_MS, type TimerSources } from '../shared/timer.js'
+import { ARENA_STALE_AFTER_MS, arenaVersion, type ArenaSource } from '../shared/arena.js'
+import { consoleStatus, cueStatus, polledStatus, worstTone, type ConnectionStatus } from '../shared/connections.js'
 import { StatusBar } from './components/StatusBar.js'
 import { CuePane, FoldedCuePane } from './components/CuePane.js'
 import { Divider } from './components/Divider.js'
 import { useCueWidth } from './cueWidth.js'
 import { MaPane, paneSummary } from './components/MaPane.js'
-import { SettingsPanel } from './components/SettingsPanel.js'
+import { ConnectionsPanel } from './components/ConnectionsPanel.js'
 import { useMode } from './mode.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
@@ -45,7 +47,7 @@ export function App() {
 	// in a window rather than the full-screen kiosk. The run order stays cold.
 	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
 	const [runOrderOpen, setRunOrderOpen] = useState(true)
-	const [settingsOpen, setSettingsOpen] = useState(false)
+	const [connectionsOpen, setConnectionsOpen] = useState(false)
 	const cueWidth = useCueWidth()
 
 	// The clock is real time; ages derive from it, so STALE arrives on its own
@@ -121,6 +123,23 @@ export function App() {
 		}
 	}, [])
 
+	// Arena's link, as main last heard it. Real in dev too, like the timers.
+	// Undefined until main has answered once: a renderer that has not asked yet
+	// is not an Arena that is not set up.
+	const [arena, setArena] = useState<ArenaSource | undefined>(undefined)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.arena().then((a) => alive && setArena(a))
+		poll()
+		const id = setInterval(poll, 1_000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
 	// The run order is the Cue Manager itself, in its own pane: real in dev
 	// too, like the MA pane. Polled for its load state and its last input.
 	const [cue, setCue] = useState<CuePaneReport | null>(null)
@@ -179,11 +198,12 @@ export function App() {
 	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs))
 
 	// The mode is which MA user the pane is (src/renderer/mode.ts). Main does the
-	// login; the renderer only says which. Settings close with operator mode, by
-	// a tap or by the idle drop, so a volunteer never inherits an open panel.
+	// login; the renderer only says which. Connections closes on any change of
+	// mode, by a tap or by the idle drop: it stands in the MA pane's place, and a
+	// volunteer left looking at it after the drop would have no MA.
 	useEffect(() => {
 		window.life?.setMaPaneMode(mode)
-		if (mode === 'volunteer') setSettingsOpen(false)
+		setConnectionsOpen(false)
 	}, [mode])
 
 	const sources: Sources =
@@ -196,6 +216,21 @@ export function App() {
 				}
 
 	const showfile = readingOf(sources.showfile, now, sources.link, SHOW_STALE_AFTER_MS)
+
+	// Every connection, once: the tab's rows, and the worst of them on the
+	// status bar's button. Outside the kiosk there is no main to ask, so the
+	// polled sources read as not set up rather than as down.
+	const connections: ConnectionStatus[] = [
+		consoleStatus(sources.link, pane?.pane ?? null),
+		polledStatus('ontime', 'OnTime', timers?.ontime ?? null, now, TIMER_STALE_AFTER_MS, (v) =>
+			v.playback === 'play' || v.playback === 'pause' || v.playback === 'roll' ? (v.nowTitle ?? null) : 'no event running',
+		),
+		polledStatus('propresenter', 'ProPresenter', timers?.propresenter ?? null, now, TIMER_STALE_AFTER_MS, () =>
+			timers?.proPresenterTimer == null ? null : `follows “${timers.proPresenterTimer}”`,
+		),
+		polledStatus('arena', 'Arena', arena ?? null, now, ARENA_STALE_AFTER_MS, (p) => `${p.name} ${arenaVersion(p)}`),
+		cueStatus(cue?.pane ?? null),
+	]
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
@@ -224,13 +259,12 @@ export function App() {
 				mode={mode}
 				onEnter={enter}
 				onLeave={leave}
-				pane={paneSummary(pane, mode)}
 				onReloadPane={
 					pane?.pane.state === 'showing' || pane?.pane.state === 'connecting' ? () => window.life?.retryMaPane() : null
 				}
-				settingsOpen={settingsOpen}
-				onSettings={() => setSettingsOpen(!settingsOpen)}
-				desk={desk}
+				connectionsOpen={connectionsOpen}
+				onConnections={() => setConnectionsOpen(!connectionsOpen)}
+				connections={worstTone(connections)}
 				showfile={showfile}
 				showfileFailure={failureOf(sources.showfile)}
 				timers={timers}
@@ -266,10 +300,19 @@ export function App() {
 					<FoldedCuePane onOpen={() => setRunOrderOpen(true)} />
 				)}
 				<main className="flex min-w-0 flex-1 flex-col">
-					{/* Always mounted, so the connection survives the settings panel
+					{/* Always mounted, so the connection survives the Connections tab
 					    standing in its place. */}
-					<MaPane report={pane} hidden={settingsOpen} now={now} />
-					{settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+					<MaPane report={pane} hidden={connectionsOpen} now={now} />
+					{connectionsOpen && (
+						<ConnectionsPanel
+							rows={connections}
+							operator={mode === 'operator'}
+							paneSummary={paneSummary(pane, mode)}
+							desk={desk}
+							now={now}
+							onClose={() => setConnectionsOpen(false)}
+						/>
+					)}
 				</main>
 			</div>
 		</div>

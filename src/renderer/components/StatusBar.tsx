@@ -1,51 +1,23 @@
 // Top band: READ-ONLY. Status where you look; actions where your hand rests.
 // Nothing in here fires, stores, or deletes anything. The mode chip, Reload MA
-// and, in operator mode, Settings are the only controls, and none touches the
-// show: Reload MA only loads the web remote's page again.
+// and Connections are the only controls, and none touches the show: Reload MA
+// only loads the web remote's page again.
+//
+// Kept to what a volunteer acts on during a service (the owner's call,
+// 2026-10-02): the console's LIVE, the show, the countdown and the clock. Every
+// other connection's health is in the Connections tab, and the button's dot is
+// the alarm that says to look there.
 
 import type { LinkState, Reading } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
+import type { Tone } from '../../shared/connections.js'
 import type { Mode } from '../../shared/ma-pane.js'
 import type { Showfile } from '../../shared/showfile.js'
 import type { TimerSources } from '../../shared/timer.js'
 import { ModeChip } from './ModeChip.js'
 import { TimerChip } from './TimerChip.js'
-import type { DeskState } from '../../shared/desk.js'
+import { Dot } from './ConnectionsPanel.js'
 import { Unknown, barButton, chip, chipLabel, formatAge, staleContent, stateClass } from './vocabulary.js'
-
-/** What channel B has actually heard — an OBSERVATION, sat deliberately apart
- *  from the link pill's VERDICT.
- *
- *  The two can disagree and that is correct: the link is UNREACHABLE because
- *  nothing has round-tripped, while the desk may be pushing fader levels at us
- *  this second. Collapsing them into one green dot is how "we heard something"
- *  quietly becomes "everything is fine", which is the failure this app exists
- *  to refuse. Uses none of the state colours, because this is not a Reading. */
-function DeskPill({ desk, now }: { desk: DeskState | null; now: number }) {
-	// No main process at all — the renderer is open in a plain browser.
-	if (desk === null) return null
-
-	if (!desk.listening) {
-		// A port that would not bind is a fault to act on, not a quiet desk.
-		// Amber is reserved for exactly this.
-		return <span className="whitespace-nowrap text-warn">OSC port {desk.port} not bound</span>
-	}
-
-	if (desk.lastHeardAt === null) {
-		return <span className="whitespace-nowrap text-booth-dim">desk not heard yet</span>
-	}
-
-	return (
-		<span className="whitespace-nowrap text-booth-dim">
-			desk {formatAge(now - desk.lastHeardAt)} · {desk.executors.length}{' '}
-			{desk.executors.length === 1 ? 'control' : 'controls'}
-			{/* Should sit at zero forever. A number climbing here means the desk is
-			    saying something we are reading wrong, and silence about it would be
-			    the worst option. */}
-			{desk.rejected > 0 && <span className="text-warn"> · {desk.rejected} rejected</span>}
-		</span>
-	)
-}
 
 /** A round trip in milliseconds, which is what `roundTripMs` holds. Tenths
  *  below 10 ms, because a console on this computer answers in well under one
@@ -126,11 +98,10 @@ export function StatusBar({
 	mode,
 	onEnter,
 	onLeave,
-	pane,
 	onReloadPane,
-	settingsOpen,
-	onSettings,
-	desk,
+	connectionsOpen,
+	onConnections,
+	connections,
 	showfile,
 	showfileFailure,
 	timers,
@@ -140,14 +111,12 @@ export function StatusBar({
 	mode: Mode
 	onEnter: () => void
 	onLeave: () => void
-	/** The MA pane's own status, in a few words (paneSummary). */
-	pane: string
 	/** Reload the MA pane; null when there is no page to reload. */
 	onReloadPane: (() => void) | null
-	settingsOpen: boolean
-	onSettings: () => void
-	/** What channel B has heard: an observation, beside the link's verdict. */
-	desk: DeskState | null
+	connectionsOpen: boolean
+	onConnections: () => void
+	/** The worst of the connections that are set up (src/shared/connections.ts). */
+	connections: Tone
 	showfile: Reading<Showfile>
 	/** Why the last showfile read failed, in the console's words, if it did. */
 	showfileFailure: string | null
@@ -164,14 +133,6 @@ export function StatusBar({
 			{/* The console: is it there, and which show is it on. */}
 			<LinkPill link={link} detail={operator} />
 			<ShowfileChip showfile={showfile} failure={showfileFailure} />
-			{/* For the operator only: what the wire has heard and where the pane
-			    is pointed. A volunteer has the pane itself to look at. */}
-			{operator && (
-				<span className="flex min-w-0 items-center gap-4 text-xs">
-					<DeskPill desk={desk} now={now} />
-					<span className="min-w-0 truncate text-booth-dim">MA · {pane}</span>
-				</span>
-			)}
 
 			{/* The time: what comes next, and what it is now. */}
 			<span className="ml-auto flex min-w-0 items-center">
@@ -193,15 +154,16 @@ export function StatusBar({
 						↻ MA
 					</button>
 				)}
-				{operator && (
-					<button
-						type="button"
-						onClick={onSettings}
-						className={settingsOpen ? `${barButton} border-booth-ink bg-booth-ink text-booth-bg` : barButton}
-					>
-						SETTINGS
-					</button>
-				)}
+				{/* For everyone: a volunteer can see what is down and say so. The
+				    fields inside are operator mode's. */}
+				<button
+					type="button"
+					onClick={onConnections}
+					className={`${barButton} gap-2 ${connectionsOpen ? 'border-booth-ink bg-booth-ink text-booth-bg' : ''}`}
+				>
+					<Dot tone={connections} />
+					CONNECTIONS
+				</button>
 				{/* Boots into volunteer, always, and never remembers otherwise. */}
 				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
 			</span>
