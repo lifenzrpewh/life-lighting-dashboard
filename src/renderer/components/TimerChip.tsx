@@ -103,19 +103,19 @@ function ProPresenter({
 	const shown = proPresenterShown(value, wanted)
 	return (
 		<Frame source="ProPresenter" ageMs={ageMs} note={ontime}>
-			{/* The number alone: which timer it is was chosen in settings, and its
-			    name in the bar was clutter (the owner's call, 2026-10-02). */}
-			{shown.kind === 'timer' && <Countdown label={null} ms={shown.timer.seconds * 1000} />}
+			{/* The stage message labels the timer, `Wrap up: 3:38`, and the timer's
+			    own name is never shown (the owner's call, 2026-10-02): the message
+			    is what the stage is being told, the name is just ProPresenter's. */}
+			{shown.kind === 'timer' && (
+				<Countdown label={value.message === null ? null : `${value.message}:`} ms={shown.timer.seconds * 1000} />
+			)}
 			{/* Said, not hidden: the booth asked for this timer, and an empty chip
 			    would read as "nothing running" when it is "renamed or deleted". */}
 			{shown.kind === 'missing' && (
 				<span className="max-w-[20rem] truncate text-sm text-booth-dim">no timer “{shown.name}” in ProPresenter</span>
 			)}
-			{value.message !== null && (
-				<span className="flex min-w-0 items-baseline gap-2 text-sm">
-					<span className="whitespace-nowrap text-booth-dim">Stage Message:</span>
-					<span className="max-w-[24rem] truncate">{value.message}</span>
-				</span>
+			{shown.kind !== 'timer' && value.message !== null && (
+				<span className="max-w-[24rem] truncate text-sm">{value.message}</span>
 			)}
 			{shown.kind === 'idle' && value.message === null && <span className="text-sm text-booth-dim">no timer running</span>}
 		</Frame>
