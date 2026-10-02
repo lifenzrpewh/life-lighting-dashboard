@@ -1,0 +1,2087 @@
+{
+	"name": {
+		"id": 1790926223762,
+		"valuetype": "ParamString",
+		"value": "OH2026"
+	},
+	"master": {
+		"id": 1790926223765,
+		"valuetype": "ParamRange",
+		"value": 1
+	},
+	"decks": [
+		{
+			"id": 1771294141002,
+			"name": {
+				"id": 1790926225762,
+				"valuetype": "ParamString",
+				"value": "TILL THE WALLS"
+			},
+			"selected": {
+				"id": 1790926225765,
+				"valuetype": "ParamTrigger",
+				"value": true
+			}
+		}
+	],
+	"layergroups": [
+		{
+			"id": 1690423576915,
+			"name": {
+				"id": 1790926229528,
+				"valuetype": "ParamString",
+				"value": "A SCREENS"
+			},
+			"master": {
+				"id": 1790926229532,
+				"valuetype": "ParamRange",
+				"value": 1
+			},
+			"bypassed": {
+				"id": 1790926229530,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"layers": [
+				{
+					"id": 1690423576981,
+					"name": {
+						"id": 1790926228146,
+						"valuetype": "ParamString",
+						"value": "PRE & POST"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842349977,
+			"name": {
+				"id": 1790926229782,
+				"valuetype": "ParamString",
+				"value": "HOLDING"
+			},
+			"master": {
+				"id": 1790926229786,
+				"valuetype": "ParamRange",
+				"value": 1
+			},
+			"bypassed": {
+				"id": 1790926229784,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"layers": [
+				{
+					"id": 1682842330884,
+					"name": {
+						"id": 1790926228286,
+						"valuetype": "ParamString",
+						"value": "HOLD BG"
+					}
+				},
+				{
+					"id": 1682842330905,
+					"name": {
+						"id": 1790926228426,
+						"valuetype": "ParamString",
+						"value": "PLAYBACK"
+					}
+				},
+				{
+					"id": 1682842330919,
+					"name": {
+						"id": 1790926228566,
+						"valuetype": "ParamString",
+						"value": "HOLD FG"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842350170,
+			"name": {
+				"id": 1790926230036,
+				"valuetype": "ParamString",
+				"value": "VFX"
+			},
+			"master": {
+				"id": 1790926230040,
+				"valuetype": "ParamRange",
+				"value": 1
+			},
+			"bypassed": {
+				"id": 1790926230038,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"layers": [
+				{
+					"id": 1682842329801,
+					"name": {
+						"id": 1790926228706,
+						"valuetype": "ParamString",
+						"value": "VFX 1"
+					}
+				},
+				{
+					"id": 1682842329802,
+					"name": {
+						"id": 1790926228846,
+						"valuetype": "ParamString",
+						"value": "VFX 2"
+					}
+				},
+				{
+					"id": 1682842329803,
+					"name": {
+						"id": 1790926228986,
+						"valuetype": "ParamString",
+						"value": "VFX 3"
+					}
+				},
+				{
+					"id": 1682842330871,
+					"name": {
+						"id": 1790926229126,
+						"valuetype": "ParamString",
+						"value": "VFX 4"
+					}
+				},
+				{
+					"id": 1682842330845,
+					"name": {
+						"id": 1790926229266,
+						"valuetype": "ParamString",
+						"value": "VFX 5"
+					}
+				},
+				{
+					"id": 1702845851867,
+					"name": {
+						"id": 1790926229406,
+						"valuetype": "ParamString",
+						"value": "VFX 6"
+					}
+				}
+			]
+		}
+	],
+	"layers": [
+		{
+			"id": 1690423576981,
+			"name": {
+				"id": 1790926228146,
+				"valuetype": "ParamString",
+				"value": "PRE & POST"
+			},
+			"master": {
+				"id": 1790926228153,
+				"valuetype": "ParamRange",
+				"value": 1
+			},
+			"bypassed": {
+				"id": 1790926228154,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294141009,
+					"name": {
+						"id": 1790926224396,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224477,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141009,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141024,
+					"name": {
+						"id": 1790926224432,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224535,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141024,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141039,
+					"name": {
+						"id": 1790926224407,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224492,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141039,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141049,
+					"name": {
+						"id": 1790926224290,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224339,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141049,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141059,
+					"name": {
+						"id": 1790926224485,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224556,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141059,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141069,
+					"name": {
+						"id": 1790926224403,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224455,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141069,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141079,
+					"name": {
+						"id": 1790926224435,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224590,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141079,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141089,
+					"name": {
+						"id": 1790926224370,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224413,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141089,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141099,
+					"name": {
+						"id": 1790926224338,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224496,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141099,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842330884,
+			"name": {
+				"id": 1790926228286,
+				"valuetype": "ParamString",
+				"value": "HOLD BG"
+			},
+			"master": {
+				"id": 1790926228293,
+				"valuetype": "ParamRange",
+				"value": 0
+			},
+			"bypassed": {
+				"id": 1790926228294,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294141010,
+					"name": {
+						"id": 1790926224304,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224342,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141010,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141025,
+					"name": {
+						"id": 1790926224231,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224298,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141025,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141040,
+					"name": {
+						"id": 1790926224389,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224441,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141040,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141050,
+					"name": {
+						"id": 1790926224302,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224352,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141050,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141060,
+					"name": {
+						"id": 1790926224450,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224527,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141060,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141070,
+					"name": {
+						"id": 1790926224242,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224295,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141070,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141080,
+					"name": {
+						"id": 1790926224433,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224461,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141080,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141090,
+					"name": {
+						"id": 1790926224431,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224559,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141090,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141100,
+					"name": {
+						"id": 1790926224513,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224577,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141100,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842330905,
+			"name": {
+				"id": 1790926228426,
+				"valuetype": "ParamString",
+				"value": "PLAYBACK"
+			},
+			"master": {
+				"id": 1790926228433,
+				"valuetype": "ParamRange",
+				"value": 1
+			},
+			"bypassed": {
+				"id": 1790926228434,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294214183,
+					"name": {
+						"id": 1790926226315,
+						"valuetype": "ParamString",
+						"value": "Solid Color"
+					},
+					"connected": {
+						"id": 1790926226417,
+						"valuetype": "ParamState",
+						"value": "Connected & previewing"
+					},
+					"thumbnail": {
+						"last_update": "17909283400139180",
+						"is_default": false,
+						"id": 1771294214183,
+						"path": "/api/v1/composition/clips/by-id/1771294214183/thumbnail"
+					}
+				},
+				{
+					"id": 1771294141026,
+					"name": {
+						"id": 1790926224472,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224573,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141026,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141041,
+					"name": {
+						"id": 1790926224219,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224255,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141041,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141051,
+					"name": {
+						"id": 1790926224216,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224244,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141051,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141061,
+					"name": {
+						"id": 1790926224222,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224273,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141061,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141071,
+					"name": {
+						"id": 1790926224473,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224516,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141071,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141081,
+					"name": {
+						"id": 1790926224439,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224466,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141081,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141091,
+					"name": {
+						"id": 1790926224422,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224491,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141091,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141101,
+					"name": {
+						"id": 1790926224319,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224426,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141101,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842330919,
+			"name": {
+				"id": 1790926228566,
+				"valuetype": "ParamString",
+				"value": "HOLD FG"
+			},
+			"master": {
+				"id": 1790926228573,
+				"valuetype": "ParamRange",
+				"value": 1
+			},
+			"bypassed": {
+				"id": 1790926228574,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294141012,
+					"name": {
+						"id": 1790926226014,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226021,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141012,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141027,
+					"name": {
+						"id": 1790926226142,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226181,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141027,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141042,
+					"name": {
+						"id": 1790926226028,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226032,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141042,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141052,
+					"name": {
+						"id": 1790926226299,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226409,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141052,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141062,
+					"name": {
+						"id": 1790926226434,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226473,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141062,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141072,
+					"name": {
+						"id": 1790926226212,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226285,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141072,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141082,
+					"name": {
+						"id": 1790926226152,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226215,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141082,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141092,
+					"name": {
+						"id": 1790926226379,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226415,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141092,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141102,
+					"name": {
+						"id": 1790926226332,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226404,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141102,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842329801,
+			"name": {
+				"id": 1790926228706,
+				"valuetype": "ParamString",
+				"value": "VFX 1"
+			},
+			"master": {
+				"id": 1790926228713,
+				"valuetype": "ParamRange",
+				"value": 0
+			},
+			"bypassed": {
+				"id": 1790926228714,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294141011,
+					"name": {
+						"id": 1790926224515,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926224563,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141011,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294214191,
+					"name": {
+						"id": 1790926226260,
+						"valuetype": "ParamString",
+						"value": "Solid Color"
+					},
+					"connected": {
+						"id": 1790926226317,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400139300",
+						"is_default": false,
+						"id": 1771294214191,
+						"path": "/api/v1/composition/clips/by-id/1771294214191/thumbnail"
+					}
+				},
+				{
+					"id": 1771294141023,
+					"name": {
+						"id": 1790926226171,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226231,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141023,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141053,
+					"name": {
+						"id": 1790926226396,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226470,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141053,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141063,
+					"name": {
+						"id": 1790926226297,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226387,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141063,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141073,
+					"name": {
+						"id": 1790926226307,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226341,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141073,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141083,
+					"name": {
+						"id": 1790926226228,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226255,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141083,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141093,
+					"name": {
+						"id": 1790926226484,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226511,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141093,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141103,
+					"name": {
+						"id": 1790926226325,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226359,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141103,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842329802,
+			"name": {
+				"id": 1790926228846,
+				"valuetype": "ParamString",
+				"value": "VFX 2"
+			},
+			"master": {
+				"id": 1790926228853,
+				"valuetype": "ParamRange",
+				"value": 0
+			},
+			"bypassed": {
+				"id": 1790926228854,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294214199,
+					"name": {
+						"id": 1790926226109,
+						"valuetype": "ParamString",
+						"value": "Gradient"
+					},
+					"connected": {
+						"id": 1790926226189,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400140038",
+						"is_default": false,
+						"id": 1771294214199,
+						"path": "/api/v1/composition/clips/by-id/1771294214199/thumbnail"
+					}
+				},
+				{
+					"id": 1771294214219,
+					"name": {
+						"id": 1790926226163,
+						"valuetype": "ParamString",
+						"value": "Solid Color"
+					},
+					"connected": {
+						"id": 1790926226210,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400140118",
+						"is_default": false,
+						"id": 1771294214219,
+						"path": "/api/v1/composition/clips/by-id/1771294214219/thumbnail"
+					}
+				},
+				{
+					"id": 1771294141044,
+					"name": {
+						"id": 1790926226378,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226522,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141044,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141054,
+					"name": {
+						"id": 1790926226277,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226319,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141054,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141064,
+					"name": {
+						"id": 1790926226131,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226164,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141064,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141074,
+					"name": {
+						"id": 1790926226558,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226574,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141074,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141084,
+					"name": {
+						"id": 1790926226361,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226391,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141084,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141094,
+					"name": {
+						"id": 1790926226347,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226521,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141094,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141104,
+					"name": {
+						"id": 1790926226321,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226364,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141104,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842329803,
+			"name": {
+				"id": 1790926228986,
+				"valuetype": "ParamString",
+				"value": "VFX 3"
+			},
+			"master": {
+				"id": 1790926228993,
+				"valuetype": "ParamRange",
+				"value": 0
+			},
+			"bypassed": {
+				"id": 1790926228994,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294214238,
+					"name": {
+						"id": 1790926226254,
+						"valuetype": "ParamString",
+						"value": "Gradient"
+					},
+					"connected": {
+						"id": 1790926226282,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400140960",
+						"is_default": false,
+						"id": 1771294214238,
+						"path": "/api/v1/composition/clips/by-id/1771294214238/thumbnail"
+					}
+				},
+				{
+					"id": 1771294214258,
+					"name": {
+						"id": 1790926226186,
+						"valuetype": "ParamString",
+						"value": "Solid Color"
+					},
+					"connected": {
+						"id": 1790926226230,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400141066",
+						"is_default": false,
+						"id": 1771294214258,
+						"path": "/api/v1/composition/clips/by-id/1771294214258/thumbnail"
+					}
+				},
+				{
+					"id": 1771294141046,
+					"name": {
+						"id": 1790926226199,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226302,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141046,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141055,
+					"name": {
+						"id": 1790926226838,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226845,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141055,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141065,
+					"name": {
+						"id": 1790926226937,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226963,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141065,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141075,
+					"name": {
+						"id": 1790926226920,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926226934,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141075,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141085,
+					"name": {
+						"id": 1790926227010,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227046,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141085,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141095,
+					"name": {
+						"id": 1790926226989,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227007,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141095,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141105,
+					"name": {
+						"id": 1790926227172,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227192,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141105,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842330871,
+			"name": {
+				"id": 1790926229126,
+				"valuetype": "ParamString",
+				"value": "VFX 4"
+			},
+			"master": {
+				"id": 1790926229133,
+				"valuetype": "ParamRange",
+				"value": 0
+			},
+			"bypassed": {
+				"id": 1790926229134,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294214277,
+					"name": {
+						"id": 1790926227195,
+						"valuetype": "ParamString",
+						"value": "Gradient"
+					},
+					"connected": {
+						"id": 1790926227215,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400141864",
+						"is_default": false,
+						"id": 1771294214277,
+						"path": "/api/v1/composition/clips/by-id/1771294214277/thumbnail"
+					}
+				},
+				{
+					"id": 1771294214297,
+					"name": {
+						"id": 1790926227145,
+						"valuetype": "ParamString",
+						"value": "Flicker-Glitch-Digital-Looping-HD-60fps"
+					},
+					"connected": {
+						"id": 1790926227158,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400142009",
+						"is_default": false,
+						"id": 1771294214297,
+						"path": "/api/v1/composition/clips/by-id/1771294214297/thumbnail"
+					},
+					"video": {
+						"fileinfo": {
+							"path": "I:\\VFX Media Renamed\\Flicker-Glitch-Digital-Looping-HD-60fps.mov",
+							"exists": false
+						}
+					}
+				},
+				{
+					"id": 1771294141047,
+					"name": {
+						"id": 1790926227103,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227117,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141047,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141056,
+					"name": {
+						"id": 1790926227161,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227175,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141056,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141066,
+					"name": {
+						"id": 1790926227273,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227285,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141066,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141076,
+					"name": {
+						"id": 1790926227299,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227319,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141076,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141086,
+					"name": {
+						"id": 1790926227204,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227230,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141086,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141096,
+					"name": {
+						"id": 1790926227393,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227443,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141096,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141106,
+					"name": {
+						"id": 1790926227467,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227503,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141106,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1682842330845,
+			"name": {
+				"id": 1790926229266,
+				"valuetype": "ParamString",
+				"value": "VFX 5"
+			},
+			"master": {
+				"id": 1790926229273,
+				"valuetype": "ParamRange",
+				"value": 0
+			},
+			"bypassed": {
+				"id": 1790926229274,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294214322,
+					"name": {
+						"id": 1790926227333,
+						"valuetype": "ParamString",
+						"value": "Solid Color"
+					},
+					"connected": {
+						"id": 1790926227367,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400142860",
+						"is_default": false,
+						"id": 1771294214322,
+						"path": "/api/v1/composition/clips/by-id/1771294214322/thumbnail"
+					}
+				},
+				{
+					"id": 1771294226455,
+					"name": {
+						"id": 1790926227261,
+						"valuetype": "ParamString",
+						"value": "Solid Color"
+					},
+					"connected": {
+						"id": 1790926227283,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400142955",
+						"is_default": false,
+						"id": 1771294226455,
+						"path": "/api/v1/composition/clips/by-id/1771294226455/thumbnail"
+					}
+				},
+				{
+					"id": 1771294141022,
+					"name": {
+						"id": 1790926227281,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227303,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141022,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141057,
+					"name": {
+						"id": 1790926227403,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227472,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141057,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141067,
+					"name": {
+						"id": 1790926227501,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227538,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141067,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141077,
+					"name": {
+						"id": 1790926227489,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227523,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141077,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141087,
+					"name": {
+						"id": 1790926227453,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227477,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141087,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141097,
+					"name": {
+						"id": 1790926227370,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227421,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141097,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141107,
+					"name": {
+						"id": 1790926227361,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227376,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141107,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		},
+		{
+			"id": 1702845851867,
+			"name": {
+				"id": 1790926229406,
+				"valuetype": "ParamString",
+				"value": "VFX 6"
+			},
+			"master": {
+				"id": 1790926229413,
+				"valuetype": "ParamRange",
+				"value": 0
+			},
+			"bypassed": {
+				"id": 1790926229414,
+				"valuetype": "ParamBoolean",
+				"value": false
+			},
+			"clips": [
+				{
+					"id": 1771294214342,
+					"name": {
+						"id": 1790926227471,
+						"valuetype": "ParamString",
+						"value": "Slice Outline"
+					},
+					"connected": {
+						"id": 1790926227520,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400143831",
+						"is_default": false,
+						"id": 1771294214342,
+						"path": "/api/v1/composition/clips/by-id/1771294214342/thumbnail"
+					}
+				},
+				{
+					"id": 1771294214355,
+					"name": {
+						"id": 1790926227416,
+						"valuetype": "ParamString",
+						"value": "Slice Outline"
+					},
+					"connected": {
+						"id": 1790926227440,
+						"valuetype": "ParamState",
+						"value": "Disconnected"
+					},
+					"thumbnail": {
+						"last_update": "17909283400143989",
+						"is_default": false,
+						"id": 1771294214355,
+						"path": "/api/v1/composition/clips/by-id/1771294214355/thumbnail"
+					}
+				},
+				{
+					"id": 1771294141048,
+					"name": {
+						"id": 1790926227577,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227625,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141048,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141058,
+					"name": {
+						"id": 1790926227483,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227497,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141058,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141068,
+					"name": {
+						"id": 1790926227636,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227658,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141068,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141078,
+					"name": {
+						"id": 1790926227601,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227617,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141078,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141088,
+					"name": {
+						"id": 1790926227826,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227830,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141088,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141098,
+					"name": {
+						"id": 1790926227838,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227844,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141098,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				},
+				{
+					"id": 1771294141108,
+					"name": {
+						"id": 1790926227869,
+						"valuetype": "ParamString",
+						"value": ""
+					},
+					"connected": {
+						"id": 1790926227872,
+						"valuetype": "ParamState",
+						"value": "Empty"
+					},
+					"thumbnail": {
+						"last_update": "0",
+						"is_default": true,
+						"id": 1771294141108,
+						"path": "/api/v1/composition/thumbnail/dummy"
+					}
+				}
+			]
+		}
+	]
+}

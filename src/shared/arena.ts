@@ -36,6 +36,46 @@ export type ArenaProduct = {
  *  is a different fact from not answering. */
 export type ArenaSource = Channel<ArenaProduct> | null
 
+/** A clip, as much of it as says what is playing. */
+export type ArenaClip = {
+	name: string
+	/** Arena's own path for its thumbnail, `/api/v1/composition/clips/by-id/<id>/thumbnail`,
+	 *  or null when Arena gives none. Relative to Arena's web server. */
+	thumbnail: string | null
+	/** Arena says the clip's file is not on this machine. A generator has no file
+	 *  and is never missing. */
+	missing: boolean
+}
+
+/** One layer, in Arena's composition order. */
+export type ArenaLayer = {
+	name: string
+	/** The layer group it sits in, or null outside any group. */
+	group: string | null
+	/** The layer fader, 0–1. */
+	master: number
+	bypassed: boolean
+	/** The clip Arena says is connected on this layer, or null for none. A clip
+	 *  that is only previewing is not playing. */
+	playing: ArenaClip | null
+}
+
+export type ArenaGroup = {
+	name: string
+	master: number
+	bypassed: boolean
+}
+
+/** What Arena is playing (docs/VISUALS_DASHBOARD.md, piece 2). */
+export type ArenaStatus = {
+	/** The composition master, 0–1. */
+	master: number
+	/** The selected deck, or null when Arena marks none. */
+	deck: string | null
+	groups: ArenaGroup[]
+	layers: ArenaLayer[]
+}
+
 /** `7.28`, or `7.28.1` when the micro version says something. */
 export function arenaVersion(p: ArenaProduct): string {
 	return p.micro === 0 ? `${p.major}.${p.minor}` : `${p.major}.${p.minor}.${p.micro}`
