@@ -39,9 +39,10 @@ export type ArenaSource = Channel<ArenaProduct> | null
 /** A clip, as much of it as says what is playing. */
 export type ArenaClip = {
 	name: string
-	/** Arena's own path for its thumbnail, `/api/v1/composition/clips/by-id/<id>/thumbnail`,
-	 *  or null when Arena gives none. Relative to Arena's web server. */
-	thumbnail: string | null
+	/** Arena's thumbnail for the clip, or null when Arena gives none. `version`
+	 *  is Arena's `last_update` (also the image's ETag), so a new picture gets a
+	 *  new address. Shown through main: see `thumbnailUrl`. */
+	thumbnail: { clipId: number; version: string } | null
 	/** Arena says the clip's file is not on this machine. A generator has no file
 	 *  and is never missing. */
 	missing: boolean
@@ -74,6 +75,30 @@ export type ArenaStatus = {
 	deck: string | null
 	groups: ArenaGroup[]
 	layers: ArenaLayer[]
+}
+
+/** The scheme main answers clip thumbnails on. The renderer's page allows no
+ *  remote origins, so it asks main, which asks only the Arena in settings
+ *  (src/main/arena-thumbnails.ts). */
+export const THUMBNAIL_SCHEME = 'arena'
+
+export function thumbnailUrl(t: { clipId: number; version: string }): string {
+	return `${THUMBNAIL_SCHEME}://thumbnail/${t.clipId}?v=${encodeURIComponent(t.version)}`
+}
+
+/** The clip id in a thumbnail address, or null when it is not one. Main
+ *  answers nothing else on the scheme. */
+export function clipIdOfThumbnail(url: string): number | null {
+	let u: URL
+	try {
+		u = new URL(url)
+	} catch {
+		return null
+	}
+	const m = /^\/(\d{1,20})$/.exec(u.pathname)
+	if (u.protocol !== `${THUMBNAIL_SCHEME}:` || u.host !== 'thumbnail' || m === null) return null
+	const id = Number(m[1])
+	return Number.isSafeInteger(id) ? id : null
 }
 
 /** `7.28`, or `7.28.1` when the micro version says something. */

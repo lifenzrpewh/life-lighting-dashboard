@@ -1,7 +1,8 @@
 // Top band: READ-ONLY. Status where you look; actions where your hand rests.
-// Nothing in here fires, stores, or deletes anything. The mode chip, Reload MA
-// and Connections are the only controls, and none touches the show: Reload MA
-// only loads the web remote's page again.
+// Nothing in here fires, stores, or deletes anything. The mode chip and
+// Connections are the only controls, and neither touches the show. Reload MA
+// moved to the MA's own slot (./Slot.tsx) when the slots arrived, 2026-10-03:
+// the MA may be on either side now, and its button goes with it.
 //
 // Kept to what a volunteer acts on during a service (the owner's call,
 // 2026-10-02): the console's LIVE, the show, the countdown and the clock. Every
@@ -98,7 +99,6 @@ export function StatusBar({
 	mode,
 	onEnter,
 	onLeave,
-	onReloadPane,
 	connectionsOpen,
 	onConnections,
 	connections,
@@ -111,8 +111,6 @@ export function StatusBar({
 	mode: Mode
 	onEnter: () => void
 	onLeave: () => void
-	/** Reload the MA pane; null when there is no page to reload. */
-	onReloadPane: (() => void) | null
 	connectionsOpen: boolean
 	onConnections: () => void
 	/** The worst of the connections that are set up (src/shared/connections.ts). */
@@ -145,15 +143,6 @@ export function StatusBar({
 
 			{/* Controls, where the hand rests. None touches the show. */}
 			<span className="flex shrink-0 items-center gap-2 border-l border-booth-edge pl-4">
-				{/* Beside the pane, never over it. The pane reloads itself when MA's
-				    page is stuck in a state it never leaves; this is for whatever
-				    that does not recognise. It reconnects the picture and fires
-				    nothing. */}
-				{onReloadPane !== null && (
-					<button type="button" onClick={onReloadPane} className={barButton}>
-						↻ MA
-					</button>
-				)}
 				{/* For everyone: a volunteer can see what is down and say so. The
 				    fields inside are operator mode's. */}
 				<button

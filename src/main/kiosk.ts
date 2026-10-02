@@ -33,6 +33,9 @@
 //
 // THE COUNTDOWN (./timers.ts) is OnTime and ProPresenter, asked over HTTP on the
 // booth network. Nothing to do with the console: it is never sent there.
+//
+// ARENA (./arena.ts) is its link, what it plays over its websocket, and its clip
+// thumbnails on a scheme of their own (./arena-thumbnails.ts).
 
 import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
@@ -53,7 +56,8 @@ import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.
 import { startLink, type LinkHandle } from './bridge/link.js'
 import { startTimers, type TimersHandle } from './timers.js'
 import { startArena, type ArenaHandle } from './arena.js'
-import type { ArenaSource } from '../shared/arena.js'
+import type { ArenaSource, ArenaStatus } from '../shared/arena.js'
+import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -74,6 +78,9 @@ let consoleLink: LinkHandle | null = null
 let timers: TimersHandle | null = null
 let arena: ArenaHandle | null = null
 const BOOTED_AT = Date.now()
+
+// Must precede ready: Electron fixes scheme privileges at startup.
+registerThumbnailScheme()
 
 /** What main knows from channel B before the socket has even bound.
  *
@@ -276,6 +283,11 @@ app.whenReady().then(() => {
 	ipcMain.handle('desk:state', () => channelB?.deskState() ?? noDesk(replyPortOf(store.current())))
 	ipcMain.handle('showfile:state', () => showfileState())
 	ipcMain.handle('arena:state', (): ArenaSource => arena?.source() ?? null)
+	ipcMain.handle('arena:status', (): Channel<ArenaStatus> | null => arena?.status() ?? null)
+	serveThumbnails(() => {
+		const s = store.current()
+		return s.arenaHost === null ? null : { host: s.arenaHost, port: s.arenaPort }
+	})
 	ipcMain.handle('timers:state', (): TimerSources => ({
 		...(timers?.sources() ?? { ontime: null, propresenter: null }),
 		proPresenterTimer: store.current().proPresenterTimer,

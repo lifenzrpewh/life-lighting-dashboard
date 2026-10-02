@@ -1,65 +1,38 @@
 # LIFE Lighting Dashboard
 
-A touchscreen operator dashboard for grandMA3, sitting next to the console: the
-Planning Center run order, the sequences that actually get fired on a Sunday, and
-the small edits made mid-service. Volunteer-simple, with an operator mode.
+A touchscreen dashboard for the booth, beside the grandMA3: the Cue Manager (the
+visuals app's run order, notes edited in place) next to the console's own web
+remote, which carries every button and every edit. Volunteer-simple, with an
+operator mode. Electron, aimed at a Windows booth PC.
 
-Plan: `~/.claude/plans/mighty-munching-nautilus.md`
+It is becoming a **Visuals Dashboard**: any two views side by side, offering only
+what is answering, with Arena (Resolume) as the next source after the console.
 
-## Status
+## Read
 
-⚠️ **Phase 0 — nothing here has been verified on a desk.** The transport spikes
-gate everything else. What exists today is the one piece that could be proven
-offline against real data.
-
-| | |
-|---|---|
-| ✅ `src/bridge/export-parse.ts` | Parser for `Export Sequence` XML. Verified against the operator's 856-file, 431 MB library. |
-| ✅ `spikes/scan-exports.mjs` | Derives the export blacklist from that library. No desk needed. |
-| ⚠️ `spikes/osc-probe.mjs` | Tests the write path and listen port. **Needs a desk.** |
-| ⚠️ `console-plugin/LifeBridge.lua` | The console-side bridge, written as a probe. **Read-only on the show** — safe on a live showfile. Harness-green, desk-unverified. |
-| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 84 checks. Mocks the MA3 API across rich / bare / hostile consoles. |
+- [`CLAUDE.md`](CLAUDE.md) — the operating manual: status of every piece, the rules,
+  the hazards already paid for, and where the next session starts.
+- [`docs/PLAN.md`](docs/PLAN.md) — the spec: architecture and phasing.
+- [`docs/MA3_READ_MODEL.md`](docs/MA3_READ_MODEL.md) — desk-verified grandMA3 facts.
+  Read before touching console code.
+- [`docs/VISUALS_DASHBOARD.md`](docs/VISUALS_DASHBOARD.md) — the visuals plan, and
+  what Arena has been seen to do.
 
 ## Running
 
 ```
 npm install
-npm test                      # builds, then runs against the real library if present
-npm run scan                  # writes export-blacklist.json
-./scripts/deploy-plugin.sh    # dry run; --write to copy the plugin to the console
-lua console-plugin/_test_lifebridge.lua
+npm test        # the tested layer, then the LifeBridge Lua harness
+npm run dev     # the kiosk with the mock desk; keys 1–5 switch failure modes, 0 the real link
+npm start       # the kiosk, built
+npm run dist:win
 ```
 
-The tests read `~/MALightingTechnology/gma3_library/datapools/sequences` and skip
-cleanly if it isn't there. They take ~50 s, because five real exports are 45 MB each.
-
-## grandMA3 versions
-
-Built on **2.3.2**, moving to **2.5 within ~6 months**. Every desk answer is
-version-specific, so `LifeBridge.lua` reports the console version first and stamps
-it onto every result it emits — re-running it on 2.5 re-answers the whole set.
-Keep each run's captured output, dated and versioned.
-
-One exposure this project has that the Show Creator does not: 2.4 consolidated
-standard-recipe range properties (`Speed From`/`To` → `Speed`). `MA3_2.5_COMPAT.md`
-clears the generator because it writes those as MAtricks/Preset properties — but
-the cue editor here touches standard recipe properties directly.
+Prerequisites (Node 22, Lua, the optional MA3 library) and the Windows traps are in
+`CLAUDE.md` § Prerequisites.
 
 ## The one rule
 
-A read that failed must never come back looking like an answer. `parseSequenceExport`
-returns a discriminated union, so a truncated export cannot be rendered as a short
-sequence. This exists because the prior tooling does `send(...) or "No groups found"`,
-which makes a slow desk look like an empty show.
-
-## Hazards, all paid for already
-
-- **`Export Sequence` hard-crashes the console** on a cue Part holding `SelectionData`
-  (`MA3_SYNTAX_REFERENCE.md:568`, ❌ 2026-08-27). Two truncated artifacts from that
-  crash are still in the library. Run `scan-exports.mjs` and honour the blacklist.
-- **Exports are enormous** — 45 MB for 16 cues, because MA3 inlines every dependency.
-  A full structure sync is not cheap.
-- **`/<prefix>/cmd` over OSC is unverified**, and a bare `/cmd` with the wrong prefix
-  is silently ignored. `Receive Command` must be on in the console's OSC entry.
-- **Deleting a recipe line renumbers the survivors.** Never cache a line index.
-- **Show names truncate silently at 31 characters.**
+A read that failed must never come back looking like an answer. Every source reports
+LIVE, STALE, UNKNOWN or UNREACHABLE, and nothing turns a timeout into a value
+(`src/shared/reading.ts`).

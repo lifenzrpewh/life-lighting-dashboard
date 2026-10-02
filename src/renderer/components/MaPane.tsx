@@ -1,18 +1,15 @@
-// The MA pane's renderer half: the box the console's web remote is placed in,
-// and what is said in it when there is nothing to show.
+// The MA pane's renderer half: what is said in its slot when there is nothing
+// to show.
 //
-// The web remote itself is a native view that main draws ON TOP of this box
-// (src/main/ma-pane.ts), and only once a page from the console has loaded.
-// Everything rendered here is therefore what someone sees when the pane is NOT
-// showing the MA — which is exactly when they need to be told why.
-//
-// THE RULE THIS FILE ENFORCES: the native view goes where this box is, and
-// nowhere else (../panePlacement.ts).
+// The web remote itself is a native view that main draws ON TOP of its slot's
+// body (src/main/ma-pane.ts, ./Slot.tsx), and only once a page from the console
+// has loaded. Everything rendered here is therefore what someone sees when the
+// pane is NOT showing the MA — which is exactly when they need to be told why.
+// Where it goes is ../panePlacement.ts, from the App.
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import type { MaPaneReport, MaPaneState, Mode } from '../../shared/ma-pane.js'
-import { usePanePlacement } from '../panePlacement.js'
 
 function hostOf(url: string): string {
 	return new URL(url).hostname
@@ -39,7 +36,7 @@ export function paneSummary(report: MaPaneReport | null, mode: Mode): string {
 	}
 }
 
-function Message({ pane, now }: { pane: MaPaneState | null; now: number }) {
+export function MaMessage({ pane, now }: { pane: MaPaneState | null; now: number }) {
 	if (pane === null) {
 		return <Say head="No MA pane here" body="The MA pane exists only inside the kiosk." />
 	}
@@ -94,36 +91,6 @@ export function Say({ head, body, children }: { head: string; body: string; chil
 			<p className="text-lg">{head}</p>
 			<p className="mt-2 text-sm break-words text-booth-dim">{body}</p>
 			{children}
-		</div>
-	)
-}
-
-export function MaPane({
-	report,
-	hidden,
-	now,
-}: {
-	report: MaPaneReport | null
-	/** Keep the connection, but take the view away: the settings panel is
-	 *  standing in the pane's place. */
-	hidden: boolean
-	now: number
-}) {
-	const box = useRef<HTMLDivElement>(null)
-	usePanePlacement(box, hidden, (rect) => window.life?.placeMaPane(rect))
-
-	// Unmounting closes the connection. It happens when the renderer goes away,
-	// which main also covers, since a crashed renderer cannot say goodbye.
-	useEffect(
-		() => () => {
-			window.life?.releaseMaPane()
-		},
-		[],
-	)
-
-	return (
-		<div ref={box} className={`min-h-0 min-w-0 flex-1 items-center justify-center bg-booth-bg ${hidden ? 'hidden' : 'flex'}`}>
-			<Message pane={report?.pane ?? null} now={now} />
 		</div>
 	)
 }

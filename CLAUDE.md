@@ -40,7 +40,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
 | ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. Channel B is wired (the "desk heard" pill); the link still reports UNREACHABLE because nothing round-trips yet. |
-| ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Real web remote on onPC 2.3.2.0, **not a desk**. Never stuck for good (2026-10-01): a 15 s load timeout, and a fresh login after 10 s of MA's own overlay saying something it never recovers from (✅ the read works in the sandbox; the fresh login is unit-tested, not watched firing). **Reload MA** beside it. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
+| ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Real web remote on onPC 2.3.2.0, **not a desk**. Never stuck for good (2026-10-01): a 15 s load timeout, and a fresh login after 10 s of MA's own overlay saying something it never recovers from (✅ the read works in the sandbox; the fresh login is unit-tested, not watched firing). **Reload MA** (↻) in its slot's strip. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
 | ⚠️ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. Verified locally on macOS Keychain; DPAPI on Windows unexercised. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
 | ✅ `src/bridge/osc.ts` | OSC 1.0 decoder. An unknown type tag fails the **whole message**, not just that argument — OSC args are positional, so skipping one reads every later value at the wrong offset and a fader level becomes whatever four bytes sit there. |
@@ -51,7 +51,8 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, its Connections row can clear it. **Working on this Mac, 2026-10-02 (owner-observed):** signed in by the app's own QR as a booth device, songs-only and note editing both work. Server side: `visuals-song-comms` `2675660` (booth devices edit), migrations `20261002090000_pairing_kind` and `20261002100000_booth_device_edit`. Not yet on Windows. |
 | ✅ `src/renderer/components/ConnectionsPanel.tsx` · `src/shared/connections.ts` | **Connections**: one row per connection (Console, OnTime, ProPresenter, Arena, Cue Manager), status in a word, tap to open its fields with its own Save. Replaced the Settings form 2026-10-02; the status bar keeps LIVE, show, countdown, clock and a Connections button whose dot is the worst connection that is set up. Everyone sees it, operator mode edits. A connection not set up is `off`, never `down`. Owner-checked on the Windows box, 2026-10-02: "functionally works". |
 | ✅ `src/bridge/arena.ts` · `src/main/arena.ts` | Arena's link: `GET /api/v1/product` every 2 s, its row in Connections. Against Arena 7.28 on the Windows box, 2026-10-02. |
-| ✅ `src/bridge/arena-live.ts` · `src/main/arena.ts` | What Arena plays, over its websocket: each composition push gives which clip is connected on each layer, subscriptions keep the faders current, and the link poll keeps it from going stale. Read against Arena 7.28 on the Windows box, 2026-10-03, in Node; **data only, nothing on screen**, by the owner's choice, until the two-slot layout. The kiosk log names what plays. `docs/VISUALS_DASHBOARD.md` § Seen on Arena (2026-10-03). |
+| ✅ `src/bridge/arena-live.ts` · `src/main/arena.ts` | What Arena plays, over its websocket: each composition push gives which clip is connected on each layer, subscriptions keep the faders current, and the link poll keeps it from going stale. Read against Arena 7.28 on the Windows box, 2026-10-03, in the kiosk. Shown as the Arena view in a slot, thumbnails through main on an `arena:` scheme; the kiosk log names what plays. `docs/VISUALS_DASHBOARD.md` § Seen on Arena (2026-10-03). |
+| ⚠️ `src/shared/layout.ts` · `src/renderer/components/Slot.tsx` · `src/renderer/slots.ts` | **Two slots** (2026-10-03, the owner's answers in `docs/VISUALS_DASHBOARD.md`): left and right each pick Run order, MA or Arena; the picker offers what answers, a slot keeps its view when it stops; picking the other slot's view swaps them; everyone picks; each machine remembers. The MA moves between slots without logging in again. Seen in the kiosk on the Windows box over the debugging port, not yet by a finger on the touchscreen. |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
@@ -289,11 +290,14 @@ on-console.
 
 ### TODO, in order
 
-0. **Arena, next piece.** Piece 2 (what plays) is built as data and waits for a
-   screen. `docs/VISUALS_DASHBOARD.md` has the pieces in order. Piece 3 (the clip
-   countdown) needs a video file connected, and this box lacks the show's media
-   (`I:\VFX Media Renamed`); piece 4 (two slots) is the screen piece 2 waits for.
-   Arena runs on the Windows box; QLab is parked (`docs/QLAB.md`, no Mac).
+0. **Try the two slots by hand** on the Windows box's touchscreen: pick, swap, fold,
+   drag the divider with the MA on the left, and restart to see the layout kept. Then
+   the next Arena piece (`docs/VISUALS_DASHBOARD.md` has them in order): piece 3, the
+   clip countdown, needs a video file connected, and this box lacks the show's media
+   (`I:\VFX Media Renamed`). QLab is parked (`docs/QLAB.md`, no Mac).
+   ⚠️ This box's console address is `127.0.0.1` with web remote port `8080`, which is
+   Arena's port here, so its MA slot shows Arena's web server page. Point it at onPC
+   or the desk to test the MA.
 0. **A showfile read that stays off the command line (research).** The watcher
    pushes a Save As or base change within a second, but a Load ends it, so the new
    name waits for the next ask: once a quiet minute now (was 5 min, the owner's
@@ -336,12 +340,16 @@ visible-campus filter back (`20261002100000`), so a booth lists only its campus,
 
 ### How the pieces work, briefly
 
+**The two slots** (`src/shared/layout.ts`) each hold Run order, MA or Arena. The
+native views are placed from the App over whichever slot's body holds them
+(`src/renderer/panePlacement.ts`), so a view changing slots moves rather than reloads.
+
 **The run order** is the Cue Manager itself (`src/main/cue-pane.ts`), placed like the
-MA pane (`src/renderer/panePlacement.ts` keeps both native views over their boxes).
+MA pane.
 It signs itself in, by emailed code or its own QR, keeps that sign-in and its offline
 queue in a persistent session, and is a picture, not a reading: the app shows its own
-offline banner. Folding the column hides it without reloading, so a half-typed note
-survives. Its edge drags to resize (`src/renderer/cueWidth.ts` has the limits), and
+offline banner. Folding the left slot hides it without reloading, so a half-typed note
+survives. Its edge drags to resize (`src/renderer/leftWidth.ts` has the limits), and
 dragged nearly shut it folds; double-tap puts it back to a phone's width. Input in it counts toward operator mode's idle timer.
 
 **The showfile chip.** LifeBridge's `show` verb makes SaveGuard's verdict on the

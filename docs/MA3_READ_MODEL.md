@@ -482,7 +482,7 @@ on screen it reads the overlay text every 2 s, from an isolated world so none of
 page's code runs, and after **10 s** (`PANE_STUCK_MS`) of anything but `Connected!`
 it clears the pane's storage and logs in again. Text it does not recognise is left
 alone, so another version's wording degrades to the old behaviour, not to a reload
-loop. **Reload MA**, in the status bar, does the same on demand. ✅ The read works
+loop. **Reload MA** (↻ in the MA slot's strip since 2026-10-03) does the same on demand. ✅ The read works
 inside the sandboxed view on onPC 2.3.2.0 (`starting` → `connected` in the log); the
 fresh login after 10 s is unit-tested and argued from the rows above, not yet watched
 firing.

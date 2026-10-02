@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 import { applyParameter, decodeComposition, decodeMessage, statusOf, subscribeMessage, subscriptionsOf } from '../dist/src/bridge/arena-live.js'
+import { clipIdOfThumbnail, thumbnailUrl } from '../dist/src/shared/arena.js'
 
 // Arena 7.28.0's composition as `GET /api/v1/composition` gave it on 2026-10-03,
 // show OH2026, pruned from 1.3 MB to the fields read here: PLAYBACK has a Solid
@@ -33,9 +34,11 @@ test('the real composition: what plays, where, and how loud', () => {
 	assert.equal(playback.bypassed, false)
 	assert.deepEqual(playback.playing, {
 		name: 'Solid Color',
-		thumbnail: '/api/v1/composition/clips/by-id/1771294214183/thumbnail',
+		thumbnail: { clipId: 1771294214183, version: '17909283400139180' },
 		missing: false,
 	})
+	assert.equal(thumbnailUrl(playback.playing.thumbnail), 'arena://thumbnail/1771294214183?v=17909283400139180')
+	assert.equal(clipIdOfThumbnail(thumbnailUrl(playback.playing.thumbnail)), 1771294214183)
 	// Loaded but disconnected is not playing; nor is an empty layer.
 	assert.equal(status.layers.filter((l) => l.playing !== null).length, 1)
 	assert.equal(status.layers[7].master, 0)
@@ -75,6 +78,20 @@ test('a composition of the wrong shape fails whole, saying what', () => {
 		assert.deepEqual(decodeComposition(body), { ok: false, detail })
 	}
 	assert.equal(decodeComposition('<html>').ok, false)
+})
+
+test('main answers only thumbnail addresses on its scheme', () => {
+	for (const bad of [
+		'arena://thumbnail/../product',
+		'arena://thumbnail/12/34',
+		'arena://elsewhere/12',
+		'http://thumbnail/12',
+		'arena://thumbnail/',
+		'arena://thumbnail/1e5',
+		'not a url',
+	]) {
+		assert.equal(clipIdOfThumbnail(bad), null, bad)
+	}
 })
 
 test('no selected deck is null, never the first deck', () => {

@@ -6,9 +6,9 @@
 // clear) gives the tree; subscriptions keep its faders current between pushes.
 // Each push is ~1.3 MB, parsed here once, and only the summary goes further.
 //
-// Data only for now: nothing on screen reads the status yet. What plays is
-// logged once per change, `[arena] playing: PLAYBACK Solid Color`, so the kiosk
-// log shows it working before any view does.
+// The Arena view (src/renderer/components/ArenaView.tsx) shows it in a slot.
+// What plays is also logged once per change, `[arena] playing: PLAYBACK Solid
+// Color`, so the kiosk log says what was on when someone asks afterwards.
 //
 // Arena says nothing while idle, so the websocket's silence cannot age the
 // status. The link poll does: each answer while the socket is open restamps the

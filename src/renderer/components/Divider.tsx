@@ -1,10 +1,10 @@
-// The edge between the run order and the MA pane, which a finger can drag.
+// The edge between the two slots, which a finger can drag.
 //
-// Drag to resize; drag nearly shut and let go to fold the column away; tap
-// twice to put it back to a phone's width. The fold and open buttons stay:
+// Drag to resize the left slot; drag nearly shut and let go to fold it away;
+// tap twice to put it back to a phone's width. The fold and open buttons stay:
 // this is a second way, never the only one.
 //
-// THE CATCH, AND WHY IT HOLDS: both panes are native views main draws over
+// THE CATCH, AND WHY IT HOLDS: either slot may hold a native view main draws over
 // the window, and a pointer that wanders over one would normally be that view's.
 // A press keeps every move until it lifts (pointer capture, and the platform's
 // own capture of a held button or a touch), so a drag that overshoots into
@@ -12,7 +12,7 @@
 
 import { useRef, useState } from 'react'
 
-import { FOLD_BELOW_PX } from '../cueWidth.js'
+import { FOLD_BELOW_PX } from '../leftWidth.js'
 
 export function Divider({
 	width,
@@ -49,7 +49,7 @@ export function Divider({
 		<div
 			role="separator"
 			aria-orientation="vertical"
-			aria-label="Drag to resize the run order"
+			aria-label="Drag to resize the left slot"
 			onPointerDown={(e) => {
 				e.currentTarget.setPointerCapture(e.pointerId)
 				start.current = { x: e.clientX, width }

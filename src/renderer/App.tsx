@@ -7,13 +7,19 @@ import { SHOW_STALE_AFTER_MS, type Showfile } from '../shared/showfile.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import type { CuePaneReport } from '../shared/cue-pane.js'
 import { TIMER_STALE_AFTER_MS, type TimerSources } from '../shared/timer.js'
-import { ARENA_STALE_AFTER_MS, arenaVersion, type ArenaSource } from '../shared/arena.js'
+import { ARENA_STALE_AFTER_MS, arenaVersion, type ArenaSource, type ArenaStatus } from '../shared/arena.js'
 import { consoleStatus, cueStatus, polledStatus, worstTone, type ConnectionStatus } from '../shared/connections.js'
 import { StatusBar } from './components/StatusBar.js'
-import { CuePane, FoldedCuePane } from './components/CuePane.js'
+import { CueMessage } from './components/CuePane.js'
 import { Divider } from './components/Divider.js'
-import { useCueWidth } from './cueWidth.js'
-import { MaPane, paneSummary } from './components/MaPane.js'
+import { useLeftWidth } from './leftWidth.js'
+import { MaMessage, paneSummary } from './components/MaPane.js'
+import { ArenaView } from './components/ArenaView.js'
+import { Centered, FoldedSlot, Slot } from './components/Slot.js'
+import { barButton } from './components/vocabulary.js'
+import { offered, type Slot as SlotId, type ViewId } from '../shared/layout.js'
+import { useSlots } from './slots.js'
+import { usePanePlacement } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
 import { useMode } from './mode.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
@@ -46,9 +52,10 @@ export function App() {
 	// 'real' is dev's way to watch main's own link, against onPC or a stand-in,
 	// in a window rather than the full-screen kiosk. The run order stays cold.
 	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
-	const [runOrderOpen, setRunOrderOpen] = useState(true)
+	const [leftOpen, setLeftOpen] = useState(true)
 	const [connectionsOpen, setConnectionsOpen] = useState(false)
-	const cueWidth = useCueWidth()
+	const leftWidth = useLeftWidth()
+	const { layout, choose } = useSlots()
 
 	// The clock is real time; ages derive from it, so STALE arrives on its own
 	// rather than needing something to happen.
@@ -140,6 +147,23 @@ export function App() {
 		}
 	}, [])
 
+	// What Arena is playing, for the Arena view. Faster than its link, so a
+	// fader moved in Arena is not visibly behind here. Undefined until main has
+	// answered once, like the link above.
+	const [arenaStatus, setArenaStatus] = useState<Channel<ArenaStatus> | null | undefined>(undefined)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.arenaStatus().then((a) => alive && setArenaStatus(a))
+		poll()
+		const id = setInterval(poll, 250)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
 	// The run order is the Cue Manager itself, in its own pane: real in dev
 	// too, like the MA pane. Polled for its load state and its last input.
 	const [cue, setCue] = useState<CuePaneReport | null>(null)
@@ -171,6 +195,23 @@ export function App() {
 			clearInterval(id)
 		}
 	}, [])
+
+	// The two native views are placed from here, which never unmounts, over
+	// whichever slot's body holds them (./panePlacement.ts). A view in neither
+	// slot, in the folded left one, or behind Connections is hidden, and keeps
+	// its page: the Cue Manager its half-typed note, the MA its connection.
+	const [maBox, setMaBox] = useState<HTMLElement | null>(null)
+	const [cueBox, setCueBox] = useState<HTMLElement | null>(null)
+	usePanePlacement(maBox, !leftOpen && layout.left === 'ma', (rect) => window.life?.placeMaPane(rect))
+	usePanePlacement(cueBox, !leftOpen && layout.left === 'cue', (rect) => window.life?.placeCuePane(rect))
+	// Unmounting closes the MA connection. It happens when the renderer goes
+	// away, which main also covers, since a crashed renderer cannot say goodbye.
+	useEffect(
+		() => () => {
+			window.life?.releaseMaPane()
+		},
+		[],
+	)
 
 	// Channel B is polled even in dev, unlike the link above. The mock desk drives
 	// the four READING states; this is the real console, and being able to watch
@@ -232,6 +273,75 @@ export function App() {
 		cueStatus(cue?.pane ?? null),
 	]
 
+	// What the pickers offer (../shared/layout.ts): a view whose source answers.
+	// The MA answers when the link is live or the console's web remote has
+	// loaded: either is the console responding.
+	const answering: Record<ViewId, boolean> = {
+		cue: true,
+		ma: sources.link.state === 'live' || pane?.pane.state === 'showing',
+		arena: connections.find((c) => c.id === 'arena')?.tone === 'live',
+	}
+	const choices = offered(layout, answering)
+	const maShown = layout.left === 'ma' || layout.right === 'ma'
+
+	/** A view's own buttons, in its slot's strip. Reload reconnects a picture
+	 *  and fires nothing. */
+	const actionsOf = (view: ViewId) => {
+		const reload = (label: string, onClick: () => void) => (
+			<button type="button" onClick={onClick} className={`${barButton} h-9`} aria-label={label}>
+				↻
+			</button>
+		)
+		switch (view) {
+			case 'cue':
+				return cue?.pane.state === 'showing' ? reload('Reload the run order', () => window.life?.retryCuePane()) : null
+			case 'ma':
+				return pane?.pane.state === 'showing' || pane?.pane.state === 'connecting'
+					? reload('Reload the MA', () => window.life?.retryMaPane())
+					: null
+			case 'arena':
+				return null
+		}
+	}
+
+	const bodyOf = (view: ViewId) => {
+		switch (view) {
+			case 'cue':
+				return (
+					<Centered>
+						<CueMessage pane={cue?.pane ?? null} now={now} />
+					</Centered>
+				)
+			case 'ma':
+				return (
+					<Centered>
+						<MaMessage pane={pane?.pane ?? null} now={now} />
+					</Centered>
+				)
+			case 'arena':
+				return <ArenaView status={arenaStatus} now={now} />
+		}
+	}
+
+	const boxRefOf = (view: ViewId) => (view === 'ma' ? setMaBox : view === 'cue' ? setCueBox : undefined)
+
+	const slot = (side: SlotId, extra: { width?: number; folded?: boolean; onFold?: () => void }) => {
+		const view = layout[side]
+		return (
+			<Slot
+				key={side}
+				view={view}
+				choices={choices}
+				onPick={(v) => choose(side, v)}
+				actions={actionsOf(view)}
+				boxRef={boxRefOf(view)}
+				{...extra}
+			>
+				{bodyOf(view)}
+			</Slot>
+		)
+	}
+
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
 			{DEV && (
@@ -259,9 +369,6 @@ export function App() {
 				mode={mode}
 				onEnter={enter}
 				onLeave={leave}
-				onReloadPane={
-					pane?.pane.state === 'showing' || pane?.pane.state === 'connecting' ? () => window.life?.retryMaPane() : null
-				}
 				connectionsOpen={connectionsOpen}
 				onConnections={() => setConnectionsOpen(!connectionsOpen)}
 				connections={worstTone(connections)}
@@ -270,8 +377,10 @@ export function App() {
 				timers={timers}
 			/>
 
-			{/* Above the pane, never over it: a native view cannot be overlaid. */}
-			{sources.link.state === 'unreachable' && (
+			{/* Above the slots, never over them: a native view cannot be overlaid.
+			    Only while a slot holds the MA: an Arena machine with no console
+			    has nothing to be told about one. */}
+			{maShown && sources.link.state === 'unreachable' && (
 				<div className="border-b border-state-unreachable/40 bg-state-unreachable/15 px-6 py-2 text-sm">
 					<span className="text-state-unreachable">
 						No console link — console readings are unknown, and the dashboard can't confirm the MA picture is current.
@@ -280,30 +389,32 @@ export function App() {
 				</div>
 			)}
 
-			{/* The run order is a sibling of the pane, never an overlay on it, so
-			    "never covered" is a fact about the layout rather than a rule
-			    someone has to remember. The buttons are the MA's own, in the pane. */}
+			{/* Two slots side by side (../shared/layout.ts), siblings and never
+			    overlays, so "never covered" is a fact about the layout rather than
+			    a rule someone has to remember. Connections stands in the right
+			    slot's place; whatever native view was there is hidden, not closed. */}
 			<div className="flex min-h-0 flex-1">
-				<CuePane report={cue} folded={!runOrderOpen} onFold={() => setRunOrderOpen(false)} width={cueWidth.width} now={now} />
-				{runOrderOpen ? (
+				{slot('left', {
+					width: leftWidth.width,
+					folded: !leftOpen,
+					onFold: () => setLeftOpen(false),
+				})}
+				{leftOpen ? (
 					<Divider
-						width={cueWidth.width}
-						onDrag={cueWidth.set}
-						onDone={cueWidth.commit}
+						width={leftWidth.width}
+						onDrag={leftWidth.set}
+						onDone={leftWidth.commit}
 						onFold={() => {
-							cueWidth.revert()
-							setRunOrderOpen(false)
+							leftWidth.revert()
+							setLeftOpen(false)
 						}}
-						onReset={cueWidth.reset}
+						onReset={leftWidth.reset}
 					/>
 				) : (
-					<FoldedCuePane onOpen={() => setRunOrderOpen(true)} />
+					<FoldedSlot view={layout.left} onOpen={() => setLeftOpen(true)} />
 				)}
 				<main className="flex min-w-0 flex-1 flex-col">
-					{/* Always mounted, so the connection survives the Connections tab
-					    standing in its place. */}
-					<MaPane report={pane} hidden={connectionsOpen} now={now} />
-					{connectionsOpen && (
+					{connectionsOpen ? (
 						<ConnectionsPanel
 							rows={connections}
 							operator={mode === 'operator'}
@@ -312,6 +423,8 @@ export function App() {
 							now={now}
 							onClose={() => setConnectionsOpen(false)}
 						/>
+					) : (
+						slot('right', {})
 					)}
 				</main>
 			</div>

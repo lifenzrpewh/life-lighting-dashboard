@@ -80,11 +80,13 @@ function playingOf(clips: unknown[], layer: string): Decoded<ArenaClip | null> {
 		const name = text(clip['name'], what)
 		if (!name.ok) return name
 		const thumb = clip['thumbnail']
-		const path = isObject(thumb) && typeof thumb['path'] === 'string' ? thumb['path'] : null
+		const version = isObject(thumb) ? thumb['last_update'] : undefined
+		const thumbnail =
+			isId(clip['id']) && (typeof version === 'string' || typeof version === 'number') ? { clipId: clip['id'], version: String(version) } : null
 		const video = clip['video']
 		const fileinfo = isObject(video) ? video['fileinfo'] : undefined
 		const missing = isObject(fileinfo) && fileinfo['exists'] === false
-		playing = { name: name.value, thumbnail: path, missing }
+		playing = { name: name.value, thumbnail, missing }
 	}
 	return { ok: true, value: playing }
 }

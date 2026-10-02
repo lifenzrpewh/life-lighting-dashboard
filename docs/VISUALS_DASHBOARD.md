@@ -1,6 +1,6 @@
 # Visuals Dashboard — planning notes (started 2026-10-02)
 
-**Status: pieces 1 and 2 built (2 as data only), the rest planned.** From a conversation with the owner. The idea: the
+**Status: pieces 1, 2 and 4 built, the rest planned.** From a conversation with the owner. The idea: the
 Lighting Dashboard becomes a Visuals Dashboard, where any two views sit side by side
 depending on what is running. Lighting is one layout among several.
 
@@ -107,15 +107,24 @@ belongs in main, never the renderer, and only the summary crosses.
    path, a missing file), layer and group faders and bypass, composition master, deck,
    over the websocket: `src/bridge/arena-live.ts` (decoder, tested against the real
    composition) and `src/main/arena.ts` (the socket, resubscribing on every reconnect).
-   Read against Arena 7.28 on the Windows box, in Node, not yet inside the kiosk.
-   **Nothing on screen yet, by the owner's choice:** it waits for piece 4's slots. Until
-   then the kiosk log says what plays, once per change (`[arena] playing: PLAYBACK Solid
-   Color`). Still unseen: a fader update while a clip connects, a deck switch, and a
+   Read against Arena 7.28 on the Windows box, in the kiosk too (2026-10-03). On screen
+   since piece 4 as the Arena view (`src/renderer/components/ArenaView.tsx`): layers top
+   of the stack first as in Arena's own panel, under their groups, thumbnails through
+   main on an `arena:` scheme (`src/main/arena-thumbnails.ts`), because the page allows
+   no remote origins. The kiosk log also says what plays, once per change. Still unseen: a fader update while a clip connects, a deck switch, and a
    layer during a transition (the first connected clip is taken).
 3. **Clip countdown.** Time left on the clip playing in PLAYBACK, in the countdown chip,
    hidden when nothing plays, red past zero. Needs a video file seen in `transport` first:
    what a Loop reports is not a countdown.
-4. **Two-slot layout.** Any two views side by side, offering only what answers.
+4. ✅ **Two slots** (2026-10-03). Left and right each pick Run order, MA or Arena
+   (`src/shared/layout.ts` has the rules, the owner's answers below). The MA counts as
+   answering when the link is live or its web remote has loaded. The native views are
+   placed from a spot that never unmounts, so moving the MA between slots moves it
+   without logging in again (watched: no reconnect in the log). Reload sits in each
+   view's strip; ↻ MA left the status bar for it. The console banner shows only while a
+   slot holds the MA. Seen in the kiosk on the Windows box, driven over the debugging
+   port while the owner was away: the pickers, Arena with its thumbnail, MA moved left,
+   the fold, and the layout remembered. **Not yet touched by a finger.**
 5. **Multiview spike** (below). Riskiest; independent of 1–4.
 6. **Brief slot.** Waits on where a brief's link lives.
 7. Later: the trigger screen, and the rename.
@@ -136,6 +145,19 @@ the dashboard adds.
 - **Briefs are view-only at the booth.** Editing happens on a laptop, so no Google
   sign-in in the kiosk; a brief shared as "anyone with the link" is enough.
 - **Rename the app and repo**: yes. Not done yet.
+
+## Answered (owner, 2026-10-03): the two slots
+
+- **Both slots pick.** Left and right each have a picker: Run order, MA, Arena, and
+  later others. A view is in one slot at a time; picking the one the other slot holds
+  swaps them.
+- **A view that stops answering stays, and says so.** The screen never rearranges
+  itself under a volunteer. "Only what answers" is what the picker offers, not what a
+  slot keeps.
+- **Everyone picks**, not only operator mode: an Arena op and a lighting op can each get
+  their view.
+- **Each machine remembers its layout** across a restart, as it does the run order's
+  width.
 
 ## Open questions
 

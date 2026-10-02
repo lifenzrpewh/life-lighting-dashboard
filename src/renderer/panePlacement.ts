@@ -1,11 +1,16 @@
 // Where a native pane sits, for both the MA pane and the Cue Manager pane.
 //
+// The box is an element, not a fixed ref, because a view moves between slots
+// (../shared/layout.ts): the slot holding it hands over its body, and this
+// follows. Called from a place in the tree that never unmounts, so a view
+// changing slots moves, and is never torn down and connected again.
+//
 // THE RULE THIS FILE ENFORCES: the native view goes where its box is, and
-// nowhere else. The box is re-measured after every render, not only on resize,
+// nowhere else. No box (no slot holds the view) is hidden. The box is re-measured after every render, not only on resize,
 // because a layout that shifts without resizing (a bar appearing above) would
 // otherwise leave the view somewhere it no longer belongs.
 
-import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
 import type { PaneRect } from '../shared/ma-pane.js'
 
@@ -14,16 +19,16 @@ const sameRect = (a: PaneRect | null, b: PaneRect | null) =>
 	(a !== null && b !== null && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height)
 
 /** Measure `box` after every render and on every resize, and tell main when
- *  it moved. `hidden` sends null: keep the page, take the view away. */
+ *  it moved. `hidden`, or no box, sends null: keep the page, take the view away. */
 export function usePanePlacement(
-	box: RefObject<HTMLElement | null>,
+	box: HTMLElement | null,
 	hidden: boolean,
 	send: (rect: PaneRect | null) => void,
 ): void {
 	const sent = useRef<PaneRect | null | undefined>(undefined)
 
 	const place = () => {
-		const el = box.current
+		const el = box
 		let rect: PaneRect | null = null
 		if (!hidden && el !== null) {
 			const r = el.getBoundingClientRect()
@@ -42,10 +47,9 @@ export function usePanePlacement(
 	})
 	// ...and on every resize in between, so a fold or window change tracks.
 	useEffect(() => {
-		const el = box.current
-		if (el === null) return
+		if (box === null) return
 		const ro = new ResizeObserver(() => latest.current())
-		ro.observe(el)
+		ro.observe(box)
 		return () => ro.disconnect()
 	}, [box])
 
