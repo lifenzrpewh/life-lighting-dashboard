@@ -188,7 +188,14 @@ belongs in main, never the renderer, and only the summary crosses.
    ✅ **The missing-media check**: every clip whose file Arena cannot find, in amber
    above the Arena and Clips views, with layer, column and path, and `FILE MISSING` on
    its cell. ⚠️ Unit-tested only: this composition has no missing file to show.
-8. **The rename to Pāua.**
+8. ✅ **The rename to Pāua** (2026-10-04). ASCII `paua` wherever it becomes a path
+   (package, data folder, exe, installer), "Pāua" where people read it. The data
+   folder moves whole on the first run, so the Cue Manager sign-in and sealed
+   passwords survive: ✅ on the Windows box, the real profile moved (23 entries), the
+   Cue Manager still signed in, and a throwaway operator password still opened after
+   a second move. A copy of the old folder dated 2026-10-03 4:38 pm appeared beside
+   it after the first move, origin unknown (perhaps the installed copy's); nothing
+   reads it, and it was left. The GitHub repo rename is the owner's to approve.
 
 ## The video feed (2026-10-03, Windows box)
 

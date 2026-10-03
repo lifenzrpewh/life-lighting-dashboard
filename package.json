@@ -1,5 +1,7 @@
 {
-	"name": "life-lighting-dashboard",
+	"name": "paua",
+	"productName": "Paua",
+	"description": "Pāua: the booth dashboard for lighting and visuals at LIFE.",
 	"version": "0.0.2",
 	"private": true,
 	"type": "module",
@@ -71,7 +73,9 @@
 			"oneClick": true,
 			"perMachine": false,
 			"runAfterFinish": true,
-			"artifactName": "LIFE-Lighting-Dashboard-Setup-${version}.${ext}"
+			"artifactName": "Paua-Setup-${version}.${ext}",
+			"shortcutName": "Pāua",
+			"uninstallDisplayName": "Pāua"
 		}
 	}
 }

@@ -70,6 +70,17 @@ import { createPopouts, type Popouts } from './popout.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { VIEWS, type ViewId } from '../shared/layout.js'
+import { settleDataDir } from '../bridge/data-dir.js'
+
+// Pāua's data folder, %APPDATA%paua, moved in whole from the name before the
+// rename on the first run after it (../bridge/data-dir.ts). Before anything
+// else: the single-instance lock, settings and every session live in it.
+{
+	const { dir, move } = settleDataDir(app.getPath('appData'))
+	app.setPath('userData', dir)
+	if (move.kind === 'moved') console.log(`[kiosk] moved ${move.entries} entries of the old profile into ${dir}`)
+	if (move.kind === 'kept-old') console.log(`[kiosk] could not move the old profile (${move.detail}); still using ${dir}`)
+}
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const PRELOAD = path.join(HERE, '../preload/index.cjs')

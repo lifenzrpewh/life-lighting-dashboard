@@ -1,4 +1,6 @@
-# LIFE Lighting Dashboard
+# Pāua
+
+LIFE's booth dashboard (LIFE Lighting Dashboard until 2026-10-04).
 
 A touchscreen dashboard for the booth, beside the grandMA3: the Cue Manager (the
 visuals app's run order, notes edited in place) next to the console's own web

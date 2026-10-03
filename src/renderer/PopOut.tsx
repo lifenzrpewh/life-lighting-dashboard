@@ -75,7 +75,7 @@ export function PopOut({ view }: { view: ViewId }) {
 	)
 
 	useEffect(() => {
-		document.title = `LIFE — ${VIEW_LABEL[view]}`
+		document.title = `Pāua — ${VIEW_LABEL[view]}`
 	}, [view])
 
 	const showing = view === 'ma' ? ma?.pane.state === 'showing' || ma?.pane.state === 'connecting' : cue?.pane.state === 'showing'

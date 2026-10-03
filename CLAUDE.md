@@ -1,4 +1,12 @@
-# LIFE Lighting Dashboard — operating manual
+# Pāua — operating manual
+
+**Renamed 2026-10-04** from LIFE Lighting Dashboard (the owner's name). Where a
+path or id is concerned it is ASCII `paua`: the package, the data folder
+`%APPDATA%\paua` (the old `life-lighting-dashboard` folder is moved in whole on
+the first run, `src/bridge/data-dir.ts`), the exe and the installer. People read
+"Pāua": the window, the shortcut, the uninstall entry. The installer keeps the old
+`appId` so it upgrades an old install in place rather than beside it. Dated notes
+below keep the old name where they quote the past.
 
 Touchscreen dashboard for grandMA3, beside the console: the Cue Manager (the
 visuals app, embedded) next to the console's own web remote, which carries every
@@ -41,7 +49,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
 | ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. Channel B is wired (the "desk heard" pill); the link still reports UNREACHABLE because nothing round-trips yet. |
 | ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Real web remote on onPC 2.3.2.0, **not a desk**. Never stuck for good (2026-10-01): a 15 s load timeout, and a fresh login after 10 s of MA's own overlay saying something it never recovers from (✅ the read works in the sandbox; the fresh login is unit-tested, not watched firing). **Reload MA** (↻) in its slot's strip. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
-| ⚠️ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. Verified locally on macOS Keychain; DPAPI on Windows unexercised. |
+| ✅ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. macOS Keychain, and **Windows DPAPI on the Windows box, 2026-10-04**: an operator password saved sealed (no plaintext on disk), still opened after the data folder was moved for the rename, then removed. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
 | ✅ `src/bridge/osc.ts` | OSC 1.0 decoder. An unknown type tag fails the **whole message**, not just that argument — OSC args are positional, so skipping one reads every later value at the wrong offset and a fader level becomes whatever four bytes sit there. |
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
@@ -269,7 +277,7 @@ absent. ~50 s, because five real exports are 45 MB each.
 **On the booth PC (Windows)**, from a checkout: `npm start` is proven on that box (and
 since 2026-10-03 so is the installer, below). In `scripts/windows/`:
 `kiosk.cmd` runs the build already there (building only if there is none), restarts
-after a crash, and logs to `%APPDATA%\life-lighting-dashboard\kiosk.log`;
+after a crash, and logs to `%APPDATA%\paua\kiosk.log`;
 `install-startup.cmd` makes it start at login; `update.cmd` pulls and rebuilds, by
 hand, never before a service. One kiosk per computer: a second launch only focuses
 the first. ✅ On the Windows box, 2026-10-03: `kiosk.cmd` built when there was no build,
@@ -278,7 +286,7 @@ pulled, reinstalled and rebuilt in 43 s. ⚠️ `install-startup.cmd` not run (i
 this user's Startup folder; the owner's call), so start at login is unwatched.
 
 **The installer (the way forward).** `npm run dist:win` builds
-`release/LIFE-Lighting-Dashboard-Setup-<version>.exe` (107 MB): per-user, no admin
+`release/Paua-Setup-<version>.exe` (107 MB; `LIFE-Lighting-Dashboard-Setup-…` before the rename): per-user, no admin
 rights, unsigned (`Get-AuthenticodeSignature`: `NotSigned`), default icon, key built in.
 ✅ **It installs and runs on the managed booth-class Windows box, 2026-10-03**, built
 there too: into `%LOCALAPPDATA%\Programs\life-lighting-dashboard`, opening on finish

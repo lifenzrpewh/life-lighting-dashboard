@@ -8,13 +8,15 @@ rem
 rem A crash restarts after 5 s. Quitting on purpose (Alt+F4) exits 0 and stays
 rem quit, so the screen can always be got out of the way.
 rem
-rem The log is %APPDATA%\life-lighting-dashboard\kiosk.log, and the run before
+rem The log is %APPDATA%\paua\kiosk.log, and the run before
 rem it is kiosk.prev.log beside it.
 
 setlocal
 cd /d "%~dp0..\.."
 
-set "DATA=%APPDATA%\life-lighting-dashboard"
+rem Paua since 2026-10-04: the app moves the old life-lighting-dashboard
+rem folder in on its first run (src/bridge/data-dir.ts).
+set "DATA=%APPDATA%\paua"
 if not exist "%DATA%" mkdir "%DATA%"
 set "LOG=%DATA%\kiosk.log"
 

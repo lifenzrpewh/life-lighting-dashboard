@@ -84,7 +84,7 @@ export function createPopouts(opts: {
 			...where(view),
 			minWidth: POPOUT_MIN.width,
 			minHeight: POPOUT_MIN.height,
-			title: `LIFE — ${VIEW_LABEL[view]}`,
+			title: `Pāua — ${VIEW_LABEL[view]}`,
 			backgroundColor: '#0a0a0b',
 			show: false,
 			autoHideMenuBar: true,

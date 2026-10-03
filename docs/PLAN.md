@@ -1,4 +1,4 @@
-# LIFE Lighting Dashboard — Plan
+# Pāua (was LIFE Lighting Dashboard) — Plan
 
 ## Context
 
