@@ -145,6 +145,9 @@ function createWindow(): void {
 	// to saying otherwise.
 	window.webContents.on('did-start-loading', () => {
 		popouts?.closeAll()
+		// The page's own cleanup does not run on a reload, so it would stay
+		// listed as watching and the feed would keep sending to nobody.
+		if (window !== null) videoFeed?.watch(window.webContents, false)
 		mode = 'volunteer'
 		maPane?.release()
 	})

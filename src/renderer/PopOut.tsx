@@ -19,7 +19,7 @@ import type { MaPaneReport } from '../shared/ma-pane.js'
 import { VIEW_LABEL, type ViewId } from '../shared/layout.js'
 import { ArenaView } from './components/ArenaView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
-import type { VideoFeedState } from '../shared/video-feed.js'
+import { currentFrame, type VideoFeedState } from '../shared/video-feed.js'
 import { CueMessage } from './components/CuePane.js'
 import { MaMessage } from './components/MaPane.js'
 import { Centered } from './components/Slot.js'
@@ -63,8 +63,8 @@ export function PopOut({ view }: { view: ViewId }) {
 	/** Fit: size this window to the picture's shape, and keep that shape while
 	 *  it is dragged bigger or smaller (src/main/popout.ts). */
 	const fitVideo = () => {
-		const picture = video?.lastFrame
-		if (picture == null || videoSpace === null) return
+		const picture = video == null ? null : currentFrame(video)
+		if (picture === null || videoSpace === null) return
 		window.life?.fitPopout(view, { width: picture.width, height: picture.height }, { width: videoSpace.width, height: videoSpace.height })
 	}
 

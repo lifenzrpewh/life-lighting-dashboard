@@ -94,13 +94,15 @@ function loadAddon(): Addon | string {
 export function startVideoFeed(): VideoFeed {
 	const addon = loadAddon()
 	const watchers = new Set<WebContents>()
+	/** Pages already told to stop watching when they are destroyed. */
+	const listening = new WeakSet<WebContents>()
 	let senders: string[] = []
 	let chosen: string | null = null
 	let receiver: { name: string; native: Receiver } | null = null
 	let poll: ReturnType<typeof setInterval> | null = null
 	let inFlight = false
 	let lastSentAt = 0
-	let lastFrame: { at: number; width: number; height: number } | null = null
+	let lastFrame: VideoFeedState['lastFrame'] = null
 	let failure: string | null = typeof addon === 'string' ? `the video addon did not load: ${addon}` : null
 	/** Frames delivered in the current second, and the last whole second's count. */
 	let counted = { second: 0, frames: 0, fps: 0 }
@@ -137,6 +139,8 @@ export function startVideoFeed(): VideoFeed {
 		try {
 			receiver = { name, native: new addon.TextureReceiver(name) }
 			failure = null
+			// This sender's own count; the last one's is not its frame rate.
+			counted = { second: 0, frames: 0, fps: 0 }
 			console.log(`[video] receiving "${name}"`)
 		} catch (e) {
 			failure = `could not open "${name}": ${(e as Error).message}`
@@ -163,6 +167,7 @@ export function startVideoFeed(): VideoFeed {
 		}
 		if (frame === null) return
 		const { handle, width, height, pixelFormat } = frame
+		const sender = receiver.name
 		const pages = [...watchers].filter((p) => !p.isDestroyed())
 		if (!isPixelFormat(pixelFormat) || pages.length === 0) {
 			if (!isPixelFormat(pixelFormat)) failure = `the sender's pixel format "${pixelFormat}" is not one Electron takes`
@@ -195,7 +200,7 @@ export function startVideoFeed(): VideoFeed {
 				}
 				failure = null
 				const now = Date.now()
-				lastFrame = { at: now, width, height }
+				lastFrame = { at: now, width, height, sender }
 				const second = Math.floor(now / 1000)
 				counted = second === counted.second ? { ...counted, frames: counted.frames + 1 } : { second, frames: 1, fps: counted.frames }
 			})
@@ -218,7 +223,16 @@ export function startVideoFeed(): VideoFeed {
 		}),
 		watch(page, on) {
 			if (on) {
-				if (!watchers.has(page)) page.once('destroyed', () => this.watch(page, false))
+				// Once per page for its life, not once per watch: a slot swapped to
+				// and from Video, or a pop-out and back, watches again each time.
+				if (!listening.has(page)) {
+					listening.add(page)
+					page.once('destroyed', () => {
+						listening.delete(page)
+						watchers.delete(page)
+						connect()
+					})
+				}
 				watchers.add(page)
 			} else watchers.delete(page)
 			connect()

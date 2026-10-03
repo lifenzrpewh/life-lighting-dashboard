@@ -11,8 +11,9 @@ export type VideoFeedState = {
 	senders: string[]
 	/** The one shown: the page's pick while it exists, otherwise the first. */
 	showing: string | null
-	/** When the last frame reached the page, and its size. */
-	lastFrame: { at: number; width: number; height: number } | null
+	/** When the last frame reached the page, its size, and which sender sent
+	 *  it. Read it through `currentFrame`, never directly. */
+	lastFrame: { at: number; width: number; height: number; sender: string } | null
 	/** Frames delivered in the last whole second. */
 	fps: number
 	/** The newest thing that went wrong, until a frame gets through again. */
@@ -30,11 +31,21 @@ export type VideoPicture =
 	| { state: 'showing'; sender: string }
 	| { state: 'stalled'; sender: string; sinceMs: number; failure: string | null }
 
+/** The last frame, if it came from the sender now shown. Another sender's
+ *  frame is no picture at all: after a pick, or when the shown sender goes
+ *  and the next takes its place, the old picture under the new name would
+ *  be a read that failed coming back looking like an answer, and its size
+ *  would send Fit to the wrong shape. */
+export function currentFrame(feed: VideoFeedState): VideoFeedState['lastFrame'] {
+	return feed.lastFrame !== null && feed.lastFrame.sender === feed.showing ? feed.lastFrame : null
+}
+
 export function videoPicture(feed: VideoFeedState, now: number): VideoPicture {
 	if (feed.showing === null) return { state: 'no-sender' }
 	const sender = feed.showing
-	if (feed.lastFrame === null) return { state: 'waiting', sender, failure: feed.failure }
-	const sinceMs = now - feed.lastFrame.at
+	const frame = currentFrame(feed)
+	if (frame === null) return { state: 'waiting', sender, failure: feed.failure }
+	const sinceMs = now - frame.at
 	return sinceMs > VIDEO_STALLED_AFTER_MS ? { state: 'stalled', sender, sinceMs, failure: feed.failure } : { state: 'showing', sender }
 }
 

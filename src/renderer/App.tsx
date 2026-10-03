@@ -16,7 +16,7 @@ import { useLeftWidth } from './leftWidth.js'
 import { MaMessage, Say, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
-import { fitLeftWidth, type VideoFeedState } from '../shared/video-feed.js'
+import { currentFrame, fitLeftWidth, type VideoFeedState } from '../shared/video-feed.js'
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
 import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
@@ -192,9 +192,11 @@ export function App() {
 	 *  still apply, so a picture too wide for them stays letterboxed. */
 	const fitVideo = () => {
 		const side = slotOf(layout, 'video')
-		const picture = videoFeed?.lastFrame
-		if (side === null || picture == null || videoSpace === null) return
-		if (side === 'left' && !leftOpen) return
+		const picture = videoFeed == null ? null : currentFrame(videoFeed)
+		if (side === null || picture === null || videoSpace === null) return
+		// Folded, the divider is not on screen: moving it would change only the
+		// width the left slot comes back at, which nobody asked for.
+		if (!leftOpen) return
 		leftWidth.commit(fitLeftWidth({ side, picture, space: videoSpace, leftWidth: leftWidth.width }))
 	}
 

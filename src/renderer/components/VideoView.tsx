@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { videoFit, videoPicture, type VideoFeedState } from '../../shared/video-feed.js'
+import { currentFrame, videoFit, videoPicture, type VideoFeedState } from '../../shared/video-feed.js'
 import { Say } from './MaPane.js'
 import { Centered } from './Slot.js'
 import { barButton } from './vocabulary.js'
@@ -67,6 +67,16 @@ export function VideoView({
 			frame.close()
 		})
 	}, [])
+
+	// Another sender picked, or the shown one gone and the next in its place:
+	// the old picture goes with it, rather than standing in for the new one.
+	const showing = feed?.showing ?? null
+	useEffect(() => {
+		const c = canvas.current
+		if (c === null) return
+		c.width = 0
+		c.height = 0
+	}, [showing])
 
 	if (feed === undefined || feed === null) {
 		return (
@@ -135,7 +145,7 @@ export function VideoStrip({
 }) {
 	const [open, setOpen] = useState(false)
 	if (feed === undefined || feed === null) return null
-	const picture = feed.lastFrame
+	const picture = currentFrame(feed)
 	const device = space === null ? null : { width: space.width * space.dpr, height: space.height * space.dpr }
 	const fit = picture === null || device === null ? null : videoFit(picture, device)
 	const short = (name: string) => name.replace(/^Arena - /, '')

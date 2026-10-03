@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { VIDEO_STALLED_AFTER_MS, fitLeftWidth, fitWindow, plainVideoFailure, videoFit, videoPicture } from '../dist/src/shared/video-feed.js'
+import { VIDEO_STALLED_AFTER_MS, currentFrame, fitLeftWidth, fitWindow, plainVideoFailure, videoFit, videoPicture } from '../dist/src/shared/video-feed.js'
 
 const feed = (over) => ({ senders: ['Arena - Multiview'], showing: 'Arena - Multiview', lastFrame: null, fps: 0, failure: null, ...over })
 
@@ -19,7 +19,7 @@ test('a sender with no frame yet is waiting, with whatever went wrong', () => {
 
 test('frames arriving are showing; frames stopping is said, with how long', () => {
 	const at = 10_000
-	const lastFrame = { at, width: 1920, height: 1080 }
+	const lastFrame = { at, width: 1920, height: 1080, sender: 'Arena - Multiview' }
 	assert.equal(videoPicture(feed({ lastFrame }), at + 100).state, 'showing')
 	assert.equal(videoPicture(feed({ lastFrame }), at + VIDEO_STALLED_AFTER_MS).state, 'showing')
 	assert.deepEqual(videoPicture(feed({ lastFrame }), at + 5_000), {
@@ -28,6 +28,17 @@ test('frames arriving are showing; frames stopping is said, with how long', () =
 		sinceMs: 5_000,
 		failure: null,
 	})
+})
+
+test("another sender's last frame is no picture: waiting, not its picture under this name", () => {
+	// Picked B while A was showing, or A gone and B next by name. A's frame
+	// must not be called B's, nor be "the last picture B sent", nor size Fit.
+	const lastFrame = { at: 10_000, width: 1282, height: 722, sender: 'Arena - A' }
+	const switched = feed({ senders: ['Arena - A', 'Arena - B'], showing: 'Arena - B', lastFrame })
+	assert.equal(currentFrame(switched), null)
+	assert.deepEqual(videoPicture(switched, 10_100), { state: 'waiting', sender: 'Arena - B', failure: null })
+	assert.deepEqual(videoPicture(switched, 60_000), { state: 'waiting', sender: 'Arena - B', failure: null })
+	assert.deepEqual(currentFrame(feed({ showing: 'Arena - A', lastFrame })), lastFrame)
 })
 
 test("Arena's 16-bit picture is refused in words that say what to change", () => {
