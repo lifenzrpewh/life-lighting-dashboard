@@ -1,0 +1,6 @@
+@napolab/texture-bridge 0.15.0, Windows x64, with LIFE's 16-bit patch.
+upstream 7f7d589809f0735ce9b1d9e7fa2e790773d401d6
+spout2   c2bcc12147711d12ace7d5f08e869d774d840f8a
+patch    sha256 687315dd184cf3bedeca2a749827cfb6a41fc72856a029870b27140580a3f004
+built    https://github.com/lifenzrpewh/life-lighting-dashboard/actions/runs/37107395549
+from     65020835877c521e664c43b518b506e96b173486

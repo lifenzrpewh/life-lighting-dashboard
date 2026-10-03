@@ -303,9 +303,10 @@ a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media d
 ### TODO, in order
 
 0. **The video feed from Arena** (`docs/VISUALS_DASHBOARD.md` § The video feed): Arena's
-   Spout output shows in the Video view at 8 bits. Next: watch Arena's own output for
-   dropped frames with the view on; a GPU 16-to-8-bit converter so High Detail shows (the
-   owner prefers 16-bit); the multiview layout itself, in Arena.
+   Spout output shows in the Video view. LIFE's own build of the addon
+   (`native/texture-bridge/`, built by GitHub Actions) converts 16-bit (High Detail) on
+   the GPU: built and loading, ⚠️ not yet seen with High Detail on. Then: watch Arena's
+   own output for dropped frames with the view on; the multiview layout itself, in Arena.
 0. **Next Arena pieces** (`docs/VISUALS_DASHBOARD.md` § The pieces): the brief slot (6)
    waits on where a brief's link lives. Undecided: whether the booth
    also wants one clip countdown beside the clock. QLab is parked (`docs/QLAB.md`).

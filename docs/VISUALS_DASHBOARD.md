@@ -247,10 +247,42 @@ measured. Arena's own output frame rate with the feed on is **the number still m
 - **A covered window costs nothing.** With Arena in front, the kiosk's own GPU use read
   0% while receiving: Chromium does not redraw a window nobody can see.
 
-**Still to do:** watch Arena's own output for dropped frames with the Video view on; a GPU
-16-to-8-bit conversion for High Detail shows; lay out the real multiview in Arena (slices
-taking Layer / Group / Composition); then macOS (Syphon needs `Syphon.framework` bundled
-and signed, per the addon's docs).
+### Picking a source, and sizing the picture (2026-10-03, the owner's asks)
+
+- **The source list is the dashboard's own.** A native `<select>` would not take a pick
+  on the booth's touchscreen (the owner); it is now a button opening big rows, like
+  every other control here. ✅ Picked between Arena's sender and the stand-in.
+- **The strip says how the picture fits:** `1282×722 → 1970×1460 · 154%` is the sender's
+  size, the space it is drawn in (screen pixels, so what Arena's screen would need to
+  fill it exactly), and the scale it is drawn at. The whole picture always shows.
+- **Fit gives the space the picture's shape**, rather than Arena a new resolution. In a
+  slot it moves the divider, within the slots' limits (the left slot's 320 px minimum
+  stopped a 16:9 picture filling a tall right slot on this 16:10 screen). In a pop-out it
+  sizes the window to the picture's shape and holds it while resized. ✅ Pop-out
+  1263×784 → 1393×784 for a 1282×722 picture.
+
+**The advice on resolution** (to the owner, 2026-10-03): set Arena's multiview screen
+once, to the space where it is watched most, read off the strip; then let Fit bring the
+dashboard to the picture rather than changing Arena. Bigger than the space costs GPU and
+is scaled down; smaller is scaled up and soft. A popped-out window on a second monitor
+gives the most room, so that monitor's size is the natural choice.
+
+### 16-bit: LIFE's build of the addon (2026-10-03)
+
+`native/texture-bridge/life-16bit.patch` makes the addon's Windows receiver draw a
+texture Electron cannot import into a BGRA8 one with a one-texel shader pass (the GPU
+converts as it writes), instead of copying it and having the format refused. 8-bit and
+half-float senders are copied as before. With no build tools on the booth box (no admin),
+`.github/workflows/texture-bridge.yml` builds it on GitHub's Windows runners, upstream and
+Spout2 pinned, and commits the binary to the `texture-bridge-build` branch; the kiosk
+loads `vendor/texture-bridge/` when present. `native/texture-bridge/README.md` has the
+steps. Also seen in the code: the addon's CPU readback copies a 16-bit texture's rows as
+if 8-bit, so its pixels for High Detail were never right either; the patch leaves that
+path alone.
+
+**Still to do:** watch Arena's own output for dropped frames with the Video view on; lay
+out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
+(Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
 
 ## The risk to measure first
 
