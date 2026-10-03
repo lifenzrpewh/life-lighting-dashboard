@@ -3,15 +3,17 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { findLibrary } from '../scripts/ma3-library.mjs'
+import { findCorpus } from '../scripts/ma3-library.mjs'
 
 import { parseSequenceExport, isExportCrashRisk } from '../dist/src/bridge/export-parse.js'
 
 // The operator's real exported library. These tests are the only thing standing
 // between the parser and 856 files of genuine console output, so they run against
-// the real corpus rather than fixtures. Skipped cleanly on a machine without it.
-const LIB = findLibrary('sequences')
-const haveLib = LIB !== null
+// the real corpus rather than fixtures. Skipped, saying why, on a machine
+// without it or with the library's folder but none of its exports.
+const corpus = findCorpus('sequences')
+const LIB = corpus.dir
+const skipLib = corpus.why ?? false
 const read = (n) => fs.readFileSync(path.join(LIB, n), 'utf8')
 
 test('synthetic: an absent CueInFade is null, not zero', () => {
@@ -52,7 +54,7 @@ test('synthetic: a truncated export is rejected, never returned as a short seque
 	assert.equal(isExportCrashRisk(r), true)
 })
 
-test('real library: the corpus parses, and only the known artifacts fail', { skip: !haveLib }, () => {
+test('real library: the corpus parses, and only the known artifacts fail', { skip: skipLib }, () => {
 	const files = fs.readdirSync(LIB).filter((f) => f.endsWith('.xml'))
 	assert.ok(files.length > 800, `expected a large corpus, got ${files.length}`)
 
@@ -87,7 +89,7 @@ test('real library: the corpus parses, and only the known artifacts fail', { ski
 	assert.ok(failed.every(([, reason]) => reason === 'truncated'))
 })
 
-test('real library: HOUSE WHITE parses but is flagged as an export crash risk', { skip: !haveLib }, () => {
+test('real library: HOUSE WHITE parses but is flagged as an export crash risk', { skip: skipLib }, () => {
 	// The sequence named in MA3_SYNTAX_REFERENCE.md:568 as the reproducible
 	// console-killer. Its own export survived; exporting it again is what dies.
 	const r = parseSequenceExport(read('house white.xml'))
@@ -96,7 +98,7 @@ test('real library: HOUSE WHITE parses but is flagged as an export crash risk', 
 	assert.equal(isExportCrashRisk(r), true, 'must be blacklisted before any re-export')
 })
 
-test('real library: recipes keep selection and preset independently', { skip: !haveLib }, () => {
+test('real library: recipes keep selection and preset independently', { skip: skipLib }, () => {
 	const files = fs.readdirSync(LIB).filter((f) => f.endsWith('.xml'))
 	let both = 0
 	let selOnly = 0

@@ -227,7 +227,7 @@ touchscreen, so a Windows checkout is a first-class case, not a courtesy.
 |---|---|
 | **Node** | `^22.20` (see `engines`) |
 | **Lua** | any 5.x on PATH. `npm test` runs the 240-check plugin harness through it — `npm run test:lua` now names the prerequisite instead of failing obscurely. macOS `brew install lua` · Windows `winget install DEVCOM.Lua` |
-| **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent → the export-parse tests skip and say so. **Present but empty** (MA3 installed, exports not copied across: the normal state on a fresh Windows box) makes three tests *fail* rather than skip (`expected a large corpus, got 0`), because `findLibrary` only asks whether the directory exists, not whether it holds anything |
+| **MA3 library** | optional. Resolved per-platform by `scripts/ma3-library.mjs`: `~/MALightingTechnology/…` and, on Windows, `%ProgramData%\MALightingTechnology\…`. Absent, or **present but empty** (MA3 installed, exports not copied across: the normal state on a fresh Windows box), and the three export-parse tests skip and say which (`findCorpus`, since 2026-10-03; before, empty failed as `expected a large corpus, got 0`). A folder of exports that parse to nothing still fails |
 
 `scripts/deploy-plugin.sh` is bash and needs Git Bash or WSL on Windows. It is
 also **no longer the deployment path** — the plugin ships embedded in its XML

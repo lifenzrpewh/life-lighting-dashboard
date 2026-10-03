@@ -190,7 +190,9 @@ export function startVideoFeed(): VideoFeed {
 		}
 		inFlight = true
 		lastSentAt = performance.now()
-		void Promise.allSettled(pages.map((p) => sharedTexture.sendSharedTexture({ frame: p.mainFrame, importedSharedTexture: imported })))
+		// async, so a send that throws rather than rejects is still settled:
+		// otherwise inFlight would stay set and the picture freeze for good.
+		void Promise.allSettled(pages.map(async (p) => sharedTexture.sendSharedTexture({ frame: p.mainFrame, importedSharedTexture: imported })))
 			.then((results) => {
 				const sent = results.some((r) => r.status === 'fulfilled')
 				if (!sent) {
