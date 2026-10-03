@@ -167,10 +167,9 @@ belongs in main, never the renderer, and only the summary crosses.
    day: "seems good". Dragging the divider trailed the finger, so it now drags pictures
    of the pages (`src/main/pane-snapshot.ts`), pinned to the window edge with the page's
    edge colour filling the room a growing slot opens: "feels good".
-5. **The video feed** (2026-10-03, § The video feed below). The receiving side is built
-   and seen working against a stand-in sender: a **Video** view in either slot or popped
-   out. Waits on a Spout output in Arena, then Arena's own frame rate watched with and
-   without it.
+5. **The video feed** (2026-10-03, § The video feed below). A **Video** view in either
+   slot or popped out, seen showing Arena's Spout output at 8 bits. Arena at 16 bits
+   (High Detail) needs a converter first; the multiview layout itself is Arena's to build.
 6. **Brief slot.** Waits on where a brief's link lives.
 7. Later: the trigger screen, and the rename.
 
@@ -218,10 +217,40 @@ So the cost is the rate the window redraws, not the feed, and the feed is capped
 ⚠️ A desktop with its screens on the graphics card should not pay the copy at all, not
 measured. Arena's own output frame rate with the feed on is **the number still missing**.
 
-**Still to do, with Arena:** turn on a Spout output (Output › Advanced Output: a screen
-whose device is Spout, slices taking Layer / Group / Composition as their input), see
-its sender name here, and watch Arena's frame rate with the Video view showing and not.
-Then macOS (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
+### From Arena (2026-10-03, Arena 7.28, show OH2026)
+
+✅ The owner turned on a Spout screen in Advanced Output; Arena published it as
+**`Arena - <screen name>`** (`Arena - OH YEAh`, then `Arena - Composition` too), 1920×1080.
+
+- **High Detail decides whether it shows.** The composition's `highdetail` (Arena's 16
+  bits a channel; the OH2026 title bar reads "3840 x 2160, 16bpc") makes the Spout
+  texture DXGI format 11, `R16G16B16A16_UNORM`. The addon refuses it ("Unsupported
+  DXGI_FORMAT for shared texture: 11"), and Electron's import takes only `bgra`, `rgba`
+  and `rgbaf16` anyway. The view says so in words (`plainVideoFailure`). With the owner's
+  go-ahead, High Detail was switched off over the API (`PUT /composition`
+  `{"highdetail":{"value":false}}`) for the test and back on after: at 8 bits the texture
+  is `bgra` and the **picture showed in the Video view, ~27 fps**, pixel for pixel what
+  Arena sent (185,515 lit pixels in both; Arena's dim logo, the composition's video
+  opacity being 0).
+- **The owner's call: 8-bit is fine for now, 16-bit preferred.** So the route stays, and
+  16-bit needs a converter: the addon's own CPU readback does take format 11 (it hands
+  back 8-bit RGBA) but took **41 ms a frame** at 1080p, too slow for main; the real fix is
+  a GPU conversion in the addon's Windows receiver (C++ behind Rust; no toolchain on
+  this box).
+- **Arena never marks a frame new**: the new-frame check said yes 1250 times in 3 s. The
+  30 fps cap is what holds the load, and Arena's frame rate cannot be counted through
+  Spout.
+- **What receiving costs Arena** (two rounds, 10 s each, the view on then off): about
+  **+5 to 6 points on its GPU copy engine and +1 to 2 on its 3D engine**; its CPU readings
+  swung too much to read. Its output frame rate is not visible from outside Arena and
+  is still to watch, in Arena, with the view on and off.
+- **A covered window costs nothing.** With Arena in front, the kiosk's own GPU use read
+  0% while receiving: Chromium does not redraw a window nobody can see.
+
+**Still to do:** watch Arena's own output for dropped frames with the Video view on; a GPU
+16-to-8-bit conversion for High Detail shows; lay out the real multiview in Arena (slices
+taking Layer / Group / Composition); then macOS (Syphon needs `Syphon.framework` bundled
+and signed, per the addon's docs).
 
 ## The risk to measure first
 

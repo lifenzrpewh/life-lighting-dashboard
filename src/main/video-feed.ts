@@ -28,7 +28,7 @@
 import { sharedTexture, type WebContents } from 'electron'
 import { createRequire } from 'node:module'
 
-import type { VideoFeedState } from '../shared/video-feed.js'
+import { plainVideoFailure, type VideoFeedState } from '../shared/video-feed.js'
 
 type Addon = typeof import('@napolab/texture-bridge')
 type Receiver = InstanceType<Addon['TextureReceiver']>
@@ -141,8 +141,9 @@ export function startVideoFeed(): VideoFeed {
 			frame = receiver.native.receiveSharedTexture()
 		} catch (e) {
 			// ✅ 2026-10-03: it throws, rather than returning null, while the
-			// sender is gone. The list notices the sender leaving.
-			failure = (e as Error).message
+			// sender is gone. The list notices the sender leaving. It also refuses
+			// a 16-bit picture here, which is said in plain words.
+			failure = plainVideoFailure((e as Error).message)
 			return
 		}
 		if (frame === null) return

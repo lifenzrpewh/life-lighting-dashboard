@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { VIDEO_STALLED_AFTER_MS, videoPicture } from '../dist/src/shared/video-feed.js'
+import { VIDEO_STALLED_AFTER_MS, plainVideoFailure, videoPicture } from '../dist/src/shared/video-feed.js'
 
 const feed = (over) => ({ senders: ['Arena - Multiview'], showing: 'Arena - Multiview', lastFrame: null, fps: 0, failure: null, ...over })
 
@@ -28,4 +28,11 @@ test('frames arriving are showing; frames stopping is said, with how long', () =
 		sinceMs: 5_000,
 		failure: null,
 	})
+})
+
+test("Arena's 16-bit picture is refused in words that say what to change", () => {
+	// The addon's words on 2026-10-03, Arena with High Detail on.
+	assert.match(plainVideoFailure('Unsupported DXGI_FORMAT for shared texture: 11'), /16-bit.*High Detail/)
+	assert.match(plainVideoFailure('Unsupported DXGI_FORMAT for shared texture: 24'), /DXGI format 24/)
+	assert.equal(plainVideoFailure('Shared texture receiver is not connected'), 'Shared texture receiver is not connected')
 })
