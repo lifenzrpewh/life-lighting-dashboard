@@ -55,6 +55,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/shared/layout.ts` · `src/renderer/components/Slot.tsx` · `src/renderer/slots.ts` | **Two slots** (2026-10-03, the owner's answers in `docs/VISUALS_DASHBOARD.md`): left and right each pick Run order, MA or Arena; the picker offers what answers, a slot keeps its view when it stops; picking the other slot's view swaps them; everyone picks; each machine remembers. The MA moves between slots without logging in again. Owner-tried on the Windows box's touchscreen, 2026-10-03: "seems good". |
 | ✅ `src/main/pane-snapshot.ts` · `src/renderer/components/Still.tsx` | **Dragging the divider**: each page stands in as a picture of itself while dragged (a live page reflowing on every step trailed the finger), pinned to the window edge with its own edge colour filling the room a growing slot opens. Owner-tried, 2026-10-03: "feels good". |
 | ⚠️ `src/main/popout.ts` · `src/shared/popout.ts` · `src/renderer/PopOut.tsx` | **Pop out**: any slot's view into a window of its own, on top of the kiosk; the slot says so and offers Bring back; closing the window brings the view home, as does a kiosk reload. The MA and run order move page and all. Seen working in the kiosk on the Windows box, 2026-10-03, driven over the debugging port; not yet by a finger or on a second display. `docs/VISUALS_DASHBOARD.md` § Pop a view out. |
+| ⚠️ `src/main/video-feed.ts` · `src/renderer/components/VideoView.tsx` | **The video feed**: a Spout/Syphon sender (Arena's multiview, to be) as a **Video** view, GPU to GPU through `@napolab/texture-bridge` and Electron's `sharedTexture`, the pages still sandboxed. Seen live from a stand-in sender (`spikes/spout-test-sender.cjs`) on the Windows box, 2026-10-03, in a slot and popped out; capped at 30 fps because on a hybrid-GPU laptop every redraw is a cross-chip copy. Not yet from Arena. `docs/VISUALS_DASHBOARD.md` § The video feed. |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
@@ -290,8 +291,8 @@ Mac (2026-10-02: link LIVE, showfile chip, MA pane as `Remote`, Cue Manager sign
 as a booth device). On the Windows box, 2026-10-03, it became a two-slot dashboard:
 either slot picks Run order, MA or Arena; the Arena view shows every layer's clip,
 fader and time left, read live from Arena 7.28; dragging the divider stays with the
-finger; any view pops out into a window of its own; and the unsigned installer
-installs and runs there. The owner tried the slots and the drag on the touchscreen. What is left for lighting is a real console; for
+finger; any view pops out into a window of its own; a Spout sender shows live
+in a Video view; and the unsigned installer installs and runs there. The owner tried the slots and the drag on the touchscreen. What is left for lighting is a real console; for
 visuals, the pieces in `docs/VISUALS_DASHBOARD.md`.
 
 **This Windows box:** Arena serves on **8090** (moved 2026-10-03 off the MA web
@@ -301,12 +302,12 @@ a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media d
 
 ### TODO, in order
 
-0. **Try the pop-out on the touchscreen** (`docs/VISUALS_DASHBOARD.md` § Pop a view
-   out): a finger on Pop out, Back and the window's own close, and with a second
-   display plugged in. The choices made while building are listed there to overrule.
-0. **Next Arena pieces** (`docs/VISUALS_DASHBOARD.md` § The pieces): the multiview
-   spike (5) is the riskiest and wants an hour at the box watching Arena's frame rate;
-   the brief slot (6) waits on where a brief's link lives. Undecided: whether the booth
+0. **The video feed from Arena** (`docs/VISUALS_DASHBOARD.md` § The video feed): the
+   receiving side works against a stand-in. Turn on a Spout output in Arena's Advanced
+   Output, show it in the Video view, and watch Arena's own frame rate with it on and
+   off. Then the multiview layout itself, in Arena.
+0. **Next Arena pieces** (`docs/VISUALS_DASHBOARD.md` § The pieces): the brief slot (6)
+   waits on where a brief's link lives. Undecided: whether the booth
    also wants one clip countdown beside the clock. QLab is parked (`docs/QLAB.md`).
 0. **A showfile read that stays off the command line (research).** The watcher
    pushes a Save As or base change within a second, but a Load ends it, so the new

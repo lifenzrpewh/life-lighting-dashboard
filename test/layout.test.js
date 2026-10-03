@@ -15,12 +15,14 @@ test('picking a view the other slot holds swaps them', () => {
 })
 
 test('the picker offers what answers, and never drops what is on screen', () => {
-	const none = { cue: false, ma: false, arena: false }
+	const none = { cue: false, ma: false, arena: false, video: false }
 	// A console gone quiet stays offered while a slot holds the MA.
 	assert.deepEqual(offered(DEFAULT_LAYOUT, none), ['cue', 'ma'])
 	assert.deepEqual(offered(DEFAULT_LAYOUT, { ...none, cue: true, arena: true }), ['cue', 'ma', 'arena'])
 	// Arena not answering is not offered for a slot that does not hold it.
-	assert.deepEqual(offered({ left: 'cue', right: 'arena' }, { cue: true, ma: false, arena: false }), ['cue', 'arena'])
+	assert.deepEqual(offered({ left: 'cue', right: 'arena' }, { ...none, cue: true }), ['cue', 'arena'])
+	// The video feed, offered once a sender is publishing.
+	assert.deepEqual(offered(DEFAULT_LAYOUT, { ...none, video: true }), ['cue', 'ma', 'video'])
 })
 
 test('which slot holds a view', () => {

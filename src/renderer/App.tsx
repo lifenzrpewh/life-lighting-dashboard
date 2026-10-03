@@ -15,6 +15,8 @@ import { Divider } from './components/Divider.js'
 import { useLeftWidth } from './leftWidth.js'
 import { MaMessage, Say, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
+import { SenderPicker, VideoView } from './components/VideoView.js'
+import type { VideoFeedState } from '../shared/video-feed.js'
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
 import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
@@ -161,6 +163,22 @@ export function App() {
 		const poll = () => void api.arenaStatus().then((a) => alive && setArenaStatus(a))
 		poll()
 		const id = setInterval(poll, 250)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+
+	// The video feed's senders and its last frame, for the picker and the
+	// view's words. The frames themselves never pass through here.
+	const [videoFeed, setVideoFeed] = useState<VideoFeedState | null | undefined>(undefined)
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.videoFeed().then((v) => alive && setVideoFeed(v))
+		poll()
+		const id = setInterval(poll, 500)
 		return () => {
 			alive = false
 			clearInterval(id)
@@ -316,6 +334,7 @@ export function App() {
 		cue: true,
 		ma: sources.link.state === 'live' || pane?.pane.state === 'showing',
 		arena: connections.find((c) => c.id === 'arena')?.tone === 'live',
+		video: (videoFeed?.senders.length ?? 0) > 0,
 	}
 	const choices = offered(layout, answering)
 	const maShown = layout.left === 'ma' || layout.right === 'ma'
@@ -358,6 +377,13 @@ export function App() {
 				)
 			case 'arena':
 				return out
+			case 'video':
+				return (
+					<>
+						<SenderPicker feed={videoFeed} />
+						{out}
+					</>
+				)
 		}
 	}
 
@@ -378,7 +404,7 @@ export function App() {
 				</Centered>
 			)
 		}
-		const still = view === 'arena' ? null : (stills?.[view] ?? null)
+		const still = view === 'ma' || view === 'cue' ? (stills?.[view] ?? null) : null
 		if (still !== null) return <Still src={still} side={side} />
 		switch (view) {
 			case 'cue':
@@ -395,6 +421,8 @@ export function App() {
 				)
 			case 'arena':
 				return <ArenaView status={arenaStatus} now={now} />
+			case 'video':
+				return <VideoView feed={videoFeed} now={now} />
 		}
 	}
 

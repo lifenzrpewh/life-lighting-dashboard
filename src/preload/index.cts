@@ -6,7 +6,7 @@
 // ...args)` passthrough and there must never be one — that would hand the
 // renderer the whole IPC surface and make this file decorative.
 
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, sharedTexture } from 'electron'
 
 // `resolution-mode` because this file is CommonJS (a sandboxed preload cannot
 // be an ES module) while src/shared is ESM. Type-only, so nothing is emitted.
@@ -19,6 +19,32 @@ import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
 import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
 import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'import' }
+import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
+
+/** The page's frame callback, while it shows the video feed. */
+let onVideoFrame: ((frame: VideoFrame) => void) | null = null
+
+// The video feed's frames arrive here as GPU textures from main
+// (src/main/video-feed.ts) and go to the page as VideoFrames, which cross the
+// context bridge without a copy of their pixels. Each is closed here once the
+// page's callback has drawn it, and the texture released a macrotask later:
+// released in the same tick, Electron's tracker can see the release before
+// the transfer (the addon's own consumer, and its note, do the same).
+// Guarded: the module is experimental, and a preload that threw here would
+// take the whole surface below with it. Without it the feed only waits.
+try {
+	sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }) => {
+		const frame = importedSharedTexture.getVideoFrame()
+		try {
+			onVideoFrame?.(frame)
+		} finally {
+			frame.close()
+			setTimeout(() => importedSharedTexture.release(), 0)
+		}
+	})
+} catch (e) {
+	console.error('[video] this page cannot receive shared textures:', e)
+}
 
 const api = {
 	/** The console link as main knows it: LIVE only while LifeBridge answers
@@ -74,6 +100,22 @@ const api = {
 	popOut: (view: ViewId): void => ipcRenderer.send('popout:open', view),
 	/** Close `view`'s window, which puts it back in the kiosk. */
 	bringBack: (view: ViewId): void => ipcRenderer.send('popout:close', view),
+
+	/** The video feed: which senders exist, which is shown, when the last
+	 *  frame arrived. */
+	videoFeed: (): Promise<VideoFeedState | null> => ipcRenderer.invoke('video:state'),
+	/** Show the feed: frames go to `draw` until the returned function is
+	 *  called. Draw at once; the frame is closed when `draw` returns. */
+	watchVideo: (draw: (frame: VideoFrame) => void): (() => void) => {
+		onVideoFrame = draw
+		ipcRenderer.send('video:watch', true)
+		return () => {
+			if (onVideoFrame === draw) onVideoFrame = null
+			ipcRenderer.send('video:watch', false)
+		}
+	},
+	/** Show this sender rather than the first. */
+	chooseVideo: (name: string): void => ipcRenderer.send('video:choose', name),
 
 	/** Settings, as the renderer may see them: passwords only as set / not set. */
 	settings: (): Promise<SettingsView> => ipcRenderer.invoke('settings:get'),

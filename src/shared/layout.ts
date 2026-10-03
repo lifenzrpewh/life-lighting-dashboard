@@ -10,15 +10,16 @@
 // its own place. So `offered` always includes what the slots already hold, and
 // nothing here ever moves a view because a source went quiet.
 
-export type ViewId = 'cue' | 'ma' | 'arena'
+export type ViewId = 'cue' | 'ma' | 'arena' | 'video'
 
 /** Every view, in the picker's order. */
-export const VIEWS: readonly ViewId[] = ['cue', 'ma', 'arena']
+export const VIEWS: readonly ViewId[] = ['cue', 'ma', 'arena', 'video']
 
 export const VIEW_LABEL: Record<ViewId, string> = {
 	cue: 'Run order',
 	ma: 'MA',
 	arena: 'Arena',
+	video: 'Video',
 }
 
 export type Slot = 'left' | 'right'

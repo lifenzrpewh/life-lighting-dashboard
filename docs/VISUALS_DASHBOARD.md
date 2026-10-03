@@ -34,8 +34,8 @@ depending on what is running. Lighting is one layout among several.
   Syphon/Spout (or NDI).
 - **Receiving Syphon/Spout in Electron needs a native addon.** Candidates:
   `@napolab/texture-bridge` (Spout and Syphon Metal, one API, actively published),
-  `node-syphon` (Mac only). Unproven here; maintenance and packaging into the Windows
-  installer are both open.
+  `node-syphon` (Mac only). Chosen and working on Windows since 2026-10-03: § The video
+  feed, below.
 - **NDI is the fallback** if texture sharing proves fragile: one route on both OSes and
   across machines, but it encodes and decodes on the CPU.
 
@@ -167,9 +167,61 @@ belongs in main, never the renderer, and only the summary crosses.
    day: "seems good". Dragging the divider trailed the finger, so it now drags pictures
    of the pages (`src/main/pane-snapshot.ts`), pinned to the window edge with the page's
    edge colour filling the room a growing slot opens: "feels good".
-5. **Multiview spike** (below). Riskiest; independent of 1–4.
+5. **The video feed** (2026-10-03, § The video feed below). The receiving side is built
+   and seen working against a stand-in sender: a **Video** view in either slot or popped
+   out. Waits on a Spout output in Arena, then Arena's own frame rate watched with and
+   without it.
 6. **Brief slot.** Waits on where a brief's link lives.
 7. Later: the trigger screen, and the rename.
+
+## The video feed (2026-10-03, Windows box)
+
+A **Video** view, offered in the pickers once a Spout (Windows) or Syphon (macOS)
+sender is publishing on the machine, the way Arena is offered once its web server
+answers. With several senders a picker in the slot's strip chooses; with one, it is
+shown. `src/main/video-feed.ts` receives, `src/renderer/components/VideoView.tsx` draws,
+`src/shared/video-feed.ts` says what a stopped picture looks like.
+
+**The route, all on the GPU.** `@napolab/texture-bridge` 0.15.0 (MIT, one maintainer,
+prebuilt Node-API binary, no install script; pinned exactly) opens the sender's texture
+in main and mints a handle per frame. Electron 44's `sharedTexture` (experimental)
+imports it and sends it to the page, where the preload gets a `VideoFrame` and hands it
+across the context bridge (which carries `VideoFrame` without copying it) to a canvas.
+The pages keep `sandbox`, `contextIsolation` and no Node: the addon's own high-level
+receiver wants a page with Node and no isolation, so its low-level calls are used
+instead. The installer unpacks the addon (`asarUnpack`), since a `.node` cannot load
+from inside the app archive.
+
+✅ **Seen, against a stand-in** (`spikes/spout-test-sender.cjs`, a hidden Electron page
+publishing a moving counter and clock; the addon cannot publish raw pixels on Windows):
+the picture live in the right slot, popped out, and back, 24-26 fps from a ~28 fps
+sender.
+
+**What the addon does that the code allows for:**
+- `receiveSharedTexture()` **throws** while no sender is connected, rather than
+  returning null.
+- Its new-frame check said yes **162 times a second** for a 30 fps sender, so the feed
+  is capped (`MIN_FRAME_MS`) or the page redraws repeats as fast as the loop turns.
+
+**What it costs (per process, GPU Engine counters, 10 s each).** This laptop renders on
+its NVIDIA RTX 4070 while its screen hangs off the Intel chip, so every redraw of the
+2560×1600 kiosk is copied across on the NVIDIA's copy engine:
+
+| Kiosk showing | Kiosk GPU (copy engine) |
+|---|---|
+| nothing moving (feed hidden) | 0 – 0.6% |
+| the feed, 26-49 fps | 9 – 21% |
+| an 8 px square moving at 60 fps, feed hidden | 39% |
+
+So the cost is the rate the window redraws, not the feed, and the feed is capped at
+**30 fps**, enough to watch a multiview by. Arena held 15-18% of the same GPU throughout.
+⚠️ A desktop with its screens on the graphics card should not pay the copy at all, not
+measured. Arena's own output frame rate with the feed on is **the number still missing**.
+
+**Still to do, with Arena:** turn on a Spout output (Output › Advanced Output: a screen
+whose device is Spout, slices taking Layer / Group / Composition as their input), see
+its sender name here, and watch Arena's frame rate with the Video view showing and not.
+Then macOS (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
 
 ## The risk to measure first
 
@@ -245,6 +297,7 @@ on macOS (where on-top over a full-screen space is set but unseen).
 
 On an Arena machine: turn on the web server, build a multiview Screen in Advanced
 Output sent over Syphon or Spout, receive it in a bare Electron window with a texture
-addon, and measure Arena's frame rate. Then do the same on the other OS.
+addon, and measure Arena's frame rate. Then do the same on the other OS. Receiving is
+done (§ The video feed); Arena's side and its frame rate are what is left.
 
 Related: [LOOKBOOK_CHECK.md](LOOKBOOK_CHECK.md), the parked foregrounds check.

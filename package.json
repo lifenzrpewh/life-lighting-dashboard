@@ -19,6 +19,7 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.web.json"
 	},
 	"dependencies": {
+		"@napolab/texture-bridge": "0.15.0",
 		"fast-xml-parser": "^4.5.0",
 		"qrcode": "^1.5.4",
 		"react": "^19.3.0",
@@ -50,6 +51,9 @@
 			"package.json"
 		],
 		"asar": true,
+		"asarUnpack": [
+			"node_modules/@napolab/texture-bridge*/**"
+		],
 		"npmRebuild": false,
 		"win": {
 			"target": [

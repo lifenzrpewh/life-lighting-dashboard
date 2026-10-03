@@ -37,6 +37,9 @@
 // ARENA (./arena.ts) is its link, what it plays over its websocket, and its clip
 // thumbnails on a scheme of their own (./arena-thumbnails.ts).
 //
+// THE VIDEO FEED (./video-feed.ts) is Arena's multiview over Spout or Syphon,
+// handed to the page as a GPU texture, received only while a page shows it.
+//
 // POP-OUTS (./popout.ts): any view can leave its slot for a window of its own,
 // on top of the kiosk, and comes back when that window closes. A pane takes
 // its place only from the window it is in, so the kiosk and a pop-out never
@@ -64,6 +67,8 @@ import { startArena, type ArenaHandle } from './arena.js'
 import type { ArenaSource, ArenaStatus } from '../shared/arena.js'
 import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
 import { createPopouts, type Popouts } from './popout.js'
+import { startVideoFeed, type VideoFeed } from './video-feed.js'
+import type { VideoFeedState } from '../shared/video-feed.js'
 import { VIEWS, type ViewId } from '../shared/layout.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -86,6 +91,7 @@ let channelB: ChannelBHandle | null = null
 let consoleLink: LinkHandle | null = null
 let timers: TimersHandle | null = null
 let arena: ArenaHandle | null = null
+let videoFeed: VideoFeed | null = null
 const BOOTED_AT = Date.now()
 
 // Must precede ready: Electron fixes scheme privileges at startup.
@@ -366,6 +372,17 @@ app.whenReady().then(() => {
 		return { ma, cue }
 	})
 
+	// The video feed. A page says when it shows the feed, and gets frames
+	// while it does; which sender it shows is a pick from what the machine has.
+	videoFeed = startVideoFeed()
+	ipcMain.handle('video:state', (e): VideoFeedState | null => (fromOurs(e) ? (videoFeed?.state() ?? null) : null))
+	ipcMain.on('video:watch', (e, on: unknown) => {
+		if (fromOurs(e) && typeof on === 'boolean') videoFeed?.watch(e.sender, on)
+	})
+	ipcMain.on('video:choose', (e, name: unknown) => {
+		if (fromOurs(e) && typeof name === 'string') videoFeed?.choose(name)
+	})
+
 	// Pop-outs. The kiosk opens them; the kiosk or the pop-out itself closes one.
 	const asView = (v: unknown): ViewId | null => ((VIEWS as readonly unknown[]).includes(v) ? (v as ViewId) : null)
 	ipcMain.handle('popout:state', (e) => (fromOurs(e) ? (popouts?.popped() ?? []) : []))
@@ -413,4 +430,5 @@ app.on('will-quit', () => {
 	stopOsc()
 	timers?.stop()
 	arena?.stop()
+	videoFeed?.stop()
 })
