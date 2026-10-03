@@ -18,7 +18,7 @@ import type { CuePaneReport } from '../shared/cue-pane.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import { VIEW_LABEL, type ViewId } from '../shared/layout.js'
 import { ArenaView } from './components/ArenaView.js'
-import { SenderPicker, VideoView } from './components/VideoView.js'
+import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { CueMessage } from './components/CuePane.js'
 import { MaMessage } from './components/MaPane.js'
@@ -59,6 +59,15 @@ export function PopOut({ view }: { view: ViewId }) {
 	/** The MA and the run order are native pages main moves in here. */
 	const native = view === 'ma' || view === 'cue'
 
+	const [videoSpace, setVideoSpace] = useState<VideoSpace | null>(null)
+	/** Fit: size this window to the picture's shape, and keep that shape while
+	 *  it is dragged bigger or smaller (src/main/popout.ts). */
+	const fitVideo = () => {
+		const picture = video?.lastFrame
+		if (picture == null || videoSpace === null) return
+		window.life?.fitPopout(view, { width: picture.width, height: picture.height }, { width: videoSpace.width, height: videoSpace.height })
+	}
+
 	const [box, setBox] = useState<HTMLElement | null>(null)
 	usePanePlacement(box, !native, (rect) =>
 		view === 'ma' ? window.life?.placeMaPane(rect) : window.life?.placeCuePane(rect),
@@ -86,7 +95,7 @@ export function PopOut({ view }: { view: ViewId }) {
 			<div className="flex h-14 shrink-0 items-center gap-2 border-b border-booth-edge px-2">
 				<h1 className="px-2 text-[10px] font-semibold tracking-widest text-booth-dim uppercase">{VIEW_LABEL[view]}</h1>
 				<span className="ml-auto" />
-				{view === 'video' && <SenderPicker feed={video} />}
+				{view === 'video' && <VideoStrip feed={video} space={videoSpace} onFit={fitVideo} />}
 				{reload}
 				{/* Big enough for a finger: the system's own close is not. */}
 				<button
@@ -101,7 +110,7 @@ export function PopOut({ view }: { view: ViewId }) {
 				{view === 'arena' ? (
 					<ArenaView status={arena} now={now} />
 				) : view === 'video' ? (
-					<VideoView feed={video} now={now} />
+					<VideoView feed={video} now={now} onSpace={setVideoSpace} />
 				) : (
 					<Centered>
 						{view === 'ma' ? <MaMessage pane={ma?.pane ?? null} now={now} /> : <CueMessage pane={cue?.pane ?? null} now={now} />}

@@ -20,7 +20,9 @@ const label = 'text-[10px] font-semibold tracking-widest uppercase'
 function Picker({ view, choices, onPick }: { view: ViewId; choices: readonly ViewId[]; onPick: (v: ViewId) => void }) {
 	if (choices.length <= 1) return <h2 className={`${label} px-3 text-booth-dim`}>{VIEW_LABEL[view]}</h2>
 	return (
-		<div role="tablist" className="flex min-w-0 items-center gap-1">
+		// Scrolls within its own room in a narrow slot rather than running under
+		// the view's buttons: four views at the narrowest overlapped them.
+		<div role="tablist" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none]">
 			{choices.map((c) => (
 				<button
 					key={c}

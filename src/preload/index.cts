@@ -98,6 +98,10 @@ const api = {
 	popouts: (): Promise<ViewId[]> => ipcRenderer.invoke('popout:state'),
 	/** The kiosk only: move `view` into a window of its own. */
 	popOut: (view: ViewId): void => ipcRenderer.send('popout:open', view),
+	/** Size `view`'s pop-out so its picture space takes the picture's shape,
+	 *  and keep that shape while the window is resized. */
+	fitPopout: (view: ViewId, picture: { width: number; height: number }, space: { width: number; height: number }): void =>
+		ipcRenderer.send('popout:fit', view, picture, space),
 	/** Close `view`'s window, which puts it back in the kiosk. */
 	bringBack: (view: ViewId): void => ipcRenderer.send('popout:close', view),
 

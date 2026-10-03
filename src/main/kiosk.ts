@@ -390,6 +390,18 @@ app.whenReady().then(() => {
 		const view = asView(v)
 		if (fromKiosk(e) && view !== null) popouts?.open(view)
 	})
+	ipcMain.on('popout:fit', (e, v: unknown, picture: unknown, space: unknown) => {
+		const view = asView(v)
+		const size = (s: unknown) => {
+			const r = s as { width?: unknown; height?: unknown } | null
+			return r !== null && typeof r === 'object' && typeof r.width === 'number' && typeof r.height === 'number' && r.width > 0 && r.height > 0
+				? { width: r.width, height: r.height }
+				: null
+		}
+		const p = size(picture)
+		const s = size(space)
+		if (view !== null && p !== null && s !== null && popouts?.isPopout(e.sender, view) === true) popouts.fit(view, p, s)
+	})
 	ipcMain.on('popout:close', (e, v: unknown) => {
 		const view = asView(v)
 		if (view !== null && (fromKiosk(e) || popouts?.isPopout(e.sender, view) === true)) popouts?.close(view)

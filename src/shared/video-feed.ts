@@ -52,3 +52,45 @@ export function plainVideoFailure(message: string): string {
 	}
 	return `The sender's picture is in a format this view cannot show yet (DXGI format ${format}).`
 }
+
+export type Size = { width: number; height: number }
+
+/** How the picture sits in its space: the scale it is drawn at (contain, so
+ *  the whole picture always shows) and the size Arena's screen would need to
+ *  fill the space exactly, both in device pixels. `best` keeps the picture's
+ *  shape when the space's own shape is not what Arena is sending. */
+export function videoFit(picture: Size, spaceDevicePx: Size): { scale: number; best: Size } {
+	const scale = Math.min(spaceDevicePx.width / picture.width, spaceDevicePx.height / picture.height)
+	return { scale, best: { width: Math.round(spaceDevicePx.width), height: Math.round(spaceDevicePx.height) } }
+}
+
+/** The left slot's width that gives the video's slot the picture's shape, its
+ *  height unchanged: Fit, rather than a new resolution in Arena. Not clamped;
+ *  the slot's own limits apply after (../renderer/leftWidth.ts). */
+export function fitLeftWidth(o: { side: 'left' | 'right'; picture: Size; space: Size; leftWidth: number }): number {
+	const grow = (o.space.height * o.picture.width) / o.picture.height - o.space.width
+	return Math.round(o.side === 'left' ? o.leftWidth + grow : o.leftWidth - grow)
+}
+
+/** A pop-out window's content size that gives its picture space the picture's
+ *  shape, as tall as it is now unless that would not fit the room it has.
+ *  `content` is the whole window's inside, `space` the picture's part of it;
+ *  the difference (the strip) is kept. */
+export function fitWindow(o: { picture: Size; space: Size; content: Size; room: Size }): Size {
+	const extraW = o.content.width - o.space.width
+	const extraH = o.content.height - o.space.height
+	const aspect = o.picture.width / o.picture.height
+	let h = o.space.height
+	let w = h * aspect
+	const maxW = o.room.width - extraW
+	const maxH = o.room.height - extraH
+	if (w > maxW) {
+		w = maxW
+		h = w / aspect
+	}
+	if (h > maxH) {
+		h = maxH
+		w = h * aspect
+	}
+	return { width: Math.round(w + extraW), height: Math.round(h + extraH) }
+}

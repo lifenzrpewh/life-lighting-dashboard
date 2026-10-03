@@ -15,12 +15,12 @@ import { Divider } from './components/Divider.js'
 import { useLeftWidth } from './leftWidth.js'
 import { MaMessage, Say, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
-import { SenderPicker, VideoView } from './components/VideoView.js'
-import type { VideoFeedState } from '../shared/video-feed.js'
+import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
+import { fitLeftWidth, type VideoFeedState } from '../shared/video-feed.js'
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
 import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
-import { VIEW_LABEL, offered, type Slot as SlotId, type ViewId } from '../shared/layout.js'
+import { VIEW_LABEL, offered, slotOf, type Slot as SlotId, type ViewId } from '../shared/layout.js'
 import { useSlots } from './slots.js'
 import { usePopouts } from './popouts.js'
 import { usePanePlacement } from './panePlacement.js'
@@ -184,6 +184,19 @@ export function App() {
 			clearInterval(id)
 		}
 	}, [])
+
+	// The space the picture has, for the strip's size readout and for Fit.
+	const [videoSpace, setVideoSpace] = useState<VideoSpace | null>(null)
+	/** Fit: move the divider so the video's slot takes the picture's shape,
+	 *  rather than changing the resolution in Arena. The slots' own limits
+	 *  still apply, so a picture too wide for them stays letterboxed. */
+	const fitVideo = () => {
+		const side = slotOf(layout, 'video')
+		const picture = videoFeed?.lastFrame
+		if (side === null || picture == null || videoSpace === null) return
+		if (side === 'left' && !leftOpen) return
+		leftWidth.commit(fitLeftWidth({ side, picture, space: videoSpace, leftWidth: leftWidth.width }))
+	}
 
 	// The run order is the Cue Manager itself, in its own pane: real in dev
 	// too, like the MA pane. Polled for its load state and its last input.
@@ -380,7 +393,7 @@ export function App() {
 			case 'video':
 				return (
 					<>
-						<SenderPicker feed={videoFeed} />
+						<VideoStrip feed={videoFeed} space={videoSpace} onFit={fitVideo} />
 						{out}
 					</>
 				)
@@ -422,7 +435,7 @@ export function App() {
 			case 'arena':
 				return <ArenaView status={arenaStatus} now={now} />
 			case 'video':
-				return <VideoView feed={videoFeed} now={now} />
+				return <VideoView feed={videoFeed} now={now} onSpace={setVideoSpace} />
 		}
 	}
 

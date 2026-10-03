@@ -21,6 +21,7 @@ import path from 'node:path'
 
 import { VIEW_LABEL, type ViewId } from '../shared/layout.js'
 import { POPOUT_MIN, popoutBounds, popoutPlacesFrom, type Box } from '../shared/popout.js'
+import { fitWindow, type Size } from '../shared/video-feed.js'
 
 /** A pane main draws: the MA or the run order. */
 type Movable = { host(): BrowserWindow; moveTo(win: BrowserWindow): void }
@@ -31,6 +32,9 @@ export type Popouts = {
 	open(view: ViewId): void
 	close(view: ViewId): void
 	closeAll(): void
+	/** Size `view`'s window so its picture space takes the picture's shape, and
+	 *  hold that shape while it is resized. */
+	fit(view: ViewId, picture: Size, space: Size): void
 	/** Whether this page is the one in `view`'s pop-out, or any pop-out's. */
 	isPopout(sender: WebContents, view?: ViewId): boolean
 }
@@ -127,6 +131,27 @@ export function createPopouts(opts: {
 		for (const view of [...windows.keys()]) close(view)
 	}
 
+	const fit = (view: ViewId, picture: Size, space: Size) => {
+		const win = windows.get(view)
+		if (win === undefined || win.isDestroyed()) return
+		const [cw = 0, ch = 0] = win.getContentSize()
+		const content = { width: cw, height: ch }
+		// The room is the display's, less the window's own frame.
+		const outer = win.getBounds()
+		const frame = { width: outer.width - cw, height: outer.height - ch }
+		const area = screen.getDisplayMatching(outer).workArea
+		const size = fitWindow({ picture, space, content, room: { width: area.width - frame.width, height: area.height - frame.height } })
+		win.setAspectRatio(picture.width / picture.height, { width: content.width - space.width, height: content.height - space.height })
+		win.setContentSize(size.width, size.height)
+		// Kept on its display: a window grown past the edge is moved back in.
+		const b = win.getBounds()
+		win.setBounds({
+			...b,
+			x: Math.min(Math.max(b.x, area.x), area.x + area.width - b.width),
+			y: Math.min(Math.max(b.y, area.y), area.y + area.height - b.height),
+		})
+	}
+
 	kiosk.on('close', closeAll)
 
 	return {
@@ -134,6 +159,7 @@ export function createPopouts(opts: {
 		open,
 		close,
 		closeAll,
+		fit,
 		isPopout: (sender, view) =>
 			[...windows.entries()].some(([v, w]) => (view === undefined || v === view) && !w.isDestroyed() && w.webContents === sender),
 	}
