@@ -7,7 +7,8 @@
 # build tools. GitHub's Windows runners have them. The built binary is
 # committed to the `texture-bridge-build` branch, so it comes back with plain
 # git (`git checkout origin/texture-bridge-build -- vendor/texture-bridge`)
-# and nothing on the box needs a token.
+# and nothing on the box needs a token. A failed build pushes its logs to
+# `texture-bridge-build-log` the same way, since the run's own logs need one.
 #
 # Everything is pinned: upstream at the commit npm's 0.15.0 was published
 # from, and the Spout2 SDK at a fixed commit, so a rebuild is the same build.
@@ -47,7 +48,10 @@ jobs:
 
       - name: Apply the LIFE patch
         shell: pwsh
-        run: git -C up apply --verbose ../life/native/texture-bridge/life-16bit.patch
+        run: |
+          New-Item -ItemType Directory -Force logs | Out-Null
+          git -C up apply --verbose ../life/native/texture-bridge/life-16bit.patch 2>&1 | Tee-Object -FilePath logs/apply.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Fetch the Spout2 SDK (pinned)
         shell: pwsh
@@ -74,8 +78,10 @@ jobs:
         shell: pwsh
         working-directory: up
         run: |
-          pnpm install --filter @napolab/texture-bridge
-          pnpm --filter @napolab/texture-bridge run build
+          pnpm install --filter @napolab/texture-bridge 2>&1 | Tee-Object -FilePath ../logs/install.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pnpm --filter @napolab/texture-bridge run build 2>&1 | Tee-Object -FilePath ../logs/build.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
         env:
           CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
 
@@ -100,3 +106,17 @@ jobs:
           git -C life add vendor/texture-bridge
           git -C life commit -m "Build texture-bridge with the LIFE 16-bit patch (${{ github.sha }})"
           git -C life push --force origin texture-bridge-build
+
+      - name: On failure, push the logs to texture-bridge-build-log
+        if: failure()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force life/build-log | Out-Null
+          if (Test-Path logs) { Copy-Item logs/* life/build-log/ }
+          "run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} from ${{ github.sha }}" | Set-Content life/build-log/RUN.txt
+          git -C life config user.name "github-actions[bot]"
+          git -C life config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C life checkout -B texture-bridge-build-log
+          git -C life add -f build-log
+          git -C life commit -m "texture-bridge build failed (${{ github.sha }})"
+          git -C life push --force origin texture-bridge-build-log
