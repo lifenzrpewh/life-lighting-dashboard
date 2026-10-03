@@ -18,12 +18,13 @@
 // old it is, and an Arena not answering is said in the slot, never drawn as an
 // empty composition.
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import {
 	ARENA_STALE_AFTER_MS,
 	clipTime,
 	formatClipTime,
+	missingMedia,
 	thumbnailUrl,
 	type ArenaClip,
 	type ArenaGroup,
@@ -36,6 +37,21 @@ import { Centered } from './Slot.js'
 import { chipLabel, formatAge, staleContent, unknownWhy } from './vocabulary.js'
 
 export function ArenaView({ status, now }: { status: Channel<ArenaStatus> | null | undefined; now: number }) {
+	return <ArenaReading status={status} now={now} render={(s, ageMs, failure) => <Board status={s} ageMs={ageMs} failure={failure} />} />
+}
+
+/** Arena's status in its four states, for any view drawn from it: not heard,
+ *  not set up and not answering are said in the slot, and a status is drawn
+ *  only live or stale (with its age and the newest failure). */
+export function ArenaReading({
+	status,
+	now,
+	render,
+}: {
+	status: Channel<ArenaStatus> | null | undefined
+	now: number
+	render: (status: ArenaStatus, ageMs: number | null, failure: string | null) => ReactNode
+}) {
 	if (status === undefined) {
 		return (
 			<Centered>
@@ -53,8 +69,8 @@ export function ArenaView({ status, now }: { status: Channel<ArenaStatus> | null
 	const latest = status.latest
 	const failure = latest !== null && !latest.ok && latest.reason === 'error' ? latest.detail : null
 	return matchReading(readingOf(status, now, null, ARENA_STALE_AFTER_MS), {
-		live: (s) => <Board status={s} ageMs={null} failure={null} />,
-		stale: (s, ageMs) => <Board status={s} ageMs={ageMs} failure={failure} />,
+		live: (s) => render(s, null, null),
+		stale: (s, ageMs) => render(s, ageMs, failure),
 		unknown: (why) => (
 			<Centered>
 				<Say
@@ -100,6 +116,7 @@ function Board({ status, ageMs, failure }: { status: ArenaStatus; ageMs: number 
 					<Level value={status.master} />
 				</span>
 			</div>
+			<MissingMediaNotice status={status} />
 			<div className={`min-h-0 flex-1 overflow-y-auto ${stale ? staleContent : ''}`}>
 				{sectionsOf(status).map((section, i) => (
 					<section key={i}>
@@ -189,6 +206,37 @@ function Thumbnail({ clip }: { clip: ArenaClip | null }) {
 				<img src={url} alt="" draggable={false} onError={() => setFailed(url)} className="size-full object-cover" />
 			)}
 		</span>
+	)
+}
+
+/** Every clip whose file is not on this computer (the owner's "keeping Arena
+ *  in sync", 2026-10-03), said above the board in amber, before a service
+ *  finds it: connecting such a clip shows nothing. Nothing when all is there. */
+export function MissingMediaNotice({ status }: { status: ArenaStatus }) {
+	const [open, setOpen] = useState(false)
+	const missing = missingMedia(status)
+	if (missing.length === 0) return null
+	return (
+		<div className="shrink-0 border-b border-booth-edge bg-warn/10">
+			<button type="button" onClick={() => setOpen(!open)} className="flex h-11 w-full items-center gap-3 px-4 text-left text-sm text-warn">
+				<span className="truncate">
+					{missing.length === 1 ? '1 clip cannot find its file' : `${missing.length} clips cannot find their files`} on this computer
+				</span>
+				<span className="ml-auto shrink-0 text-xs">{open ? 'Hide' : 'Show'}</span>
+			</button>
+			{open && (
+				<ul className="max-h-60 overflow-y-auto px-4 pb-3 text-sm">
+					{missing.map((m, i) => (
+						<li key={i} className="flex min-w-0 flex-col py-1.5">
+							<span className="truncate">
+								{m.layer} · column {m.column} · {m.clip}
+							</span>
+							<span className="truncate text-xs text-booth-dim">{m.file}</span>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
 	)
 }
 

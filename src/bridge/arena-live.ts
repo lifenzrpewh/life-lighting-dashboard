@@ -21,7 +21,7 @@
 // fails whole, with what was wrong. A layer with no readable fader is not a layer
 // at full, and a clip state this file does not know is not "not playing".
 
-import type { ArenaClip, ArenaStatus } from '../shared/arena.js'
+import type { ArenaClip, ArenaColumn, ArenaSlot, ArenaStatus, SlotState } from '../shared/arena.js'
 import type { Decoded } from './ontime.js'
 
 type Param<T> = { id: number; value: T }
@@ -46,7 +46,8 @@ export type ArenaTree = {
 	speed: Level
 	deck: string | null
 	groups: { name: string; master: Level; bypassed: Flag; speed: Level }[]
-	layers: { name: string; group: string | null; master: Level; bypassed: Flag; playing: TreeClip | null }[]
+	layers: { id: number; name: string; group: string | null; master: Level; bypassed: Flag; playing: TreeClip | null; slots: ArenaSlot[] }[]
+	columns: ArenaColumn[]
 }
 
 /** Every state Arena 7.28 offers for a clip's `connected`. */
@@ -55,6 +56,11 @@ const CLIP_STATES = ['Empty', 'Disconnected', 'Previewing', 'Connected', 'Connec
 /** Playing, whatever the preview monitor shows: selecting another clip turns
  *  `Connected & previewing` into `Connected` without anything changing on output. */
 const PLAYING: readonly string[] = ['Connected', 'Connected & previewing']
+
+/** Every state Arena 7.28 offers for a column's `connected`. */
+const COLUMN_STATES = ['Empty', 'Disconnected', 'Connected'] as const
+
+const slotState = (state: string): SlotState => (state === 'Empty' ? 'empty' : PLAYING.includes(state) ? 'playing' : 'loaded')
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
@@ -107,10 +113,35 @@ function transportOf(clip: Record<string, unknown>, what: string): Decoded<TreeT
 	return { ok: true, value: { position: { ...position.value, max }, playmode: playmode.value, direction: direction.value, speed: speed.value } }
 }
 
-/** The clip a layer is playing, or null. The first connected clip if Arena ever
- *  says more than one (during a transition, perhaps: not yet seen). */
-function playingOf(clips: unknown[], layer: string): Decoded<TreeClip | null> {
+/** A clip's thumbnail, or null. ✅ 2026-10-03: a clip Arena has not drawn a
+ *  thumbnail for says `is_default: true` and points at `/thumbnail/dummy`, a
+ *  blank image. That is Arena giving none, so it reads as none. */
+function thumbnailOf(clip: Record<string, unknown>): ArenaClip['thumbnail'] {
+	const thumb = clip['thumbnail']
+	const version = isObject(thumb) && thumb['is_default'] !== true ? thumb['last_update'] : undefined
+	return isId(clip['id']) && (typeof version === 'string' || typeof version === 'number') ? { clipId: clip['id'], version: String(version) } : null
+}
+
+/** The file Arena says is not on this machine, or null. ✅ 2026-10-03: a
+ *  missing file reads `video.fileinfo.exists: false`; a generator has no
+ *  `fileinfo` at all. A clip's sound has a `fileinfo` of its own. */
+function missingFileOf(clip: Record<string, unknown>): string | null {
+	for (const part of ['video', 'audio']) {
+		const p = clip[part]
+		const info = isObject(p) ? p['fileinfo'] : undefined
+		if (isObject(info) && info['exists'] === false) {
+			return typeof info['path'] === 'string' && info['path'] !== '' ? info['path'] : '(a file Arena does not name)'
+		}
+	}
+	return null
+}
+
+/** Every cell of a layer, and the clip it is playing, or null. The first
+ *  connected clip if Arena ever says more than one (during a transition,
+ *  perhaps: not yet seen). */
+function clipsOf(clips: unknown[], layer: string): Decoded<{ playing: TreeClip | null; slots: ArenaSlot[] }> {
 	let playing: TreeClip | null = null
+	const slots: ArenaSlot[] = []
 	// Every clip is read, not only up to the playing one: a clip whose state
 	// cannot be read fails the layer wherever it sits.
 	for (const [i, clip] of clips.entries()) {
@@ -120,24 +151,36 @@ function playingOf(clips: unknown[], layer: string): Decoded<TreeClip | null> {
 		if (typeof state !== 'string' || !(CLIP_STATES as readonly string[]).includes(state)) {
 			return { ok: false, detail: `${what} is ${JSON.stringify(state)}, a state this does not know` }
 		}
+		if (!isId(clip['id'])) return { ok: false, detail: `${what} has no id` }
+		const named: Decoded<string> = state === 'Empty' ? { ok: true, value: '' } : text(clip['name'], what)
+		if (!named.ok) return named
+		const missingFile = state === 'Empty' ? null : missingFileOf(clip)
+		slots.push({ id: clip['id'], name: named.value, state: slotState(state), thumbnail: state === 'Empty' ? null : thumbnailOf(clip), missingFile })
 		if (!PLAYING.includes(state) || playing !== null) continue
-		const name = text(clip['name'], what)
-		if (!name.ok) return name
-		const transport = transportOf(clip, `${layer}'s ${name.value}`)
+		const transport = transportOf(clip, `${layer}'s ${named.value}`)
 		if (!transport.ok) return transport
-		// ✅ 2026-10-03: a clip Arena has not drawn a thumbnail for says
-		// `is_default: true` and points at `/thumbnail/dummy`, a blank image. That
-		// is Arena giving none, so it reads as none.
-		const thumb = clip['thumbnail']
-		const version = isObject(thumb) && thumb['is_default'] !== true ? thumb['last_update'] : undefined
-		const thumbnail =
-			isId(clip['id']) && (typeof version === 'string' || typeof version === 'number') ? { clipId: clip['id'], version: String(version) } : null
-		const video = clip['video']
-		const fileinfo = isObject(video) ? video['fileinfo'] : undefined
-		const missing = isObject(fileinfo) && fileinfo['exists'] === false
-		playing = { name: name.value, thumbnail, missing, transport: transport.value }
+		playing = { name: named.value, thumbnail: thumbnailOf(clip), missing: missingFile !== null, transport: transport.value }
 	}
-	return { ok: true, value: playing }
+	return { ok: true, value: { playing, slots } }
+}
+
+/** The columns, in order. Arena's default name `Column #` stands for the
+ *  column's number, as its own panel shows it. */
+function columnsOf(raw: unknown): Decoded<ArenaColumn[]> {
+	if (!Array.isArray(raw)) return { ok: false, detail: 'the composition has no columns' }
+	const columns: ArenaColumn[] = []
+	for (const [i, c] of raw.entries()) {
+		const what = `column ${i + 1}`
+		if (!isObject(c) || !isId(c['id']) || !isObject(c['connected'])) return { ok: false, detail: `${what} is not a column` }
+		const state = c['connected']['value']
+		if (typeof state !== 'string' || !(COLUMN_STATES as readonly string[]).includes(state)) {
+			return { ok: false, detail: `${what} is ${JSON.stringify(state)}, a state this does not know` }
+		}
+		const name = text(c['name'], what)
+		if (!name.ok) return name
+		columns.push({ id: c['id'], name: name.value.replaceAll('#', String(i + 1)), state: slotState(state) })
+	}
+	return { ok: true, value: columns }
 }
 
 export function decodeComposition(body: unknown): Decoded<ArenaTree> {
@@ -194,12 +237,23 @@ export function decodeComposition(body: unknown): Decoded<ArenaTree> {
 		if (!lm.ok) return lm
 		const lb = flag(l['bypassed'], `${name.value}'s bypass`)
 		if (!lb.ok) return lb
-		const playing = playingOf(l['clips'], name.value)
-		if (!playing.ok) return playing
-		layers.push({ name: name.value, group: groupOf.get(l['id']) ?? null, master: lm.value, bypassed: lb.value, playing: playing.value })
+		const clips = clipsOf(l['clips'], name.value)
+		if (!clips.ok) return clips
+		layers.push({
+			id: l['id'],
+			name: name.value,
+			group: groupOf.get(l['id']) ?? null,
+			master: lm.value,
+			bypassed: lb.value,
+			playing: clips.value.playing,
+			slots: clips.value.slots,
+		})
 	}
 
-	return { ok: true, value: { master: master.value, speed: speed.value, deck, groups, layers } }
+	const columns = columnsOf(body['columns'])
+	if (!columns.ok) return columns
+
+	return { ok: true, value: { master: master.value, speed: speed.value, deck, groups, layers, columns: columns.value } }
 }
 
 /** Every parameter in the tree that moves: what to subscribe to. Which clip
@@ -249,6 +303,7 @@ export function applyParameter(tree: ArenaTree, id: number, value: unknown): Dec
 			master: set(tree.master),
 			speed: set(tree.speed),
 			deck: tree.deck,
+			columns: tree.columns,
 			groups: tree.groups.map((g) => ({ ...g, master: set(g.master), bypassed: set(g.bypassed), speed: set(g.speed) })),
 			layers: tree.layers.map((l) => ({
 				...l,
@@ -273,6 +328,7 @@ export function statusOf(tree: ArenaTree): ArenaStatus {
 			const t = clip?.transport ?? null
 			const rate = t === null ? 0 : t.speed.value * (l.group === null ? 1 : (groupSpeed.get(l.group) ?? 1)) * tree.speed.value
 			return {
+				id: l.id,
 				name: l.name,
 				group: l.group,
 				master: l.master.value,
@@ -289,8 +345,10 @@ export function statusOf(tree: ArenaTree): ArenaStatus {
 										? null
 										: { positionMs: t.position.value, lengthMs: t.position.max, playmode: t.playmode.value, direction: t.direction.value, rate },
 							},
+				slots: l.slots,
 			}
 		}),
+		columns: tree.columns,
 	}
 }
 

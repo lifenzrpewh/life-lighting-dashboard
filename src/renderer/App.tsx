@@ -15,6 +15,7 @@ import { Divider } from './components/Divider.js'
 import { useLeftWidth } from './leftWidth.js'
 import { MaMessage, Say, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
+import { ClipsView } from './components/ClipsView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import { currentFrame, fitLeftWidth, type VideoFeedState } from '../shared/video-feed.js'
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
@@ -345,10 +346,12 @@ export function App() {
 	// What the pickers offer (../shared/layout.ts): a view whose source answers.
 	// The MA answers when the link is live or the console's web remote has
 	// loaded: either is the console responding.
+	const arenaAnswering = connections.find((c) => c.id === 'arena')?.tone === 'live'
 	const answering: Record<ViewId, boolean> = {
 		cue: true,
 		ma: sources.link.state === 'live' || pane?.pane.state === 'showing',
-		arena: connections.find((c) => c.id === 'arena')?.tone === 'live',
+		arena: arenaAnswering,
+		clips: arenaAnswering,
 		video: (videoFeed?.senders.length ?? 0) > 0,
 	}
 	const choices = offered(layout, answering)
@@ -391,6 +394,7 @@ export function App() {
 					</>
 				)
 			case 'arena':
+			case 'clips':
 				return out
 			case 'video':
 				return (
@@ -436,6 +440,8 @@ export function App() {
 				)
 			case 'arena':
 				return <ArenaView status={arenaStatus} now={now} />
+			case 'clips':
+				return <ClipsView status={arenaStatus} now={now} />
 			case 'video':
 				return <VideoView feed={videoFeed} now={now} onSpace={setVideoSpace} />
 		}

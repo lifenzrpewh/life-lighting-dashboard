@@ -89,9 +89,11 @@ at 0, and move that fader to 0.5 and back. Everything was put back as found.
 - **A missing file is said:** `video.fileinfo.exists: false` (VFX 4's
   `I:\VFX Media Renamed\…` is not on this box), with `duration_ms: 0`. Connecting such a
   clip returns `204` and does nothing; it only selects it.
-- **Connecting by REST needs a press and a release:** `POST
-  /composition/clips/by-id/<id>/connect` with body `true`, then `false`. With no body it
-  only selected the clip. `POST /composition/layers/by-id/<id>/clear` disconnects a layer;
+- **Connecting by REST is one POST with no body** (corrected 2026-10-04): `POST
+  /composition/clips/by-id/<id>/connect`, Arena's "short click". It connected 66 of 66
+  VFX clips, selected or not, and the same on a column. Body `true` then `false` only
+  selected an unselected clip and left a selected one previewing; this note said the
+  opposite on 2026-10-03, from a test that did not let Arena settle between steps. `POST /composition/layers/by-id/<id>/clear` disconnects a layer;
   `POST /composition/clips/by-id/<id>/select` puts a clip back in the preview.
 - **Parameter ids held across the pushes**, so a subscription made from one composition
   still means the same thing after the next. Not yet tried: whether they survive Arena
@@ -171,7 +173,22 @@ belongs in main, never the renderer, and only the summary crosses.
    slot or popped out, seen showing Arena's Spout output at 8 bits. Arena at 16 bits
    (High Detail) needs a converter first; the multiview layout itself is Arena's to build.
 6. **Brief slot.** Waits on where a brief's link lives.
-7. Later: the trigger screen, and the rename.
+7. ✅ **The trigger screen: the Clips view** (2026-10-04). Arena's grid, highest layer
+   first: tap a clip, fire a column, Clear a layer, drag its fader; everyone may.
+   `src/renderer/components/ClipsView.tsx` draws it, `src/bridge/arena-control.ts` is
+   the only thing that writes to Arena: four requests built from templates, every id
+   checked against the composition main holds, never the endpoints that empty a slot
+   (`/clips/…/clear`) or a layer (`/clearclips`), which a test enforces. What plays is
+   read back from Arena's next push, never drawn because it was tapped. An empty
+   column is not offered (Arena fires a column by stopping every layer empty in it,
+   so an empty one is a blackout), and nothing fires while Arena is stale. Each fire
+   is in the kiosk log (`[arena] fired: Solid Color on VFX 3`). ✅ In the kiosk on the
+   Windows box, by clicks: the first tap on each of four layers played, Clear stopped
+   it, VFX 4's fader went to 62% and back to 0; Arena left as found.
+   ✅ **The missing-media check**: every clip whose file Arena cannot find, in amber
+   above the Arena and Clips views, with layer, column and path, and `FILE MISSING` on
+   its cell. ⚠️ Unit-tested only: this composition has no missing file to show.
+8. **The rename to Pāua.**
 
 ## The video feed (2026-10-03, Windows box)
 
@@ -346,6 +363,16 @@ the dashboard adds.
   their view.
 - **Each machine remembers its layout** across a restart, as it does the run order's
   width.
+
+## Answered (owner, 2026-10-03, evening): triggers, media, the name
+
+- **The trigger screen is wanted now**, not later: tap a clip to play it, fire a column,
+  clear a layer, drag a layer's fader. **Everyone may fire**, as everyone picks views:
+  it is for a single-screen volunteer op, so no operator-mode guard.
+- **"Keeping Arena in sync" means a missing-media check**: every clip in the composition
+  whose file is not on this machine, said before a service. Not comparing compositions
+  between booths, not numbering, not pushing media.
+- **The rename: Pāua.** No clip countdown chip beside the clock (dropped).
 
 ## Pop a view out (owner's idea and answers, 2026-10-03; built the same day)
 

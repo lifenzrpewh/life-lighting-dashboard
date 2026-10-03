@@ -15,6 +15,7 @@
 // status, so an Arena that stops answering takes its status STALE with it.
 
 import { decodeArenaProduct } from '../bridge/arena.js'
+import { checkCommand, type ArenaWire } from '../bridge/arena-control.js'
 import {
 	applyParameter,
 	decodeComposition,
@@ -25,7 +26,15 @@ import {
 	unsubscribeMessage,
 	type ArenaTree,
 } from '../bridge/arena-live.js'
-import { ARENA_POLL_MS, ARENA_REQUEST_TIMEOUT_MS, type ArenaProduct, type ArenaSource, type ArenaStatus } from '../shared/arena.js'
+import {
+	ARENA_POLL_MS,
+	ARENA_REQUEST_TIMEOUT_MS,
+	type ArenaCommand,
+	type ArenaCommandResult,
+	type ArenaProduct,
+	type ArenaSource,
+	type ArenaStatus,
+} from '../shared/arena.js'
 import { record, unread, type Channel, type ReadResult } from '../shared/reading.js'
 import type { Settings } from '../shared/settings.js'
 import { getJson, poll } from './http-poll.js'
@@ -37,12 +46,17 @@ export type ArenaHandle = {
 	source(): ArenaSource
 	/** What Arena is playing, or null when settings name no Arena. */
 	status(): Channel<ArenaStatus> | null
+	/** Something from the Clips view: checked against the composition held
+	 *  here, then sent (../bridge/arena-control.ts). */
+	command(raw: unknown): Promise<ArenaCommandResult>
 	stop(): void
 }
 
 export function startArena(s: Settings): ArenaHandle {
-	if (s.arenaHost === null) return { source: () => null, status: () => null, stop() {} }
-	const live = watchArena(`ws://${s.arenaHost}:${s.arenaPort}/api/v1`)
+	if (s.arenaHost === null) {
+		return { source: () => null, status: () => null, command: async () => ({ ok: false, detail: 'no Arena is set up' }), stop() {} }
+	}
+	const live = watchArena(`ws://${s.arenaHost}:${s.arenaPort}/api/v1`, `http://${s.arenaHost}:${s.arenaPort}/api/v1`)
 	const link = poll<ArenaProduct>({
 		log: 'arena',
 		label: 'Arena',
@@ -57,6 +71,7 @@ export function startArena(s: Settings): ArenaHandle {
 	return {
 		source: () => link.channel(),
 		status: () => live.status(),
+		command: (raw) => live.command(raw),
 		stop() {
 			link.stop()
 			live.stop()
@@ -64,7 +79,10 @@ export function startArena(s: Settings): ArenaHandle {
 	}
 }
 
-function watchArena(url: string): { status(): Channel<ArenaStatus>; answered(): void; stop(): void } {
+function watchArena(
+	url: string,
+	rest: string,
+): { status(): Channel<ArenaStatus>; answered(): void; command(raw: unknown): Promise<ArenaCommandResult>; stop(): void } {
 	let channel = unread<ArenaTree>()
 	let socket: WebSocket | null = null
 	let open = false
@@ -166,6 +184,32 @@ function watchArena(url: string): { status(): Channel<ArenaStatus>; answered(): 
 		ws.addEventListener('error', end)
 		ws.addEventListener('close', end)
 	}
+	/** Put a checked command on the wire. Each REST call waits for the one
+	 *  before, so a release never overtakes its press. */
+	const send = async (wire: ArenaWire): Promise<ArenaCommandResult> => {
+		if (wire.kind === 'socket') {
+			if (socket === null || !open) return { ok: false, detail: 'the websocket to Arena is not open' }
+			socket.send(wire.message)
+			return { ok: true }
+		}
+		for (const call of wire.calls) {
+			try {
+				const r = await fetch(rest + call.path, {
+					method: 'POST',
+					headers: call.body === null ? {} : { 'content-type': 'application/json' },
+					body: call.body === null ? null : JSON.stringify(call.body),
+					signal: AbortSignal.timeout(ARENA_REQUEST_TIMEOUT_MS),
+				})
+				if (!r.ok) return { ok: false, detail: `Arena answered ${r.status}` }
+			} catch (e) {
+				const why = (e as Error).name === 'TimeoutError' ? 'Arena did not answer in time' : (e as Error).message
+				console.log(`[arena] sending failed: ${why}`)
+				return { ok: false, detail: why }
+			}
+		}
+		return { ok: true }
+	}
+
 	connect()
 
 	return {
@@ -175,6 +219,17 @@ function watchArena(url: string): { status(): Channel<ArenaStatus>; answered(): 
 				latest: latest === null || !latest.ok ? latest : { ...latest, value: statusOf(latest.value) },
 				lastOk: lastOk === null ? null : { value: statusOf(lastOk.value), at: lastOk.at },
 			}
+		},
+		async command(raw) {
+			const latest = channel.latest
+			// Only against a composition read on this connection: an id from a
+			// stale or failed read may name something Arena no longer has.
+			if (!open || latest === null || !latest.ok) return { ok: false, detail: 'Arena is not answering, so nothing was sent' }
+			const checked = checkCommand(raw, latest.value)
+			if (!checked.ok) return { ok: false, detail: checked.detail }
+			const { command, wire } = checked.value
+			if (command.kind !== 'fader') console.log(`[arena] ${describe(command, latest.value)}`)
+			return send(wire)
 		},
 		answered() {
 			const latest = channel.latest
@@ -186,5 +241,23 @@ function watchArena(url: string): { status(): Channel<ArenaStatus>; answered(): 
 			socket?.close()
 			socket = null
 		},
+	}
+}
+
+/** A command, in words for the kiosk log: what was fired, so the log says
+ *  what someone asked for when the screen is asked about afterwards. */
+function describe(command: ArenaCommand, tree: ArenaTree): string {
+	switch (command.kind) {
+		case 'clip': {
+			const layer = tree.layers.find((l) => l.slots.some((s) => s.id === command.clipId))
+			const slot = layer?.slots.find((s) => s.id === command.clipId)
+			return `fired: ${slot?.name ?? 'a clip'} on ${layer?.name ?? 'its layer'}`
+		}
+		case 'column':
+			return `fired: ${tree.columns.find((c) => c.id === command.columnId)?.name ?? 'a column'}`
+		case 'clear':
+			return `cleared: ${tree.layers.find((l) => l.id === command.layerId)?.name ?? 'a layer'}`
+		case 'fader':
+			return `fader: ${tree.layers.find((l) => l.id === command.layerId)?.name ?? 'a layer'} to ${command.value.toFixed(2)}`
 	}
 }

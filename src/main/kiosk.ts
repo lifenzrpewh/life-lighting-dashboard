@@ -64,7 +64,7 @@ import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.
 import { startLink, type LinkHandle } from './bridge/link.js'
 import { startTimers, type TimersHandle } from './timers.js'
 import { startArena, type ArenaHandle } from './arena.js'
-import type { ArenaSource, ArenaStatus } from '../shared/arena.js'
+import type { ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js'
 import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
 import { createPopouts, type Popouts } from './popout.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
@@ -318,6 +318,11 @@ app.whenReady().then(() => {
 	ipcMain.handle('showfile:state', () => showfileState())
 	ipcMain.handle('arena:state', (): ArenaSource => arena?.source() ?? null)
 	ipcMain.handle('arena:status', (): Channel<ArenaStatus> | null => arena?.status() ?? null)
+	// The Clips view firing. Everyone may (the owner, 2026-10-03); what is sent
+	// is checked in main against the composition, never taken from the page.
+	ipcMain.handle('arena:command', (e, raw: unknown): Promise<ArenaCommandResult> | ArenaCommandResult =>
+		fromOurs(e) ? (arena?.command(raw) ?? { ok: false, detail: 'no Arena is set up' }) : { ok: false, detail: 'not from this app' },
+	)
 	serveThumbnails(() => {
 		const s = store.current()
 		return s.arenaHost === null ? null : { host: s.arenaHost, port: s.arenaPort }

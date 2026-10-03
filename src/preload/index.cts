@@ -13,7 +13,7 @@ import { contextBridge, ipcRenderer, sharedTexture } from 'electron'
 import type { Channel, LinkState } from '../shared/reading.js' with { 'resolution-mode': 'import' }
 import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 'import' }
 import type { TimerSources } from '../shared/timer.js' with { 'resolution-mode': 'import' }
-import type { ArenaSource, ArenaStatus } from '../shared/arena.js' with { 'resolution-mode': 'import' }
+import type { ArenaCommand, ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js' with { 'resolution-mode': 'import' }
 import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
@@ -68,6 +68,9 @@ const api = {
 	 *  when settings name no Arena. Thumbnails come on their own scheme,
 	 *  `thumbnailUrl` in src/shared/arena.ts. */
 	arenaStatus: (): Promise<Channel<ArenaStatus> | null> => ipcRenderer.invoke('arena:status'),
+	/** Fire a clip or column, clear a layer, or move its fader. Sent is not
+	 *  done: what plays comes back in `arenaStatus`. */
+	arenaCommand: (command: ArenaCommand): Promise<ArenaCommandResult> => ipcRenderer.invoke('arena:command', command),
 
 	/** The Cue Manager pane (src/main/cue-pane.ts): the visuals app itself,
 	 *  where the run order used to be. Placed like the MA pane. */

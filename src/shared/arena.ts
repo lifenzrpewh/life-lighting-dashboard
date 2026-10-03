@@ -97,8 +97,37 @@ export function formatClipTime(ms: number): string {
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
+/** Where a clip slot or column is: nothing loaded, loaded, or on output.
+ *  Previewing is not playing; Arena's `Connected & previewing` is playing. */
+export type SlotState = 'empty' | 'loaded' | 'playing'
+
+/** One cell of the composition's grid: a layer at a column. */
+export type ArenaSlot = {
+	/** Arena's clip id: what a tap fires (`/composition/clips/by-id/<id>`). */
+	id: number
+	/** Empty for an empty slot. */
+	name: string
+	state: SlotState
+	thumbnail: { clipId: number; version: string } | null
+	/** The file Arena cannot find on this machine, or null: a generator has no
+	 *  file, and a file that is there is not missing. */
+	missingFile: string | null
+}
+
+/** A column of the grid. Firing it connects every clip in it and stops every
+ *  layer whose cell in it is empty (✅ 2026-10-03, Arena 7.28: column 2 stopped
+ *  PLAYBACK, which had nothing in column 2). */
+export type ArenaColumn = {
+	id: number
+	/** As Arena shows it: its `Column #` names the column by its number. */
+	name: string
+	state: SlotState
+}
+
 /** One layer, in Arena's composition order. */
 export type ArenaLayer = {
+	/** Arena's layer id: what Clear and the fader act on. */
+	id: number
 	name: string
 	/** The layer group it sits in, or null outside any group. */
 	group: string | null
@@ -108,6 +137,8 @@ export type ArenaLayer = {
 	/** The clip Arena says is connected on this layer, or null for none. A clip
 	 *  that is only previewing is not playing. */
 	playing: ArenaClip | null
+	/** Every cell of this layer, one per column, in column order. */
+	slots: ArenaSlot[]
 }
 
 export type ArenaGroup = {
@@ -124,7 +155,35 @@ export type ArenaStatus = {
 	deck: string | null
 	groups: ArenaGroup[]
 	layers: ArenaLayer[]
+	columns: ArenaColumn[]
 }
+
+/** A clip whose file is not on this machine (the owner's "keeping Arena in
+ *  sync", 2026-10-03): said before a service, because connecting one does
+ *  nothing on output (✅ 2026-10-03: `204`, and it only selects the clip). */
+export type MissingMedia = { layer: string; column: number; clip: string; file: string }
+
+/** Every missing clip, top layer first as Arena's own panel lists them, then
+ *  by column. */
+export function missingMedia(status: ArenaStatus): MissingMedia[] {
+	return [...status.layers].reverse().flatMap((l) =>
+		l.slots.flatMap((s, i) => (s.missingFile === null ? [] : [{ layer: l.name, column: i + 1, clip: s.name, file: s.missingFile }])),
+	)
+}
+
+/** What a finger may ask Arena to do from the Clips view: the owner's four,
+ *  2026-10-03, and nothing else. Everyone may (it is for a single-screen
+ *  volunteer op). Main checks every id against the composition it holds
+ *  before anything is sent (src/bridge/arena-control.ts). */
+export type ArenaCommand =
+	| { kind: 'clip'; clipId: number }
+	| { kind: 'column'; columnId: number }
+	| { kind: 'clear'; layerId: number }
+	| { kind: 'fader'; layerId: number; value: number }
+
+/** What came of a command: sent, or why not. Sent is not done: what plays is
+ *  read back from Arena's next push, never assumed. */
+export type ArenaCommandResult = { ok: true } | { ok: false; detail: string }
 
 /** The scheme main answers clip thumbnails on. The renderer's page allows no
  *  remote origins, so it asks main, which asks only the Arena in settings

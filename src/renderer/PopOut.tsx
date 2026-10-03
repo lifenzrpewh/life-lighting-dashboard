@@ -18,6 +18,7 @@ import type { CuePaneReport } from '../shared/cue-pane.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import { VIEW_LABEL, type ViewId } from '../shared/layout.js'
 import { ArenaView } from './components/ArenaView.js'
+import { ClipsView } from './components/ClipsView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import { currentFrame, type VideoFeedState } from '../shared/video-feed.js'
 import { CueMessage } from './components/CuePane.js'
@@ -54,7 +55,7 @@ export function PopOut({ view }: { view: ViewId }) {
 
 	const ma = usePolled<MaPaneReport>(view === 'ma' ? (api) => api.maPane() : null, 1000)
 	const cue = usePolled<CuePaneReport>(view === 'cue' ? (api) => api.cuePane() : null, 1000)
-	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' ? (api) => api.arenaStatus() : null, 250)
+	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' ? (api) => api.arenaStatus() : null, 250)
 	const video = usePolled<VideoFeedState | null>(view === 'video' ? (api) => api.videoFeed() : null, 500)
 	/** The MA and the run order are native pages main moves in here. */
 	const native = view === 'ma' || view === 'cue'
@@ -109,6 +110,8 @@ export function PopOut({ view }: { view: ViewId }) {
 			<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-bg">
 				{view === 'arena' ? (
 					<ArenaView status={arena} now={now} />
+				) : view === 'clips' ? (
+					<ClipsView status={arena} now={now} />
 				) : view === 'video' ? (
 					<VideoView feed={video} now={now} onSpace={setVideoSpace} />
 				) : (

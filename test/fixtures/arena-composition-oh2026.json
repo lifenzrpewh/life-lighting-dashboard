@@ -3088,5 +3088,88 @@
 				}
 			]
 		}
+	],
+	"columns": [
+		{
+			"id": 1771292931117,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Disconnected"
+			}
+		},
+		{
+			"id": 1771292931118,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Disconnected"
+			}
+		},
+		{
+			"id": 1771292931119,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Empty"
+			}
+		},
+		{
+			"id": 1771292931120,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Empty"
+			}
+		},
+		{
+			"id": 1771292931121,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Empty"
+			}
+		},
+		{
+			"id": 1771292931122,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Empty"
+			}
+		},
+		{
+			"id": 1771292931123,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Empty"
+			}
+		},
+		{
+			"id": 1771292931124,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Empty"
+			}
+		},
+		{
+			"id": 1771292931125,
+			"name": {
+				"value": "Column #"
+			},
+			"connected": {
+				"value": "Empty"
+			}
+		}
 	]
 }
