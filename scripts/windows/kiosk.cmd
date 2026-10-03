@@ -43,7 +43,11 @@ call "node_modules\.bin\electron.cmd" . > "%LOG%" 2>&1
 rem Not `if errorlevel 1`: a Windows crash code such as 0xC0000005 is negative.
 if not "%errorlevel%"=="0" (
   echo The dashboard stopped unexpectedly. Restarting in 5 s; close this window to stop it.
-  timeout /t 5 /nobreak >nul
+  rem By full path, and ping rather than timeout: a Git install that puts its
+  rem Unix tools on PATH makes `timeout` GNU's, which refuses /t and skips the
+  rem wait (seen 2026-10-03, run from Git Bash), and Windows' timeout.exe quits
+  rem at once when there is no console to read. Six pings are five seconds.
+  "%SystemRoot%\System32\ping.exe" -n 6 127.0.0.1 >nul
   goto run
 )
 exit /b 0
