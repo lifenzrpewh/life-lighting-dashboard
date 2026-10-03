@@ -17,6 +17,7 @@
 
 import { DEFAULT_ARENA_PORT } from './arena.js'
 import { DEFAULT_REMOTE_USER, DEFAULT_WEB_REMOTE_PORT, isConsoleHost, isPort } from './ma-pane.js'
+import { CAMPUS_MAX } from './showfile-write.js'
 
 export type Settings = {
 	/** The console's IP or hostname. Null until someone sets it: there is no
@@ -53,6 +54,11 @@ export type Settings = {
 	 *  computer, 127.0.0.1, because the visuals station runs on Arena's machine. */
 	arenaHost: string | null
 	arenaPort: number
+	/** The campus this booth is, as Save As names begin with it
+	 *  (`Central 2026-10-04 0915`, src/shared/showfile-write.ts). No show
+	 *  carries it, and the Cue Manager's campus is behind its own page. Null:
+	 *  names begin `Show`. */
+	campus: string | null
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -86,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	proPresenterTimer: null,
 	arenaHost: null,
 	arenaPort: DEFAULT_ARENA_PORT,
+	campus: null,
 }
 
 /** What the renderer is shown. Passwords appear only as whether they exist. */
@@ -126,6 +133,13 @@ const TIMER_NAME_MAX = 128
 function timerNameError(name: string): string | null {
 	if (name.trim() === '') return 'A timer name is needed.'
 	if (name.length > TIMER_NAME_MAX) return `At most ${TIMER_NAME_MAX} characters.`
+	if (/[\u0000-\u001f\u007f]/.test(name)) return 'Letters, numbers and punctuation only.'
+	return null
+}
+
+function campusError(name: string): string | null {
+	if (name.trim() === '') return 'A campus name is needed.'
+	if (name.length > CAMPUS_MAX) return `At most ${CAMPUS_MAX} characters.`
 	if (/[\u0000-\u001f\u007f]/.test(name)) return 'Letters, numbers and punctuation only.'
 	return null
 }
@@ -186,6 +200,15 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 	}
 	if (next.proPresenterHost !== null && next.proPresenterPort === null && errors.proPresenterPort === undefined) {
 		errors.proPresenterPort = 'ProPresenter picks its own port: copy it from ProPresenter’s Network settings.'
+	}
+	if (patch.campus !== undefined) {
+		const name = patch.campus === null ? '' : patch.campus.trim()
+		if (name === '') next.campus = null
+		else {
+			const e = campusError(name)
+			if (e === null) next.campus = name
+			else errors.campus = e
+		}
 	}
 	if (patch.proPresenterTimer !== undefined) {
 		// Kept as typed, not trimmed: it is compared exactly against the names
@@ -249,6 +272,7 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['proPresenterTimer'] === 'string' && timerNameError(r['proPresenterTimer']) === null) out.proPresenterTimer = r['proPresenterTimer']
 	if (typeof r['arenaHost'] === 'string' && isConsoleHost(r['arenaHost'])) out.arenaHost = r['arenaHost']
 	if (typeof r['arenaPort'] === 'number' && isPort(r['arenaPort'])) out.arenaPort = r['arenaPort']
+	if (typeof r['campus'] === 'string' && campusError(r['campus']) === null) out.campus = r['campus']
 	return out
 }
 
@@ -274,6 +298,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['proPresenterTimer', strOrNull],
 		['arenaHost', strOrNull],
 		['arenaPort', num],
+		['campus', strOrNull],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

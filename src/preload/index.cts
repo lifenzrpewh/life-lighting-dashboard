@@ -14,6 +14,7 @@ import type { Channel, LinkState } from '../shared/reading.js' with { 'resolutio
 import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 'import' }
 import type { TimerSources } from '../shared/timer.js' with { 'resolution-mode': 'import' }
 import type { ArenaCommand, ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js' with { 'resolution-mode': 'import' }
+import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js' with { 'resolution-mode': 'import' }
 import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
@@ -71,6 +72,11 @@ const api = {
 	/** Fire a clip or column, clear a layer, or move its fader. Sent is not
 	 *  done: what plays comes back in `arenaStatus`. */
 	arenaCommand: (command: ArenaCommand): Promise<ArenaCommandResult> => ipcRenderer.invoke('arena:command', command),
+	/** The showfile's write half, operator mode only (main refuses otherwise).
+	 *  Sent is not done: the new name comes back in `showfile`. */
+	listShows: (): Promise<ShowList> => ipcRenderer.invoke('showfile:shows'),
+	saveShowAs: (name: string): Promise<ShowWriteResult> => ipcRenderer.invoke('showfile:save-as', name),
+	loadShow: (name: string, saveFirst: boolean): Promise<ShowWriteResult> => ipcRenderer.invoke('showfile:load', name, saveFirst),
 
 	/** The Cue Manager pane (src/main/cue-pane.ts): the visuals app itself,
 	 *  where the run order used to be. Placed like the MA pane. */

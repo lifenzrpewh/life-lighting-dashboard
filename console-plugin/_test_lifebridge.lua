@@ -506,6 +506,81 @@ do
   io.open = realOpen
 end
 
+-- 9. `shows` — the console's show files, newest first, for the Load list.
+--    Read-only; packed into a few messages; a name the trip would change is
+--    marked; a console where no way finds the folder says so, never "none".
+local function showsEnvironment(files)
+  return function()
+    showEnvironment('/shows/test.show', 'Mount Eden Base')()
+    _G.Enums = { PathType = { Showfiles = 7 } }
+    _G.GetPath = function(p) if p == 7 then return 'C:/ProgramData/MALightingTechnology/gma3_library/shows' end end
+    _G.DirList = function(folder, filter)
+      if filter ~= '*.show' then return {} end
+      return files
+    end
+  end
+end
+local function showsReplies(c)
+  local out = {}
+  for _, line in ipairs(c) do
+    local body = line:match('^SendOSC %d+ "/shows,s,(.*)"$')
+    if body == nil then return nil end
+    out[#out + 1] = body
+  end
+  return out
+end
+
+do
+  local listing = {
+    { name = 'Old Show.show', time = 100 },
+    { name = 'Central 2026-10-04 0915.show', time = 300 },
+    { name = 'Mount Eden Base.show', time = 200 },
+    { name = 'P\195\162ua, test.show', time = 50 },
+  }
+  local ok, err, c, p = run(showsEnvironment(listing), nil, 'shows')
+  check('shows: does not throw', ok, tostring(err))
+  local r = showsReplies(c)
+  check('shows: only /shows messages, SendOSC only', r ~= nil and #r == 1, table.concat(c, '\n'))
+  if r ~= nil and r[1] ~= nil then
+    check('shows: newest first, the way named, a name the trip changes marked',
+      r[1] == '2.3.2.0|GetPath(Enums.PathType.Showfiles)|1/1|Central 2026-10-04 0915|Mount Eden Base|Old Show|!P-ua; test', r[1])
+  end
+  check('shows: prints nothing', #p == 0, table.concat(p, '\n'))
+  check('shows: writes no file', next(files) == nil)
+end
+
+do
+  local many = {}
+  for i = 1, 60 do many[#many + 1] = { name = string.format('Sunday service number %02d.show', i), time = i } end
+  local ok, err, c = run(showsEnvironment(many), nil, 'shows')
+  check('shows many: does not throw', ok, tostring(err))
+  local r = showsReplies(c) or {}
+  local names, parts = 0, {}
+  for _, body in ipairs(r) do
+    local part, rest = body:match('^2%.3%.2%.0|[^|]+|(%d+/%d+)|(.*)$')
+    parts[#parts + 1] = part
+    for _ in (rest or ''):gmatch('[^|]+') do names = names + 1 end
+    check('shows many: each message within the chunk', #(rest or '') <= 180, tostring(#(rest or '')))
+  end
+  check('shows many: capped at 40, newest first', names == 40 and r[1] ~= nil and r[1]:find('number 60', 1, true) ~= nil,
+    tostring(names))
+  check('shows many: parts counted 1/n to n/n', #r > 1 and parts[1] == '1/' .. #r and parts[#r] == #r .. '/' .. #r,
+    table.concat(parts, ' '))
+end
+
+do
+  local ok, err, c = run(function()
+    showEnvironment('/shows/test.show', 'Mount Eden Base')()
+    _G.Enums = nil
+    _G.GetPath = function() error('no such path type') end
+    _G.DirList = nil
+  end, nil, 'shows')
+  check('shows unreadable: does not throw', ok, tostring(err))
+  local r = showsReplies(c)
+  check('shows unreadable: says so, never an empty list',
+    r ~= nil and #r == 1 and r[1] == '2.3.2.0|unreadable|no show folder found', table.concat(c, '\n'))
+end
+
 print(string.format('%d checks, %d failed', checks, failures))
 if failures > 0 then os.exit(1) end
 print('LIFEBRIDGE HARNESS: OK')

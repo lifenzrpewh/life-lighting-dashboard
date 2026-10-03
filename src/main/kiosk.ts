@@ -65,6 +65,7 @@ import { startLink, type LinkHandle } from './bridge/link.js'
 import { startTimers, type TimersHandle } from './timers.js'
 import { startArena, type ArenaHandle } from './arena.js'
 import type { ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js'
+import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js'
 import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
 import { createPopouts, type Popouts } from './popout.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
@@ -329,6 +330,30 @@ app.whenReady().then(() => {
 	ipcMain.handle('showfile:state', () => showfileState())
 	ipcMain.handle('arena:state', (): ArenaSource => arena?.source() ?? null)
 	ipcMain.handle('arena:status', (): Channel<ArenaStatus> | null => arena?.status() ?? null)
+	// The showfile's write half (docs/PLAN.md Phase 3): operator mode only, from
+	// the kiosk only, and the link checks it is live before anything is sent.
+	// Each is logged, so the booth log says who saved or loaded what, and when.
+	const operatorOnly = (e: IpcMainInvokeEvent): string | null =>
+		!fromKiosk(e) ? 'Not from the kiosk.' : mode !== 'operator' ? 'Operator mode only.' : null
+	ipcMain.handle('showfile:shows', (e): Promise<ShowList> | ShowList => {
+		const why = operatorOnly(e)
+		if (why !== null) return { ok: false, detail: why }
+		return consoleLink?.listShows() ?? { ok: false, detail: 'No console is set up.' }
+	})
+	ipcMain.handle('showfile:save-as', (e, name: unknown): ShowWriteResult => {
+		const why = operatorOnly(e) ?? (typeof name === 'string' ? null : 'No name.')
+		if (why !== null || typeof name !== 'string') return { ok: false, detail: why ?? 'No name.' }
+		const r = consoleLink?.saveAs(name) ?? { ok: false, detail: 'No console is set up.' }
+		console.log(`[showfile] Save As "${name}": ${r.ok ? 'sent' : r.detail}`)
+		return r
+	})
+	ipcMain.handle('showfile:load', (e, name: unknown, saveFirst: unknown): ShowWriteResult => {
+		const why = operatorOnly(e) ?? (typeof name === 'string' && typeof saveFirst === 'boolean' ? null : 'Not a load.')
+		if (why !== null || typeof name !== 'string' || typeof saveFirst !== 'boolean') return { ok: false, detail: why ?? 'Not a load.' }
+		const r = consoleLink?.load(name, saveFirst) ?? { ok: false, detail: 'No console is set up.' }
+		console.log(`[showfile] Load "${name}" ${saveFirst ? 'saving the current show first' : 'without saving'}: ${r.ok ? 'sent' : r.detail}`)
+		return r
+	})
 	// The Clips view firing. Everyone may (the owner, 2026-10-03); what is sent
 	// is checked in main against the composition, never taken from the page.
 	ipcMain.handle('arena:command', (e, raw: unknown): Promise<ArenaCommandResult> | ArenaCommandResult =>

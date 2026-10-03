@@ -26,6 +26,7 @@ import { useSlots } from './slots.js'
 import { usePopouts } from './popouts.js'
 import { usePanePlacement } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
+import { ShowfileSheet } from './components/ShowfileSheet.js'
 import { useMode } from './mode.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
@@ -59,6 +60,16 @@ export function App() {
 	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
 	const [leftOpen, setLeftOpen] = useState(true)
 	const [connectionsOpen, setConnectionsOpen] = useState(false)
+	// The showfile sheet (Save As, Load) takes the right slot's place as
+	// Connections does; one at a time. The campus is read as it opens, for the
+	// name Save As offers.
+	const [showfileOpen, setShowfileOpen] = useState(false)
+	const [campus, setCampus] = useState<string | null>(null)
+	const openShowfile = () => {
+		setConnectionsOpen(false)
+		setShowfileOpen(!showfileOpen)
+		void window.life?.settings().then((s) => setCampus(s.campus))
+	}
 	const leftWidth = useLeftWidth()
 	const { layout, choose } = useSlots()
 	const { popped, popOut, bringBack } = usePopouts()
@@ -494,7 +505,11 @@ export function App() {
 				onEnter={enter}
 				onLeave={leave}
 				connectionsOpen={connectionsOpen}
-				onConnections={() => setConnectionsOpen(!connectionsOpen)}
+				onConnections={() => {
+					setShowfileOpen(false)
+					setConnectionsOpen(!connectionsOpen)
+				}}
+				onShowfile={openShowfile}
 				connections={worstTone(connections)}
 				showfile={showfile}
 				showfileFailure={failureOf(sources.showfile)}
@@ -551,6 +566,15 @@ export function App() {
 							desk={desk}
 							now={now}
 							onClose={() => setConnectionsOpen(false)}
+						/>
+					) : showfileOpen ? (
+						<ShowfileSheet
+							showfile={showfile}
+							linkLive={sources.link.state === 'live'}
+							operator={mode === 'operator'}
+							campus={campus}
+							now={now}
+							onClose={() => setShowfileOpen(false)}
 						/>
 					) : (
 						slot('right', {})

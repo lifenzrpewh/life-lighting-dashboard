@@ -55,6 +55,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
+| ⚠️ `src/renderer/components/ShowfileSheet.tsx` · `src/shared/showfile-write.ts` · LifeBridge `shows` | **Save As and Load** from the showfile chip's ▸ (2026-10-04): offered names (campus + NZ date and time, 31-char meter), read back before "saved"; Load from the console's own list, operator mode, live link, save-first ticked, 3 s hold. Unit-tested and harness-green, ⚠️ not yet on a console. `docs/PLAN.md` Phase 3. |
 | ✅ `src/bridge/showfile.ts` · LifeBridge `show` · `watch` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap. **Watched since 2026-10-02**: the ask is `watch`, and LifeBridge then pushes any change within a second (the chip went amber 1.8 s after a base change, in the kiosk). A Load ends the watcher, so a Load still waits for the next link-up or ask. An older plugin's `unknown verb watch` falls back to `show`. `docs/MA3_READ_MODEL.md` § The showfile, watched. |
 | ✅ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, its Connections row can clear it. **Working on this Mac, 2026-10-02 (owner-observed):** signed in by the app's own QR as a booth device, songs-only and note editing both work. Server side: `visuals-song-comms` `2675660` (booth devices edit), migrations `20261002090000_pairing_kind` and `20261002100000_booth_device_edit`. Not yet on Windows. |
 | ✅ `src/renderer/components/ConnectionsPanel.tsx` · `src/shared/connections.ts` | **Connections**: one row per connection (Console, OnTime, ProPresenter, Arena, Cue Manager), status in a word, tap to open its fields with its own Save. Replaced the Settings form 2026-10-02; the status bar keeps LIVE, show, countdown, clock and a Connections button whose dot is the worst connection that is set up. Everyone sees it, operator mode edits. A connection not set up is `off`, never `down`. Owner-checked on the Windows box, 2026-10-02: "functionally works". |
@@ -322,11 +323,16 @@ a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media d
    the GPU: ✅ every value exact from a 16-bit stand-in sender, ⚠️ not yet seen from
    Arena with High Detail on (switch it on, pick Arena's sender; it should just show). Then: watch Arena's
    own output for dropped frames with the view on; the multiview layout itself, in Arena.
-0. **Next Arena pieces** (`docs/VISUALS_DASHBOARD.md` § The pieces): the Clips view and
-   the missing-media check are built; see a real missing file in it. Then the rename to
-   **Pāua** (the owner's name, 2026-10-03), then showfile Save As and Load. The brief
-   slot (6) waits on where a brief's link lives; no countdown chip (dropped). QLab is
-   parked (`docs/QLAB.md`).
+0. **Showfile Save As and Load: built, see it on onPC** (`docs/PLAN.md` Phase 3). Needs
+   onPC on this box hearing the dashboard (an OSC row on 8003 with Receive Command,
+   replies to 127.0.0.1:8004) and this build's LifeBridge (delete, then import
+   `console-plugin/LifeBridge.xml`). Then: which way `shows` finds the show folder, a
+   Save As read back, a Load read back. The owner says this onPC is safe to load on.
+0. **Arena:** the Clips view and the missing-media check are built; see a real missing
+   file in it. The brief slot (6) waits on where a brief's link lives; no countdown chip
+   (dropped). QLab is parked (`docs/QLAB.md`).
+0. **The GitHub repo rename to `paua`** is the owner's to do on GitHub (no `gh` or
+   token on this box); then `git remote set-url origin https://github.com/lifenzrpewh/paua.git`.
 0. **A showfile read that stays off the command line (research).** The watcher
    pushes a Save As or base change within a second, but a Load ends it, so the new
    name waits for the next ask: once a quiet minute now (was 5 min, the owner's

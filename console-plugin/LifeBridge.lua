@@ -679,6 +679,96 @@ local function unwatchVerb()
   watcher = nil
 end
 
+--- `shows` — the show files on this console, newest first, for the dashboard's
+--- Load list (docs/PLAN.md Phase 3).
+---
+--- Read-only: a directory listing. The Load itself is the dashboard's own
+--- `LoadShow` over channel A, behind its guards; nothing here loads anything.
+---
+--- WHERE THE FILES ARE is asked of the console, several ways, because which
+--- one 2.3.2 answers is not yet seen: the reply names the way that worked, so
+--- the first desk run settles it. Nothing found is said as `unreadable` with
+--- every way tried, never as an empty list: an empty list would read as a
+--- console with no shows.
+---
+--- Several messages, each one line on the LD's command line, so the names are
+--- packed to SHOWS_CHUNK characters a message and capped at SHOWS_MAX:
+---   /shows ,s "<version>|<way>|<part>/<parts>|<name>|<name>…"
+---   /shows ,s "<version>|unreadable|<ways tried>"
+--- A name the trip would change (non-ASCII, a comma, a quote, a pipe) comes
+--- with a leading `!`: the dashboard shows it but cannot send it back in a
+--- `LoadShow`, because the name it holds is not the file's.
+local SHOWS_MAX = 40
+local SHOWS_CHUNK = 180
+
+local function showFolderCandidates()
+  local out = {}
+  local function try(way, f)
+    local ok, v = pcall(f)
+    if ok and type(v) == 'string' and v ~= '' then out[#out + 1] = { way, v } end
+  end
+  try('GetPath(Enums.PathType.Showfiles)', function() return GetPath(Enums.PathType.Showfiles) end)
+  try('GetPath(shows)', function() return GetPath('shows') end)
+  try('GetPathOverrideFor(shows)', function() return GetPathOverrideFor('shows', GetPath('shows')) end)
+  return out
+end
+
+local function listShows()
+  local tried = {}
+  for _, c in ipairs(showFolderCandidates()) do
+    local way, folder = c[1], c[2]
+    local ok, list = pcall(function() return DirList(folder, '*.show') end)
+    if ok and type(list) == 'table' then
+      local shows = {}
+      for _, f in ipairs(list) do
+        local name = type(f) == 'table' and f.name or f
+        if type(name) == 'string' then
+          local bare = name:match('^(.*)%.show$') or name
+          shows[#shows + 1] = { name = bare, time = type(f) == 'table' and tonumber(f.time) or 0 }
+        end
+      end
+      table.sort(shows, function(a, b)
+        if a.time ~= b.time then return a.time > b.time end
+        return a.name < b.name
+      end)
+      return way, shows
+    end
+    tried[#tried + 1] = way
+  end
+  if #tried == 0 then tried[1] = 'no show folder found' end
+  return nil, tried
+end
+
+local function showsVerb()
+  pcall(probeVersion)
+  local way, shows = listShows()
+  if way == nil then
+    sendOsc('/shows', 's', fieldSafe(consoleVersion) .. '|unreadable|' .. fieldSafe(table.concat(shows, '; ')))
+    return
+  end
+  local names = {}
+  for i = 1, math.min(#shows, SHOWS_MAX) do
+    local raw = shows[i].name
+    local sent = fieldSafe(raw)
+    names[#names + 1] = (sent == raw and '' or '!') .. sent
+  end
+  local chunks, current = {}, {}
+  local size = 0
+  for _, n in ipairs(names) do
+    if #current > 0 and size + #n + 1 > SHOWS_CHUNK then
+      chunks[#chunks + 1] = current
+      current, size = {}, 0
+    end
+    current[#current + 1] = n
+    size = size + #n + 1
+  end
+  chunks[#chunks + 1] = current
+  for i, chunk in ipairs(chunks) do
+    sendOsc('/shows', 's', sformat('%s|%s|%d/%d|%s', fieldSafe(consoleVersion), fieldSafe(way), i, #chunks,
+      table.concat(chunk, '|')))
+  end
+end
+
 --- Try each address accessor and report which one answers.
 local function addressOf(obj)
   local attempts = {
@@ -769,6 +859,8 @@ local function main(...)
   if verb == 'watch' then return watchVerb() end
 
   if verb == 'unwatch' then return unwatchVerb() end
+
+  if verb == 'shows' then return showsVerb() end
 
   if verb == 'pool' then
     log('pool probe — READ-ONLY, resolving object addresses')

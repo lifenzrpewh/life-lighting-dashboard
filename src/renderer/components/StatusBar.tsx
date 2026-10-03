@@ -1,6 +1,8 @@
 // Top band: READ-ONLY. Status where you look; actions where your hand rests.
-// Nothing in here fires, stores, or deletes anything. The mode chip and
-// Connections are the only controls, and neither touches the show. Reload MA
+// Nothing in here fires, stores, or deletes anything. The mode chip,
+// Connections and the showfile chip's ▸ are the only controls, and none of them
+// touches the show: the ▸ opens a sheet, whose Save As and Load are behind
+// operator mode and their own guards (./ShowfileSheet.tsx). Reload MA
 // moved to the MA's own slot (./Slot.tsx) when the slots arrived, 2026-10-03:
 // the MA may be on either side now, and its button goes with it.
 //
@@ -51,9 +53,19 @@ function LinkPill({ link, detail }: { link: LinkState; detail: boolean }) {
  *  dismiss (docs/PLAN.md, Phase 3). The verdict is SaveGuard's, made on the
  *  console; this only shows it.
  *
- *  No ▸ yet. The sheet it will open (Save As, Load) is not built, and an arrow
- *  on something that does nothing when tapped teaches people to stop trying. */
-function ShowfileChip({ showfile, failure }: { showfile: Reading<Showfile>; failure: string | null }) {
+ *  The ▸ opens the showfile sheet (./ShowfileSheet.tsx): Save As and Load. */
+function ShowfileChip({ showfile, failure, onOpen }: { showfile: Reading<Showfile>; failure: string | null; onOpen: () => void }) {
+	return (
+		<button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-1 text-left" aria-label="Showfile: Save As and Load">
+			<ShowfileState showfile={showfile} failure={failure} />
+			<span aria-hidden className="shrink-0 px-1 text-booth-dim">
+				▸
+			</span>
+		</button>
+	)
+}
+
+function ShowfileState({ showfile, failure }: { showfile: Reading<Showfile>; failure: string | null }) {
 	return matchReading(showfile, {
 		live: (show) => <ShowName show={show} ageMs={null} />,
 		stale: (show, ageMs) => <ShowName show={show} ageMs={ageMs} />,
@@ -101,6 +113,7 @@ export function StatusBar({
 	onLeave,
 	connectionsOpen,
 	onConnections,
+	onShowfile,
 	connections,
 	showfile,
 	showfileFailure,
@@ -113,6 +126,8 @@ export function StatusBar({
 	onLeave: () => void
 	connectionsOpen: boolean
 	onConnections: () => void
+	/** Open the showfile sheet. */
+	onShowfile: () => void
 	/** The worst of the connections that are set up (src/shared/connections.ts). */
 	connections: Tone
 	showfile: Reading<Showfile>
@@ -130,7 +145,7 @@ export function StatusBar({
 		<header className="flex h-16 shrink-0 items-center gap-4 border-b border-booth-edge bg-booth-panel px-4 text-sm">
 			{/* The console: is it there, and which show is it on. */}
 			<LinkPill link={link} detail={operator} />
-			<ShowfileChip showfile={showfile} failure={showfileFailure} />
+			<ShowfileChip showfile={showfile} failure={showfileFailure} onOpen={onShowfile} />
 
 			{/* The time: what comes next, and what it is now. */}
 			<span className="ml-auto flex min-w-0 items-center">

@@ -20,6 +20,15 @@ import { readPing, readShow } from '../../bridge/channel-c.js'
 import type { OscMessage } from '../../bridge/osc.js'
 import { createLinkTracker, pingCommand, type PingStats } from '../../bridge/ping.js'
 import { createShowfileReader, type AskMoment } from '../../bridge/showfile.js'
+import { collectShowList, readShows, type ShowListCollector } from '../../bridge/show-list.js'
+import {
+	loadCommand,
+	loadProblem,
+	saveAsCommand,
+	saveAsProblem,
+	type ShowList,
+	type ShowWriteResult,
+} from '../../shared/showfile-write.js'
 import type { Channel, LinkState, ReadResult } from '../../shared/reading.js'
 import type { Showfile } from '../../shared/showfile.js'
 import { createCommandSender, type CommandSender } from './osc-out.js'
@@ -52,6 +61,15 @@ export type LinkHandle = {
 	showfile(): Channel<Showfile>
 	/** Offer a message off the reply port: an echo, or other proof of life. */
 	offer(message: OscMessage): void
+	/** The console's show files, from LifeBridge's `shows` verb. One ask at a
+	 *  time: a second call while one is out gets the same answer. */
+	listShows(): Promise<ShowList>
+	/** Save As, by an offered name (../../shared/showfile-write.ts). Sent is
+	 *  not saved: the watcher's push of the new name is the read-back. */
+	saveAs(name: string): ShowWriteResult
+	/** Load a show. The link drops while the console loads; link-up asks the
+	 *  name again, and that is the read-back. */
+	load(name: string, saveFirst: boolean): ShowWriteResult
 	stats(): PingStats
 	stop(): void
 }
@@ -79,6 +97,18 @@ export function startLink(options: {
 	let timer: ReturnType<typeof setInterval> | null = null
 	let lastState = tracker.link(clock()).state
 	let lastShow = showfile.channel(clock()).latest
+
+	/** How long the show list may take: several messages, one line each. */
+	const SHOWS_TIMEOUT_MS = 10_000
+	let listing: { collector: ShowListCollector; done: (list: ShowList) => void; promise: Promise<ShowList> } | null = null
+
+	/** Why a write cannot go now, or null: only to a console that is
+	 *  answering, so a command is never queued blind into a silent link. */
+	const cannotSend = (): string | null => {
+		if (sender === null) return 'No console is set up.'
+		if (tracker.link(clock()).state !== 'live') return 'The console is not answering, so nothing was sent.'
+		return null
+	}
 
 	const askShow = (moment: AskMoment) => {
 		const now = clock()
@@ -135,7 +165,50 @@ export function startLink(options: {
 			if (!answered && message.address.startsWith(ours)) tracker.heard(clock())
 			const show = readShow(message, options.prefix)
 			if (show.ok) showfile.reply(show.reply, clock())
+			const shows = readShows(message, options.prefix)
+			if (shows.ok && listing !== null) {
+				const list = listing.collector.offer(shows.reply)
+				if (list !== null) listing.done(list)
+			}
 			check()
+		},
+		listShows() {
+			if (listing !== null) return listing.promise
+			const why = cannotSend()
+			if (why !== null) return Promise.resolve({ ok: false, detail: why })
+			let done: (list: ShowList) => void = () => {}
+			const promise = new Promise<ShowList>((resolve) => {
+				const timer = setTimeout(() => done({ ok: false, detail: `The console did not send its show list in ${SHOWS_TIMEOUT_MS / 1000} s.` }), SHOWS_TIMEOUT_MS)
+				done = (list) => {
+					clearTimeout(timer)
+					listing = null
+					resolve(list)
+				}
+			})
+			listing = { collector: collectShowList(), done: (list) => done(list), promise }
+			sender?.send('Call Plugin "LifeBridge" "shows"')
+			return promise
+		},
+		saveAs(name) {
+			const why = cannotSend()
+			if (why !== null) return { ok: false, detail: why }
+			const latest = showfile.channel(clock()).latest
+			const base = latest !== null && latest.ok ? latest.value.base : null
+			const problem = saveAsProblem(name, base)
+			if (problem !== null) return { ok: false, detail: problem }
+			sender?.send(saveAsCommand(name))
+			// The watcher pushes the new name within a second when it runs; an
+			// ask restarts it when it does not (an older plugin, a Load since).
+			setTimeout(() => askShow('link-up'), 1_500).unref?.()
+			return { ok: true }
+		},
+		load(name, saveFirst) {
+			const why = cannotSend()
+			if (why !== null) return { ok: false, detail: why }
+			const problem = loadProblem(name)
+			if (problem !== null) return { ok: false, detail: problem }
+			sender?.send(loadCommand(name, saveFirst))
+			return { ok: true }
 		},
 		stats: () => tracker.stats(),
 		stop() {

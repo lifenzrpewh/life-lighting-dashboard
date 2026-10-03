@@ -372,6 +372,21 @@ A **chip in the status bar**, not a panel, opening to a sheet.
 - Save As sits at the top of the sheet; Load at the bottom behind deliberate emptiness. They never
   share a neighbourhood.
 
+> ⚠️ **The write half is built, not yet seen on a console** (2026-10-04). The chip's ▸ opens
+> `src/renderer/components/ShowfileSheet.tsx` in the right slot. Save As offers **campus + New
+> Zealand date and time** (`Central 2026-10-04 0915`, the owner's choice: no PCO lookup; campus is a
+> setting on the Console row), timestamp budgeted first, only characters every leg carries
+> unchanged, never the base show's name; it sends `SaveShow "<name>"` and says saved only when
+> LifeBridge reads the new name back. Load lists the console's shows through a new read-only
+> LifeBridge verb, `shows` (newest first, at most 40, a few messages; a name the trip changes is
+> marked and not offered), then needs operator mode, a live link, "save the current show first"
+> (ticked: `/Save`, else `/NoSave`, always `/NoConfirmation`) and a 3 s hold. The loaded show is
+> not offered. The rules are `src/shared/showfile-write.ts`; main checks the link is live and the
+> mode is operator before sending, and logs each. **Not built:** an in-place Save (MA's own does
+> it, and SaveGuard guards it) and the "a service is underway" second confirm (nothing here knows
+> PCO's times). **Still to see on onPC:** which way `shows` finds the folder, and both commands'
+> read-back.
+
 ---
 
 ## Mode switching

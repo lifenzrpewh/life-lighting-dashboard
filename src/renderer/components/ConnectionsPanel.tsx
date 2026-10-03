@@ -316,10 +316,12 @@ function ConsoleEditor({ view, save }: { view: SettingsView; save: Save }) {
 	const [operatorPassword, setOperatorPassword] = useState('')
 	const [removeVolunteer, setRemoveVolunteer] = useState(false)
 	const [removeOperator, setRemoveOperator] = useState(false)
+	const [campus, setCampus] = useState(view.campus ?? '')
 
 	const patch = (): SettingsPatch => {
 		const p: SettingsPatch = {
 			consoleHost: host,
+			campus: campus.trim() === '' ? null : campus,
 			webRemotePort: portOf(webPort),
 			oscPort: portOf(oscPort),
 			replyPort: replyPort.trim() === '' ? null : portOf(replyPort),
@@ -358,6 +360,9 @@ function ConsoleEditor({ view, save }: { view: SettingsView; save: Save }) {
 								inputMode="numeric"
 								placeholder={`same (${oscPort.trim() || view.oscPort})`}
 							/>
+						</Field>
+						<Field label="Campus" error={err('campus')} hint="Save As names begin with it, then the date and time.">
+							<Input value={campus} onChange={setCampus} placeholder="Central" />
 						</Field>
 					</div>
 					<p className="text-sm text-booth-dim">
