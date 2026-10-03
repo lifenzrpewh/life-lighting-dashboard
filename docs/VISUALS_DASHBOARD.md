@@ -280,6 +280,31 @@ steps. Also seen in the code: the addon's CPU readback copies a 16-bit texture's
 if 8-bit, so its pixels for High Detail were never right either; the patch leaves that
 path alone.
 
+✅ **Proven against a 16-bit stand-in, 2026-10-03** (Arena's High Detail was off and
+left alone). `spikes/spout-16bit-sender.cs` publishes an `R16G16B16A16_UNORM` texture
+the way Spout2 does, built with the C# compiler Windows already has (no SDK, no admin).
+Its picture is chosen so every 8-bit value is known: a 16-bit `v×257` converts to
+exactly `v`.
+- **The control:** npm's addon refuses it with Arena's own words, "Unsupported
+  DXGI_FORMAT for shared texture: 11". LIFE's build hands back `bgra`.
+- **In the kiosk**, read off the Video view's canvas: the four patches came back
+  `(255,0,0) (0,128,0) (0,0,64) (200,200,200)`, exactly, so no channel is swapped, and
+  the ramp read 0, 64, 128, 191, 255 at its quarters. 27-28 fps under the 30 cap.
+- **A sender changing size** (killed at 1280×720, back at 1920×1080) was picked up and
+  converted, every patch still exact: the staging texture and its render target are
+  rebuilt.
+- While the picked sender was gone the view showed Arena's (the first by name), and
+  went back to the picked one when it returned. That is the rule as written in
+  `src/main/video-feed.ts`; whether a booth would rather see "gone" is a question.
+
+**Why the new-frame check always says yes** (it said so 1250 times in 3 s from Arena):
+Spout's frame counting is a per-user setting, `HKCUSoftwareLeading EdgeSpout`
+`Framecount`, off unless set (SpoutSettings sets it), and this box has no such key. With
+it off, `GetNewFrame` answers yes every time (`SpoutFrameCount.cpp`), whatever the
+sender does. So it is not Arena failing to mark frames; the 30 fps cap is what holds the
+load either way. Turning it on is a machine setting for Arena and the kiosk both, not
+tried.
+
 **Still to do:** watch Arena's own output for dropped frames with the Video view on; lay
 out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
