@@ -305,6 +305,11 @@ sender does. So it is not Arena failing to mark frames; the 30 fps cap is what h
 load either way. Turning it on is a machine setting for Arena and the kiosk both, not
 tried.
 
+**Arena's frame rate cannot be read from outside it either** (2026-10-03). The
+composition's `framerate` (0-1000) is the **target**, not a measurement: subscribed for
+8 s it pushed once, 50, and every GET reads 50. With Spout's frame counting off too, the
+output rate with the Video view on is read in Arena's own window or not at all.
+
 **Still to do:** watch Arena's own output for dropped frames with the Video view on; lay
 out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
