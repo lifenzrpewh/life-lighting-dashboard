@@ -18,6 +18,7 @@ import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mo
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
 import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
+import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'import' }
 
 const api = {
 	/** The console link as main knows it: LIVE only while LifeBridge answers
@@ -65,6 +66,14 @@ const api = {
 	retryMaPane: (): void => ipcRenderer.send('ma-pane:retry'),
 	/** Which MA user the pane should be: volunteer or operator. */
 	setMaPaneMode: (mode: Mode): void => ipcRenderer.send('ma-pane:mode', mode),
+
+	/** The views popped out of their slots into windows of their own
+	 *  (src/main/popout.ts). */
+	popouts: (): Promise<ViewId[]> => ipcRenderer.invoke('popout:state'),
+	/** The kiosk only: move `view` into a window of its own. */
+	popOut: (view: ViewId): void => ipcRenderer.send('popout:open', view),
+	/** Close `view`'s window, which puts it back in the kiosk. */
+	bringBack: (view: ViewId): void => ipcRenderer.send('popout:close', view),
 
 	/** Settings, as the renderer may see them: passwords only as set / not set. */
 	settings: (): Promise<SettingsView> => ipcRenderer.invoke('settings:get'),

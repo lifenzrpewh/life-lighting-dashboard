@@ -13,13 +13,14 @@ import { StatusBar } from './components/StatusBar.js'
 import { CueMessage } from './components/CuePane.js'
 import { Divider } from './components/Divider.js'
 import { useLeftWidth } from './leftWidth.js'
-import { MaMessage, paneSummary } from './components/MaPane.js'
+import { MaMessage, Say, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
 import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
-import { offered, type Slot as SlotId, type ViewId } from '../shared/layout.js'
+import { VIEW_LABEL, offered, type Slot as SlotId, type ViewId } from '../shared/layout.js'
 import { useSlots } from './slots.js'
+import { usePopouts } from './popouts.js'
 import { usePanePlacement } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
 import { useMode } from './mode.js'
@@ -57,6 +58,7 @@ export function App() {
 	const [connectionsOpen, setConnectionsOpen] = useState(false)
 	const leftWidth = useLeftWidth()
 	const { layout, choose } = useSlots()
+	const { popped, popOut, bringBack } = usePopouts()
 
 	// The clock is real time; ages derive from it, so STALE arrives on its own
 	// rather than needing something to happen.
@@ -200,7 +202,9 @@ export function App() {
 	// The two native views are placed from here, which never unmounts, over
 	// whichever slot's body holds them (./panePlacement.ts). A view in neither
 	// slot, in the folded left one, or behind Connections is hidden, and keeps
-	// its page: the Cue Manager its half-typed note, the MA its connection.
+	// its page: the Cue Manager its half-typed note, the MA its connection. A
+	// popped-out view is placed by its own window, and main ignores the kiosk
+	// about it until it is back.
 	const [maBox, setMaBox] = useState<HTMLElement | null>(null)
 	const [cueBox, setCueBox] = useState<HTMLElement | null>(null)
 
@@ -226,9 +230,15 @@ export function App() {
 		setTimeout(() => drag.current === id && setStills(null), 300)
 	}
 
-	usePanePlacement(maBox, (!leftOpen && layout.left === 'ma') || (frozen && stills?.ma != null), (rect) => window.life?.placeMaPane(rect))
-	usePanePlacement(cueBox, (!leftOpen && layout.left === 'cue') || (frozen && stills?.cue != null), (rect) =>
-		window.life?.placeCuePane(rect),
+	usePanePlacement(
+		maBox,
+		popped.has('ma') || (!leftOpen && layout.left === 'ma') || (frozen && stills?.ma != null),
+		(rect) => window.life?.placeMaPane(rect),
+	)
+	usePanePlacement(
+		cueBox,
+		popped.has('cue') || (!leftOpen && layout.left === 'cue') || (frozen && stills?.cue != null),
+		(rect) => window.life?.placeCuePane(rect),
 	)
 	// Unmounting closes the MA connection. It happens when the renderer goes
 	// away, which main also covers, since a crashed renderer cannot say goodbye.
@@ -311,26 +321,63 @@ export function App() {
 	const maShown = layout.left === 'ma' || layout.right === 'ma'
 
 	/** A view's own buttons, in its slot's strip. Reload reconnects a picture
-	 *  and fires nothing. */
+	 *  and fires nothing. A popped-out view's buttons are in its own window. */
 	const actionsOf = (view: ViewId) => {
+		if (popped.has(view)) return null
 		const reload = (label: string, onClick: () => void) => (
 			<button type="button" onClick={onClick} className={`${barButton} h-9`} aria-label={label}>
 				↻
 			</button>
 		)
+		const out =
+			window.life === undefined ? null : (
+				<button
+					type="button"
+					onClick={() => popOut(view)}
+					className={`${barButton} h-9`}
+					aria-label={`Pop ${VIEW_LABEL[view]} out into its own window`}
+				>
+					Pop out
+				</button>
+			)
 		switch (view) {
 			case 'cue':
-				return cue?.pane.state === 'showing' ? reload('Reload the run order', () => window.life?.retryCuePane()) : null
+				return (
+					<>
+						{out}
+						{cue?.pane.state === 'showing' && reload('Reload the run order', () => window.life?.retryCuePane())}
+					</>
+				)
 			case 'ma':
-				return pane?.pane.state === 'showing' || pane?.pane.state === 'connecting'
-					? reload('Reload the MA', () => window.life?.retryMaPane())
-					: null
+				return (
+					<>
+						{out}
+						{(pane?.pane.state === 'showing' || pane?.pane.state === 'connecting') &&
+							reload('Reload the MA', () => window.life?.retryMaPane())}
+					</>
+				)
 			case 'arena':
-				return null
+				return out
 		}
 	}
 
 	const bodyOf = (view: ViewId, side: SlotId) => {
+		// The slot keeps the view's place while it is out (../shared/popout.ts).
+		if (popped.has(view)) {
+			return (
+				<Centered>
+					<Say head={`${VIEW_LABEL[view]} is popped out`} body="It is in its own window, on top of this one.">
+						<button
+							type="button"
+							onClick={() => bringBack(view)}
+							className="mt-5 h-12 rounded-md border border-booth-edge px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
+						>
+							Bring back
+						</button>
+					</Say>
+				</Centered>
+			)
+		}
 		const still = view === 'arena' ? null : (stills?.[view] ?? null)
 		if (still !== null) return <Still src={still} side={side} />
 		switch (view) {

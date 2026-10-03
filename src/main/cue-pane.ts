@@ -40,6 +40,11 @@ export type CuePane = {
 	reset(): Promise<void>
 	/** A picture of the page as it is, while it is on screen (./pane-snapshot.ts). */
 	snapshot(): Promise<string | null>
+	/** The window the pane is in: the kiosk, or its pop-out (./popout.ts). */
+	host(): BrowserWindow
+	/** Move the pane, page and all, into `win`. It stays hidden there until
+	 *  that window's page places it. */
+	moveTo(win: BrowserWindow): void
 }
 
 export function createCuePane(window: BrowserWindow): CuePane {
@@ -56,6 +61,9 @@ export function createCuePane(window: BrowserWindow): CuePane {
 	view.setVisible(false)
 	window.contentView.addChildView(view)
 	const wc = view.webContents
+
+	/** Where the pane is drawn. The kiosk, unless it has been popped out. */
+	let host = window
 
 	/** Where the app is, so a reload or a retry comes back to the same run
 	 *  sheet rather than to the list of services. */
@@ -154,9 +162,20 @@ export function createCuePane(window: BrowserWindow): CuePane {
 
 		snapshot: () => snapshotOf(view, wanted && rect !== null && state.state === 'showing'),
 
+			host: () => host,
+
+			moveTo(win) {
+				if (win === host) return
+				if (!host.isDestroyed()) host.contentView.removeChildView(view)
+				win.contentView.addChildView(view)
+				host = win
+				rect = null
+				apply()
+			},
+
 		place(next) {
 			wanted = true
-			rect = next === null ? null : clampToWindow(next, window)
+			rect = next === null ? null : clampToWindow(next, host)
 			if (state.state === 'idle') connect()
 			else apply()
 		},

@@ -36,6 +36,11 @@
 //
 // ARENA (./arena.ts) is its link, what it plays over its websocket, and its clip
 // thumbnails on a scheme of their own (./arena-thumbnails.ts).
+//
+// POP-OUTS (./popout.ts): any view can leave its slot for a window of its own,
+// on top of the kiosk, and comes back when that window closes. A pane takes
+// its place only from the window it is in, so the kiosk and a pop-out never
+// fight over where the MA goes.
 
 import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
@@ -58,8 +63,11 @@ import { startTimers, type TimersHandle } from './timers.js'
 import { startArena, type ArenaHandle } from './arena.js'
 import type { ArenaSource, ArenaStatus } from '../shared/arena.js'
 import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
+import { createPopouts, type Popouts } from './popout.js'
+import { VIEWS, type ViewId } from '../shared/layout.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
+const PRELOAD = path.join(HERE, '../preload/index.cjs')
 
 /** Set by scripts/dev.mjs. Absent in a packaged build, which then loads the
  *  built renderer off disk. */
@@ -68,6 +76,7 @@ const DEV_SERVER = process.env['VITE_DEV_SERVER_URL']
 let window: BrowserWindow | null = null
 let maPane: MaPane | null = null
 let cuePane: CuePane | null = null
+let popouts: Popouts | null = null
 let settings: SettingsStore | null = null
 /** The screen's mode, as the renderer last reported it. Main learns it only to
  *  pick the pane's MA user and to keep settings operator-only. It is not a
@@ -106,7 +115,7 @@ function createWindow(): void {
 		show: false,
 		autoHideMenuBar: true,
 		webPreferences: {
-			preload: path.join(HERE, '../preload/index.cjs'),
+			preload: PRELOAD,
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
@@ -117,10 +126,19 @@ function createWindow(): void {
 
 	if (settings !== null) maPane = createMaPane(window, settings)
 	cuePane = createCuePane(window)
-	// A reloaded renderer boots into volunteer mode. Without this, a crash-and-
-	// reload would leave the pane logged in as the operator under a fresh
-	// volunteer screen, until the renderer got round to saying otherwise.
+	popouts = createPopouts({
+		kiosk: window,
+		panes: { ...(maPane === null ? {} : { ma: maPane }), cue: cuePane },
+		load: loadPage,
+		preload: PRELOAD,
+		placesFile: path.join(app.getPath('userData'), 'popouts.json'),
+	})
+	// A reloaded renderer boots into volunteer mode, with every view in its
+	// slot. Without this, a crash-and-reload would leave the pane logged in as
+	// the operator under a fresh volunteer screen, until the renderer got round
+	// to saying otherwise.
 	window.webContents.on('did-start-loading', () => {
+		popouts?.closeAll()
 		mode = 'volunteer'
 		maPane?.release()
 	})
@@ -133,14 +151,21 @@ function createWindow(): void {
 		window?.reload()
 	})
 
-	// Nothing in this app should ever open a second window or navigate away.
+	// The page never opens a window or navigates away. The only other windows
+	// are pop-outs, and main opens those (./popout.ts).
 	window.webContents.setWindowOpenHandler(({ url }) => {
 		void shell.openExternal(url)
 		return { action: 'deny' }
 	})
 
-	if (DEV_SERVER) void window.loadURL(DEV_SERVER)
-	else void window.loadFile(path.join(HERE, '../../renderer/index.html'))
+	loadPage(window, null)
+}
+
+/** The renderer's page: the kiosk's, or a pop-out's for `view`. */
+function loadPage(win: BrowserWindow, view: ViewId | null): void {
+	const query: Record<string, string> = view === null ? {} : { popout: view }
+	if (DEV_SERVER) void win.loadURL(view === null ? DEV_SERVER : `${DEV_SERVER}?${new URLSearchParams(query)}`)
+	else void win.loadFile(path.join(HERE, '../../renderer/index.html'), { query })
 }
 
 /** The console link, as main currently knows it: the ping round trip, or
@@ -302,15 +327,22 @@ app.whenReady().then(() => {
 	startArenaPoll(store)
 	store.onChange(() => startArenaPoll(store))
 
-	// Only the kiosk's own renderer may move the pane. The pane's page has no
-	// preload and so no way to send, but the check costs nothing.
+	// Only the kiosk's own renderer may change the mode, settings or the layout.
+	// The panes' pages have no preload and so no way to send, but the check
+	// costs nothing.
 	const fromKiosk = (e: IpcMainEvent | IpcMainInvokeEvent) => e.sender === window?.webContents
-	ipcMain.handle('ma-pane:report', (e) => (fromKiosk(e) ? maPane?.report() : undefined))
+	// The kiosk or a pop-out: our own pages, which may read the panes.
+	const fromOurs = (e: IpcMainEvent | IpcMainInvokeEvent) => fromKiosk(e) || popouts?.isPopout(e.sender) === true
+	// Only the window a pane is in may place it or reload it. While the MA is
+	// popped out, whatever the kiosk says about where it goes is not about it.
+	const fromHost = (e: IpcMainEvent | IpcMainInvokeEvent, pane: MaPane | CuePane | null) =>
+		pane !== null && !pane.host().isDestroyed() && e.sender === pane.host().webContents
+	ipcMain.handle('ma-pane:report', (e) => (fromOurs(e) ? maPane?.report() : undefined))
 	ipcMain.on('ma-pane:place', (e, rect: unknown) => {
-		if (fromKiosk(e)) maPane?.place(rect === null ? null : asRect(rect))
+		if (fromHost(e, maPane)) maPane?.place(rect === null ? null : asRect(rect))
 	})
 	ipcMain.on('ma-pane:release', (e) => fromKiosk(e) && maPane?.release())
-	ipcMain.on('ma-pane:retry', (e) => fromKiosk(e) && maPane?.retry())
+	ipcMain.on('ma-pane:retry', (e) => fromHost(e, maPane) && maPane?.retry())
 	ipcMain.on('ma-pane:mode', (e, next: unknown) => {
 		if (!fromKiosk(e) || (next !== 'volunteer' && next !== 'operator')) return
 		mode = next
@@ -320,16 +352,30 @@ app.whenReady().then(() => {
 	// The Cue Manager is the same for every mode: the booth device's rights,
 	// held by the app's own backend, are what it may do. Clearing its sign-in
 	// is operator business.
-	ipcMain.handle('cue-pane:report', (e) => (fromKiosk(e) ? cuePane?.report() : undefined))
+	ipcMain.handle('cue-pane:report', (e) => (fromOurs(e) ? cuePane?.report() : undefined))
 	ipcMain.on('cue-pane:place', (e, rect: unknown) => {
-		if (fromKiosk(e)) cuePane?.place(rect === null ? null : asRect(rect))
+		if (fromHost(e, cuePane)) cuePane?.place(rect === null ? null : asRect(rect))
 	})
-	ipcMain.on('cue-pane:retry', (e) => fromKiosk(e) && cuePane?.retry())
-	// Pictures of both panes, to stand in for them while the divider is dragged.
+	ipcMain.on('cue-pane:retry', (e) => fromHost(e, cuePane) && cuePane?.retry())
+	// Pictures of the panes in the kiosk, to stand in for them while the
+	// divider is dragged. A popped-out pane is not under the divider.
 	ipcMain.handle('panes:snapshot', async (e) => {
 		if (!fromKiosk(e)) return { ma: null, cue: null }
-		const [ma, cue] = await Promise.all([maPane?.snapshot() ?? null, cuePane?.snapshot() ?? null])
+		const inKiosk = (p: MaPane | CuePane | null) => (p !== null && p.host() === window ? p.snapshot() : null)
+		const [ma, cue] = await Promise.all([inKiosk(maPane), inKiosk(cuePane)])
 		return { ma, cue }
+	})
+
+	// Pop-outs. The kiosk opens them; the kiosk or the pop-out itself closes one.
+	const asView = (v: unknown): ViewId | null => ((VIEWS as readonly unknown[]).includes(v) ? (v as ViewId) : null)
+	ipcMain.handle('popout:state', (e) => (fromOurs(e) ? (popouts?.popped() ?? []) : []))
+	ipcMain.on('popout:open', (e, v: unknown) => {
+		const view = asView(v)
+		if (fromKiosk(e) && view !== null) popouts?.open(view)
+	})
+	ipcMain.on('popout:close', (e, v: unknown) => {
+		const view = asView(v)
+		if (view !== null && (fromKiosk(e) || popouts?.isPopout(e.sender, view) === true)) popouts?.close(view)
 	})
 	ipcMain.handle('cue-pane:reset', async (e) => {
 		if (!fromKiosk(e) || mode !== 'operator') return false

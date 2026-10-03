@@ -201,34 +201,38 @@ the dashboard adds.
 - **Each machine remembers its layout** across a restart, as it does the run order's
   width.
 
-## Proposed, not built: pop a view out (owner, 2026-10-03)
+## Pop a view out (owner's idea and answers, 2026-10-03; built the same day)
 
-The owner's ask: pop a slot's view out into a floating window of its own; closing
-that window puts the view back in the slots. Noted for discussion before building.
+Any slot's view can pop out into a floating window of its own: **Pop out** in the
+slot's strip. Closing that window, by its **Back to the dashboard** button or the
+system's own close, puts the view back. `src/shared/popout.ts` has the rules,
+`src/main/popout.ts` the windows.
 
-**What makes it feasible.** The MA and the Run order are `WebContentsView`s, and a
-view can be moved to another window's `contentView` without reloading, so the MA
-would stay logged in and a half-typed note would survive, as they already do when a
-view changes slots. The Arena view is React, so a pop-out would be a second renderer
-window showing only that view, polling main as the kiosk does.
+**The owner's answers:**
+- **The slot keeps the view's place** and says "popped out", with **Bring back**. The
+  layout never changes by itself.
+- **Anywhere, always on top**: one screen or two. On one, it floats over the kiosk; with
+  a second display it opens there.
+- **All three views.** The MA and the run order move into the window page and all (the
+  MA stays logged in, a half-typed note survives); Arena is drawn again in the window.
 
-**To decide first:**
-- **What the slot does meanwhile.** Show "Popped out" with a Bring back button (the
-  layout unchanged), or let the slot take another view, and on close send the view to
-  where it came from or to whichever slot is free?
-- **Covering the kiosk.** On a single touchscreen a floating window sits over the
-  kiosk, against the rule that nothing covers the MA. On a second monitor (the Arena
-  op's two-screen setup) it is the real use. Allow pop-out only with a second display,
-  or anywhere?
-- **Always on top, and full-screen.** The kiosk is full-screen; a window that falls
-  behind it is lost to a volunteer with no taskbar. Probably always-on-top, with its own
-  close button big enough for a finger.
-- **Mode.** The MA in a pop-out must still follow operator mode and the idle drop back to
-  volunteer, from the kiosk's mode chip.
-- **Restarts.** Remember a pop-out's display and size per machine, as the layout is, and
-  reopen it popped out? And a renderer crash or reload of the kiosk: does the pop-out
-  close (its view returning) or stay?
-- **Which views.** All three, or the MA only?
+**Decided in building, for the owner to overrule:**
+- **Mode** stays the kiosk's: the MA in a pop-out follows the mode chip and the idle drop.
+- **A kiosk reload or crash brings every view home**, as it drops to volunteer mode.
+- **A restart starts with every view in its slot.** Each window's place and size is
+  remembered per machine (`popouts.json` in the app's data folder) for the next pop-out,
+  and only while its top edge is still on a display; otherwise it opens centred on a
+  display other than the kiosk's, or on the kiosk's when there is one.
+- **A pane takes its place only from the window it is in**, so the kiosk and a pop-out
+  never fight over the MA.
+
+✅ Seen in the kiosk on the Windows box, 2026-10-03, driven over the debugging port:
+each of the three popped out and came back; the run order kept its page and the MA its
+login across the move (no new `since`, no second load); a kiosk reload closed an open
+pop-out and the view came home. A page that closes its own window skips Electron's
+`close` event, so the view going home is also done on `closed` (it had stayed listed
+as out). ⚠️ Not yet tried by a finger on the touchscreen, nor on a second display, nor
+on macOS (where on-top over a full-screen space is set but unseen).
 
 ## Open questions
 

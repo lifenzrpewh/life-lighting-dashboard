@@ -24,6 +24,9 @@
 // A native view is drawn above the renderer, so no DOM can overlay it. The
 // layout therefore gives the pane a rect of its own, and anything that must be
 // said about the pane sits beside it, never on top.
+//
+// The pane lives in the kiosk window or in its pop-out (./popout.ts), and moves
+// between them page and all: popping the MA out does not log it in again.
 
 import { WebContentsView, session, type BrowserWindow, type Rectangle } from 'electron'
 
@@ -72,6 +75,11 @@ export type MaPane = {
 	retry(): void
 	/** A picture of the page as it is, while it is on screen (./pane-snapshot.ts). */
 	snapshot(): Promise<string | null>
+	/** The window the pane is in: the kiosk, or its pop-out (./popout.ts). */
+	host(): BrowserWindow
+	/** Move the pane, page and all, into `win`. It stays hidden there until
+	 *  that window's page places it. */
+	moveTo(win: BrowserWindow): void
 }
 
 type Target = { url: string; login: string; user: string }
@@ -89,6 +97,8 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 	window.contentView.addChildView(view)
 	const wc = view.webContents
 
+	/** Where the pane is drawn. The kiosk, unless it has been popped out. */
+	let host = window
 	let mode: Mode = 'volunteer'
 	let target: Target | null = null
 	let state: MaPaneState = { state: 'no-address' }
@@ -278,10 +288,21 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 
 		snapshot: () => snapshotOf(view, wanted && rect !== null && state.state === 'showing'),
 
+			host: () => host,
+
+			moveTo(win) {
+				if (win === host) return
+				if (!host.isDestroyed()) host.contentView.removeChildView(view)
+				win.contentView.addChildView(view)
+				host = win
+				rect = null
+				apply()
+			},
+
 		place(next) {
 			const first = !wanted
 			wanted = true
-			rect = next === null ? null : clampToWindow(next, window)
+			rect = next === null ? null : clampToWindow(next, host)
 			if (first && (state.state === 'idle' || state.state === 'no-address')) connect()
 			else apply()
 		},
