@@ -160,7 +160,10 @@ belongs in main, never the renderer, and only the summary crosses.
    view's strip; ↻ MA left the status bar for it. The console banner shows only while a
    slot holds the MA. Seen in the kiosk on the Windows box, driven over the debugging
    port while the owner was away: the pickers, Arena with its thumbnail, MA moved left,
-   the fold, and the layout remembered. **Not yet touched by a finger.**
+   the fold, and the layout remembered. Then the owner on the touchscreen, the same
+   day: "seems good". Dragging the divider trailed the finger, so it now drags pictures
+   of the pages (`src/main/pane-snapshot.ts`), pinned to the window edge with the page's
+   edge colour filling the room a growing slot opens: "feels good".
 5. **Multiview spike** (below). Riskiest; independent of 1–4.
 6. **Brief slot.** Waits on where a brief's link lives.
 7. Later: the trigger screen, and the rename.
@@ -194,6 +197,35 @@ the dashboard adds.
   their view.
 - **Each machine remembers its layout** across a restart, as it does the run order's
   width.
+
+## Proposed, not built: pop a view out (owner, 2026-10-03)
+
+The owner's ask: pop a slot's view out into a floating window of its own; closing
+that window puts the view back in the slots. Noted for discussion before building.
+
+**What makes it feasible.** The MA and the Run order are `WebContentsView`s, and a
+view can be moved to another window's `contentView` without reloading, so the MA
+would stay logged in and a half-typed note would survive, as they already do when a
+view changes slots. The Arena view is React, so a pop-out would be a second renderer
+window showing only that view, polling main as the kiosk does.
+
+**To decide first:**
+- **What the slot does meanwhile.** Show "Popped out" with a Bring back button (the
+  layout unchanged), or let the slot take another view, and on close send the view to
+  where it came from or to whichever slot is free?
+- **Covering the kiosk.** On a single touchscreen a floating window sits over the
+  kiosk, against the rule that nothing covers the MA. On a second monitor (the Arena
+  op's two-screen setup) it is the real use. Allow pop-out only with a second display,
+  or anywhere?
+- **Always on top, and full-screen.** The kiosk is full-screen; a window that falls
+  behind it is lost to a volunteer with no taskbar. Probably always-on-top, with its own
+  close button big enough for a finger.
+- **Mode.** The MA in a pop-out must still follow operator mode and the idle drop back to
+  volunteer, from the kiosk's mode chip.
+- **Restarts.** Remember a pop-out's display and size per machine, as the layout is, and
+  reopen it popped out? And a renderer crash or reload of the kiosk: does the pop-out
+  close (its view returning) or stay?
+- **Which views.** All three, or the MA only?
 
 ## Open questions
 

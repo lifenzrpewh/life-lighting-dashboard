@@ -52,7 +52,8 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/renderer/components/ConnectionsPanel.tsx` · `src/shared/connections.ts` | **Connections**: one row per connection (Console, OnTime, ProPresenter, Arena, Cue Manager), status in a word, tap to open its fields with its own Save. Replaced the Settings form 2026-10-02; the status bar keeps LIVE, show, countdown, clock and a Connections button whose dot is the worst connection that is set up. Everyone sees it, operator mode edits. A connection not set up is `off`, never `down`. Owner-checked on the Windows box, 2026-10-02: "functionally works". |
 | ✅ `src/bridge/arena.ts` · `src/main/arena.ts` | Arena's link: `GET /api/v1/product` every 2 s, its row in Connections. Against Arena 7.28 on the Windows box, 2026-10-02. |
 | ✅ `src/bridge/arena-live.ts` · `src/main/arena.ts` | What Arena plays, over its websocket: each composition push gives which clip is connected on each layer, subscriptions keep the faders current, and the link poll keeps it from going stale. Read against Arena 7.28 on the Windows box, 2026-10-03, in the kiosk. Shown as the Arena view in a slot, thumbnails through main on an `arena:` scheme; the kiosk log names what plays. Each playing clip shows its time left, at the clip × group × composition speed (LIFE's VFX group runs at 1.795). `docs/VISUALS_DASHBOARD.md` § Seen on Arena (2026-10-03). |
-| ⚠️ `src/shared/layout.ts` · `src/renderer/components/Slot.tsx` · `src/renderer/slots.ts` | **Two slots** (2026-10-03, the owner's answers in `docs/VISUALS_DASHBOARD.md`): left and right each pick Run order, MA or Arena; the picker offers what answers, a slot keeps its view when it stops; picking the other slot's view swaps them; everyone picks; each machine remembers. The MA moves between slots without logging in again. Seen in the kiosk on the Windows box over the debugging port, not yet by a finger on the touchscreen. |
+| ✅ `src/shared/layout.ts` · `src/renderer/components/Slot.tsx` · `src/renderer/slots.ts` | **Two slots** (2026-10-03, the owner's answers in `docs/VISUALS_DASHBOARD.md`): left and right each pick Run order, MA or Arena; the picker offers what answers, a slot keeps its view when it stops; picking the other slot's view swaps them; everyone picks; each machine remembers. The MA moves between slots without logging in again. Owner-tried on the Windows box's touchscreen, 2026-10-03: "seems good". |
+| ✅ `src/main/pane-snapshot.ts` · `src/renderer/components/Still.tsx` | **Dragging the divider**: each page stands in as a picture of itself while dragged (a live page reflowing on every step trailed the finger), pinned to the window edge with its own edge colour filling the room a growing slot opens. Owner-tried, 2026-10-03: "feels good". |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
@@ -262,8 +263,8 @@ npm run scan   # regenerate export-blacklist.json
 Tests read `~/MALightingTechnology/gma3_library/datapools/sequences` and skip if
 absent. ~50 s, because five real exports are 45 MB each.
 
-**On the booth PC (Windows)**, from a checkout, not an installer: `npm start` is proven
-on that box, an unsigned installer on a managed machine is not. In `scripts/windows/`:
+**On the booth PC (Windows)**, from a checkout: `npm start` is proven on that box (and
+since 2026-10-03 so is the installer, below). In `scripts/windows/`:
 `kiosk.cmd` runs the build already there (building only if there is none), restarts
 after a crash, and logs to `%APPDATA%\life-lighting-dashboard\kiosk.log`;
 `install-startup.cmd` makes it start at login; `update.cmd` pulls and rebuilds, by
@@ -271,31 +272,43 @@ hand, never before a service. One kiosk per computer: a second launch only focus
 the first. ⚠️ None of the three has run on Windows yet.
 
 **The installer (the way forward).** `npm run dist:win` builds
-`release/LIFE-Lighting-Dashboard-Setup-<version>.exe` on this Mac: per-user, no admin
-rights, unsigned, default icon, key built in. The same build packaged for macOS
-(`npx electron-builder --mac --dir`) ran here 2026-10-02: renderer, preload and MA
-pane all load from the asar. ⚠️ **Whether the managed booth PC will run an unsigned
-installer is the open question**; it decides everything after it (hosting on
-`visuals.prodapps.life`, self-update, start at login).
+`release/LIFE-Lighting-Dashboard-Setup-<version>.exe` (107 MB): per-user, no admin
+rights, unsigned (`Get-AuthenticodeSignature`: `NotSigned`), default icon, key built in.
+✅ **It installs and runs on the managed booth-class Windows box, 2026-10-03**, built
+there too: into `%LOCALAPPDATA%\Programs\life-lighting-dashboard`, opening on finish
+and sharing the dev copy's settings (same `%APPDATA%\life-lighting-dashboard`).
+⚠️ What SmartScreen showed on the way is not recorded; ask before relying on volunteers
+installing an update themselves. That gates hosting on `visuals.prodapps.life`,
+self-update and start at login, the next steps. Close the installed copy before a dev
+run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-02).** The whole service screen works against onPC on
-this Mac, logged in one run: console link LIVE (70 ms), the showfile chip `ON BASE
-SHOW Mount Eden Base`, the MA pane on the real web remote as `Remote`, and the Cue
-Manager signed in as a booth device with notes edited in place. onPC needs its
-network interface on 127.0.0.1 for the link (on 2026-10-01 it held no OSC socket
-until that was set). What is left is Windows and a real console. onPC counts as
-on-console.
+**Where things stand (2026-10-03).** The lighting screen works against onPC on the
+Mac (2026-10-02: link LIVE, showfile chip, MA pane as `Remote`, Cue Manager signed in
+as a booth device). On the Windows box, 2026-10-03, it became a two-slot dashboard:
+either slot picks Run order, MA or Arena; the Arena view shows every layer's clip,
+fader and time left, read live from Arena 7.28; dragging the divider stays with the
+finger; and the unsigned installer installs and runs there. The owner tried the slots
+and the drag on the touchscreen. What is left for lighting is a real console; for
+visuals, the pieces in `docs/VISUALS_DASHBOARD.md`.
+
+**This Windows box:** Arena serves on **8090** (moved 2026-10-03 off the MA web
+remote's 8080); the dashboard's Arena setting is `127.0.0.2:8090`; VFX 1 column 1 holds
+a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media drive
+(`I:\VFX Media Renamed`) is not on this box.
 
 ### TODO, in order
 
-0. **Try the two slots by hand** on the Windows box's touchscreen: pick, swap, fold,
-   drag the divider with the MA on the left, and restart to see the layout kept. Watch
-   a video's time left count down in the Arena view (VFX 1 holds a test video). Then
-   the next Arena piece (`docs/VISUALS_DASHBOARD.md` has them in order). QLab is parked
-   (`docs/QLAB.md`, no Mac). Arena on this box serves on **8090** since 2026-10-03,
-   off the MA web remote's 8080.
+0. **Watch a video's time left count down** in the Arena view: connect VFX 1's test
+   video and check its row starts near 0:22 (39.27 s ÷ 1.795), and that Play Once &
+   Hold ends on `0:00 held`. Not yet seen with a video, only a looping generator.
+0. **Decide the pop-out** (`docs/VISUALS_DASHBOARD.md` § Proposed, not built: pop a
+   view out). The owner's idea; the questions there come first.
+0. **Next Arena pieces** (`docs/VISUALS_DASHBOARD.md` § The pieces): the multiview
+   spike (5) is the riskiest and wants an hour at the box watching Arena's frame rate;
+   the brief slot (6) waits on where a brief's link lives. Undecided: whether the booth
+   also wants one clip countdown beside the clock. QLab is parked (`docs/QLAB.md`).
 0. **A showfile read that stays off the command line (research).** The watcher
    pushes a Save As or base change within a second, but a Load ends it, so the new
    name waits for the next ask: once a quiet minute now (was 5 min, the owner's
@@ -306,9 +319,9 @@ on-console.
 0. **Every booth show needs the OSC row and LifeBridge** (✅ 2026-10-02: a Load
    replaces OSC settings; "Mount Eden Base" as saved has no 8003 row). The work
    is the Show Creator's: its `docs/ROADMAP.md` § From the Lighting Dashboard.
-1. **The test installer on the booth PC** (`npm run dist:win`). Whether a managed
-   machine runs it unsigned decides hosting, self-update and start at login. On the
-   booth screen, also check the Windows touch keyboard comes up for a note.
+1. **After the installer:** record what SmartScreen shows, then decide hosting,
+   self-update and start at login (above, § The installer). On the booth screen, also
+   check the Windows touch keyboard comes up for a note.
 2. **Sign the booth PC's Cue Manager in** with its own QR, as its own booth device,
    so one lost PC can be revoked alone.
 3. **The MA pane, still to watch firing:** Web Remote off then on, and a console
@@ -321,7 +334,7 @@ on-console.
    only when there is something for it to open.
 6. **Housekeeping:** delete the retired run order (`src/backend/`, `src/main/backend/`,
    `src/shared/{backend,service}.ts`, its tests and the mock's schedule) once the
-   Cue Manager has run a service. `README.md` is stale; bring it in line by linking.
+   Cue Manager has run a service.
 
 **Decided, not forgotten (2026-09-30):** no start times and no NOW highlight,
 because the backend stores neither (no plan or item times are synced, and
