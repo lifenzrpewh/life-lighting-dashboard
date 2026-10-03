@@ -48,11 +48,13 @@
 			"dist/src/**/*.js",
 			"dist/src/**/*.cjs",
 			"dist/renderer/**/*",
-			"package.json"
+			"package.json",
+			"vendor/texture-bridge/**"
 		],
 		"asar": true,
 		"asarUnpack": [
-			"node_modules/@napolab/texture-bridge*/**"
+			"node_modules/@napolab/texture-bridge*/**",
+			"vendor/texture-bridge/**"
 		],
 		"npmRebuild": false,
 		"win": {

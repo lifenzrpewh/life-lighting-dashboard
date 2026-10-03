@@ -1,0 +1,222 @@
+diff --git a/packages/native/build.rs b/packages/native/build.rs
+index 3a7d401..0152dda 100644
+--- a/packages/native/build.rs
++++ b/packages/native/build.rs
+@@ -49,6 +49,8 @@ fn build_windows(vendor_dir: &std::path::Path) {
+ 
+     println!("cargo:rustc-link-lib=d3d11");
+     println!("cargo:rustc-link-lib=dxgi");
++    // LIFE patch: D3DCompile, for the 16-bit to BGRA8 conversion shaders.
++    println!("cargo:rustc-link-lib=d3dcompiler");
+     println!("cargo:rustc-link-lib=user32");
+     println!("cargo:rustc-link-lib=gdi32");
+     println!("cargo:rustc-link-lib=shell32");
+diff --git a/packages/native/cpp/win/spout_bridge.cpp b/packages/native/cpp/win/spout_bridge.cpp
+index 9b0e043..c657c5c 100644
+--- a/packages/native/cpp/win/spout_bridge.cpp
++++ b/packages/native/cpp/win/spout_bridge.cpp
+@@ -13,6 +13,7 @@
+ #include <set>
+ #include <string>
+ #include <d3d11_1.h>
++#include <d3dcompiler.h>
+ #include "SpoutDX.h"
+ #include "SpoutSenderNames.h"
+ #include "SpoutFrameCount.h"
+@@ -174,6 +175,14 @@ struct SpoutReceiverBridge {
+     DWORD             ntStagingFormat;
+     HANDLE            cachedNtHandle;
+ 
++    // LIFE patch: a sender in a format Electron cannot import (Arena's High
++    // Detail is R16G16B16A16_UNORM) is drawn into a BGRA8 staging texture
++    // by a one-texel shader pass rather than copied. Created on first need.
++    ID3D11VertexShader*       convertVS;
++    ID3D11PixelShader*        convertPS;
++    ID3D11ShaderResourceView* senderSRV;      // on senderTexture
++    ID3D11RenderTargetView*   ntStagingRTV;   // on ntStaging, when converting
++
+     // CPU-mappable staging for the RGBA readback path.
+     ID3D11Texture2D*  cpuStaging;
+     unsigned int      cpuStagingWidth;
+@@ -184,6 +193,10 @@ struct SpoutReceiverBridge {
+ // Release any cached reference to the sender's shared texture. Called when
+ // the sender disappears or publishes a new share handle.
+ static void release_sender_texture(SpoutReceiverBridge* bridge) {
++    if (bridge->senderSRV) {
++        bridge->senderSRV->Release();
++        bridge->senderSRV = nullptr;
++    }
+     if (bridge->senderTexture) {
+         bridge->senderTexture->Release();
+         bridge->senderTexture = nullptr;
+@@ -251,6 +264,107 @@ static bool refresh_sender(SpoutReceiverBridge* bridge) {
+     return true;
+ }
+ 
++// LIFE patch: the format handed to Electron for a sender format. Electron's
++// importSharedTexture takes bgra (87), rgba (28) and rgbaf16 (10); anything
++// else is converted to BGRA8 on the GPU.
++static DWORD output_format(DWORD senderFormat) {
++    switch (senderFormat) {
++        case DXGI_FORMAT_B8G8R8A8_UNORM:
++        case DXGI_FORMAT_R8G8B8A8_UNORM:
++        case DXGI_FORMAT_R16G16B16A16_FLOAT:
++            return senderFormat;
++        default:
++            return DXGI_FORMAT_B8G8R8A8_UNORM;
++    }
++}
++
++// LIFE patch: a full-screen triangle, and a pixel shader that reads the one
++// sender texel under each output pixel. Same size in and out, so no sampler
++// and no filtering: the GPU's format conversion on write is the whole job.
++static const char kConvertHLSL[] =
++    "Texture2D src : register(t0);\n"
++    "float4 vs(uint id : SV_VertexID) : SV_Position {\n"
++    "    float2 uv = float2((id << 1) & 2, id & 2);\n"
++    "    return float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);\n"
++    "}\n"
++    "float4 ps(float4 pos : SV_Position) : SV_Target {\n"
++    "    return src.Load(int3(pos.xy, 0));\n"
++    "}\n";
++
++static bool ensure_convert_shaders(SpoutReceiverBridge* bridge) {
++    if (bridge->convertVS && bridge->convertPS) return true;
++    ID3DBlob* vsBlob = nullptr;
++    ID3DBlob* psBlob = nullptr;
++    ID3DBlob* errors = nullptr;
++    HRESULT hr = D3DCompile(kConvertHLSL, sizeof(kConvertHLSL) - 1, "life_convert", nullptr, nullptr,
++                            "vs", "vs_5_0", 0, 0, &vsBlob, &errors);
++    if (SUCCEEDED(hr)) {
++        hr = D3DCompile(kConvertHLSL, sizeof(kConvertHLSL) - 1, "life_convert", nullptr, nullptr,
++                        "ps", "ps_5_0", 0, 0, &psBlob, &errors);
++    }
++    if (FAILED(hr)) {
++        fprintf(stderr, "[SpoutBridge] convert shaders did not compile hr=0x%08lx %s\n",
++                static_cast<unsigned long>(hr),
++                errors ? static_cast<const char*>(errors->GetBufferPointer()) : "");
++    } else {
++        hr = bridge->device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
++                                                nullptr, &bridge->convertVS);
++        if (SUCCEEDED(hr)) {
++            hr = bridge->device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(),
++                                                   nullptr, &bridge->convertPS);
++        }
++        if (FAILED(hr)) {
++            fprintf(stderr, "[SpoutBridge] convert shaders not created hr=0x%08lx\n",
++                    static_cast<unsigned long>(hr));
++        }
++    }
++    if (vsBlob) vsBlob->Release();
++    if (psBlob) psBlob->Release();
++    if (errors) errors->Release();
++    return bridge->convertVS && bridge->convertPS;
++}
++
++// LIFE patch: draw the sender's texture into ntStaging, converting its
++// format. Caller holds the sender's texture access.
++static bool convert_into_staging(SpoutReceiverBridge* bridge) {
++    if (!ensure_convert_shaders(bridge)) return false;
++    if (!bridge->senderSRV) {
++        HRESULT hr = bridge->device->CreateShaderResourceView(bridge->senderTexture, nullptr, &bridge->senderSRV);
++        if (FAILED(hr)) {
++            fprintf(stderr, "[SpoutBridge] sender SRV failed hr=0x%08lx fmt=%lu\n",
++                    static_cast<unsigned long>(hr), static_cast<unsigned long>(bridge->senderFormat));
++            bridge->senderSRV = nullptr;
++            return false;
++        }
++    }
++    if (!bridge->ntStagingRTV) {
++        HRESULT hr = bridge->device->CreateRenderTargetView(bridge->ntStaging, nullptr, &bridge->ntStagingRTV);
++        if (FAILED(hr)) {
++            fprintf(stderr, "[SpoutBridge] staging RTV failed hr=0x%08lx\n", static_cast<unsigned long>(hr));
++            bridge->ntStagingRTV = nullptr;
++            return false;
++        }
++    }
++    ID3D11DeviceContext* ctx = bridge->context;
++    D3D11_VIEWPORT vp = {};
++    vp.Width    = static_cast<float>(bridge->ntStagingWidth);
++    vp.Height   = static_cast<float>(bridge->ntStagingHeight);
++    vp.MaxDepth = 1.0f;
++    ctx->OMSetRenderTargets(1, &bridge->ntStagingRTV, nullptr);
++    ctx->RSSetViewports(1, &vp);
++    ctx->IASetInputLayout(nullptr);
++    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
++    ctx->VSSetShader(bridge->convertVS, nullptr, 0);
++    ctx->PSSetShader(bridge->convertPS, nullptr, 0);
++    ctx->PSSetShaderResources(0, 1, &bridge->senderSRV);
++    ctx->Draw(3, 0);
++    // Unbind, so the sender texture is not left bound as an input.
++    ID3D11ShaderResourceView* noSRV = nullptr;
++    ctx->PSSetShaderResources(0, 1, &noSRV);
++    ctx->OMSetRenderTargets(0, nullptr, nullptr);
++    return true;
++}
++
+ // Allocate or reallocate the NT-shared staging texture to match dims/format.
+ // Mints a fresh NT HANDLE via CreateSharedHandle and caches it for
+ // per-frame DuplicateHandle.
+@@ -268,6 +382,10 @@ static bool ensure_nt_staging(SpoutReceiverBridge* bridge,
+         CloseHandle(bridge->cachedNtHandle);
+         bridge->cachedNtHandle = nullptr;
+     }
++    if (bridge->ntStagingRTV) {
++        bridge->ntStagingRTV->Release();
++        bridge->ntStagingRTV = nullptr;
++    }
+     if (bridge->ntStaging) {
+         bridge->ntStaging->Release();
+         bridge->ntStaging = nullptr;
+@@ -435,6 +553,9 @@ void spout_receiver_destroy(void* handle) {
+         CloseHandle(bridge->cachedNtHandle);
+         bridge->cachedNtHandle = nullptr;
+     }
++    if (bridge->ntStagingRTV) { bridge->ntStagingRTV->Release(); bridge->ntStagingRTV = nullptr; }
++    if (bridge->convertVS)    { bridge->convertVS->Release();    bridge->convertVS = nullptr; }
++    if (bridge->convertPS)    { bridge->convertPS->Release();    bridge->convertPS = nullptr; }
+     if (bridge->ntStaging)   { bridge->ntStaging->Release();   bridge->ntStaging = nullptr; }
+     if (bridge->cpuStaging)  { bridge->cpuStaging->Release();  bridge->cpuStaging = nullptr; }
+     release_sender_texture(bridge);
+@@ -551,12 +672,16 @@ int32_t spout_receiver_receive_shared_texture(void* handle,
+         return -1;
+     }
+ 
++    // LIFE patch: staged in the format Electron will get, which differs
++    // from the sender's when it has to be converted.
++    const DWORD outFormat = output_format(bridge->senderFormat);
++    const bool  convert   = outFormat != bridge->senderFormat;
+     if (bridge->ntStagingWidth  != bridge->senderWidth  ||
+         bridge->ntStagingHeight != bridge->senderHeight ||
+-        bridge->ntStagingFormat != bridge->senderFormat ||
++        bridge->ntStagingFormat != outFormat ||
+         !bridge->ntStaging) {
+         if (!ensure_nt_staging(bridge, bridge->senderWidth, bridge->senderHeight,
+-                               bridge->senderFormat)) {
++                               outFormat)) {
+             return -2;
+         }
+         *out_width  = bridge->senderWidth;
+@@ -567,9 +692,12 @@ int32_t spout_receiver_receive_shared_texture(void* handle,
+     if (!bridge->frameCount->GetNewFrame()) return 1;
+ 
+     if (!bridge->frameCount->CheckTextureAccess(bridge->senderTexture)) return 1;
+-    bridge->context->CopyResource(bridge->ntStaging, bridge->senderTexture);
++    bool staged = true;
++    if (convert) staged = convert_into_staging(bridge);
++    else bridge->context->CopyResource(bridge->ntStaging, bridge->senderTexture);
+     bridge->context->Flush();
+     bridge->frameCount->AllowTextureAccess(bridge->senderTexture);
++    if (!staged) return -2;
+ 
+     HANDLE duplicate = nullptr;
+     BOOL ok_dup = DuplicateHandle(
+@@ -587,7 +715,7 @@ int32_t spout_receiver_receive_shared_texture(void* handle,
+     *out_nt_handle = duplicate;
+     *out_width  = bridge->senderWidth;
+     *out_height = bridge->senderHeight;
+-    *out_format = bridge->senderFormat;
++    *out_format = outFormat;
+     return 0;
+ }
+ 

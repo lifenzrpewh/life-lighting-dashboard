@@ -1,2 +1,6 @@
 # cmd.exe misreads labels in LF-only batch files, so they stay CRLF everywhere.
 *.cmd text eol=crlf
+# Kept byte for byte: the patch applies to upstream with its line endings,
+# and the built addon is a binary.
+native/texture-bridge/*.patch -text
+vendor/texture-bridge/*.node binary

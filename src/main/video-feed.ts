@@ -26,7 +26,10 @@
 // spike-grade module until it has run a service.
 
 import { sharedTexture, type WebContents } from 'electron'
+import fs from 'node:fs'
 import { createRequire } from 'node:module'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { plainVideoFailure, type VideoFeedState } from '../shared/video-feed.js'
 
@@ -66,11 +69,23 @@ export type VideoFeed = {
 	stop(): void
 }
 
+/** LIFE's own Windows build of the addon, with the 16-bit patch
+ *  (native/texture-bridge/): Arena with High Detail on is converted to BGRA8
+ *  on the GPU rather than refused. Built by GitHub Actions
+ *  (.github/workflows/texture-bridge.yml), since a booth box has no build
+ *  tools. Same API as the npm package's binary, which is the fallback. */
+const PATCHED = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../vendor/texture-bridge/index.win32-x64-msvc.node')
+
 /** The addon, or why it would not load: a missing or broken native binary is
  *  said in the view, never a crash of the kiosk. */
 function loadAddon(): Addon | string {
+	const require = createRequire(import.meta.url)
 	try {
-		return createRequire(import.meta.url)('@napolab/texture-bridge') as Addon
+		if (process.platform === 'win32' && fs.existsSync(PATCHED)) {
+			console.log('[video] using the LIFE build of texture-bridge (16-bit senders converted)')
+			return require(PATCHED) as Addon
+		}
+		return require('@napolab/texture-bridge') as Addon
 	} catch (e) {
 		return (e as Error).message
 	}
