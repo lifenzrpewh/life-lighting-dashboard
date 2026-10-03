@@ -293,6 +293,9 @@ exactly `v`.
 - **A sender changing size** (killed at 1280×720, back at 1920×1080) was picked up and
   converted, every patch still exact: the staging texture and its render target are
   rebuilt.
+- **The packaged app carries it too**: built with `electron-builder --win --dir` (the
+  installer's contents, nothing installed), it loaded the binary from
+  `app.asar.unpacked/vendor/texture-bridge/` and read the same four patches exactly.
 - While the picked sender was gone the view showed Arena's (the first by name), and
   went back to the picked one when it returned. That is the rule as written in
   `src/main/video-feed.ts`; whether a booth would rather see "gone" is a question.
