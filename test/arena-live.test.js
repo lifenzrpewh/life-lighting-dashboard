@@ -70,6 +70,14 @@ test('a clip whose file is not on this machine says so', () => {
 	assert.equal(vfx1.playing?.missing, true)
 })
 
+test("Arena's placeholder thumbnail is no thumbnail", () => {
+	// VFX 1's video, as Arena gave it before drawing one: `is_default`, the dummy.
+	const body = real()
+	body.layers[4].clips[0].connected.value = 'Connected'
+	assert.equal(body.layers[4].clips[0].thumbnail.is_default, true)
+	assert.equal(statusOf(decoded(body)).layers[4].playing?.thumbnail, null)
+})
+
 test('a composition of the wrong shape fails whole, saying what', () => {
 	const cases = [
 		[(b) => delete b.layers, 'not an Arena composition'],

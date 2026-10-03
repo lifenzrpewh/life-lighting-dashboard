@@ -125,8 +125,11 @@ function playingOf(clips: unknown[], layer: string): Decoded<TreeClip | null> {
 		if (!name.ok) return name
 		const transport = transportOf(clip, `${layer}'s ${name.value}`)
 		if (!transport.ok) return transport
+		// ✅ 2026-10-03: a clip Arena has not drawn a thumbnail for says
+		// `is_default: true` and points at `/thumbnail/dummy`, a blank image. That
+		// is Arena giving none, so it reads as none.
 		const thumb = clip['thumbnail']
-		const version = isObject(thumb) ? thumb['last_update'] : undefined
+		const version = isObject(thumb) && thumb['is_default'] !== true ? thumb['last_update'] : undefined
 		const thumbnail =
 			isId(clip['id']) && (typeof version === 'string' || typeof version === 'number') ? { clipId: clip['id'], version: String(version) } : null
 		const video = clip['video']

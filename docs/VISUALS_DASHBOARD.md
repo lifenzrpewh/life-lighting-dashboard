@@ -150,8 +150,11 @@ belongs in main, never the renderer, and only the summary crosses.
    `src/shared/arena.ts`): a loop counts to its loop point, marked ↻; Play Once & Hold
    at its end reads `0:00 held`; paused says so; Random and a clip off the timeline show
    none. Main subscribes to a clip's transport while it plays and unsubscribes when it
-   stops. Seen in the kiosk on a looping generator; the owner's video counting down is
-   still to watch. The status-bar chip is not built: undecided whether it is wanted.
+   stops. Seen in the kiosk on a looping generator, then (2026-10-03) on VFX 1's 39.27 s
+   video at the VFX group's 1.795×: `0:21` two seconds after connecting, down a second a
+   second to `0:01`, then `0:00 held` under Play Once & Hold, and the row empty once Play
+   Once & Clear cleared it at ~22 s. A video Arena has not drawn a thumbnail for has
+   `is_default: true` and a blank dummy image; that reads as no thumbnail. The status-bar chip is not built: undecided whether it is wanted.
 4. ✅ **Two slots** (2026-10-03). Left and right each pick Run order, MA or Arena
    (`src/shared/layout.ts` has the rules, the owner's answers below). The MA counts as
    answering when the link is live or its web remote has loaded. The native views are
