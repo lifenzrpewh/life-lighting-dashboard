@@ -84,7 +84,8 @@ at 0, and move that fader to 0.5 and back. Everything was put back as found.
   Selecting another clip turned PLAYBACK's `Connected & previewing` into `Connected`.
   Read `Connected` and `Connected & previewing` alike as playing.
 - **A loaded clip carries `transport` even when disconnected**; only an empty slot's is
-  null. Its `position` advances only while connected.
+  null. Its `position` can move while disconnected (next section), so a countdown reads
+  it only for a connected clip.
 - **A missing file is said:** `video.fileinfo.exists: false` (VFX 4's
   `I:\VFX Media Renamed\…` is not on this box), with `duration_ms: 0`. Connecting such a
   clip returns `204` and does nothing; it only selects it.
@@ -95,6 +96,35 @@ at 0, and move that fader to 0.5 and back. Everything was put back as found.
 - **Parameter ids held across the pushes**, so a subscription made from one composition
   still means the same thing after the next. Not yet tried: whether they survive Arena
   reopening the composition. Assume not, and resubscribe on every reconnect.
+
+## Seen on Arena: a video clip's transport (2026-10-03, port 8090)
+
+✅ `spikes/arena-transport.mjs`, read-only, while the owner played
+`MicrosoftTeams-video.mp4` (39.27 s, 30 fps) on VFX 1, column 1, through Loop, Play
+Once & Hold and Play Once & Clear. Arena's web server had moved to **8090**, off the MA
+web remote's 8080.
+
+- **`position` is in milliseconds of the clip**, `max` 39270 = `duration` 39.27 s ×
+  1000. The file's own `duration_ms` is 39318: the transport's duration, not the
+  file's, is the one that ends.
+- **It is pushed ~100 times a second** to a subscriber (the composition `framerate` reads
+  50), so it is coalesced before anything reaches the renderer, as channel B is.
+- **It runs at the group's speed, not the clock's.** Connected on VFX 1 it advanced
+  1.795 s per second, and a Loop pass took 21.9 s, not 39.27. The layer group VFX has
+  `speed` 1.795 (A SCREENS 0.578, HOLDING 1, composition 1, the clip's own 1). So time
+  left is `(max − position) ÷ (clip × group × composition speed)`, never `max − position`.
+- **Connecting restarts it** (`playmodeaway` `Restart`): position to 0 within the same
+  0.1 s as `connected` changed.
+- **Loop** wraps to ~0 at the end and carries on, with no other message.
+- **Play Once & Hold** stops at the end (38.15 s seen 0.5 s before) and position stops
+  being pushed: nothing changes, so nothing is sent. The clip stays `Connected`.
+- **Play Once & Clear** disconnects at the end: `connected` → `Disconnected`, then a
+  composition push 0.4 s later. Position stayed at the end for 4.6 s, then went to 0.
+- **A disconnected clip's position moved at 1×** before it was first connected, and
+  looped (the clip was likely in Arena's preview). Not understood; the countdown ignores
+  position on any clip that is not connected.
+- **`transporttype` is `Timeline`.** A BPM-synced clip would report otherwise and is
+  not seen yet.
 
 So piece 2 takes structure (which clip is where, its name and thumbnail) from each
 composition push, and levels from subscriptions. Each push is 1.3 MB to parse, so it
@@ -113,9 +143,15 @@ belongs in main, never the renderer, and only the summary crosses.
    main on an `arena:` scheme (`src/main/arena-thumbnails.ts`), because the page allows
    no remote origins. The kiosk log also says what plays, once per change. Still unseen: a fader update while a clip connects, a deck switch, and a
    layer during a transition (the first connected clip is taken).
-3. **Clip countdown.** Time left on the clip playing in PLAYBACK, in the countdown chip,
-   hidden when nothing plays, red past zero. Needs a video file seen in `transport` first:
-   what a Loop reports is not a countdown.
+3. ✅ **Time left, on every layer** (2026-10-03). Changed from the plan's one chip for
+   PLAYBACK by the owner: the Arena view (and later the single-screen trigger screen)
+   needs one per layer. Each connected clip's row shows its time left in real time,
+   `(length − position) ÷ (clip × group × composition speed)` (`clipTime` in
+   `src/shared/arena.ts`): a loop counts to its loop point, marked ↻; Play Once & Hold
+   at its end reads `0:00 held`; paused says so; Random and a clip off the timeline show
+   none. Main subscribes to a clip's transport while it plays and unsubscribes when it
+   stops. Seen in the kiosk on a looping generator; the owner's video counting down is
+   still to watch. The status-bar chip is not built: undecided whether it is wanted.
 4. ✅ **Two slots** (2026-10-03). Left and right each pick Run order, MA or Arena
    (`src/shared/layout.ts` has the rules, the owner's answers below). The MA counts as
    answering when the link is live or its web remote has loaded. The native views are

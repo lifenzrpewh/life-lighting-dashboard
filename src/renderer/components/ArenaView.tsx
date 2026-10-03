@@ -1,6 +1,12 @@
 // What Arena is playing (docs/VISUALS_DASHBOARD.md, piece 2), as a view a slot
-// can hold: each layer, the clip connected on it, its fader and bypass, under
-// its layer group, with the deck and the composition master above.
+// can hold: each layer, the clip connected on it, the time it has left, its
+// fader and bypass, under its layer group, with the deck and the composition
+// master above.
+//
+// The time left is real time, at the clip's speed × its group's × the
+// composition's (../../shared/arena.ts `clipTime`). The owner's answers,
+// 2026-10-03: one on every layer, not one chip for the booth; a loop counts to
+// its loop point; a Play Once & Hold clip at its end reads 0:00, held.
 //
 // Layers run top to bottom as Arena's own layer panel does: the highest layer
 // first, layer 1 last. Arena's composition lists them the other way round
@@ -14,7 +20,16 @@
 
 import { useState } from 'react'
 
-import { ARENA_STALE_AFTER_MS, thumbnailUrl, type ArenaClip, type ArenaGroup, type ArenaLayer, type ArenaStatus } from '../../shared/arena.js'
+import {
+	ARENA_STALE_AFTER_MS,
+	clipTime,
+	formatClipTime,
+	thumbnailUrl,
+	type ArenaClip,
+	type ArenaGroup,
+	type ArenaLayer,
+	type ArenaStatus,
+} from '../../shared/arena.js'
 import { matchReading, readingOf, type Channel } from '../../shared/reading.js'
 import { Say } from './MaPane.js'
 import { Centered } from './Slot.js'
@@ -120,10 +135,48 @@ function LayerRow({ layer }: { layer: ArenaLayer }) {
 					{clip?.missing && <span className="shrink-0 text-xs text-warn">file missing</span>}
 				</div>
 			</div>
+			{clip !== null && <TimeLeft clip={clip} />}
 			{layer.bypassed && <Bypassed />}
 			<Level value={layer.master} />
 		</div>
 	)
+}
+
+/** What the clip has left, in real time. A loop is marked ↻: at 0:00 it goes
+ *  round again rather than ending. */
+function TimeLeft({ clip }: { clip: ArenaClip }) {
+	const t = clipTime(clip.transport)
+	const box = 'flex w-24 shrink-0 items-baseline justify-end gap-1.5 tabular-nums'
+	const note = 'text-[10px] font-semibold tracking-widest text-booth-dim uppercase'
+	switch (t.kind) {
+		case 'none':
+			return null
+		case 'held':
+			return (
+				<span className={box}>
+					<span className="text-lg">0:00</span>
+					<span className={note}>held</span>
+				</span>
+			)
+		case 'paused':
+			return (
+				<span className={box}>
+					<span className="text-lg text-booth-dim">{formatClipTime(t.ms)}</span>
+					<span className={note}>paused</span>
+				</span>
+			)
+		case 'left':
+			return (
+				<span className={box}>
+					<span className="text-lg">{formatClipTime(t.ms)}</span>
+					{t.loops && (
+						<span className="text-sm text-booth-dim" aria-label="loops">
+							↻
+						</span>
+					)}
+				</span>
+			)
+	}
 }
 
 function Thumbnail({ clip }: { clip: ArenaClip | null }) {

@@ -2,12 +2,21 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-import { applyParameter, decodeComposition, decodeMessage, statusOf, subscribeMessage, subscriptionsOf } from '../dist/src/bridge/arena-live.js'
-import { clipIdOfThumbnail, thumbnailUrl } from '../dist/src/shared/arena.js'
+import {
+	applyParameter,
+	decodeComposition,
+	decodeMessage,
+	statusOf,
+	subscribeMessage,
+	subscriptionsOf,
+	unsubscribeMessage,
+} from '../dist/src/bridge/arena-live.js'
+import { clipIdOfThumbnail, clipTime, formatClipTime, thumbnailUrl } from '../dist/src/shared/arena.js'
 
 // Arena 7.28.0's composition as `GET /api/v1/composition` gave it on 2026-10-03,
 // show OH2026, pruned from 1.3 MB to the fields read here: PLAYBACK has a Solid
-// Color connected, VFX 4's video file is on a drive this box does not have.
+// Color connected, and VFX 1 holds the owner's 39.27 s video, disconnected. The
+// VFX group runs at 1.795, A SCREENS at 0.578.
 const real = () => JSON.parse(fs.readFileSync(new URL('./fixtures/arena-composition-oh2026.json', import.meta.url), 'utf8'))
 
 const decoded = (body) => {
@@ -32,12 +41,11 @@ test('the real composition: what plays, where, and how loud', () => {
 	assert.equal(playback.group, 'HOLDING')
 	assert.equal(playback.master, 1)
 	assert.equal(playback.bypassed, false)
-	assert.deepEqual(playback.playing, {
-		name: 'Solid Color',
-		thumbnail: { clipId: 1771294214183, version: '17909283400139180' },
-		missing: false,
-	})
-	assert.equal(thumbnailUrl(playback.playing.thumbnail), 'arena://thumbnail/1771294214183?v=17909283400139180')
+	assert.equal(playback.playing.name, 'Solid Color')
+	assert.equal(playback.playing.missing, false)
+	const version = real().layers[2].clips[0].thumbnail.last_update
+	assert.deepEqual(playback.playing.thumbnail, { clipId: 1771294214183, version })
+	assert.equal(thumbnailUrl(playback.playing.thumbnail), `arena://thumbnail/1771294214183?v=${version}`)
 	assert.equal(clipIdOfThumbnail(thumbnailUrl(playback.playing.thumbnail)), 1771294214183)
 	// Loaded but disconnected is not playing; nor is an empty layer.
 	assert.equal(status.layers.filter((l) => l.playing !== null).length, 1)
@@ -46,19 +54,20 @@ test('the real composition: what plays, where, and how loud', () => {
 
 test('previewing elsewhere does not stop a clip playing', () => {
 	const body = real()
-	body.layers[2].clips[0].connected.value = 'Connected'
-	body.layers[7].clips[1].connected.value = 'Previewing'
+	body.layers[2].clips[0].connected.value = 'Connected & previewing'
+	body.layers[4].clips[0].connected.value = 'Previewing'
 	const status = statusOf(decoded(body))
 	assert.equal(status.layers[2].playing?.name, 'Solid Color')
-	assert.equal(status.layers[7].playing, null)
+	assert.equal(status.layers[4].playing, null)
 })
 
 test('a clip whose file is not on this machine says so', () => {
 	const body = real()
-	body.layers[7].clips[1].connected.value = 'Connected'
-	const vfx4 = statusOf(decoded(body)).layers[7]
-	assert.equal(vfx4.playing?.name, 'Flicker-Glitch-Digital-Looping-HD-60fps')
-	assert.equal(vfx4.playing?.missing, true)
+	body.layers[4].clips[0].connected.value = 'Connected'
+	body.layers[4].clips[0].video.fileinfo.exists = false
+	const vfx1 = statusOf(decoded(body)).layers[4]
+	assert.equal(vfx1.playing?.name, 'MicrosoftTeams-video')
+	assert.equal(vfx1.playing?.missing, true)
 })
 
 test('a composition of the wrong shape fails whole, saying what', () => {
@@ -103,17 +112,19 @@ test('no selected deck is null, never the first deck', () => {
 test('subscriptions cover every level, and an update lands on its own', () => {
 	const tree = decoded(real())
 	const ids = subscriptionsOf(tree)
-	assert.equal(ids.length, 1 + 3 * 2 + 10 * 2)
+	// Master and speed; each group's master, bypass and speed; each layer's
+	// master and bypass; the playing Solid Color's position, mode, direction, speed.
+	assert.equal(ids.length, 2 + 3 * 3 + 10 * 2 + 4)
 	assert.equal(new Set(ids).size, ids.length)
 	assert.equal(subscribeMessage(1790926228713), '{"action":"subscribe","parameter":"/parameter/by-id/1790926228713"}')
 
-	// VFX 1's master, 0 → 0.5, as the fader moved on 2026-10-03.
+	// VFX 1's master, at 1 in the fixture, moved to 0.5.
 	const moved = applyParameter(tree, 1790926228713, 0.5)
 	assert.ok(moved?.ok)
 	const after = statusOf(moved.value)
 	assert.equal(after.layers[4].master, 0.5)
 	assert.equal(after.layers[5].master, 0)
-	assert.equal(statusOf(tree).layers[4].master, 0, 'the old tree is untouched')
+	assert.equal(statusOf(tree).layers[4].master, 1, 'the old tree is untouched')
 
 	const bypass = applyParameter(tree, tree.groups[1].bypassed.id, true)
 	assert.ok(bypass?.ok)
@@ -126,6 +137,79 @@ test('an update for another parameter is not ours; one of the wrong kind fails',
 	assert.equal(applyParameter(tree, tree.master.id, true)?.ok, false)
 	assert.equal(applyParameter(tree, tree.layers[0].bypassed.id, 1)?.ok, false)
 	assert.equal(applyParameter(tree, tree.master.id, Number.NaN)?.ok, false)
+})
+
+/** The owner's video, connected on VFX 1 at `position` with `playmode`. */
+const videoPlaying = (position, playmode = 'Loop') => {
+	const body = real()
+	const clip = body.layers[4].clips[0]
+	clip.connected.value = 'Connected'
+	clip.transport.position.value = position
+	clip.transport.controls.playmode.value = playmode
+	return decoded(body)
+}
+
+const transportOf = (tree) => statusOf(tree).layers[4].playing.transport
+
+test("a clip's time left runs at its group's speed, as seen 2026-10-03", () => {
+	const tree = videoPlaying(20000)
+	const t = transportOf(tree)
+	assert.equal(t.lengthMs, 39270)
+	assert.ok(Math.abs(t.rate - 1.7951) < 0.001, String(t.rate))
+	const left = clipTime(t)
+	assert.equal(left.kind, 'left')
+	// 19.27 s of clip at 1.795 is 10.7 s of real time, not 19.
+	assert.ok(Math.abs(left.ms - 19270 / t.rate) < 0.001, String(left.ms))
+	assert.equal(left.loops, true)
+	assert.equal(formatClipTime(left.ms), '0:11')
+
+	// The position, pushed ~100 times a second, lands on the playing clip.
+	const later = applyParameter(tree, tree.layers[4].playing.transport.position.id, 38000)
+	assert.ok(later?.ok)
+	assert.equal(transportOf(later.value).positionMs, 38000)
+	// And the group's speed is followed too.
+	const slower = applyParameter(tree, tree.groups[2].speed.id, 1)
+	assert.ok(slower?.ok)
+	assert.ok(Math.abs(clipTime(transportOf(slower.value)).ms - 19270) < 0.001)
+	assert.ok(subscriptionsOf(tree).includes(tree.layers[4].playing.transport.position.id))
+})
+
+test('play once counts down, holds at its end, and random has no end', () => {
+	const once = clipTime(transportOf(videoPlaying(30000, 'Play Once & Clear')))
+	assert.equal(once.kind, 'left')
+	assert.equal(once.loops, false)
+	assert.deepEqual(clipTime(transportOf(videoPlaying(39270, 'Play Once & Hold'))), { kind: 'held' })
+	assert.deepEqual(clipTime(transportOf(videoPlaying(39230, 'Play Once & Hold'))), { kind: 'held' })
+	assert.equal(clipTime(transportOf(videoPlaying(39000, 'Play Once & Hold'))).kind, 'left')
+	assert.deepEqual(clipTime(transportOf(videoPlaying(1000, 'Random'))), { kind: 'none' })
+	assert.deepEqual(clipTime(null), { kind: 'none' })
+})
+
+test('backwards counts to the start; paused keeps its time to the end', () => {
+	const t = { positionMs: 9000, lengthMs: 39270, playmode: 'Loop', direction: '<', rate: 1 }
+	assert.equal(clipTime(t).ms, 9000)
+	// Paused says no direction, so it is measured to the end, as forward play is.
+	assert.deepEqual(clipTime({ ...t, direction: '||' }), { kind: 'paused', ms: 30270 })
+	assert.equal(clipTime({ ...t, direction: '>', rate: 2 }).ms, (39270 - 9000) / 2)
+})
+
+test('a clip time reads as minutes and whole seconds, rounded up', () => {
+	assert.equal(formatClipTime(0), '0:00')
+	assert.equal(formatClipTime(1), '0:01')
+	assert.equal(formatClipTime(59000), '0:59')
+	assert.equal(formatClipTime(59001), '1:00')
+	assert.equal(formatClipTime(725000), '12:05')
+	assert.equal(formatClipTime(-50), '0:00')
+})
+
+test('a clip off the timeline has no transport; a malformed one fails whole', () => {
+	const synced = real()
+	synced.layers[2].clips[0].transporttype.value = 'BPM Sync'
+	assert.equal(statusOf(decoded(synced)).layers[2].playing.transport, null)
+	const broken = real()
+	delete broken.layers[2].clips[0].transport.controls.playmode
+	assert.deepEqual(decodeComposition(broken), { ok: false, detail: "PLAYBACK's Solid Color's play mode is not a parameter" })
+	assert.equal(unsubscribeMessage(5), '{"action":"unsubscribe","parameter":"/parameter/by-id/5"}')
 })
 
 test('messages as Arena sent them, 2026-10-03', () => {

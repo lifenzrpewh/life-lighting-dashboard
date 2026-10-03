@@ -7,7 +7,16 @@
 	"master": {
 		"id": 1790926223765,
 		"valuetype": "ParamRange",
+		"min": 0,
+		"max": 1,
 		"value": 1
+	},
+	"speed": {
+		"id": 1790926222205,
+		"valuetype": "ParamRange",
+		"min": 0,
+		"max": 10,
+		"value": 0.9999999999998967
 	},
 	"decks": [
 		{
@@ -35,12 +44,21 @@
 			"master": {
 				"id": 1790926229532,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 1
 			},
 			"bypassed": {
 				"id": 1790926229530,
 				"valuetype": "ParamBoolean",
 				"value": false
+			},
+			"speed": {
+				"id": 1790926229511,
+				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 10,
+				"value": 0.5778045774021734
 			},
 			"layers": [
 				{
@@ -63,12 +81,21 @@
 			"master": {
 				"id": 1790926229786,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 1
 			},
 			"bypassed": {
 				"id": 1790926229784,
 				"valuetype": "ParamBoolean",
 				"value": false
+			},
+			"speed": {
+				"id": 1790926229765,
+				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 10,
+				"value": 1
 			},
 			"layers": [
 				{
@@ -107,12 +134,21 @@
 			"master": {
 				"id": 1790926230040,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 1
 			},
 			"bypassed": {
 				"id": 1790926230038,
 				"valuetype": "ParamBoolean",
 				"value": false
+			},
+			"speed": {
+				"id": 1790926230019,
+				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 10,
+				"value": 1.7951326002419494
 			},
 			"layers": [
 				{
@@ -177,6 +213,8 @@
 			"master": {
 				"id": 1790926228153,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 1
 			},
 			"bypassed": {
@@ -197,6 +235,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224227,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -216,6 +260,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224332,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -235,6 +285,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224186,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -254,6 +310,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224197,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -273,6 +335,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224297,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -292,6 +360,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224269,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -311,6 +385,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224245,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -330,6 +410,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224189,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -349,6 +435,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224172,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -368,6 +460,8 @@
 			"master": {
 				"id": 1790926228293,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 0
 			},
 			"bypassed": {
@@ -388,6 +482,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224177,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -407,6 +507,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224164,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -426,6 +532,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224260,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -445,6 +557,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224180,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -464,6 +582,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224265,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -483,6 +607,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224158,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -502,6 +632,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224235,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -521,6 +657,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224318,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -540,6 +682,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224289,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -559,6 +707,8 @@
 			"master": {
 				"id": 1790926228433,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 1
 			},
 			"bypassed": {
@@ -577,7 +727,47 @@
 					"connected": {
 						"id": 1790926226417,
 						"valuetype": "ParamState",
-						"value": "Connected & previewing"
+						"value": "Connected"
+					},
+					"transporttype": {
+						"id": 1790926226143,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926230902,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 342.70347121945224
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926231201,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926231208,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926231311,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926231218,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999996902
+							}
+						}
 					},
 					"thumbnail": {
 						"last_update": "17909283400139180",
@@ -598,6 +788,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224238,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -617,6 +813,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224161,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -636,6 +838,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224159,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -655,6 +863,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224160,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -674,6 +888,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224268,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -693,6 +913,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224253,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -712,6 +938,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224236,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -731,6 +963,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926224205,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -750,6 +988,8 @@
 			"master": {
 				"id": 1790926228573,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 1
 			},
 			"bypassed": {
@@ -770,6 +1010,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926225995,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -789,6 +1035,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226047,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -808,6 +1060,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226015,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -827,6 +1085,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226080,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -846,6 +1110,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226276,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -865,6 +1135,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226082,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -884,6 +1160,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226045,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -903,6 +1185,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226197,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -922,6 +1210,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226128,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -941,7 +1235,9 @@
 			"master": {
 				"id": 1790926228713,
 				"valuetype": "ParamRange",
-				"value": 0
+				"min": 0,
+				"max": 1,
+				"value": 1
 			},
 			"bypassed": {
 				"id": 1790926228714,
@@ -954,18 +1250,65 @@
 					"name": {
 						"id": 1790926224515,
 						"valuetype": "ParamString",
-						"value": ""
+						"value": "MicrosoftTeams-video"
 					},
 					"connected": {
 						"id": 1790926224563,
 						"valuetype": "ParamState",
-						"value": "Empty"
+						"value": "Disconnected"
+					},
+					"transporttype": {
+						"id": 1790926224351,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926254695,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 39270,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926254721,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926254722,
+								"valuetype": "ParamChoice",
+								"value": "Play Once & Clear"
+							},
+							"duration": {
+								"id": 1790926254729,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 39.27
+							},
+							"speed": {
+								"id": 1790926254725,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 1
+							}
+						}
 					},
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
 						"id": 1771294141011,
 						"path": "/api/v1/composition/thumbnail/dummy"
+					},
+					"video": {
+						"fileinfo": {
+							"path": "C:\\Users\\Ruarangi.Pewhairangi\\Downloads\\MicrosoftTeams-video.mp4",
+							"exists": true,
+							"duration_ms": 39318
+						}
 					}
 				},
 				{
@@ -979,6 +1322,46 @@
 						"id": 1790926226317,
 						"valuetype": "ParamState",
 						"value": "Disconnected"
+					},
+					"transporttype": {
+						"id": 1790926226112,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248258,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248508,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248520,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248604,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248537,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999997419
+							}
+						}
 					},
 					"thumbnail": {
 						"last_update": "17909283400139300",
@@ -999,6 +1382,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226055,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1018,6 +1407,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226130,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1037,6 +1432,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226141,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1056,6 +1457,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226122,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1075,6 +1482,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226089,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1094,6 +1507,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226191,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1113,6 +1532,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226135,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1132,6 +1557,8 @@
 			"master": {
 				"id": 1790926228853,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 0
 			},
 			"bypassed": {
@@ -1152,6 +1579,46 @@
 						"valuetype": "ParamState",
 						"value": "Disconnected"
 					},
+					"transporttype": {
+						"id": 1790926226054,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248244,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248515,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248525,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248598,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248543,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999995353
+							}
+						}
+					},
 					"thumbnail": {
 						"last_update": "17909283400140038",
 						"is_default": false,
@@ -1170,6 +1637,46 @@
 						"id": 1790926226210,
 						"valuetype": "ParamState",
 						"value": "Disconnected"
+					},
+					"transporttype": {
+						"id": 1790926226058,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248245,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248493,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248497,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248609,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248514,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999996902
+							}
+						}
 					},
 					"thumbnail": {
 						"last_update": "17909283400140118",
@@ -1190,6 +1697,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226184,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1209,6 +1722,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226147,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1228,6 +1747,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226068,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1247,6 +1772,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226355,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1266,6 +1797,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226124,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1285,6 +1822,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226101,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1304,6 +1847,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226117,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1323,6 +1872,8 @@
 			"master": {
 				"id": 1790926228993,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 0
 			},
 			"bypassed": {
@@ -1343,6 +1894,46 @@
 						"valuetype": "ParamState",
 						"value": "Disconnected"
 					},
+					"transporttype": {
+						"id": 1790926226136,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248243,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248590,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248591,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248649,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248597,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999995869
+							}
+						}
+					},
 					"thumbnail": {
 						"last_update": "17909283400140960",
 						"is_default": false,
@@ -1361,6 +1952,46 @@
 						"id": 1790926226230,
 						"valuetype": "ParamState",
 						"value": "Disconnected"
+					},
+					"transporttype": {
+						"id": 1790926226074,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248249,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248571,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248576,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248644,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248589,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999996386
+							}
+						}
 					},
 					"thumbnail": {
 						"last_update": "17909283400141066",
@@ -1381,6 +2012,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226066,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1400,6 +2037,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226813,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1419,6 +2062,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226869,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1438,6 +2087,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226863,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1457,6 +2112,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226953,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1476,6 +2137,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926226938,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1495,6 +2162,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227079,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1514,6 +2187,8 @@
 			"master": {
 				"id": 1790926229133,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 0
 			},
 			"bypassed": {
@@ -1534,6 +2209,46 @@
 						"valuetype": "ParamState",
 						"value": "Disconnected"
 					},
+					"transporttype": {
+						"id": 1790926227105,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248264,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248529,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248535,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248619,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248545,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999994836
+							}
+						}
+					},
 					"thumbnail": {
 						"last_update": "17909283400141864",
 						"is_default": false,
@@ -1546,24 +2261,24 @@
 					"name": {
 						"id": 1790926227145,
 						"valuetype": "ParamString",
-						"value": "Flicker-Glitch-Digital-Looping-HD-60fps"
+						"value": ""
 					},
 					"connected": {
 						"id": 1790926227158,
 						"valuetype": "ParamState",
-						"value": "Disconnected"
+						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227064,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
-						"last_update": "17909283400142009",
-						"is_default": false,
+						"last_update": "0",
+						"is_default": true,
 						"id": 1771294214297,
-						"path": "/api/v1/composition/clips/by-id/1771294214297/thumbnail"
-					},
-					"video": {
-						"fileinfo": {
-							"path": "I:\\VFX Media Renamed\\Flicker-Glitch-Digital-Looping-HD-60fps.mov",
-							"exists": false
-						}
+						"path": "/api/v1/composition/thumbnail/dummy"
 					}
 				},
 				{
@@ -1578,6 +2293,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227035,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1597,6 +2318,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227113,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1616,6 +2343,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227219,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1635,6 +2368,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227214,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1654,6 +2393,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227166,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1673,6 +2418,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227305,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1692,6 +2443,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227373,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1711,6 +2468,8 @@
 			"master": {
 				"id": 1790926229273,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 0
 			},
 			"bypassed": {
@@ -1731,6 +2490,46 @@
 						"valuetype": "ParamState",
 						"value": "Disconnected"
 					},
+					"transporttype": {
+						"id": 1790926227270,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248246,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248548,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248554,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248634,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248560,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999995869
+							}
+						}
+					},
 					"thumbnail": {
 						"last_update": "17909283400142860",
 						"is_default": false,
@@ -1749,6 +2548,46 @@
 						"id": 1790926227283,
 						"valuetype": "ParamState",
 						"value": "Disconnected"
+					},
+					"transporttype": {
+						"id": 1790926227212,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248265,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248561,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248566,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248661,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248580,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999995353
+							}
+						}
 					},
 					"thumbnail": {
 						"last_update": "17909283400142955",
@@ -1769,6 +2608,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227220,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1788,6 +2633,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227328,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1807,6 +2658,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227381,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1826,6 +2683,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227407,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1845,6 +2708,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227380,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1864,6 +2733,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227317,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1883,6 +2758,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227307,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1902,6 +2783,8 @@
 			"master": {
 				"id": 1790926229413,
 				"valuetype": "ParamRange",
+				"min": 0,
+				"max": 1,
 				"value": 0
 			},
 			"bypassed": {
@@ -1922,6 +2805,46 @@
 						"valuetype": "ParamState",
 						"value": "Disconnected"
 					},
+					"transporttype": {
+						"id": 1790926227375,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248241,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248579,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248584,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248659,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248596,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999995353
+							}
+						}
+					},
 					"thumbnail": {
 						"last_update": "17909283400143831",
 						"is_default": false,
@@ -1940,6 +2863,46 @@
 						"id": 1790926227440,
 						"valuetype": "ParamState",
 						"value": "Disconnected"
+					},
+					"transporttype": {
+						"id": 1790926227325,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": {
+						"position": {
+							"id": 1790926248263,
+							"valuetype": "ParamRange",
+							"min": 0,
+							"max": 5000,
+							"value": 0
+						},
+						"controls": {
+							"playdirection": {
+								"id": 1790926248534,
+								"valuetype": "ParamChoice",
+								"value": ">"
+							},
+							"playmode": {
+								"id": 1790926248544,
+								"valuetype": "ParamChoice",
+								"value": "Loop"
+							},
+							"duration": {
+								"id": 1790926248602,
+								"valuetype": "ParamRange",
+								"min": 0.001,
+								"max": 604800,
+								"value": 5
+							},
+							"speed": {
+								"id": 1790926248552,
+								"valuetype": "ParamRange",
+								"min": 0,
+								"max": 10,
+								"value": 0.9999999999994836
+							}
+						}
 					},
 					"thumbnail": {
 						"last_update": "17909283400143989",
@@ -1960,6 +2923,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227475,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1979,6 +2948,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227410,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -1998,6 +2973,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227521,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -2017,6 +2998,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227542,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -2036,6 +3023,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227815,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -2055,6 +3048,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227806,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,
@@ -2074,6 +3073,12 @@
 						"valuetype": "ParamState",
 						"value": "Empty"
 					},
+					"transporttype": {
+						"id": 1790926227863,
+						"valuetype": "ParamChoice",
+						"value": "Timeline"
+					},
+					"transport": null,
 					"thumbnail": {
 						"last_update": "0",
 						"is_default": true,

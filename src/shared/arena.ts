@@ -46,6 +46,55 @@ export type ArenaClip = {
 	/** Arena says the clip's file is not on this machine. A generator has no file
 	 *  and is never missing. */
 	missing: boolean
+	/** Where the clip is in its timeline, or null when it has none this reads
+	 *  (a clip synced to the BPM rather than on a `Timeline`). */
+	transport: ArenaTransport | null
+}
+
+/** A connected clip's place in its timeline (docs/VISUALS_DASHBOARD.md § a
+ *  video clip's transport). Positions are milliseconds of the CLIP, which runs
+ *  at `rate` of the clock's speed. */
+export type ArenaTransport = {
+	positionMs: number
+	/** The transport's length, its position's max: not the file's duration. */
+	lengthMs: number
+	playmode: string
+	/** `>` forward, `<` back, `||` paused, as Arena writes them. */
+	direction: string
+	/** Clip ms per real ms: the clip's speed × its layer group's × the
+	 *  composition's. LIFE's VFX group at 1.795 played a 39 s clip in 22 s. */
+	rate: number
+}
+
+/** What a layer's clip has left, in real time. */
+export type ClipTime =
+	/** Counting down. `loops`: Loop or Bounce, so at zero it goes round again. */
+	| { kind: 'left'; ms: number; loops: boolean }
+	/** Play Once & Hold, at its end, holding the last frame. */
+	| { kind: 'held' }
+	| { kind: 'paused'; ms: number }
+	/** No end to count to: Random, or a clip with no timeline. */
+	| { kind: 'none' }
+
+/** Within this many clip-milliseconds of the end is at the end. Arena stops
+ *  pushing a held clip's position once it stops moving, and a push every ~10 ms
+ *  at up to ~2× speed leaves the last one this close or closer. ⚠️ The exact
+ *  value a held clip settles on is not yet seen. */
+export const END_SLACK_MS = 50
+
+export function clipTime(t: ArenaTransport | null): ClipTime {
+	if (t === null || t.playmode === 'Random') return { kind: 'none' }
+	const backwards = t.direction === '<'
+	const toEnd = Math.max(0, backwards ? t.positionMs : t.lengthMs - t.positionMs)
+	if (t.playmode === 'Play Once & Hold' && toEnd <= END_SLACK_MS) return { kind: 'held' }
+	if (t.direction === '||' || t.rate <= 0) return { kind: 'paused', ms: toEnd / (t.rate > 0 ? t.rate : 1) }
+	return { kind: 'left', ms: toEnd / t.rate, loops: t.playmode === 'Loop' || t.playmode === 'Bounce' }
+}
+
+/** `0:42`, `12:05`: whole seconds, rounded up, so 0:00 means it is over. */
+export function formatClipTime(ms: number): string {
+	const s = Math.ceil(Math.max(0, ms) / 1000)
+	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 /** One layer, in Arena's composition order. */

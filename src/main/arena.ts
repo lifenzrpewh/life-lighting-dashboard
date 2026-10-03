@@ -15,7 +15,16 @@
 // status, so an Arena that stops answering takes its status STALE with it.
 
 import { decodeArenaProduct } from '../bridge/arena.js'
-import { applyParameter, decodeComposition, decodeMessage, statusOf, subscribeMessage, subscriptionsOf, type ArenaTree } from '../bridge/arena-live.js'
+import {
+	applyParameter,
+	decodeComposition,
+	decodeMessage,
+	statusOf,
+	subscribeMessage,
+	subscriptionsOf,
+	unsubscribeMessage,
+	type ArenaTree,
+} from '../bridge/arena-live.js'
 import { ARENA_POLL_MS, ARENA_REQUEST_TIMEOUT_MS, type ArenaProduct, type ArenaSource, type ArenaStatus } from '../shared/arena.js'
 import { record, unread, type Channel, type ReadResult } from '../shared/reading.js'
 import type { Settings } from '../shared/settings.js'
@@ -79,7 +88,12 @@ function watchArena(url: string): { status(): Channel<ArenaStatus>; answered(): 
 		}
 		if (lastFault !== null) console.log('[arena] websocket: reading')
 		lastFault = null
-		const playing = result.value.layers.flatMap((l) => (l.playing === null ? [] : [`${l.name} ${l.playing.name}${l.playing.missing ? ' (file missing)' : ''}`])).join(' · ')
+	}
+
+	/** Which clips play only changes with a composition, so it is logged from
+	 *  there, not from the ~100 position updates a second in between. */
+	const logPlaying = (tree: ArenaTree) => {
+		const playing = tree.layers.flatMap((l) => (l.playing === null ? [] : [`${l.name} ${l.playing.name}${l.playing.missing ? ' (file missing)' : ''}`])).join(' · ')
 		const line = playing === '' ? 'nothing' : playing
 		if (line !== lastPlaying) console.log(`[arena] playing: ${line}`)
 		lastPlaying = line
@@ -94,11 +108,13 @@ function watchArena(url: string): { status(): Channel<ArenaStatus>; answered(): 
 				const tree = decodeComposition(msg.body)
 				if (!tree.ok) return put({ ok: false, reason: 'error', at, detail: tree.detail })
 				put({ ok: true, value: tree.value, at })
-				for (const id of subscriptionsOf(tree.value)) {
-					if (subscribed.has(id)) continue
-					subscribed.add(id)
-					socket?.send(subscribeMessage(id))
-				}
+				logPlaying(tree.value)
+				// Subscribe to what is new, and let go of what is gone: a clip
+				// no longer playing would otherwise keep sending its position.
+				const wanted = new Set(subscriptionsOf(tree.value))
+				for (const id of wanted) if (!subscribed.has(id)) socket?.send(subscribeMessage(id))
+				for (const id of subscribed) if (!wanted.has(id)) socket?.send(unsubscribeMessage(id))
+				subscribed = wanted
 				return
 			}
 			case 'parameter': {

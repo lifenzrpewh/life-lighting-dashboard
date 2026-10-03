@@ -51,7 +51,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, its Connections row can clear it. **Working on this Mac, 2026-10-02 (owner-observed):** signed in by the app's own QR as a booth device, songs-only and note editing both work. Server side: `visuals-song-comms` `2675660` (booth devices edit), migrations `20261002090000_pairing_kind` and `20261002100000_booth_device_edit`. Not yet on Windows. |
 | ✅ `src/renderer/components/ConnectionsPanel.tsx` · `src/shared/connections.ts` | **Connections**: one row per connection (Console, OnTime, ProPresenter, Arena, Cue Manager), status in a word, tap to open its fields with its own Save. Replaced the Settings form 2026-10-02; the status bar keeps LIVE, show, countdown, clock and a Connections button whose dot is the worst connection that is set up. Everyone sees it, operator mode edits. A connection not set up is `off`, never `down`. Owner-checked on the Windows box, 2026-10-02: "functionally works". |
 | ✅ `src/bridge/arena.ts` · `src/main/arena.ts` | Arena's link: `GET /api/v1/product` every 2 s, its row in Connections. Against Arena 7.28 on the Windows box, 2026-10-02. |
-| ✅ `src/bridge/arena-live.ts` · `src/main/arena.ts` | What Arena plays, over its websocket: each composition push gives which clip is connected on each layer, subscriptions keep the faders current, and the link poll keeps it from going stale. Read against Arena 7.28 on the Windows box, 2026-10-03, in the kiosk. Shown as the Arena view in a slot, thumbnails through main on an `arena:` scheme; the kiosk log names what plays. `docs/VISUALS_DASHBOARD.md` § Seen on Arena (2026-10-03). |
+| ✅ `src/bridge/arena-live.ts` · `src/main/arena.ts` | What Arena plays, over its websocket: each composition push gives which clip is connected on each layer, subscriptions keep the faders current, and the link poll keeps it from going stale. Read against Arena 7.28 on the Windows box, 2026-10-03, in the kiosk. Shown as the Arena view in a slot, thumbnails through main on an `arena:` scheme; the kiosk log names what plays. Each playing clip shows its time left, at the clip × group × composition speed (LIFE's VFX group runs at 1.795). `docs/VISUALS_DASHBOARD.md` § Seen on Arena (2026-10-03). |
 | ⚠️ `src/shared/layout.ts` · `src/renderer/components/Slot.tsx` · `src/renderer/slots.ts` | **Two slots** (2026-10-03, the owner's answers in `docs/VISUALS_DASHBOARD.md`): left and right each pick Run order, MA or Arena; the picker offers what answers, a slot keeps its view when it stops; picking the other slot's view swaps them; everyone picks; each machine remembers. The MA moves between slots without logging in again. Seen in the kiosk on the Windows box over the debugging port, not yet by a finger on the touchscreen. |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
@@ -291,13 +291,11 @@ on-console.
 ### TODO, in order
 
 0. **Try the two slots by hand** on the Windows box's touchscreen: pick, swap, fold,
-   drag the divider with the MA on the left, and restart to see the layout kept. Then
-   the next Arena piece (`docs/VISUALS_DASHBOARD.md` has them in order): piece 3, the
-   clip countdown, needs a video file connected, and this box lacks the show's media
-   (`I:\VFX Media Renamed`). QLab is parked (`docs/QLAB.md`, no Mac).
-   ⚠️ This box's console address is `127.0.0.1` with web remote port `8080`, which is
-   Arena's port here, so its MA slot shows Arena's web server page. Point it at onPC
-   or the desk to test the MA.
+   drag the divider with the MA on the left, and restart to see the layout kept. Watch
+   a video's time left count down in the Arena view (VFX 1 holds a test video). Then
+   the next Arena piece (`docs/VISUALS_DASHBOARD.md` has them in order). QLab is parked
+   (`docs/QLAB.md`, no Mac). Arena on this box serves on **8090** since 2026-10-03,
+   off the MA web remote's 8080.
 0. **A showfile read that stays off the command line (research).** The watcher
    pushes a Save As or base change within a second, but a Load ends it, so the new
    name waits for the next ask: once a quiet minute now (was 5 min, the owner's
