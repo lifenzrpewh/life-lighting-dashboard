@@ -271,7 +271,10 @@ since 2026-10-03 so is the installer, below). In `scripts/windows/`:
 after a crash, and logs to `%APPDATA%\life-lighting-dashboard\kiosk.log`;
 `install-startup.cmd` makes it start at login; `update.cmd` pulls and rebuilds, by
 hand, never before a service. One kiosk per computer: a second launch only focuses
-the first. ⚠️ None of the three has run on Windows yet.
+the first. ✅ On the Windows box, 2026-10-03: `kiosk.cmd` built when there was no build,
+came back 6 s after a forced kill and stayed shut after a normal close; `update.cmd`
+pulled, reinstalled and rebuilt in 43 s. ⚠️ `install-startup.cmd` not run (it writes to
+this user's Startup folder; the owner's call), so start at login is unwatched.
 
 **The installer (the way forward).** `npm run dist:win` builds
 `release/LIFE-Lighting-Dashboard-Setup-<version>.exe` (107 MB): per-user, no admin
