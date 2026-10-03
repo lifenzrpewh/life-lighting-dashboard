@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
@@ -16,6 +16,7 @@ import { useLeftWidth } from './leftWidth.js'
 import { MaMessage, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
+import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
 import { offered, type Slot as SlotId, type ViewId } from '../shared/layout.js'
 import { useSlots } from './slots.js'
@@ -202,8 +203,33 @@ export function App() {
 	// its page: the Cue Manager its half-typed note, the MA its connection.
 	const [maBox, setMaBox] = useState<HTMLElement | null>(null)
 	const [cueBox, setCueBox] = useState<HTMLElement | null>(null)
-	usePanePlacement(maBox, !leftOpen && layout.left === 'ma', (rect) => window.life?.placeMaPane(rect))
-	usePanePlacement(cueBox, !leftOpen && layout.left === 'cue', (rect) => window.life?.placeCuePane(rect))
+
+	// While the divider is dragged, each page stands still as a picture of
+	// itself and the live view is hidden (../main/pane-snapshot.ts): a page
+	// reflowing on every step trailed the finger. A pane with no picture stays
+	// live. The pictures outlast the drag by a moment, so the live view is back
+	// over its box before the picture under it goes.
+	const [stills, setStills] = useState<{ ma: string | null; cue: string | null } | null>(null)
+	const [frozen, setFrozen] = useState(false)
+	const drag = useRef(0)
+	const startDrag = () => {
+		const id = ++drag.current
+		void window.life?.snapshotPanes().then((s) => {
+			if (drag.current !== id) return
+			setStills(s)
+			setFrozen(true)
+		})
+	}
+	const endDrag = () => {
+		const id = ++drag.current
+		setFrozen(false)
+		setTimeout(() => drag.current === id && setStills(null), 300)
+	}
+
+	usePanePlacement(maBox, (!leftOpen && layout.left === 'ma') || (frozen && stills?.ma != null), (rect) => window.life?.placeMaPane(rect))
+	usePanePlacement(cueBox, (!leftOpen && layout.left === 'cue') || (frozen && stills?.cue != null), (rect) =>
+		window.life?.placeCuePane(rect),
+	)
 	// Unmounting closes the MA connection. It happens when the renderer goes
 	// away, which main also covers, since a crashed renderer cannot say goodbye.
 	useEffect(
@@ -304,7 +330,9 @@ export function App() {
 		}
 	}
 
-	const bodyOf = (view: ViewId) => {
+	const bodyOf = (view: ViewId, side: SlotId) => {
+		const still = view === 'arena' ? null : (stills?.[view] ?? null)
+		if (still !== null) return <Still src={still} side={side} />
 		switch (view) {
 			case 'cue':
 				return (
@@ -337,7 +365,7 @@ export function App() {
 				boxRef={boxRefOf(view)}
 				{...extra}
 			>
-				{bodyOf(view)}
+				{bodyOf(view, side)}
 			</Slot>
 		)
 	}
@@ -402,9 +430,14 @@ export function App() {
 				{leftOpen ? (
 					<Divider
 						width={leftWidth.width}
+						onStart={startDrag}
 						onDrag={leftWidth.set}
-						onDone={leftWidth.commit}
+						onDone={(px) => {
+							endDrag()
+							leftWidth.commit(px)
+						}}
 						onFold={() => {
+							endDrag()
 							leftWidth.revert()
 							setLeftOpen(false)
 						}}

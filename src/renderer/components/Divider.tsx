@@ -16,12 +16,15 @@ import { FOLD_BELOW_PX } from '../leftWidth.js'
 
 export function Divider({
 	width,
+	onStart,
 	onDrag,
 	onDone,
 	onFold,
 	onReset,
 }: {
 	width: number
+	/** A finger went down: a drag may follow. It ends in `onDone` or `onFold`. */
+	onStart: () => void
 	/** Every step of a drag, with the width the finger is asking for. */
 	onDrag: (px: number) => void
 	/** The drag ended here. */
@@ -54,6 +57,7 @@ export function Divider({
 				e.currentTarget.setPointerCapture(e.pointerId)
 				start.current = { x: e.clientX, width }
 				setDragging(true)
+				onStart()
 			}}
 			onPointerMove={(e) => {
 				if (start.current === null) return

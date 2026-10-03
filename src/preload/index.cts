@@ -48,6 +48,10 @@ const api = {
 	/** Want it at `rect`; null keeps the page but hides it (the column folded). */
 	placeCuePane: (rect: PaneRect | null): void => ipcRenderer.send('cue-pane:place', rect),
 	retryCuePane: (): void => ipcRenderer.send('cue-pane:retry'),
+	/** Pictures of the MA and the Cue Manager as they are now, each null when
+	 *  it is not on screen. Shown in their place while the divider is dragged,
+	 *  because a page reflowing on every step trails the finger. */
+	snapshotPanes: (): Promise<{ ma: string | null; cue: string | null }> => ipcRenderer.invoke('panes:snapshot'),
 	/** Operator mode only: sign the app out and forget what it kept. */
 	resetCuePane: (): Promise<boolean> => ipcRenderer.invoke('cue-pane:reset'),
 

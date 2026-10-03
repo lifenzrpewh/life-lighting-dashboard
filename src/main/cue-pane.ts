@@ -24,6 +24,7 @@ import { BACKEND_URL } from '../backend/endpoint.js'
 import { KIOSK_USER_AGENT_MARK, type CuePaneReport, type CuePaneState } from '../shared/cue-pane.js'
 import { PANE_LOAD_TIMEOUT_MS, PANE_RETRY_MS, isWebRemote as sameOrigin, type PaneRect } from '../shared/ma-pane.js'
 import { clampToWindow } from './ma-pane.js'
+import { snapshotOf } from './pane-snapshot.js'
 
 const ERR_ABORTED = -3
 const ACTIVITY = new Set(['mouseDown', 'mouseWheel', 'rawKeyDown', 'keyDown', 'touchStart', 'gestureTap'])
@@ -37,6 +38,8 @@ export type CuePane = {
 	retry(): void
 	/** Operator Settings: sign the app out and forget everything it kept here. */
 	reset(): Promise<void>
+	/** A picture of the page as it is, while it is on screen (./pane-snapshot.ts). */
+	snapshot(): Promise<string | null>
 }
 
 export function createCuePane(window: BrowserWindow): CuePane {
@@ -148,6 +151,8 @@ export function createCuePane(window: BrowserWindow): CuePane {
 
 	return {
 		report: () => ({ pane: state, lastInputAt }),
+
+		snapshot: () => snapshotOf(view, wanted && rect !== null && state.state === 'showing'),
 
 		place(next) {
 			wanted = true

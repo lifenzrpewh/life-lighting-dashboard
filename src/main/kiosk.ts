@@ -325,6 +325,12 @@ app.whenReady().then(() => {
 		if (fromKiosk(e)) cuePane?.place(rect === null ? null : asRect(rect))
 	})
 	ipcMain.on('cue-pane:retry', (e) => fromKiosk(e) && cuePane?.retry())
+	// Pictures of both panes, to stand in for them while the divider is dragged.
+	ipcMain.handle('panes:snapshot', async (e) => {
+		if (!fromKiosk(e)) return { ma: null, cue: null }
+		const [ma, cue] = await Promise.all([maPane?.snapshot() ?? null, cuePane?.snapshot() ?? null])
+		return { ma, cue }
+	})
 	ipcMain.handle('cue-pane:reset', async (e) => {
 		if (!fromKiosk(e) || mode !== 'operator') return false
 		await cuePane?.reset()

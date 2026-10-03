@@ -43,6 +43,7 @@ import {
 	type PaneRect,
 } from '../shared/ma-pane.js'
 import type { SettingsStore } from './settings.js'
+import { snapshotOf } from './pane-snapshot.js'
 
 /** Chromium's code for a load we cancelled ourselves, as a release does. Not a
  *  failure, and reporting it as one would flash an error at every mode switch. */
@@ -69,6 +70,8 @@ export type MaPane = {
 	release(): void
 	/** Try now, when it failed; Reload MA, a fresh login, otherwise. */
 	retry(): void
+	/** A picture of the page as it is, while it is on screen (./pane-snapshot.ts). */
+	snapshot(): Promise<string | null>
 }
 
 type Target = { url: string; login: string; user: string }
@@ -272,6 +275,8 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 
 	return {
 		report: () => ({ pane: state, lastInputAt, hasOperatorUser: settings.current().operatorUser !== null }),
+
+		snapshot: () => snapshotOf(view, wanted && rect !== null && state.state === 'showing'),
 
 		place(next) {
 			const first = !wanted
