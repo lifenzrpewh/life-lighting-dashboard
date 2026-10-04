@@ -306,18 +306,19 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-05).** Field-test build **0.1.0** is built for Windows and
-Apple Silicon by GitHub Actions and waits as a draft release; the app now keeps its own
-log, shows its version, keeps the screen awake, restarts itself after a crash (installed
-copy), and connections can be turned off. **Next: the list under "Improvements, in
-order"** (embeds, then MA3-style windows). Before that, on 2026-10-04: on the Windows box the dashboard is two slots, each
-picking Run order (the Cue Manager), MA, Arena, Clips or Video; any view pops out. Against
-**onPC** there: link LIVE, the showfile chip, and **Save As and Load from the app, each read
-back** (Save As needed `/NoConfirmation`). Against **Arena 7.28**: what plays with time
-left, the Clips trigger screen, the missing-file notice, the **media check** (a lookbook
-service's codes against what Arena holds), and the **Video** view of Arena's Spout output,
-16 bpc included, with Arena holding its 50 fps. The unsigned installer installs and runs.
-What is left needs a booth: the real console, and Arena with the show's media.
+**Where things stand (2026-10-05, morning).** The overnight list is done and **v0.2.0**
+is tagged: GitHub Actions builds Windows and Apple Silicon and drafts the release, for the
+owner to publish (`docs/FIELD_TEST.md` has what to check). New in it: **embeds** (any web
+page as a view, own sign-in each, zoom), **windows on a 12 × 8 grid** with tabs and Edit
+layout (replacing the two slots and the divider), **saved layouts**, pop-outs that offer
+**Show** and can be **sent behind**, the **pāua icon**, **windowed mode** and **MARK**. All
+driven in the kiosk on this box over CDP; none yet by a finger, on a booth, or signed in to
+Google. The choices taken without asking are in `docs/VISUALS_DASHBOARD.md` § Windows,
+embeds and layouts: read them first and change any the owner disagrees with. Before
+0.2.0, on 2026-10-04: against **onPC** here, link LIVE, the showfile chip, Save As and Load
+from the app; against **Arena 7.28**, what plays with time left, Clips, the missing-file
+notice, the media check and the Video view (16 bpc included). What is left needs a booth:
+the real console, and Arena with the show's media.
 
 **This Windows box:** Arena serves on **8090** (moved 2026-10-03 off the MA web remote's
 8080); the dashboard's Arena setting is `127.0.0.2:8090`; the VFX layer group runs at 1.795×
@@ -329,6 +330,11 @@ gets every reply. The web remote ignores pasted text and drops shifted keys; typ
 and use MA's on-screen Shift. Driving the kiosk: start it with
 `electron . --remote-debugging-port=9223` and send CDP input; a held press can be cancelled
 by a real mouse moving over the window, so check the log said "sent".
+Left from the overnight run (2026-10-05): the kiosk's layout is three windows (Run order;
+MA; Arena and a second MA tab), with two saved layouts, "Three windows" and "Two windows",
+both test arrangements to delete or keep. No embed is set up (the test one was removed). A
+dev kiosk is left running with \`--remote-debugging-port=9223\`. \`npm test\` clears \`dist/\`,
+so a dev kiosk reloaded after it loses its preload: \`npm run build:app\` and restart.
 
 ### Improvements, in order: "work on what is listed in the md"
 
@@ -340,53 +346,16 @@ whatever only a finger or a booth can confirm. Don't stop to ask: where a choice
 open, take the plainest one, say so in the commit, and list it for the owner. Keep
 the tests green and the typecheck clean at every commit.
 
-Field-test build 0.1.0 is out (`docs/FIELD_TEST.md`, `.github/workflows/release.yml`;
-a tag `v<version>` builds both and drafts a release, logs on `release-build-log`).
+Done overnight, 2026-10-05, each its own commit and status row above: ✅ embeds, the grid
+windows with tabs, saved layouts, pop-outs with Show and Send behind, the icon, windowed
+mode and MARK, and v0.2.0 tagged. The owner's decisions behind them (2026-10-04) are kept
+in the code's headers (`src/shared/layout.ts`, `src/shared/embeds.ts`,
+`src/shared/popout.ts`). **The list is empty**: next is the owner's reply to the choices
+in `docs/VISUALS_DASHBOARD.md` § Windows, embeds and layouts, then the items below.
 
-Done, 2026-10-04: ✅ the screen kept awake and the installed app's watchdog
-(`src/main/entry.ts`, `supervisor.ts`; a killed app back in 5 s, a normal close
-stays shut, a second launch leaves one app; ⚠️ a managed machine's own idle lock is
-unwatched). ✅ Connections can be turned off (settings `off`, `inUse`); the Video
-feed is a connection of its own; watched in the kiosk, each off and back on.
-
-The owner's decisions for what follows (2026-10-04), so none needs asking again:
-
-1. **Embeds.** Connections gets an **Embeds** section: add (a name and a URL) and
-   remove, **operator mode only**. Each embed is a view, in any slot or window.
-   - **Its own sign-in per embed** (a persistent session partition each, so one
-     Google login does not cover another embed).
-   - It may navigate anywhere inside itself (Google sign-in hops domains). A link
-     that would open a new window opens in **the computer's normal browser**
-     (`shell.openExternal`), never inside Pāua.
-   - A **− / + zoom** on its strip, remembered per embed. Reload like the others.
-   - Its Connections row says loaded / loading / not loading; it can be turned off
-     like any connection.
-   Build embeds in today's two slots first, so the owner has Google Sheets at once.
-2. **Windows on a grid, MA3-style** (replaces the two slots and the divider, and
-   covers the old "duplicates" item). A **12 × 8 grid**; windows never overlap (a
-   native page cannot be drawn over, and MA3's do not either). Add a window, drag to
-   move, drag edges to resize, snapping to cells; pages stand in as pictures while
-   dragged (`pane-snapshot.ts`).
-   - Each window has **tabs**: tap to switch, + to add a view, × to remove. Any view
-     in any tab, duplicates allowed.
-   - **The MA shows once**: another MA tab says "Only one MA window at a time" with
-     **Move it here**. Before allowing two Cue Manager pages, check its offline queue
-     is not synced twice; if unsure, the second is read-only or says so.
-   - **Turned-off connections**: their tabs disappear, and come back when on.
-   - **Arranging is operator mode only**, behind an Edit layout switch.
-   - **Default layout** (fresh, or nothing saved): two windows, Run order on the left
-     third, MA on the right two-thirds, as today.
-3. **Saved layouts**: named, on each machine (like settings); **everyone may switch**
-   between them, from the status bar. A layout keeps its windows, their tabs and which
-   tab shows.
-4. **Pop-outs stay, and pop a tab**: that view goes to its own OS window; the tab stays
-   and offers **Show** and **Bring back**. A pop-out can be **sent behind** (not always
-   on top); Show brings it forward.
-5. A **pāua shell icon** (installer, taskbar, Dock); **windowed mode** as a setting (for
-   Mac testers; the booth stays full screen); **"mark this moment"**, a button that
-   writes a tester's mark into the log.
-6. If stable at the end: tag **v0.2.0** (a draft release, Windows + Mac; the owner
-   publishes). Bump `package.json` first.
+For the owner to try first, by finger on the booth screen: Edit layout (drag a window, an
+edge, a corner), a Google Sheet as an embed and its sign-in, and whether 2 × 2 cells is a
+sensible smallest window.
 
 Later, not tonight:
 - **Fetch missing media** (the owner wants to explore it): the media check finds a
@@ -455,17 +424,19 @@ visible-campus filter back (`20261002100000`), so a booth lists only its campus,
 
 ### How the pieces work, briefly
 
-**The two slots** (`src/shared/layout.ts`) each hold Run order, MA or Arena. The
-native views are placed from the App over whichever slot's body holds them
-(`src/renderer/panePlacement.ts`), so a view changing slots moves rather than reloads.
+**The windows** (`src/shared/layout.ts`, `src/renderer/components/Grid.tsx`) sit on a 12 × 8
+grid and hold tabs. The pages main draws (the MA, the run order, each embed) are placed
+from the App over the body of the one tab that is their home
+(`src/renderer/panePlacement.ts`, one `PanePlacer` per page), so a page changing windows
+moves rather than reloads. While Edit layout is on, every page is hidden and a picture of
+it stands in (`pane-snapshot.ts`), so the grid's handles can be drawn.
 
 **The run order** is the Cue Manager itself (`src/main/cue-pane.ts`), placed like the
 MA pane.
 It signs itself in, by emailed code or its own QR, keeps that sign-in and its offline
 queue in a persistent session, and is a picture, not a reading: the app shows its own
-offline banner. Folding the left slot hides it without reloading, so a half-typed note
-survives. Its edge drags to resize (`src/renderer/leftWidth.ts` has the limits), and
-dragged nearly shut it folds; double-tap puts it back to a phone's width. Input in it counts toward operator mode's idle timer.
+offline banner. A tab switched away hides it without reloading, so a half-typed note
+survives. Input in it counts toward operator mode's idle timer.
 
 **The showfile chip.** LifeBridge's `show` verb makes SaveGuard's verdict on the
 console, because the trip mangles names (`docs/MA3_READ_MODEL.md` § The showfile).

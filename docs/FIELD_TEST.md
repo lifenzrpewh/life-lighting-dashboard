@@ -2,7 +2,8 @@
 
 For whoever is trying Pāua at a booth. It's the touchscreen dashboard beside
 the grandMA3: the run order (Cue Manager), the MA's web remote, Arena's clips
-and video, in two slots you pick.
+and video, and any web page you add (a Google Sheet, say), in windows you
+arrange on a grid.
 
 This is a test build. Nothing here can change the show except what an
 operator does on purpose (Save As, Load, firing a clip), and the console is
@@ -27,7 +28,8 @@ Each new build asks again. The first time it stores an MA password, macOS asks
 whether Pāua may use the keychain: **Always Allow**. That too comes back with
 each new build.
 
-**Getting out:** Alt+F4 on Windows, Cmd+Q on a Mac. It runs full screen.
+**Getting out:** Alt+F4 on Windows, Cmd+Q on a Mac. It runs full screen; on a
+laptop, **Connections › This screen › Window** (operator mode) gives it a window.
 
 ## First run
 
@@ -48,6 +50,10 @@ The path and the version are at the foot of Connections; in operator mode,
 **Show the log** opens its folder. The file before it is `paua.1.log`.
 
 ## Reporting something
+
+When something happens, tap **MARK** in the status bar: it writes a numbered
+mark in the log at that moment, with what was on screen, and shows the number.
+Write the number down with what you saw.
 
 Say: the **version** (foot of Connections), roughly **when** it happened, what
 you did, what you saw. Send `paua.log` with it. A photo of the screen helps
@@ -76,6 +82,17 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Clips fire from the Clips view; faders move
 - [ ] The Video view shows Arena's output and keeps up
 
+**Windows and layouts** (0.2.0)
+- [ ] Edit layout (operator mode, status bar): move a window, resize it by an edge, add one, add and remove tabs
+- [ ] A second MA tab says "Only one MA window at a time"; Move it here brings the MA over without logging in again
+- [ ] Save the layout under a name (LAYOUT in the status bar), change it, then switch back as a volunteer
+- [ ] Pop a tab out, Send behind, then Show from its tab; Bring back
+
+**Embeds** (0.2.0)
+- [ ] Connections › Add a web page: a Google Sheet; sign in inside it (say what Google showed, passkey prompts included)
+- [ ] Zoom it with − / +; it keeps its zoom after a restart
+- [ ] A link that opens a new window opens in the computer's browser
+- [ ] Two embeds signed in to two different Google accounts stay apart
+
 **Generally**
-- [ ] Dragging the divider, popping a view out and bringing it back
 - [ ] Anything a volunteer found confusing, in their words

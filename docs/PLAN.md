@@ -373,7 +373,7 @@ A **chip in the status bar**, not a panel, opening to a sheet.
   share a neighbourhood.
 
 > ⚠️ **The write half is built, not yet seen on a console** (2026-10-04). The chip's ▸ opens
-> `src/renderer/components/ShowfileSheet.tsx` in the right slot. Save As offers **campus + New
+> `src/renderer/components/ShowfileSheet.tsx` in the grid's place. Save As offers **campus + New
 > Zealand date and time** (`Central 2026-10-04 0915`, the owner's choice: no PCO lookup; campus is a
 > setting on the Console row), timestamp budgeted first, only characters every leg carries
 > unchanged, never the base show's name; it sends `SaveShow "<name>"` and says saved only when

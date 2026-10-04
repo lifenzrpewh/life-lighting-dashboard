@@ -370,6 +370,10 @@ the dashboard adds.
 
 ## Answered (owner, 2026-10-03): the two slots
 
+> Replaced on 2026-10-05 by windows on a grid (§ Windows, embeds and layouts,
+> below). What carried over: a view that stops answering keeps its tab and says
+> so, everyone switches tabs, and each machine remembers its layout.
+
 - **Both slots pick.** Left and right each have a picker: Run order, MA, Arena, and
   later others. A view is in one slot at a time; picking the one the other slot holds
   swaps them.
@@ -482,6 +486,43 @@ sync. The booth's Arena files carry the NAS names (`LC-NAS-01 › Graphics › S
 1. Central`, a Synology). The lookbook is the truth for the current version. **Still
 open:** the real composition's slot names (only needed if the check should say a code
 is in the wrong slot), and whether countdowns (D) belong in it.
+
+## Windows, embeds and layouts (owner, 2026-10-04; built 2026-10-05)
+
+The owner's decisions are in CLAUDE.md § Improvements; the rules are in the code's
+headers: `src/shared/layout.ts` (the grid, tabs, saved layouts) and
+`src/shared/embeds.ts` (embeds). Built overnight on the Windows box and driven over
+CDP, not yet by a finger.
+
+**Choices made without asking** (the plainest that works; the owner may change any):
+
+- **Every page shows once, not only the MA.** The run order and each embed are
+  native pages too, and a page can be in one place at a time. A second tab of any of
+  them says "Only one … window at a time" with **Move it here**. For the Cue Manager
+  this also settles the offline-queue question: there is never a second page to sync
+  twice. A second live copy of an embed would need a second page in the same session;
+  not built.
+- **Adding and removing tabs is arranging**, so it is in Edit layout (operator mode).
+  Switching tabs and **Move it here** are everyone's.
+- **While editing, every page is a picture** for the whole edit, not only while
+  dragging: the handles are drawn over the windows, and nothing can be drawn over a
+  live page. The pictures are taken as Edit layout is tapped.
+- **The smallest window is 2 × 2 cells.** A window with all its tabs removed stays,
+  empty, until it is removed or given a tab. Add window takes the biggest free place;
+  with no room, it says so.
+- **Video's Fit is a pop-out's only.** On the grid a window snaps to cells, so it
+  cannot take a picture's exact shape; the picture letterboxes.
+- **Saved layouts open in the grid's place** (like Connections), from LAYOUT in the
+  status bar, because a menu over a live page cannot be drawn. The button names the
+  layout on screen; switching a tab still counts as that layout. Up to 12.
+- **Embeds open only once a window shows them**, so a booth can add many without each
+  loading in the background. Off closes the page and keeps its sign-in; removing one
+  clears its session, and its folder at the next start. The Google sign-in page on
+  Windows raised a **passkey dialog** naming electron.exe as an "untrusted app": that
+  is Google offering a passkey, and Cancel or another way in both work.
+- **MARK** is for everyone and writes the mode, the layout and the views on screen
+  beside the mark's number. **This screen** (Full screen / Window) is in Connections,
+  operator mode.
 
 ## Open questions
 
