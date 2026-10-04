@@ -69,6 +69,9 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ⚠️ `src/main/video-feed.ts` · `src/renderer/components/VideoView.tsx` | **The video feed**: a Spout/Syphon sender (Arena's multiview, to be) as a **Video** view, GPU to GPU through `@napolab/texture-bridge` and Electron's `sharedTexture`, the pages still sandboxed. Seen live from a stand-in sender (`spikes/spout-test-sender.cjs`) and from **Arena 7.28's Spout output** on the Windows box, 2026-10-03, in a slot and popped out; capped at 30 fps. A touch-sized source picker, and **Fit** to give the space the picture's shape. 16-bit (Arena's High Detail) goes through **LIFE's build of the addon** (`native/texture-bridge/`, built by GitHub Actions), converted to 8-bit on the GPU: ✅ exact against a 16-bit stand-in (`spikes/spout-16bit-sender.cs`), 2026-10-03, and ✅ **from Arena at 16 bpc**, 2026-10-04 (owner-set and owner-watched; the kiosk read 1920×1080 at 27 fps, no failure; the stock addon refuses 16-bit, and the sender's own format is not logged). `docs/VISUALS_DASHBOARD.md` § The video feed. |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
+| ✅ `src/bridge/log-file.ts` · `src/main/log.ts` | **The app's own log**, `paua.log` in the data folder, timed, two 5 MB files at most; the kiosk page's errors and a crashed GPU or page process go in too. Version and path at the foot of Connections. Watched writing on the Windows box, 2026-10-04. |
+| ✅ `src/main/entry.ts` · `src/main/supervisor.ts` · `src/bridge/supervise.ts` | **The installed app's watchdog**: Paua.exe in Node mode runs the app and restarts it 5 s after a crash, gives up after 5 in 2 minutes, leaves a clean quit alone. A checkout is left to kiosk.cmd. Watched on the packaged build on the Windows box, 2026-10-04. |
+| ✅ `.github/workflows/release.yml` · `docs/FIELD_TEST.md` | **Field-test builds**: a tag `v<version>` builds `Paua-Setup-<v>.exe` and `Paua-<v>-arm64.dmg` (ad-hoc signed, Syphon.framework left as upstream signed it) and drafts a release; logs pushed to `release-build-log`. v0.1.0 built green 2026-10-04. ⚠️ Neither file installed anywhere yet; the Mac build never opened on a Mac. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
@@ -300,7 +303,11 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-04).** On the Windows box the dashboard is two slots, each
+**Where things stand (2026-10-05).** Field-test build **0.1.0** is built for Windows and
+Apple Silicon by GitHub Actions and waits as a draft release; the app now keeps its own
+log, shows its version, keeps the screen awake, restarts itself after a crash (installed
+copy), and connections can be turned off. **Next: the list under "Improvements, in
+order"** (embeds, then MA3-style windows). Before that, on 2026-10-04: on the Windows box the dashboard is two slots, each
 picking Run order (the Cue Manager), MA, Arena, Clips or Video; any view pops out. Against
 **onPC** there: link LIVE, the showfile chip, and **Save As and Load from the app, each read
 back** (Save As needed `/NoConfirmation`). Against **Arena 7.28**: what plays with time
@@ -320,29 +327,78 @@ and use MA's on-screen Shift. Driving the kiosk: start it with
 `electron . --remote-debugging-port=9223` and send CDP input; a held press can be cancelled
 by a real mouse moving over the window, so check the log said "sent".
 
-### Improvements, in order (the owner's picks, 2026-10-04)
+### Improvements, in order: "work on what is listed in the md"
+
+**When the owner says "work on what is listed in the md" (or similar), this is the
+list: work down it in order, unattended.** Commit and push after each piece that
+works (`/handoff` § 4's style). Check each piece in the kiosk on this box over the
+debugging port (`electron . --remote-debugging-port=9223`, CDP input); mark ⚠️
+whatever only a finger or a booth can confirm. Don't stop to ask: where a choice is
+open, take the plainest one, say so in the commit, and list it for the owner. Keep
+the tests green and the typecheck clean at every commit.
 
 Field-test build 0.1.0 is out (`docs/FIELD_TEST.md`, `.github/workflows/release.yml`;
 a tag `v<version>` builds both and drafts a release, logs on `release-build-log`).
-1. ✅ The screen kept awake, and the installed app's watchdog (`src/main/entry.ts`,
-   `supervisor.ts`): watched on the Windows box, 2026-10-04: a killed app back in 5 s,
-   a normal close stays shut, a second launch leaves one app. ⚠️ A managed machine's
-   own idle lock is unwatched.
-2. **Connections can be turned off**: off leaves the dot, the slot pickers and its info
-   (countdown chip, LIVE/showfile). The **Video feed** becomes a connection of its own,
-   separate from Arena.
-3. **Duplicates**: any view in both slots. The MA can be picked twice, but only one
-   shows; the other slot says "Only one MA window at a time" with Move it here. Check
-   first that two Cue Manager pages do not double-sync its offline queue.
-4. **Pop-outs** can be sent back (not always on top), with Show on the slot to find them.
-5. A **pāua shell icon**; windowed mode (for Mac testers); "mark this moment" in the log.
-6. Start at login; self-update once hosting is decided.
-7. **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
-   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
-   view** ("?" in each slot). Then, interested: a big countdown view, connection history
-   (an hour's strip per row), a read-only phone view on the booth network.
-Parked: the pre-service check. Declined: stage messages (not this desk's role), clips
-for this service (another role fires clips from a Stream Deck), panic to black, dim mode.
+
+Done, 2026-10-04: ✅ the screen kept awake and the installed app's watchdog
+(`src/main/entry.ts`, `supervisor.ts`; a killed app back in 5 s, a normal close
+stays shut, a second launch leaves one app; ⚠️ a managed machine's own idle lock is
+unwatched). ✅ Connections can be turned off (settings `off`, `inUse`); the Video
+feed is a connection of its own; watched in the kiosk, each off and back on.
+
+The owner's decisions for what follows (2026-10-04), so none needs asking again:
+
+1. **Embeds.** Connections gets an **Embeds** section: add (a name and a URL) and
+   remove, **operator mode only**. Each embed is a view, in any slot or window.
+   - **Its own sign-in per embed** (a persistent session partition each, so one
+     Google login does not cover another embed).
+   - It may navigate anywhere inside itself (Google sign-in hops domains). A link
+     that would open a new window opens in **the computer's normal browser**
+     (`shell.openExternal`), never inside Pāua.
+   - A **− / + zoom** on its strip, remembered per embed. Reload like the others.
+   - Its Connections row says loaded / loading / not loading; it can be turned off
+     like any connection.
+   Build embeds in today's two slots first, so the owner has Google Sheets at once.
+2. **Windows on a grid, MA3-style** (replaces the two slots and the divider, and
+   covers the old "duplicates" item). A **12 × 8 grid**; windows never overlap (a
+   native page cannot be drawn over, and MA3's do not either). Add a window, drag to
+   move, drag edges to resize, snapping to cells; pages stand in as pictures while
+   dragged (`pane-snapshot.ts`).
+   - Each window has **tabs**: tap to switch, + to add a view, × to remove. Any view
+     in any tab, duplicates allowed.
+   - **The MA shows once**: another MA tab says "Only one MA window at a time" with
+     **Move it here**. Before allowing two Cue Manager pages, check its offline queue
+     is not synced twice; if unsure, the second is read-only or says so.
+   - **Turned-off connections**: their tabs disappear, and come back when on.
+   - **Arranging is operator mode only**, behind an Edit layout switch.
+   - **Default layout** (fresh, or nothing saved): two windows, Run order on the left
+     third, MA on the right two-thirds, as today.
+3. **Saved layouts**: named, on each machine (like settings); **everyone may switch**
+   between them, from the status bar. A layout keeps its windows, their tabs and which
+   tab shows.
+4. **Pop-outs stay, and pop a tab**: that view goes to its own OS window; the tab stays
+   and offers **Show** and **Bring back**. A pop-out can be **sent behind** (not always
+   on top); Show brings it forward.
+5. A **pāua shell icon** (installer, taskbar, Dock); **windowed mode** as a setting (for
+   Mac testers; the booth stays full screen); **"mark this moment"**, a button that
+   writes a tester's mark into the log.
+6. If stable at the end: tag **v0.2.0** (a draft release, Windows + Mac; the owner
+   publishes). Bump `package.json` first.
+
+Later, not tonight:
+- **Fetch missing media** (the owner wants to explore it): the media check finds a
+  code missing or an old version; copy the right file from the graphics drive / NAS
+  down to this machine, then load it into the right Arena slot. Pāua's first writer
+  to a media drive and to Arena's composition: never during a service, progress for
+  big files. Design with the owner first. Today the check only reads.
+- Start at login; self-update once hosting is decided.
+- **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
+  fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
+  view** ("?"). Then, interested: a big countdown view, connection history (an hour's
+  strip per row), a read-only phone view on the booth network.
+- Parked: the pre-service check. Declined: stage messages (not this desk's role), clips
+  for this service (another role fires clips from a Stream Deck), panic to black, dim
+  mode.
 
 ### TODO, in order
 
