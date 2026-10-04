@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { consoleStatus, cueStatus, polledStatus, worstTone } from '../dist/src/shared/connections.js'
+import { CONNECTIONS, CONNECTION_OF_VIEW, consoleStatus, cueStatus, polledStatus, turnedOff, videoStatus, worstTone } from '../dist/src/shared/connections.js'
 import { record, unread } from '../dist/src/shared/reading.js'
 
 const T0 = 1_000_000
@@ -60,4 +60,26 @@ test('the Cue Manager: a page loaded is live, a failed load says why', () => {
 	assert.equal(failed.tone, 'down')
 	assert.equal(failed.detail, 'ERR_NAME_NOT_RESOLVED')
 	assert.equal(cueStatus(null).tone, 'off')
+})
+
+test('a connection turned off is off, in its own words, and never touches the dot', () => {
+	const row = turnedOff('arena', 'Arena')
+	assert.deepEqual(row, { id: 'arena', name: 'Arena', tone: 'off', status: 'turned off', detail: null })
+	const live = polledStatus('ontime', 'OnTime', ok(1), T0, 5_000, detail)
+	assert.equal(worstTone([live, row]), 'live')
+})
+
+test('every view belongs to a connection, and the video feed is its own, not Arena’s', () => {
+	assert.equal(CONNECTION_OF_VIEW.video, 'video')
+	assert.equal(CONNECTION_OF_VIEW.clips, 'arena')
+	assert.equal(CONNECTION_OF_VIEW.ma, 'console')
+	assert.ok(Object.values(CONNECTION_OF_VIEW).every((id) => CONNECTIONS.includes(id)))
+})
+
+test('the video feed: no sender is down; a sender is live, named with its size', () => {
+	const feed = { senders: [], showing: null, lastFrame: null, fps: 0, failure: null }
+	assert.equal(videoStatus(null).tone, 'off')
+	assert.equal(videoStatus(feed).tone, 'down')
+	const showing = { ...feed, senders: ['Arena'], showing: 'Arena', lastFrame: { at: T0, width: 1920, height: 1080, sender: 'Arena' } }
+	assert.deepEqual(videoStatus(showing), { id: 'video', name: 'Video feed', tone: 'live', status: 'LIVE', detail: 'Arena, 1920×1080' })
 })

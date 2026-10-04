@@ -107,6 +107,7 @@ function ShowName({ show, ageMs }: { show: Showfile; ageMs: number | null }) {
 
 export function StatusBar({
 	link,
+	consoleOn,
 	now,
 	mode,
 	onEnter,
@@ -120,6 +121,8 @@ export function StatusBar({
 	timers,
 }: {
 	link: LinkState
+	/** False when the console is turned off in Connections: no LIVE, no show. */
+	consoleOn: boolean
 	now: number
 	mode: Mode
 	onEnter: () => void
@@ -144,8 +147,12 @@ export function StatusBar({
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-4 border-b border-booth-edge bg-booth-panel px-4 text-sm">
 			{/* The console: is it there, and which show is it on. */}
-			<LinkPill link={link} detail={operator} />
-			<ShowfileChip showfile={showfile} failure={showfileFailure} onOpen={onShowfile} />
+			{consoleOn && (
+				<>
+					<LinkPill link={link} detail={operator} />
+					<ShowfileChip showfile={showfile} failure={showfileFailure} onOpen={onShowfile} />
+				</>
+			)}
 
 			{/* The time: what comes next, and what it is now. */}
 			<span className="ml-auto flex min-w-0 items-center">

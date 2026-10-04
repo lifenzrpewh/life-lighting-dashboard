@@ -30,6 +30,7 @@ export function ConnectionsPanel({
 	paneSummary,
 	desk,
 	now,
+	onChanged,
 	onClose,
 }: {
 	rows: readonly ConnectionStatus[]
@@ -38,6 +39,8 @@ export function ConnectionsPanel({
 	paneSummary: string
 	desk: DeskState | null
 	now: number
+	/** Settings were saved: the screen re-reads what is turned off. */
+	onChanged: () => void
 	onClose: () => void
 }) {
 	const [view, setView] = useState<SettingsView | null>(null)
@@ -54,8 +57,12 @@ export function ConnectionsPanel({
 		if (result === undefined) return { form: 'The kiosk did not answer.' }
 		if (!result.ok) return result.errors
 		await load()
+		onChanged()
 		return null
 	}
+	const isOff = (id: ConnectionId) => view.off.includes(id)
+	const setOn = (id: ConnectionId, on: boolean) =>
+		save({ off: on ? view.off.filter((x) => x !== id) : [...view.off, id] })
 
 	const address: Record<ConnectionId, string | null> = {
 		console: view.consoleHost,
@@ -64,6 +71,7 @@ export function ConnectionsPanel({
 			view.proPresenterHost === null ? null : `${view.proPresenterHost}:${view.proPresenterPort ?? '?'}`,
 		arena: view.arenaHost === null ? null : `${view.arenaHost}:${view.arenaPort}`,
 		cue: null,
+		video: null,
 	}
 
 	return (
@@ -92,11 +100,20 @@ export function ConnectionsPanel({
 								<span className={`whitespace-nowrap text-sm ${toneText[row.tone]}`}>{row.status}</span>
 								{row.detail !== null && <span className="truncate text-sm text-booth-dim">{row.detail}</span>}
 							</span>
-							<span className="text-sm whitespace-nowrap text-booth-dim tabular-nums">{address[row.id] ?? ''}</span>
+							<span className={`text-sm whitespace-nowrap text-booth-dim tabular-nums ${isOff(row.id) ? 'line-through opacity-60' : ''}`}>
+								{address[row.id] ?? ''}
+							</span>
 							<span className="text-booth-dim">{open === row.id ? '▾' : '›'}</span>
 						</button>
 						{open === row.id && (
 							<div className="flex flex-col gap-4 border-t border-booth-edge bg-booth-panel px-4 py-5">
+								{operator && <OnOff on={!isOff(row.id)} onSet={(on) => void setOn(row.id, on)} />}
+								{row.id === 'video' && (
+									<p className="text-sm text-booth-dim">
+										A picture another program on this computer sends over Spout (Windows) or Syphon (Mac), such as Arena’s
+										multiview. Separate from Arena: it works with Arena’s web server off.
+									</p>
+								)}
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
 								{!operator ? (
 									row.id !== 'cue' && (
@@ -161,6 +178,32 @@ export function Dot({ tone }: { tone: Tone }) {
 		off: 'border border-booth-dim',
 	}
 	return <span className={`size-2.5 rounded-full ${fill[tone]}`} />
+}
+
+/** Whether this booth uses a connection. Off keeps the address but stops
+ *  asking, leaves the dot alone, and takes its views and chips off the screen. */
+function OnOff({ on, onSet }: { on: boolean; onSet: (on: boolean) => void }) {
+	const option = (value: boolean, label: string) => (
+		<button
+			type="button"
+			onClick={() => value !== on && onSet(value)}
+			aria-pressed={value === on}
+			className={`h-10 px-5 text-sm ${value === on ? 'bg-booth-ink text-booth-bg' : 'text-booth-dim'}`}
+		>
+			{label}
+		</button>
+	)
+	return (
+		<div className="flex items-center gap-4">
+			<span className="flex overflow-hidden rounded border border-booth-edge">
+				{option(true, 'On')}
+				{option(false, 'Off')}
+			</span>
+			<span className="text-sm text-booth-dim">
+				{on ? 'Used at this booth.' : 'Not used here: not asked, not in the dot, and its views and chips are hidden.'}
+			</span>
+		</div>
+	)
 }
 
 /** A row's own Save, with what went wrong under it. One row's fields only:

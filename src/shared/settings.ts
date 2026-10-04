@@ -16,6 +16,7 @@
 // whether one is set and never what it is; main keeps them encrypted at rest.
 
 import { DEFAULT_ARENA_PORT } from './arena.js'
+import { CONNECTIONS, type ConnectionId } from './connections.js'
 import { DEFAULT_REMOTE_USER, DEFAULT_WEB_REMOTE_PORT, isConsoleHost, isPort } from './ma-pane.js'
 import { CAMPUS_MAX } from './showfile-write.js'
 
@@ -59,6 +60,11 @@ export type Settings = {
 	 *  carries it, and the Cue Manager's campus is behind its own page. Null:
 	 *  names begin `Show`. */
 	campus: string | null
+	/** Connections turned off in Connections: kept, address and all, but not
+	 *  asked, not in the dot, and their views and chips gone from the screen
+	 *  (the owner, 2026-10-04). Which programs a booth uses is a fact about the
+	 *  booth, not the show, so it passes the test above. */
+	off: ConnectionId[]
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -93,6 +99,27 @@ export const DEFAULT_SETTINGS: Settings = {
 	arenaHost: null,
 	arenaPort: DEFAULT_ARENA_PORT,
 	campus: null,
+	off: [],
+}
+
+/** The settings main works from: a connection turned off is treated as one
+ *  with no address, so nothing asks it. The stored settings keep the address. */
+export function inUse(s: Settings): Settings {
+	const off = new Set(s.off)
+	return {
+		...s,
+		consoleHost: off.has('console') ? null : s.consoleHost,
+		onTimeHost: off.has('ontime') ? null : s.onTimeHost,
+		proPresenterHost: off.has('propresenter') ? null : s.proPresenterHost,
+		arenaHost: off.has('arena') ? null : s.arenaHost,
+	}
+}
+
+/** A list of connections off disk or IPC, or null if it is not one. Known ids
+ *  only, each once, in the tab's order. */
+function offFrom(v: unknown): ConnectionId[] | null {
+	if (!Array.isArray(v) || !v.every((id) => (CONNECTIONS as readonly unknown[]).includes(id))) return null
+	return CONNECTIONS.filter((id) => v.includes(id))
 }
 
 /** What the renderer is shown. Passwords appear only as whether they exist. */
@@ -244,6 +271,11 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 			else errors.operatorUser = e
 		}
 	}
+	if (patch.off !== undefined) {
+		const off = offFrom(patch.off)
+		if (off === null) errors.off = 'Not a list of connections.'
+		else next.off = off
+	}
 	for (const key of ['volunteerPassword', 'operatorPassword'] as const) {
 		const pw = patch[key]
 		if (typeof pw === 'string' && pw === '') errors[key] = 'Leave blank to keep the password; use Remove to clear it.'
@@ -273,6 +305,7 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['arenaHost'] === 'string' && isConsoleHost(r['arenaHost'])) out.arenaHost = r['arenaHost']
 	if (typeof r['arenaPort'] === 'number' && isPort(r['arenaPort'])) out.arenaPort = r['arenaPort']
 	if (typeof r['campus'] === 'string' && campusError(r['campus']) === null) out.campus = r['campus']
+	out.off = offFrom(r['off']) ?? []
 	return out
 }
 
@@ -299,6 +332,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['arenaHost', strOrNull],
 		['arenaPort', num],
 		['campus', strOrNull],
+		['off', Array.isArray],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

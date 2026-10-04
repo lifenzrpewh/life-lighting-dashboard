@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_SETTINGS, applyPatch, fromDisk, isLoopback, patchFrom, replyPortOf } from '../dist/src/shared/settings.js'
+import { DEFAULT_SETTINGS, applyPatch, fromDisk, inUse, isLoopback, patchFrom, replyPortOf } from '../dist/src/shared/settings.js'
 
 test('first boot has no console address, rather than a guessed one', () => {
 	assert.equal(DEFAULT_SETTINGS.consoleHost, null)
@@ -66,6 +66,7 @@ test('a corrupt file costs only the bad values', () => {
 		arenaHost: null,
 		arenaPort: 8080,
 		campus: null,
+		off: [],
 	})
 	assert.deepEqual(fromDisk('garbage'), DEFAULT_SETTINGS)
 })
@@ -116,4 +117,27 @@ test('onPC on this computer with replies on its own port is refused, and says wh
 	assert.ok(applyPatch(DEFAULT_SETTINGS, { consoleHost: '10.11.60.40' }).ok, 'a console elsewhere shares one port, as MA intends')
 	assert.equal(isLoopback('127.0.0.1.example'), false)
 	assert.equal(isLoopback('10.11.60.40'), false)
+})
+
+test('a connection turned off keeps its address, but main works as if it had none', () => {
+	const on = { ...DEFAULT_SETTINGS, consoleHost: '10.11.60.40', arenaHost: '127.0.0.1', onTimeHost: '10.0.0.5' }
+	const r = applyPatch(on, { off: ['arena', 'console'] })
+	assert.ok(r.ok)
+	assert.equal(r.settings.arenaHost, '127.0.0.1', 'the address stays, for turning it back on')
+	assert.deepEqual(r.settings.off, ['console', 'arena'], 'in the tab’s order')
+	const used = inUse(r.settings)
+	assert.equal(used.consoleHost, null)
+	assert.equal(used.arenaHost, null)
+	assert.equal(used.onTimeHost, '10.0.0.5')
+})
+
+test('the off list: unknown ids are refused in a patch, and dropped whole off disk', () => {
+	const r = applyPatch(DEFAULT_SETTINGS, { off: ['arena', 'teleporter'] })
+	assert.equal(r.ok, false)
+	assert.ok('off' in r.errors)
+	assert.equal(patchFrom({ off: 'arena' }), null, 'not a list is the wrong shape')
+	assert.deepEqual(patchFrom({ off: ['video'] }), { off: ['video'] })
+	assert.deepEqual(fromDisk({ off: ['video', 'video', 'ontime'] }).off, ['ontime', 'video'])
+	assert.deepEqual(fromDisk({ off: ['nope'] }).off, [])
+	assert.deepEqual(fromDisk({}).off, [], 'a settings file from before the switch has everything on')
 })

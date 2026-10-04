@@ -16,6 +16,7 @@ import type { Mode } from '../shared/ma-pane.js'
 import {
 	applyPatch,
 	fromDisk,
+	inUse,
 	type Checked,
 	type Settings,
 	type SettingsPatch,
@@ -25,6 +26,8 @@ import {
 type Secrets = Record<Mode, string | null>
 
 export type SettingsStore = {
+	/** What main works from: a connection turned off reads as having no
+	 *  address (`inUse`). The panel's `view` keeps the stored address. */
 	current(): Settings
 	/** For main alone: the pane's login. Never sent over IPC. */
 	password(mode: Mode): string | null
@@ -52,7 +55,7 @@ export function openSettings(): SettingsStore {
 	}
 
 	return {
-		current: () => settings,
+		current: () => inUse(settings),
 		password: (mode) => secrets[mode],
 		view: () => ({
 			...settings,

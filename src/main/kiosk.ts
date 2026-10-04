@@ -223,6 +223,13 @@ function startOsc(store: SettingsStore): void {
 	oscKey = key
 
 	stopOsc()
+	// No console (not set up, or turned off in Connections): nothing to ask
+	// and nobody to listen for. Binding anyway fought onPC for its port and
+	// logged a fault about a console nobody uses (seen 2026-10-04).
+	if (s.consoleHost === null) {
+		console.log('[kiosk] no console in use: not listening for one')
+		return
+	}
 	// Logged once per distinct fault. A console with no route answers every
 	// ping with the same error, and a line a second would bury everything else.
 	let lastSendError = ''
@@ -433,7 +440,18 @@ app.whenReady().then(() => {
 
 	// The video feed. A page says when it shows the feed, and gets frames
 	// while it does; which sender it shows is a pick from what the machine has.
-	videoFeed = startVideoFeed()
+	// Only while its connection is on: off, nothing lists senders.
+	const syncVideo = () => {
+		const on = !store.current().off.includes('video')
+		if (on && videoFeed === null) videoFeed = startVideoFeed()
+		if (!on && videoFeed !== null) {
+			videoFeed.stop()
+			videoFeed = null
+			console.log('[video] turned off')
+		}
+	}
+	syncVideo()
+	store.onChange(syncVideo)
 	ipcMain.handle('video:state', (e): VideoFeedState | null => (fromOurs(e) ? (videoFeed?.state() ?? null) : null))
 	ipcMain.on('video:watch', (e, on: unknown) => {
 		if (fromOurs(e) && typeof on === 'boolean') videoFeed?.watch(e.sender, on)

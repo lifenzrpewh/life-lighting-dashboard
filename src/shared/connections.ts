@@ -13,15 +13,39 @@
 // answering is `down`, whatever it last said.
 
 import type { CuePaneState } from './cue-pane.js'
+import type { ViewId } from './layout.js'
 import type { MaPaneState } from './ma-pane.js'
 import type { Channel, LinkState } from './reading.js'
 import { readingOf } from './reading.js'
+import { currentFrame, type VideoFeedState } from './video-feed.js'
 
 /** LIVE, STALE, down, or not set up. Down covers UNKNOWN and UNREACHABLE: in a
  *  list of connections, both mean "not answering now". */
 export type Tone = 'live' | 'stale' | 'down' | 'off'
 
-export type ConnectionId = 'console' | 'ontime' | 'propresenter' | 'arena' | 'cue'
+export type ConnectionId = 'console' | 'ontime' | 'propresenter' | 'arena' | 'cue' | 'video'
+
+/** Every connection, in the tab's order. */
+export const CONNECTIONS: readonly ConnectionId[] = ['console', 'ontime', 'propresenter', 'arena', 'cue', 'video']
+
+/** Which connection each view shows. A view whose connection is turned off
+ *  leaves the slot pickers (the owner, 2026-10-04). The video feed is its own
+ *  connection, not Arena's: it reads a Spout or Syphon sender on this computer,
+ *  which works with Arena's web server off, or with no Arena at all. */
+export const CONNECTION_OF_VIEW: Record<ViewId, ConnectionId> = {
+	cue: 'cue',
+	ma: 'console',
+	arena: 'arena',
+	clips: 'arena',
+	video: 'video',
+}
+
+/** A connection someone turned off in Connections: `off`, like one not set
+ *  up, so it never touches the dot, and said in its own words. Its address
+ *  stays, for turning it back on. */
+export function turnedOff(id: ConnectionId, name: string): ConnectionStatus {
+	return { id, name, tone: 'off', status: 'turned off', detail: null }
+}
 
 export type ConnectionStatus = {
 	id: ConnectionId
@@ -99,6 +123,17 @@ export function cueStatus(pane: CuePaneState | null): ConnectionStatus {
 		case 'failed':
 			return { ...base, tone: 'down', status: pane.cause === 'no-answer' ? 'no answer' : 'not loading', detail: pane.detail }
 	}
+}
+
+/** The video feed: a sender on this computer, and frames from it while a
+ *  page watches. On with no sender is down: someone turned it on to see one. */
+export function videoStatus(feed: VideoFeedState | null): ConnectionStatus {
+	const base = { id: 'video' as const, name: 'Video feed' }
+	if (feed === null) return { ...base, tone: 'off', status: 'kiosk only', detail: null }
+	if (feed.showing === null) return { ...base, tone: 'down', status: 'no sender', detail: feed.failure }
+	const frame = currentFrame(feed)
+	const size = frame === null ? '' : `, ${frame.width}×${frame.height}`
+	return { ...base, tone: 'live', status: 'LIVE', detail: `${feed.showing}${size}` }
 }
 
 function ageWords(ms: number): string {

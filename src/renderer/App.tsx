@@ -8,7 +8,17 @@ import type { MaPaneReport } from '../shared/ma-pane.js'
 import type { CuePaneReport } from '../shared/cue-pane.js'
 import { TIMER_STALE_AFTER_MS, type TimerSources } from '../shared/timer.js'
 import { ARENA_STALE_AFTER_MS, arenaVersion, type ArenaSource, type ArenaStatus } from '../shared/arena.js'
-import { consoleStatus, cueStatus, polledStatus, worstTone, type ConnectionStatus } from '../shared/connections.js'
+import {
+	CONNECTION_OF_VIEW,
+	consoleStatus,
+	cueStatus,
+	polledStatus,
+	turnedOff,
+	videoStatus,
+	worstTone,
+	type ConnectionId,
+	type ConnectionStatus,
+} from '../shared/connections.js'
 import { StatusBar } from './components/StatusBar.js'
 import { CueMessage } from './components/CuePane.js'
 import { Divider } from './components/Divider.js'
@@ -21,7 +31,7 @@ import { currentFrame, fitLeftWidth, type VideoFeedState } from '../shared/video
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
 import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
-import { VIEW_LABEL, offered, slotOf, type Slot as SlotId, type ViewId } from '../shared/layout.js'
+import { VIEWS, VIEW_LABEL, offered, slotOf, type Slot as SlotId, type ViewId } from '../shared/layout.js'
 import { useSlots } from './slots.js'
 import { usePopouts } from './popouts.js'
 import { usePanePlacement } from './panePlacement.js'
@@ -70,6 +80,11 @@ export function App() {
 		setShowfileOpen(!showfileOpen)
 		void window.life?.settings().then((s) => setCampus(s.campus))
 	}
+	// The connections turned off in Connections (../shared/settings.ts `off`):
+	// read on start and again whenever Connections saves.
+	const [off, setOff] = useState<ConnectionId[]>([])
+	const readOff = () => void window.life?.settings().then((s) => setOff(s.off))
+	useEffect(readOff, [])
 	const leftWidth = useLeftWidth()
 	const { layout, choose } = useSlots()
 	const { popped, popOut, bringBack } = usePopouts()
@@ -352,7 +367,9 @@ export function App() {
 		),
 		polledStatus('arena', 'Arena', arena ?? null, now, ARENA_STALE_AFTER_MS, (p) => `${p.name} ${arenaVersion(p)}`),
 		cueStatus(cue?.pane ?? null),
-	]
+		videoStatus(videoFeed ?? null),
+	].map((row) => (off.includes(row.id) ? turnedOff(row.id, row.name) : row))
+	const consoleOn = !off.includes('console')
 
 	// What the pickers offer (../shared/layout.ts): a view whose source answers.
 	// The MA answers when the link is live or the console's web remote has
@@ -365,7 +382,21 @@ export function App() {
 		clips: arenaAnswering,
 		video: (videoFeed?.senders.length ?? 0) > 0,
 	}
-	const choices = offered(layout, answering)
+	// A view whose connection is off is not offered, even in its own slot.
+	const shown = (v: ViewId) => !off.includes(CONNECTION_OF_VIEW[v])
+	const choices = offered(layout, answering).filter(shown)
+	// A slot left holding a view that was just turned off takes the first view
+	// still on, answering first. Turning a connection off is someone's choice,
+	// so this is not the screen rearranging itself under a volunteer.
+	useEffect(() => {
+		for (const side of ['left', 'right'] as const) {
+			if (shown(layout[side])) continue
+			const other = layout[side === 'left' ? 'right' : 'left']
+			const candidates = VIEWS.filter((v) => shown(v) && v !== other)
+			const next = candidates.find((v) => answering[v]) ?? candidates[0]
+			if (next !== undefined) choose(side, next)
+		}
+	})
 	const maShown = layout.left === 'ma' || layout.right === 'ma'
 
 	/** A view's own buttons, in its slot's strip. Reload reconnects a picture
@@ -500,6 +531,7 @@ export function App() {
 
 			<StatusBar
 				link={sources.link}
+				consoleOn={consoleOn}
 				now={now}
 				mode={mode}
 				onEnter={enter}
@@ -565,6 +597,7 @@ export function App() {
 							paneSummary={paneSummary(pane, mode)}
 							desk={desk}
 							now={now}
+							onChanged={readOff}
 							onClose={() => setConnectionsOpen(false)}
 						/>
 					) : showfileOpen ? (
