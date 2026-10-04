@@ -32,9 +32,8 @@ import {
 	type ArenaStatus,
 } from '../../shared/arena.js'
 import { matchReading, readingOf, type Channel } from '../../shared/reading.js'
-import { Say } from './MaPane.js'
+import { Centered, Say } from './MaPane.js'
 import { MediaCheck } from './MediaCheck.js'
-import { Centered } from './Slot.js'
 import { chipLabel, formatAge, staleContent, unknownWhy } from './vocabulary.js'
 
 export function ArenaView({ status, now }: { status: Channel<ArenaStatus> | null | undefined; now: number }) {

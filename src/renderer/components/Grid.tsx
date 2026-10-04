@@ -1,0 +1,268 @@
+// The windows on the grid (../../shared/layout.ts): each with a strip of tabs
+// and a body its view fills.
+//
+// A native page (the MA, the run order, an embed) is drawn by main over the
+// body of the one tab that is its home, so the strip above is the only part of
+// a window that page cannot cover. That is why the tabs and the view's own
+// buttons live in it.
+//
+// EDITING (operator mode, behind Edit layout): every page stands in as a
+// picture of itself, so the grid can be drawn over. Drag a window's body to
+// move it, its edges or corners to resize it; it snaps to cells, and a place
+// over another window is shown in red and not taken. + adds a tab, × takes one
+// away, and the strip's × removes the window. Out of editing, only tapping a
+// tab does anything to the layout.
+
+import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+
+import { COLS, MIN_H, MIN_W, ROWS, fits, shownTab, type Box, type GridWindow, type Layout, type Tab, type ViewId } from '../../shared/layout.js'
+
+const label = 'text-[10px] font-semibold tracking-widest uppercase'
+
+/** Which edges a handle moves. All four is the whole window. */
+type Edges = { l: boolean; r: boolean; t: boolean; b: boolean }
+const MOVE: Edges = { l: true, r: true, t: true, b: true }
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi)
+
+/** Where a window goes when `edges` are dragged `dx`, `dy` cells. */
+export function dragged(from: Box, edges: Edges, dx: number, dy: number): Box {
+	if (edges.l && edges.r && edges.t && edges.b) {
+		return { ...from, x: clamp(from.x + dx, 0, COLS - from.w), y: clamp(from.y + dy, 0, ROWS - from.h) }
+	}
+	let { x, y, w, h } = from
+	if (edges.l) {
+		x = clamp(from.x + dx, 0, from.x + from.w - MIN_W)
+		w = from.x + from.w - x
+	}
+	if (edges.r) w = clamp(from.w + dx, MIN_W, COLS - from.x)
+	if (edges.t) {
+		y = clamp(from.y + dy, 0, from.y + from.h - MIN_H)
+		h = from.y + from.h - y
+	}
+	if (edges.b) h = clamp(from.h + dy, MIN_H, ROWS - from.y)
+	return { x, y, w, h }
+}
+
+const area = (b: Box) => ({ gridColumn: `${b.x + 1} / span ${b.w}`, gridRow: `${b.y + 1} / span ${b.h}` })
+
+export type GridProps = {
+	layout: Layout
+	editing: boolean
+	/** Whether a view's tab is on screen at all (its connection is on). */
+	visible: (view: ViewId) => boolean
+	labelOf: (view: ViewId) => string
+	/** What + offers, in its order. */
+	offer: readonly ViewId[]
+	/** What a window's shown tab has in its body. */
+	body: (win: GridWindow, tab: Tab) => ReactNode
+	/** The body's ref, for the tab a native page is drawn in. */
+	boxRef: (win: GridWindow, tab: Tab) => ((el: HTMLElement | null) => void) | undefined
+	/** The shown view's own buttons, at the strip's far end. */
+	actions: (win: GridWindow, tab: Tab) => ReactNode
+	onSelect: (windowId: string, tabId: string) => void
+	onAddTab: (windowId: string, view: ViewId) => void
+	onRemoveTab: (windowId: string, tabId: string) => void
+	onRemoveWindow: (windowId: string) => void
+	onPlace: (windowId: string, box: Box) => void
+}
+
+export function Grid(p: GridProps) {
+	const gridRef = useRef<HTMLDivElement>(null)
+	const start = useRef<{ id: string; from: Box; px: number; py: number; edges: Edges } | null>(null)
+	const [drag, setDrag] = useState<{ id: string; box: Box; ok: boolean } | null>(null)
+	const latest = useRef(drag)
+	latest.current = drag
+	const [adding, setAdding] = useState<string | null>(null)
+
+	/** Pointer handlers for a handle that moves `edges` of `win`. A press keeps
+	 *  every move until it lifts (pointer capture), so a drag that runs off the
+	 *  handle, or off the window, still lands. */
+	const handle = (win: GridWindow, edges: Edges) => ({
+		onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+			e.currentTarget.setPointerCapture(e.pointerId)
+			e.stopPropagation()
+			const from = { x: win.x, y: win.y, w: win.w, h: win.h }
+			start.current = { id: win.id, from, px: e.clientX, py: e.clientY, edges }
+			setDrag({ id: win.id, box: from, ok: true })
+		},
+		onPointerMove: (e: ReactPointerEvent<HTMLElement>) => {
+			const s = start.current
+			const grid = gridRef.current
+			if (s === null || grid === null) return
+			const r = grid.getBoundingClientRect()
+			const dx = Math.round((e.clientX - s.px) / (r.width / COLS))
+			const dy = Math.round((e.clientY - s.py) / (r.height / ROWS))
+			const box = dragged(s.from, s.edges, dx, dy)
+			const d = latest.current
+			if (d !== null && d.box.x === box.x && d.box.y === box.y && d.box.w === box.w && d.box.h === box.h) return
+			setDrag({ id: s.id, box, ok: fits(p.layout, box, s.id) })
+		},
+		onPointerUp: () => {
+			const d = latest.current
+			if (d !== null && d.ok) p.onPlace(d.id, d.box)
+			start.current = null
+			setDrag(null)
+		},
+		onPointerCancel: () => {
+			start.current = null
+			setDrag(null)
+		},
+	})
+
+	return (
+		<div
+			ref={gridRef}
+			className="grid min-h-0 flex-1 gap-1 bg-booth-bg p-1"
+			style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))` }}
+		>
+			{/* The cells, while editing: where a window can go. */}
+			{p.editing &&
+				Array.from({ length: COLS * ROWS }, (_, i) => (
+					<div
+						key={`cell${i}`}
+						aria-hidden
+						className="rounded-sm border border-dashed border-booth-edge/60"
+						style={area({ x: i % COLS, y: Math.floor(i / COLS), w: 1, h: 1 })}
+					/>
+				))}
+			{p.layout.windows.map((win) => {
+				const tab = shownTab(win, p.visible)
+				const tabs = win.tabs.filter((t) => p.visible(t.view))
+				const moving = drag?.id === win.id ? drag : null
+				const box = moving?.box ?? win
+				return (
+					<section
+						key={win.id}
+						style={area(box)}
+						className={`relative z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-sm bg-booth-panel ${
+							moving === null ? '' : moving.ok ? 'ring-2 ring-booth-ink' : 'ring-2 ring-state-unreachable opacity-80'
+						}`}
+					>
+						<div className="flex h-12 shrink-0 items-center gap-1 border-b border-booth-edge px-1">
+							<div role="tablist" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none]">
+								{tabs.map((t) => (
+									<span key={t.id} className="flex shrink-0 items-center">
+										<button
+											type="button"
+											role="tab"
+											aria-selected={t.id === tab?.id}
+											onClick={() => p.onSelect(win.id, t.id)}
+											className={`${label} h-10 shrink-0 rounded-md px-3 active:scale-[0.98] ${
+												t.id === tab?.id ? 'bg-booth-ink text-booth-bg' : 'text-booth-dim active:bg-booth-edge'
+											}`}
+										>
+											{p.labelOf(t.view)}
+										</button>
+										{p.editing && (
+											<button
+												type="button"
+												onClick={() => p.onRemoveTab(win.id, t.id)}
+												aria-label={`Remove the ${p.labelOf(t.view)} tab`}
+												className="h-10 w-8 shrink-0 rounded-md text-booth-dim active:bg-booth-edge"
+											>
+												×
+											</button>
+										)}
+									</span>
+								))}
+								{tabs.length === 0 && !p.editing && <span className={`${label} px-3 text-booth-dim`}>Empty</span>}
+							</div>
+							{p.editing && (
+								<button
+									type="button"
+									onClick={() => setAdding(adding === win.id ? null : win.id)}
+									aria-label="Add a tab"
+									aria-expanded={adding === win.id}
+									className="h-10 w-10 shrink-0 rounded-md border border-booth-edge text-lg text-booth-dim active:bg-booth-edge"
+								>
+									+
+								</button>
+							)}
+							<span className="ml-auto" />
+							{!p.editing && tab !== null && p.actions(win, tab)}
+							{p.editing && (
+								<button
+									type="button"
+									onClick={() => p.onRemoveWindow(win.id)}
+									aria-label="Remove this window"
+									className="h-10 shrink-0 rounded-md border border-booth-edge px-3 text-xs text-booth-dim active:bg-booth-edge"
+								>
+									Remove window
+								</button>
+							)}
+						</div>
+						<div ref={tab === null ? undefined : p.boxRef(win, tab)} className="relative flex min-h-0 min-w-0 flex-1 bg-booth-bg">
+							{tab === null ? (
+								<div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-booth-dim">
+									{win.tabs.length === 0
+										? p.editing
+											? 'Tap + to put a view here, or remove this window.'
+											: 'Nothing here. In operator mode, Edit layout puts a view here.'
+										: 'Its views are turned off in Connections.'}
+								</div>
+							) : (
+								p.body(win, tab)
+							)}
+							{p.editing && (
+								<>
+									{/* The body moves the window; its edges resize it. */}
+									<div
+										{...handle(win, MOVE)}
+										className="absolute inset-0 flex cursor-move touch-none items-end justify-center bg-booth-bg/40 pb-6"
+									>
+										<span className="rounded-md bg-booth-panel px-4 py-2 text-xs text-booth-dim">
+											Drag to move · drag an edge to resize
+										</span>
+									</div>
+									<EdgeHandles win={win} handle={handle} />
+								</>
+							)}
+							{p.editing && adding === win.id && (
+								<AddMenu
+									offer={p.offer}
+									labelOf={p.labelOf}
+									onPick={(v) => {
+										setAdding(null)
+										p.onAddTab(win.id, v)
+									}}
+								/>
+							)}
+						</div>
+					</section>
+				)
+			})}
+		</div>
+	)
+}
+
+/** Bands along each edge and squares at each corner, big enough for a finger. */
+function EdgeHandles({ win, handle }: { win: GridWindow; handle: (win: GridWindow, edges: Edges) => object }) {
+	const band = 'absolute touch-none bg-booth-ink/0 hover:bg-booth-ink/20 active:bg-booth-ink/30'
+	const e = (l: boolean, r: boolean, t: boolean, b: boolean): Edges => ({ l, r, t, b })
+	return (
+		<>
+			<div {...handle(win, e(true, false, false, false))} className={`${band} inset-y-6 left-0 w-5 cursor-ew-resize`} />
+			<div {...handle(win, e(false, true, false, false))} className={`${band} inset-y-6 right-0 w-5 cursor-ew-resize`} />
+			<div {...handle(win, e(false, false, true, false))} className={`${band} inset-x-6 top-0 h-5 cursor-ns-resize`} />
+			<div {...handle(win, e(false, false, false, true))} className={`${band} inset-x-6 bottom-0 h-5 cursor-ns-resize`} />
+			<div {...handle(win, e(true, false, true, false))} className={`${band} top-0 left-0 size-6 cursor-nwse-resize`} />
+			<div {...handle(win, e(false, true, true, false))} className={`${band} top-0 right-0 size-6 cursor-nesw-resize`} />
+			<div {...handle(win, e(true, false, false, true))} className={`${band} bottom-0 left-0 size-6 cursor-nesw-resize`} />
+			<div {...handle(win, e(false, true, false, true))} className={`${band} right-0 bottom-0 size-6 cursor-nwse-resize`} />
+		</>
+	)
+}
+
+/** + : every view that may be on screen. */
+function AddMenu({ offer, labelOf, onPick }: { offer: readonly ViewId[]; labelOf: (v: ViewId) => string; onPick: (v: ViewId) => void }) {
+	return (
+		<div className="absolute top-2 left-2 z-20 flex max-h-[calc(100%-1rem)] w-56 flex-col overflow-y-auto rounded-md border border-booth-edge bg-booth-panel py-1 shadow-lg">
+			{offer.map((v) => (
+				<button key={v} type="button" onClick={() => onPick(v)} className="h-12 shrink-0 px-4 text-left text-sm active:bg-booth-edge">
+					{labelOf(v)}
+				</button>
+			))}
+		</div>
+	)
+}

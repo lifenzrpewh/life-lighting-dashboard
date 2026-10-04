@@ -75,14 +75,6 @@ export function videoFit(picture: Size, spaceDevicePx: Size): { scale: number; b
 	return { scale, best: { width: Math.round(spaceDevicePx.width), height: Math.round(spaceDevicePx.height) } }
 }
 
-/** The left slot's width that gives the video's slot the picture's shape, its
- *  height unchanged: Fit, rather than a new resolution in Arena. Not clamped;
- *  the slot's own limits apply after (../renderer/leftWidth.ts). */
-export function fitLeftWidth(o: { side: 'left' | 'right'; picture: Size; space: Size; leftWidth: number }): number {
-	const grow = (o.space.height * o.picture.width) / o.picture.height - o.space.width
-	return Math.round(o.side === 'left' ? o.leftWidth + grow : o.leftWidth - grow)
-}
-
 /** A pop-out window's content size that gives its picture space the picture's
  *  shape, as tall as it is now unless that would not fit the room it has.
  *  `content` is the whole window's inside, `space` the picture's part of it;

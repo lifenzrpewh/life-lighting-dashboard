@@ -57,7 +57,7 @@ test('an embed is a view: native, named by itself, kept in a stored layout', () 
 	assert.ok(isNative(view) && isNative('ma') && isNative('cue') && !isNative('arena'))
 	assert.equal(viewLabel(view, [sheet]), 'Run sheet')
 	assert.equal(viewLabel(view, []), 'Embed')
-	assert.deepEqual(layoutFrom(JSON.stringify({ left: view, right: 'ma' })), { left: view, right: 'ma' })
+	assert.equal(layoutFrom(JSON.stringify({ left: view, right: 'ma' })).windows[0].tabs[0].view, view)
 	assert.equal(isViewId('embed:'), false)
 })
 

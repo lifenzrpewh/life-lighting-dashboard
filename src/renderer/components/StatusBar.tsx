@@ -113,6 +113,8 @@ export function StatusBar({
 	onEnter,
 	onLeave,
 	connectionsOpen,
+	editing,
+	onEdit,
 	onConnections,
 	onShowfile,
 	connections,
@@ -128,6 +130,9 @@ export function StatusBar({
 	onEnter: () => void
 	onLeave: () => void
 	connectionsOpen: boolean
+	/** Arranging the windows (./Grid.tsx), operator mode only. */
+	editing: boolean
+	onEdit: () => void
 	onConnections: () => void
 	/** Open the showfile sheet. */
 	onShowfile: () => void
@@ -165,6 +170,16 @@ export function StatusBar({
 
 			{/* Controls, where the hand rests. None touches the show. */}
 			<span className="flex shrink-0 items-center gap-2 border-l border-booth-edge pl-4">
+				{operator && (
+					<button
+						type="button"
+						onClick={onEdit}
+						aria-pressed={editing}
+						className={`${barButton} ${editing ? 'border-booth-ink bg-booth-ink text-booth-bg' : ''}`}
+					>
+						EDIT LAYOUT
+					</button>
+				)}
 				{/* For everyone: a volunteer can see what is down and say so. The
 				    fields inside are operator mode's. */}
 				<button

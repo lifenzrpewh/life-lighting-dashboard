@@ -94,3 +94,9 @@ export function Say({ head, body, children }: { head: string; body: string; chil
 		</div>
 	)
 }
+
+/** A body's message, in the middle of it: what someone sees while a native
+ *  page is not drawn over it. */
+export function Centered({ children }: { children: ReactNode }) {
+	return <div className="flex min-w-0 flex-1 items-center justify-center">{children}</div>
+}

@@ -24,19 +24,34 @@ import {
 } from '../shared/connections.js'
 import { StatusBar } from './components/StatusBar.js'
 import { CueMessage } from './components/CuePane.js'
-import { Divider } from './components/Divider.js'
-import { useLeftWidth } from './leftWidth.js'
-import { MaMessage, Say, paneSummary } from './components/MaPane.js'
+import { Centered, MaMessage, Say, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
-import { currentFrame, fitLeftWidth, type VideoFeedState } from '../shared/video-feed.js'
-import { Centered, FoldedSlot, Slot } from './components/Slot.js'
+import type { VideoFeedState } from '../shared/video-feed.js'
 import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
-import { VIEWS, isNative, offered, slotOf, viewLabel, type Slot as SlotId, type ViewId } from '../shared/layout.js'
+import {
+	VIEWS,
+	addTab,
+	addWindow,
+	freshId,
+	homeOf,
+	isNative,
+	makeHome,
+	placeWindow,
+	removeTab,
+	removeWindow,
+	selectTab,
+	viewLabel,
+	viewsShown,
+	type GridWindow,
+	type Tab,
+	type ViewId,
+} from '../shared/layout.js'
+import { Grid } from './components/Grid.js'
 import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
-import { useSlots } from './slots.js'
+import { useLayout } from './layoutStore.js'
 import { usePopouts } from './popouts.js'
 import { PanePlacer } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
@@ -72,7 +87,8 @@ export function App() {
 	// 'real' is dev's way to watch main's own link, against onPC or a stand-in,
 	// in a window rather than the full-screen kiosk. The run order stays cold.
 	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
-	const [leftOpen, setLeftOpen] = useState(true)
+	// Arranging the windows: operator mode only (../shared/layout.ts).
+	const [editing, setEditing] = useState(false)
 	const [connectionsOpen, setConnectionsOpen] = useState(false)
 	// The showfile sheet (Save As, Load) takes the right slot's place as
 	// Connections does; one at a time. The campus is read as it opens, for the
@@ -81,6 +97,7 @@ export function App() {
 	const [campus, setCampus] = useState<string | null>(null)
 	const openShowfile = () => {
 		setConnectionsOpen(false)
+		setEditing(false)
 		setShowfileOpen(!showfileOpen)
 		void window.life?.settings().then((s) => setCampus(s.campus))
 	}
@@ -101,8 +118,7 @@ export function App() {
 		})
 	useEffect(readOff, [])
 	const label = (view: ViewId) => viewLabel(view, embeds)
-	const leftWidth = useLeftWidth()
-	const { layout, choose } = useSlots()
+	const { layout, update } = useLayout()
 	const { popped, popOut, bringBack } = usePopouts()
 
 	// The clock is real time; ages derive from it, so STALE arrives on its own
@@ -228,20 +244,10 @@ export function App() {
 		}
 	}, [])
 
-	// The space the picture has, for the strip's size readout and for Fit.
+	// The space the picture has, for the strip's size readout. Fit is a
+	// pop-out's: a window on the grid snaps to cells, so it cannot take a
+	// picture's exact shape.
 	const [videoSpace, setVideoSpace] = useState<VideoSpace | null>(null)
-	/** Fit: move the divider so the video's slot takes the picture's shape,
-	 *  rather than changing the resolution in Arena. The slots' own limits
-	 *  still apply, so a picture too wide for them stays letterboxed. */
-	const fitVideo = () => {
-		const side = slotOf(layout, 'video')
-		const picture = videoFeed == null ? null : currentFrame(videoFeed)
-		if (side === null || picture === null || videoSpace === null) return
-		// Folded, the divider is not on screen: moving it would change only the
-		// width the left slot comes back at, which nobody asked for.
-		if (!leftOpen) return
-		leftWidth.commit(fitLeftWidth({ side, picture, space: videoSpace, leftWidth: leftWidth.width }))
-	}
 
 	// The run order is the Cue Manager itself, in its own pane: real in dev
 	// too, like the MA pane. Polled for its load state and its last input.
@@ -291,18 +297,17 @@ export function App() {
 		}
 	}, [])
 
-	// The two native views are placed from here, which never unmounts, over
-	// whichever slot's body holds them (./panePlacement.ts). A view in neither
-	// slot, in the folded left one, or behind Connections is hidden, and keeps
-	// its page: the Cue Manager its half-typed note, the MA its connection. A
-	// popped-out view is placed by its own window, and main ignores the kiosk
-	// about it until it is back.
+	// The pages main draws (the MA, the run order, each embed) are placed from
+	// here, which never unmounts, over the body of the tab that is their home
+	// (./panePlacement.ts). A page in no tab, behind Connections or popped out
+	// is hidden, and keeps its page: the Cue Manager its half-typed note, the MA
+	// its connection. A popped-out page is placed by its own window, and main
+	// ignores the kiosk about it until it is back.
 	// One box per page, by view. Each view's ref callback is made once and
 	// kept, so React does not hand a box over and back on every render.
 	const [boxes, setBoxes] = useState<Record<string, HTMLElement | null>>({})
 	const boxRefs = useRef(new Map<ViewId, (el: HTMLElement | null) => void>())
 	const boxRefOf = (view: ViewId) => {
-		if (!isNative(view)) return undefined
 		let ref = boxRefs.current.get(view)
 		if (ref === undefined) {
 			ref = (el) => setBoxes((b) => (b[view] === el ? b : { ...b, [view]: el }))
@@ -311,27 +316,30 @@ export function App() {
 		return ref
 	}
 
-	// While the divider is dragged, each page stands still as a picture of
-	// itself and the live view is hidden (../main/pane-snapshot.ts): a page
-	// reflowing on every step trailed the finger. A pane with no picture stays
-	// live. The pictures outlast the drag by a moment, so the live view is back
-	// over its box before the picture under it goes.
+	// While the layout is edited, each page stands still as a picture of
+	// itself and the live page is hidden (../main/pane-snapshot.ts): the grid's
+	// handles are drawn over the windows, and a native page cannot be drawn
+	// over. The pictures outlast the editing by a moment, so the live page is
+	// back over its box before the picture under it goes.
+	// The pictures are taken before editing starts: once it has, the pages are
+	// hidden and there is nothing to take a picture of.
 	const [stills, setStills] = useState<Record<string, string | null> | null>(null)
-	const [frozen, setFrozen] = useState(false)
-	const drag = useRef(0)
-	const startDrag = () => {
-		const id = ++drag.current
-		void window.life?.snapshotPanes().then((s) => {
-			if (drag.current !== id) return
+	const editTurn = useRef(0)
+	const startEditing = () => {
+		const id = ++editTurn.current
+		const pictures = window.life?.snapshotPanes() ?? Promise.resolve({})
+		void pictures.then((s) => {
+			if (editTurn.current !== id) return
 			setStills(s)
-			setFrozen(true)
+			setEditing(true)
 		})
 	}
-	const endDrag = () => {
-		const id = ++drag.current
-		setFrozen(false)
-		setTimeout(() => drag.current === id && setStills(null), 300)
-	}
+	useEffect(() => {
+		if (editing) return
+		const id = ++editTurn.current
+		const t = setTimeout(() => editTurn.current === id && setStills(null), 300)
+		return () => clearTimeout(t)
+	}, [editing])
 
 	/** Every page main draws, and how this screen places it. */
 	const pages: Array<{ view: ViewId; send: (rect: PaneRect | null) => void }> = [
@@ -341,8 +349,7 @@ export function App() {
 			.filter((e) => e.on)
 			.map((e) => ({ view: embedView(e.id), send: (rect: PaneRect | null) => window.life?.placeEmbed(e.id, rect) })),
 	]
-	const pageHidden = (view: ViewId) =>
-		popped.has(view) || (!leftOpen && layout.left === view) || (frozen && stills?.[view] != null)
+	const pageHidden = (view: ViewId) => popped.has(view) || editing
 	// Unmounting closes the MA connection. It happens when the renderer goes
 	// away, which main also covers, since a crashed renderer cannot say goodbye.
 	useEffect(
@@ -386,6 +393,7 @@ export function App() {
 	useEffect(() => {
 		window.life?.setMaPaneMode(mode)
 		setConnectionsOpen(false)
+		setEditing(false)
 	}, [mode])
 
 	const sources: Sources =
@@ -418,37 +426,16 @@ export function App() {
 		.concat(embeds.map((e) => embedStatus(e, embedReport(e.id)?.pane ?? null)))
 	const consoleOn = !off.includes('console')
 
-	// What the pickers offer (../shared/layout.ts): a view whose source answers.
-	// The MA answers when the link is live or the console's web remote has
-	// loaded: either is the console responding.
-	const arenaAnswering = connections.find((c) => c.id === 'arena')?.tone === 'live'
-	const answering: Record<ViewId, boolean> = {
-		cue: true,
-		ma: sources.link.state === 'live' || pane?.pane.state === 'showing',
-		arena: arenaAnswering,
-		clips: arenaAnswering,
-		video: (videoFeed?.senders.length ?? 0) > 0,
-	}
-	// A view whose connection is off is not offered, even in its own slot.
-	const shown = (v: ViewId) => viewIsOn(v, off, embeds)
+	// A tab whose connection is off is not on screen (../shared/layout.ts),
+	// and comes back when it is on. Until settings are read, nothing is off:
+	// every embed would otherwise look removed for a moment.
+	const visible = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds)
 	const embedViews = embeds.filter((e) => e.on).map((e) => embedView(e.id))
-	const choices = offered(layout, answering, embedViews).filter(shown)
-	// A slot left holding a view that was just turned off takes the first view
-	// still on, answering first. Turning a connection off is someone's choice,
-	// so this is not the screen rearranging itself under a volunteer.
-	useEffect(() => {
-		if (!settingsRead) return
-		for (const side of ['left', 'right'] as const) {
-			if (shown(layout[side])) continue
-			const other = layout[side === 'left' ? 'right' : 'left']
-			const candidates = [...VIEWS, ...embedViews].filter((v) => shown(v) && v !== other)
-			const next = candidates.find((v) => !(v in answering) || answering[v as keyof typeof answering]) ?? candidates[0]
-			if (next !== undefined) choose(side, next)
-		}
-	})
-	const maShown = layout.left === 'ma' || layout.right === 'ma'
+	/** What a window's + offers: every view that may be on screen. */
+	const offer = [...VIEWS, ...embedViews].filter(visible)
+	const maShown = viewsShown(layout, visible).includes('ma')
 
-	/** A view's own buttons, in its slot's strip. Reload reconnects a picture
+	/** A view's own buttons, in its window's strip. Reload reconnects a picture
 	 *  and fires nothing. A popped-out view's buttons are in its own window. */
 	const actionsOf = (view: ViewId) => {
 		if (popped.has(view)) return null
@@ -501,15 +488,16 @@ export function App() {
 			case 'video':
 				return (
 					<>
-						<VideoStrip feed={videoFeed} space={videoSpace} onFit={fitVideo} />
+						<VideoStrip feed={videoFeed} space={videoSpace} />
 						{out}
 					</>
 				)
 		}
 	}
 
-	const bodyOf = (view: ViewId, side: SlotId) => {
-		// The slot keeps the view's place while it is out (../shared/popout.ts).
+	const bodyOf = (_win: GridWindow, tab: Tab) => {
+		const view = tab.view
+		// The tab keeps the view's place while it is out (../shared/popout.ts).
 		if (popped.has(view)) {
 			return (
 				<Centered>
@@ -525,8 +513,33 @@ export function App() {
 				</Centered>
 			)
 		}
-		const still = isNative(view) ? (stills?.[view] ?? null) : null
-		if (still !== null) return <Still src={still} side={side} />
+		if (isNative(view) && homeOf(layout, view, visible) !== tab.id) {
+			// A page is in one place at a time. Not its home: say where it is, and
+			// offer to bring it here. Everyone may: it moves a page, not a window.
+			return (
+				<Centered>
+					<Say head={`Only one ${label(view)} window at a time`} body={`${label(view)} is showing in another window.`}>
+						<button
+							type="button"
+							onClick={() => update((l) => makeHome(l, view, tab.id))}
+							className="mt-5 h-12 rounded-md border border-booth-edge px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
+						>
+							Move it here
+						</button>
+					</Say>
+				</Centered>
+			)
+		}
+		if (editing && isNative(view)) {
+			const still = stills?.[view] ?? null
+			return still !== null ? (
+				<Still src={still} side="left" />
+			) : (
+				<Centered>
+					<Say head={label(view)} body="Shown again when the layout is done." />
+				</Centered>
+			)
+		}
 		const embedId = embedIdOf(view)
 		if (embedId !== null) {
 			return (
@@ -563,23 +576,14 @@ export function App() {
 	}
 
 
-	const slot = (side: SlotId, extra: { width?: number; folded?: boolean; onFold?: () => void }) => {
-		const view = layout[side]
-		return (
-			<Slot
-				key={side}
-				view={view}
-				labelOf={label}
-				choices={choices}
-				onPick={(v) => choose(side, v)}
-				actions={actionsOf(view)}
-				boxRef={boxRefOf(view)}
-				{...extra}
-			>
-				{bodyOf(view, side)}
-			</Slot>
-		)
-	}
+	/** A new id for a window or tab, unlike any in the layout now. */
+	const newId = (prefix: 'w' | 't') => freshId(layout, prefix)
+	const [noRoom, setNoRoom] = useState(false)
+	useEffect(() => {
+		if (!noRoom) return
+		const t = setTimeout(() => setNoRoom(false), 4_000)
+		return () => clearTimeout(t)
+	}, [noRoom])
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
@@ -613,8 +617,16 @@ export function App() {
 				onEnter={enter}
 				onLeave={leave}
 				connectionsOpen={connectionsOpen}
+				editing={editing}
+				onEdit={() => {
+					setConnectionsOpen(false)
+					setShowfileOpen(false)
+					if (editing) setEditing(false)
+					else startEditing()
+				}}
 				onConnections={() => {
 					setShowfileOpen(false)
+					setEditing(false)
 					setConnectionsOpen(!connectionsOpen)
 				}}
 				onShowfile={openShowfile}
@@ -624,8 +636,8 @@ export function App() {
 				timers={timers}
 			/>
 
-			{/* Above the slots, never over them: a native view cannot be overlaid.
-			    Only while a slot holds the MA: an Arena machine with no console
+			{/* Above the windows, never over them: a native view cannot be overlaid.
+			    Only while a window shows the MA: an Arena machine with no console
 			    has nothing to be told about one. */}
 			{maShown && sources.link.state === 'unreachable' && (
 				<div className="border-b border-state-unreachable/40 bg-state-unreachable/15 px-6 py-2 text-sm">
@@ -636,60 +648,81 @@ export function App() {
 				</div>
 			)}
 
-			{/* Two slots side by side (../shared/layout.ts), siblings and never
+			{editing && (
+				// Above the grid: while editing, pages are pictures, and the bar says
+				// what can be done and how to finish.
+				<div className="flex h-14 shrink-0 items-center gap-4 border-b border-booth-edge bg-booth-panel px-4 text-sm">
+					<span className="text-xs font-semibold tracking-widest text-booth-ink uppercase">Editing the layout</span>
+					<span className="text-booth-dim">
+						{noRoom
+							? 'No room for another window: make one smaller first.'
+							: 'Drag a window to move it, its edges to resize. + adds a tab, × takes one away.'}
+					</span>
+					<button
+						type="button"
+						onClick={() => {
+							const next = addWindow(layout, null, { window: newId('w'), tab: newId('t') })
+							if (next === layout) setNoRoom(true)
+							else update(() => next)
+						}}
+						className={`${barButton} ml-auto`}
+					>
+						Add window
+					</button>
+					<button
+						type="button"
+						onClick={() => setEditing(false)}
+						className="h-10 rounded-md border-2 border-booth-ink bg-booth-ink px-6 text-sm font-semibold text-booth-bg active:scale-[0.98]"
+					>
+						Done
+					</button>
+				</div>
+			)}
+
+			{/* The windows on the grid (../shared/layout.ts), siblings and never
 			    overlays, so "never covered" is a fact about the layout rather than
-			    a rule someone has to remember. Connections stands in the right
-			    slot's place; whatever native view was there is hidden, not closed. */}
-			<div className="flex min-h-0 flex-1">
-				{slot('left', {
-					width: leftWidth.width,
-					folded: !leftOpen,
-					onFold: () => setLeftOpen(false),
-				})}
-				{leftOpen ? (
-					<Divider
-						width={leftWidth.width}
-						onStart={startDrag}
-						onDrag={leftWidth.set}
-						onDone={(px) => {
-							endDrag()
-							leftWidth.commit(px)
-						}}
-						onFold={() => {
-							endDrag()
-							leftWidth.revert()
-							setLeftOpen(false)
-						}}
-						onReset={leftWidth.reset}
+			    a rule someone has to remember. Connections and the showfile sheet
+			    stand in the grid's place; every page is hidden, not closed. */}
+			<main className="flex min-h-0 min-w-0 flex-1 flex-col">
+				{connectionsOpen ? (
+					<ConnectionsPanel
+						rows={connections}
+						operator={mode === 'operator'}
+						paneSummary={paneSummary(pane, mode)}
+						desk={desk}
+						now={now}
+						onChanged={readOff}
+						onClose={() => setConnectionsOpen(false)}
+					/>
+				) : showfileOpen ? (
+					<ShowfileSheet
+						showfile={showfile}
+						linkLive={sources.link.state === 'live'}
+						operator={mode === 'operator'}
+						campus={campus}
+						now={now}
+						onClose={() => setShowfileOpen(false)}
 					/>
 				) : (
-					<FoldedSlot label={label(layout.left)} onOpen={() => setLeftOpen(true)} />
+					<Grid
+						layout={layout}
+						editing={editing}
+						visible={visible}
+						labelOf={label}
+						offer={offer}
+						body={bodyOf}
+						boxRef={(_win, tab) =>
+							isNative(tab.view) && !editing && homeOf(layout, tab.view, visible) === tab.id ? boxRefOf(tab.view) : undefined
+						}
+						actions={(_win, tab) => actionsOf(tab.view)}
+						onSelect={(w, t) => update((l) => selectTab(l, w, t))}
+						onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
+						onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
+						onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
+						onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
+					/>
 				)}
-				<main className="flex min-w-0 flex-1 flex-col">
-					{connectionsOpen ? (
-						<ConnectionsPanel
-							rows={connections}
-							operator={mode === 'operator'}
-							paneSummary={paneSummary(pane, mode)}
-							desk={desk}
-							now={now}
-							onChanged={readOff}
-							onClose={() => setConnectionsOpen(false)}
-						/>
-					) : showfileOpen ? (
-						<ShowfileSheet
-							showfile={showfile}
-							linkLive={sources.link.state === 'live'}
-							operator={mode === 'operator'}
-							campus={campus}
-							now={now}
-							onClose={() => setShowfileOpen(false)}
-						/>
-					) : (
-						slot('right', {})
-					)}
-				</main>
-			</div>
+			</main>
 		</div>
 	)
 }

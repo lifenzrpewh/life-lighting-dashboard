@@ -12,7 +12,8 @@
 
 import { useEffect, useState } from 'react'
 
-import type { Slot } from '../../shared/layout.js'
+/** Which side the picture is pinned to: the side away from what is dragged. */
+type Slot = 'left' | 'right'
 
 /** The average colour of the picture's column nearest the divider. */
 function edgeColour(src: string, side: Slot): Promise<string | null> {

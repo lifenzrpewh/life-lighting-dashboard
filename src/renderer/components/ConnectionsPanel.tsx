@@ -276,7 +276,7 @@ function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 						>
 							Add
 						</button>
-						{added !== null && <span className="text-sm text-state-live">Added {added}. Pick it in a slot's tabs.</span>}
+						{added !== null && <span className="text-sm text-state-live">Added {added}. In Edit layout, a window's + puts it on screen.</span>}
 					</div>
 				</>
 			)}
@@ -696,7 +696,7 @@ function Frame({ onClose, children }: { onClose: () => void; children: ReactNode
 					onClick={onClose}
 					className="ml-auto h-10 rounded border border-booth-edge px-5 text-sm active:scale-[0.98]"
 				>
-					Back to the MA
+					Back
 				</button>
 			</div>
 			<div className="flex max-w-3xl flex-col gap-6 overflow-y-auto px-6 py-6 select-text">{children}</div>

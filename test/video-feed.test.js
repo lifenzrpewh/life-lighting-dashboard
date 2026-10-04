@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { VIDEO_STALLED_AFTER_MS, currentFrame, fitLeftWidth, fitWindow, plainVideoFailure, videoFit, videoPicture } from '../dist/src/shared/video-feed.js'
+import { VIDEO_STALLED_AFTER_MS, currentFrame, fitWindow, plainVideoFailure, videoFit, videoPicture } from '../dist/src/shared/video-feed.js'
 
 const feed = (over) => ({ senders: ['Arena - Multiview'], showing: 'Arena - Multiview', lastFrame: null, fps: 0, failure: null, ...over })
 
@@ -52,15 +52,6 @@ test('the picture is drawn whole, at the scale its space allows', () => {
 	const { scale, best } = videoFit({ width: 1920, height: 1080 }, { width: 1596, height: 1456 })
 	assert.equal(scale, 1596 / 1920)
 	assert.deepEqual(best, { width: 1596, height: 1456 })
-})
-
-test('Fit moves the divider so the slot takes the picture shape', () => {
-	// Video on the right, 1600x1450, a 16:9 picture: the slot wants 2578 wide,
-	// so the left slot gives up 978.
-	const picture = { width: 1920, height: 1080 }
-	assert.equal(fitLeftWidth({ side: 'right', picture, space: { width: 1600, height: 1450 }, leftWidth: 1000 }), 22)
-	// On the left the same picture widens the left slot.
-	assert.equal(fitLeftWidth({ side: 'left', picture, space: { width: 400, height: 900 }, leftWidth: 400 }), 1600)
 })
 
 test('Fit sizes a pop-out to the picture, inside the room it has', () => {

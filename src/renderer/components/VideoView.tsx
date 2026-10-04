@@ -13,8 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { currentFrame, videoFit, videoPicture, type VideoFeedState } from '../../shared/video-feed.js'
-import { Say } from './MaPane.js'
-import { Centered } from './Slot.js'
+import { Centered, Say } from './MaPane.js'
 import { barButton } from './vocabulary.js'
 
 export function VideoView({

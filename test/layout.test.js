@@ -1,39 +1,131 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_LAYOUT, layoutFrom, offered, pick, slotOf } from '../dist/src/shared/layout.js'
+import {
+	COLS,
+	DEFAULT_LAYOUT,
+	ROWS,
+	addTab,
+	addWindow,
+	fits,
+	freeBox,
+	freshId,
+	homeOf,
+	layoutFrom,
+	makeHome,
+	placeWindow,
+	removeTab,
+	removeWindow,
+	selectTab,
+	shownTab,
+	viewsShown,
+} from '../dist/src/shared/layout.js'
 
-test('the default is the screen before slots: run order beside the MA', () => {
-	assert.deepEqual(DEFAULT_LAYOUT, { left: 'cue', right: 'ma' })
+const all = () => true
+
+test('the default is the screen before windows: run order on the left third, MA on the rest', () => {
+	const [left, right] = DEFAULT_LAYOUT.windows
+	assert.deepEqual([left.x, left.w, left.h, left.tabs[0].view], [0, COLS / 3, ROWS, 'cue'])
+	assert.deepEqual([right.x, right.w, right.h, right.tabs[0].view], [COLS / 3, (COLS * 2) / 3, ROWS, 'ma'])
+	assert.deepEqual(viewsShown(DEFAULT_LAYOUT, all), ['cue', 'ma'])
 })
 
-test('picking a view the other slot holds swaps them', () => {
-	assert.deepEqual(pick(DEFAULT_LAYOUT, 'right', 'arena'), { left: 'cue', right: 'arena' })
-	assert.deepEqual(pick(DEFAULT_LAYOUT, 'left', 'ma'), { left: 'ma', right: 'cue' })
-	assert.deepEqual(pick(DEFAULT_LAYOUT, 'right', 'cue'), { left: 'ma', right: 'cue' })
-	assert.equal(pick(DEFAULT_LAYOUT, 'left', 'cue'), DEFAULT_LAYOUT)
+test('a window fits inside the grid, at least 2 × 2, over no other', () => {
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 4, h: 8 }, 'w1'), true)
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 5, h: 8 }, 'w1'), false) // over the MA
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 1, h: 8 }, 'w1'), false) // too thin
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 11, y: 0, w: 2, h: 2 }, 'w2'), false) // off the edge
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0.5, y: 0, w: 2, h: 2 }, 'w1'), false) // not on a cell
 })
 
-test('the picker offers what answers, and never drops what is on screen', () => {
-	const none = { cue: false, ma: false, arena: false, video: false }
-	// A console gone quiet stays offered while a slot holds the MA.
-	assert.deepEqual(offered(DEFAULT_LAYOUT, none), ['cue', 'ma'])
-	assert.deepEqual(offered(DEFAULT_LAYOUT, { ...none, cue: true, arena: true }), ['cue', 'ma', 'arena'])
-	// Arena not answering is not offered for a slot that does not hold it.
-	assert.deepEqual(offered({ left: 'cue', right: 'arena' }, { ...none, cue: true }), ['cue', 'arena'])
-	// The video feed, offered once a sender is publishing.
-	assert.deepEqual(offered(DEFAULT_LAYOUT, { ...none, video: true }), ['cue', 'ma', 'video'])
+test('moving or resizing onto another window does nothing', () => {
+	assert.equal(placeWindow(DEFAULT_LAYOUT, 'w1', { x: 2, y: 0, w: 4, h: 8 }), DEFAULT_LAYOUT)
+	const narrower = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })
+	assert.deepEqual(narrower.windows[0], { ...DEFAULT_LAYOUT.windows[0], w: 3 })
+	const moved = placeWindow(narrower, 'w1', { x: 1, y: 0, w: 3, h: 8 })
+	assert.equal(moved.windows[0].x, 1)
+	assert.equal(placeWindow(DEFAULT_LAYOUT, 'nope', { x: 0, y: 0, w: 2, h: 2 }), DEFAULT_LAYOUT)
 })
 
-test('which slot holds a view', () => {
-	assert.equal(slotOf(DEFAULT_LAYOUT, 'cue'), 'left')
-	assert.equal(slotOf(DEFAULT_LAYOUT, 'ma'), 'right')
-	assert.equal(slotOf(DEFAULT_LAYOUT, 'arena'), null)
+test('a new window takes the biggest free place, or none when the grid is full', () => {
+	assert.equal(freeBox(DEFAULT_LAYOUT), null)
+	assert.equal(addWindow(DEFAULT_LAYOUT, 'arena', { window: 'w3', tab: 't3' }), DEFAULT_LAYOUT)
+	const room = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 4, y: 0, w: 8, h: 5 })
+	assert.deepEqual(freeBox(room), { x: 4, y: 5, w: 8, h: 3 })
+	const three = addWindow(room, 'arena', { window: 'w3', tab: 't3' })
+	assert.deepEqual(three.windows[2], { x: 4, y: 5, w: 8, h: 3, id: 'w3', tabs: [{ id: 't3', view: 'arena' }], active: 't3' })
+	assert.equal(removeWindow(three, 'w3').windows.length, 2)
 })
 
-test('a stored layout is two different known views, or the default', () => {
-	assert.deepEqual(layoutFrom('{"left":"arena","right":"ma"}'), { left: 'arena', right: 'ma' })
-	for (const bad of [null, undefined, '', 'not json', '[]', '{"left":"ma","right":"ma"}', '{"left":"brief","right":"ma"}', '{"left":"cue"}']) {
-		assert.deepEqual(layoutFrom(bad), DEFAULT_LAYOUT, String(bad))
+test('tabs: add shows it, select switches, remove shows the neighbour', () => {
+	let l = addTab(DEFAULT_LAYOUT, 'w2', 'arena', 't3')
+	assert.equal(l.windows[1].active, 't3')
+	l = addTab(l, 'w2', 'clips', 't4')
+	l = selectTab(l, 'w2', 't3')
+	assert.equal(l.windows[1].active, 't3')
+	l = removeTab(l, 'w2', 't3')
+	assert.equal(l.windows[1].active, 't4')
+	l = removeTab(l, 'w2', 't4')
+	l = removeTab(l, 'w2', 't2')
+	assert.deepEqual([l.windows[1].tabs, l.windows[1].active], [[], null])
+	assert.equal(selectTab(DEFAULT_LAYOUT, 'w2', 'missing'), DEFAULT_LAYOUT)
+})
+
+test('a tab turned off is passed over, and comes back when it is on', () => {
+	const l = selectTab(addTab(DEFAULT_LAYOUT, 'w2', 'arena', 't3'), 'w2', 't3')
+	const arenaOff = (v) => v !== 'arena'
+	assert.equal(shownTab(l.windows[1], arenaOff).view, 'ma')
+	assert.equal(l.windows[1].active, 't3') // still remembered
+	assert.equal(shownTab(l.windows[1], all).view, 'arena')
+	assert.equal(shownTab(l.windows[1], () => false), null)
+})
+
+test('the MA is drawn in one tab: the first showing it, unless moved', () => {
+	let l = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 4, y: 0, w: 8, h: 4 })
+	l = addWindow(l, 'ma', { window: 'w3', tab: 't3' })
+	assert.equal(homeOf(l, 'ma', all), 't2')
+	l = makeHome(l, 'ma', 't3')
+	assert.equal(homeOf(l, 'ma', all), 't3')
+	// The chosen tab not showing: the MA goes back to the one that is.
+	l = selectTab(addTab(l, 'w3', 'arena', 't4'), 'w3', 't4')
+	assert.equal(homeOf(l, 'ma', all), 't2')
+	assert.equal(homeOf(l, 'cue', (v) => v !== 'cue'), null)
+})
+
+test('a stored layout holds, or is the default', () => {
+	const l = addTab(DEFAULT_LAYOUT, 'w1', 'embed:abc123', 't9')
+	assert.deepEqual(layoutFrom(JSON.stringify(l)), l)
+	assert.deepEqual(layoutFrom(l), l)
+	const overlapping = { windows: [DEFAULT_LAYOUT.windows[0], { ...DEFAULT_LAYOUT.windows[1], x: 3 }] }
+	const twice = { windows: [DEFAULT_LAYOUT.windows[0], { ...DEFAULT_LAYOUT.windows[1], id: 'w1' }] }
+	const badView = { windows: [{ ...DEFAULT_LAYOUT.windows[0], tabs: [{ id: 't1', view: 'brief' }] }] }
+	for (const bad of [null, 'not json', '[]', '{"windows":3}', overlapping, twice, badView]) {
+		assert.deepEqual(layoutFrom(typeof bad === 'string' || bad === null ? bad : JSON.stringify(bad)), DEFAULT_LAYOUT, JSON.stringify(bad))
 	}
+	// A home naming a tab that is not there is dropped, not trusted.
+	assert.deepEqual(layoutFrom({ ...DEFAULT_LAYOUT, homes: { ma: 'gone', cue: 't1' } }).homes, { cue: 't1' })
+	// An active tab that is not there falls to the first.
+	assert.equal(layoutFrom({ windows: [{ ...DEFAULT_LAYOUT.windows[0], active: 'zz' }] }).windows[0].active, 't1')
+})
+
+test('the slots layout from before the grid becomes two windows holding the same', () => {
+	const l = layoutFrom('{"left":"arena","right":"ma"}')
+	assert.deepEqual(
+		l.windows.map((w) => [w.x, w.w, w.tabs[0].view]),
+		[
+			[0, 4, 'arena'],
+			[4, 8, 'ma'],
+		],
+	)
+	assert.deepEqual(layoutFrom('{"left":"ma","right":"ma"}'), DEFAULT_LAYOUT)
+})
+
+test('fresh ids are unused', () => {
+	let n = 0
+	const seq = [0.5, 0.5, 0.25]
+	const id = freshId(DEFAULT_LAYOUT, 't', () => seq[n++])
+	assert.match(id, /^t[a-z0-9]+$/)
+	const taken = addTab(DEFAULT_LAYOUT, 'w1', 'arena', id)
+	n = 0
+	assert.notEqual(freshId(taken, 't', () => seq[n++]), id)
 })
