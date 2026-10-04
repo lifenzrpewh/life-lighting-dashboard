@@ -1,6 +1,6 @@
 // Top band: READ-ONLY. Status where you look; actions where your hand rests.
 // Nothing in here fires, stores, or deletes anything. The mode button,
-// Layouts, Connections and the console card are the only controls, and none
+// Layouts, Edit layout (operator mode), Connections and the console card are the only controls, and none
 // of them touches the show: the console card opens a sheet, whose Save As and
 // Load are behind operator mode and their own guards (./ShowfileSheet.tsx).
 //
@@ -16,7 +16,7 @@
 // is visible from across the booth without being the loudest thing on it.
 
 import { useEffect, useState } from 'react'
-import { ChevronDown, Flag, PanelsTopLeft } from 'lucide-react'
+import { Check, ChevronDown, Flag, PanelsTopLeft, Pencil } from 'lucide-react'
 
 import type { LinkState, Reading, UnknownReason } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
@@ -153,6 +153,8 @@ export function StatusBar({
 	layoutName,
 	layoutsOpen,
 	onLayouts,
+	editing,
+	onEditLayout,
 	onConnections,
 	showfileOpen,
 	onShowfile,
@@ -177,6 +179,10 @@ export function StatusBar({
 	layoutsOpen: boolean
 	/** Open Layouts: everyone may switch; operator mode edits and saves. */
 	onLayouts: () => void
+	/** Edit layout, on the bar as well as in Layouts (the owner's ask,
+	 *  2026-10-05): operator mode only; tapped again, it finishes. */
+	editing: boolean
+	onEditLayout: () => void
 	onConnections: () => void
 	showfileOpen: boolean
 	/** Open the showfile sheet. */
@@ -219,6 +225,11 @@ export function StatusBar({
 					<span className="truncate">{layoutName ?? 'Layouts'}</span>
 					<ChevronDown size={16} className="-mr-1 text-booth-dim" aria-hidden />
 				</Button>
+				{operator && (
+					<Button icon={editing ? Check : Pencil} onClick={onEditLayout} pressed={editing} className={editing ? open : ''}>
+						{editing ? 'Done' : 'Edit layout'}
+					</Button>
+				)}
 				{/* For everyone: a volunteer can see what is down and say so. The
 				    fields inside are operator mode's. */}
 				<Button onClick={onConnections} pressed={connectionsOpen} className={connectionsOpen ? open : ''}>

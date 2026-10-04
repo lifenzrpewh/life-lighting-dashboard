@@ -649,6 +649,14 @@ export function App() {
 					setEditing(false)
 					setLayoutsOpen(!layoutsOpen)
 				}}
+				editing={editing}
+				onEditLayout={() => {
+					if (editing) return setEditing(false)
+					setConnectionsOpen(false)
+					setShowfileOpen(false)
+					setLayoutsOpen(false)
+					startEditing()
+				}}
 				onConnections={() => {
 					setLayoutsOpen(false)
 					setShowfileOpen(false)
