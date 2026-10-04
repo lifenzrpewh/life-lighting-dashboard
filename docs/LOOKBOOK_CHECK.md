@@ -4,6 +4,12 @@
 is keen. It needs a lot of back and forth before any code, so this page holds the idea
 and the open questions, not a design.
 
+**Folded into the media check (2026-10-04).** The owner's answers on announcements gave
+the link this page was missing: LIFE's media codes (`CF455` and the like) in PCO's
+`Media No.` column and in the file names. One check now covers every coded item,
+foregrounds included: `docs/VISUALS_DASHBOARD.md` § Answered (owner, 2026-10-04): the
+media check. Copying and loading files stays this page's idea, after the check.
+
 ## The idea
 
 The lookbook (the planned foregrounds for each service) lives in two places: a web

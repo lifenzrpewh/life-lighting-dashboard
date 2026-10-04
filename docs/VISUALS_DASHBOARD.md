@@ -414,24 +414,45 @@ pop-out and the view came home. A page that closes its own window skips Electron
 as out). ⚠️ Not yet tried by a finger on the touchscreen, nor on a second display, nor
 on macOS (where on-top over a full-screen space is set but unseen).
 
-## Open questions
+## Answered (owner, 2026-10-04): the media check
 
-- **Announcements against Arena's designated columns** (the owner, 2026-10-04; talk
-  first, do not build blind). LIFE keeps designated slots in Arena for the service's
-  messages (announcements). The wish: read the run sheet, from PCO or from LIFE's
-  "lookbook" app (which pulls from PCO), compare each announcement against those
-  columns, and say what is up to date, what is missing, and where. **The gap:** PCO's
-  item names follow no convention that matches Arena's, and the comms team names the
-  media files, with no number or pattern of ours. So the first job is a conversation:
-  which columns are designated for what, what a PCO announcement item looks like, how
-  the lookbook app names things, and what "up to date" would mean (file date, the
-  clip's name, something the comms team sets). The missing-file check already built
-  is the base it builds on.
+Started as "announcements against Arena's designated columns"; the answers widened it.
+**Nothing is built yet.** It takes in the parked foregrounds idea, `docs/LOOKBOOK_CHECK.md`.
+
+- **The link is LIFE's media code**, which PCO's item names were missing: `CB102` is
+  Central Background 102, `CF455` a Central foreground, `CD…` a countdown track. The
+  first letter is the campus (`C` Central, `N` North, `W` West, …), the second the type.
+- **The run sheet lists codes in PCO's `Media No.` column** (an item-note category),
+  placed ad hoc against whichever item, not on announcement items of their own. It is
+  usually the source of truth, but a service sometimes deviates.
+  ⚠️ The shared backend does **not** sync PCO's item notes today (it keeps an item's
+  `html_details` and its own `note_values`), so reading `Media No.` means adding item
+  notes to `pco-sync`, append-only. The owner thinks **the lookbook app** shows this
+  better; where it lives and what it reads is still to find out.
+- **Every coded item, one check** (the owner's pick): backgrounds, foregrounds,
+  countdowns and announcements together.
+- **Announcements are transparent PNGs, not videos**, usually `F`-coded, rarely `B`.
+- **The code sits somewhere in the file name**, not always first, so matching means
+  finding a code anywhere in the name.
+- **Arena:** announcements sit in fixed columns (fixed, but they may move) across up to
+  three layers of the **Holding** group (Holding BG, Holding FG, Holding Playback),
+  usually one. The columns are **named, with slot labels** (like "ANNOUNCE 1"), not the
+  code or the title, so a column's name finds the slot but not what belongs in it.
+- **"Up to date" means all three:** a listed code has a clip loaded; that clip's file is
+  on this machine (the missing-file check already built); and it is the newest version on
+  the network drive, by modified date, but the name matters too.
+- **The network drive** is a few stacked folders; the owner needs to look before
+  describing it.
+
+**Still to find out before code:** a real `Media No.` value and a real file name (is it
+always letter, letter, digits?); where the lookbook app lives and whether it already
+reads `Media No.`; the drive's path and layout; the real composition's column names.
+
+## Open questions
 
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
-- **The rename:** the new name, and what a lighting-only station keeps.
 
 ## The first spike
 

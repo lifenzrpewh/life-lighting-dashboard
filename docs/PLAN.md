@@ -384,8 +384,13 @@ A **chip in the status bar**, not a panel, opening to a sheet.
 > not offered. The rules are `src/shared/showfile-write.ts`; main checks the link is live and the
 > mode is operator before sending, and logs each. **Not built:** an in-place Save (MA's own does
 > it, and SaveGuard guards it) and the "a service is underway" second confirm (nothing here knows
-> PCO's times). **Still to see on onPC:** which way `shows` finds the folder, and both commands'
-> read-back.
+> PCO's times). **Still to see on onPC:** both commands' read-back.
+>
+> ✅ **`shows` on onPC 2.3.2.0, Windows, 2026-10-04:** called from the web remote's command line,
+> it found the folder by `GetPath(Enums.PathType.Showfiles)` (the first way it tries) and packed
+> the list into 2 messages. Their `SendOSC 3` failed `Illegal object` because that onPC had no
+> row 3, which is how a missing reply row looks: the plugin runs, the console says so, nothing
+> arrives.
 
 ---
 

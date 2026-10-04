@@ -323,19 +323,23 @@ a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media d
    the GPU: ✅ every value exact from a 16-bit stand-in sender, ⚠️ not yet seen from
    Arena with High Detail on (switch it on, pick Arena's sender; it should just show). Then: watch Arena's
    own output for dropped frames with the view on; the multiview layout itself, in Arena.
-0. **Showfile Save As and Load: built, see it on onPC** (`docs/PLAN.md` Phase 3). This
-   build's `LifeBridge.xml` is already copied into onPC's library,
-   `C:/ProgramData/MALightingTechnology/gma3_library/datapools/plugins/` (2026-10-04).
-   The owner sets onPC up: an OSC row on 8003 with Receive Command, row 3 sending to
-   127.0.0.1:8004, interface 127.0.0.1 if no socket opens, then delete and import
-   LifeBridge. Check from here: `Get-NetUDPEndpoint` shows app_gma3 on 8003. Then:
-   which way `shows` finds the show folder, a Save As read back, a Load read back. The
-   owner says this onPC is safe to save and load on (2026-10-04).
-0. **Next talk, before any code: announcements against Arena's columns**
-   (`docs/VISUALS_DASHBOARD.md` § Open questions). Run sheet (PCO, or the lookbook app)
-   against Arena's designated message columns: up to date, missing, where. No naming
-   convention links PCO to Arena yet, and the comms team names the files, so
-   understand it first.
+0. **Showfile Save As and Load: built, see it on onPC** (`docs/PLAN.md` Phase 3).
+   LifeBridge is imported on this box's onPC and `shows` runs there (✅ 2026-10-04,
+   found the folder by `GetPath(Enums.PathType.Showfiles)`). OSC on that onPC
+   (show "Together Forever Showfile", interface loopback): row 1 on 8003 receives
+   (Receive, Receive Command; Send, Send Command and Echo off); row 3 is the reply row,
+   127.0.0.1:8004, Send and Send Command on, Receive off; row 2 is a leftover copy of
+   row 3, all off. **Blocked at the box:** onPC still holds 8004 from when every flag
+   was on, so the dashboard cannot listen. Toggle Enable Input off and on, turn off
+   row 3's Receive Command, then `Get-NetUDPEndpoint` should show app_gma3 on 8003 only.
+   Then from here: a Save As read back, a Load read back. The owner says this onPC is
+   safe to save and load on (2026-10-04). The web remote ignores pasted text and drops
+   shifted keys; type lowercase and use MA's on-screen Shift.
+0. **The media check: answers in, a few facts before code**
+   (`docs/VISUALS_DASHBOARD.md` § Answered (owner, 2026-10-04): the media check). LIFE's
+   media codes (`CF455`) in PCO's `Media No.` column against Arena's Holding layers and
+   the network drive: loaded, on disk, newest. Still to find out: a real `Media No.` and
+   file name, where the lookbook app lives, the drive's layout, the real column names.
 0. **Arena:** the Clips view and the missing-media check are built; see a real missing
    file in it. The brief slot (6) waits on where a brief's link lives; no countdown chip
    (dropped). QLab is parked (`docs/QLAB.md`).
