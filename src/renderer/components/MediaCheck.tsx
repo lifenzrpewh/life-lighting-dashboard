@@ -15,7 +15,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
-import { clipsToUpdate, placementWords, type Placement, type Unplaced, type UpdateStep } from '../../shared/holding.js'
+import { clipsToUpdate, columnNamesOf, placementWords, type Placement, type Unplaced, type UpdateStep } from '../../shared/holding.js'
 import { TYPE_NAMES, mediaCodeOf, type CodeCheck, type LookbookService, type SameMark } from '../../shared/media-check.js'
 import { megabytes, type FetchRequest, type FetchStates } from '../../shared/media-fetch.js'
 import { useMediaCheck, type Load, type MediaCheckState } from '../useMediaCheck.js'
@@ -215,7 +215,7 @@ export function updateStep(req: FetchRequest, status: ArenaStatus): UpdateStep {
 function placeOf(clipId: number, status: ArenaStatus): string | null {
 	for (const layer of status.layers) {
 		const i = layer.slots.findIndex((s) => s.id === clipId)
-		if (i >= 0) return `${layer.name} · ${status.columns[i]?.name ?? 'column'} (column ${i + 1})`
+		if (i >= 0) return `${layer.name} · ${columnNamesOf(layer, status)[i] || 'column'} (column ${i + 1})`
 	}
 	return null
 }

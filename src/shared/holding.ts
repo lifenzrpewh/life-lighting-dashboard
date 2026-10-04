@@ -24,6 +24,10 @@
 // the lookbook on PLAYBACK; each service has its own deck, so a clip this run
 // sheet does not use may be replaced.
 //
+// The names are the LAYER GROUP's columns (the owner named HOLDING's and A
+// SCREENS's, 2026-10-05; the composition's own stayed `Column #`): each layer
+// reads its group's, and the composition's only when its group names none.
+//
 // THE RULES THIS FILE ENFORCES:
 // - A placement is a suggestion with its reason; the operator confirms it.
 // - Never a playing clip, never two PROMO items into one column, never a
@@ -51,6 +55,15 @@ const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
 /** Arena's default column name (`Column #`, `Column 3`): not a name. */
 const unnamed = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
 
+/** The column names over a layer: its group's, or the composition's when its
+ *  group names none (or it is in no group). */
+export function columnNamesOf(layer: ArenaLayer, status: ArenaStatus): string[] {
+	const group = layer.group === null ? undefined : status.groups.find((g) => g.name === layer.group)
+	const own = group?.columns ?? []
+	if (own.some((n) => !unnamed(n))) return layer.slots.map((_, i) => own[i] ?? '')
+	return layer.slots.map((_, i) => status.columns[i]?.name ?? '')
+}
+
 /** The layers the Holding view shows, top first as Arena's panel reads:
  *  HOLDING's and PRE & POST, PLAYBACK last as it is rarely used. */
 export function holdingLayers(status: ArenaStatus): ArenaLayer[] {
@@ -65,7 +78,7 @@ export function holdingLayers(status: ArenaStatus): ArenaLayer[] {
  *  lookbook does not fill (COUNTDOWN, a video background), or, in a
  *  composition whose columns are not named yet, HOLD BG's 3 and 4. */
 export function reserved(layer: ArenaLayer, column: number, status: ArenaStatus): boolean {
-	const name = status.columns[column - 1]?.name ?? ''
+	const name = columnNamesOf(layer, status)[column - 1] ?? ''
 	if (/count\s*down|video|broadcast/i.test(name)) return true
 	return unnamed(name) && TYPE_LAYER['B']?.test(layer.name.trim()) === true && (column === 3 || column === 4)
 }
@@ -213,13 +226,17 @@ function arenaCodes(item: LookbookItem): { code: string; type: string; want: str
  *  where it belongs, and what has no place. A code already in its column (any
  *  version: an old one is Update's, by `clipsToUpdate`) needs nothing. */
 export function planPlacements(items: LookbookItem[], status: ArenaStatus): { placements: Placement[]; unplaced: Unplaced[] } {
-	const names = status.columns.map((c) => c.name)
-	const anyNamed = names.some((n) => !unnamed(n))
 	const today = codesOn(items)
 	const layerOf = (type: string) => {
 		const p = TYPE_LAYER[type]
 		return p === undefined ? undefined : status.layers.find((l) => p.test(l.name.trim()))
 	}
+	// An item's column is found by the names over the foreground's layer
+	// (HOLDING's), or the background's, or the A-screen's; its other codes go
+	// in the same column on theirs.
+	const home = layerOf('F') ?? layerOf('B') ?? layerOf('A')
+	const names = home === undefined ? status.columns.map((c) => c.name) : columnNamesOf(home, status)
+	const anyNamed = names.some((n) => !unnamed(n))
 	const promoColumns = names.flatMap((n, i) => (norm(n).startsWith('PROMO') ? [i] : []))
 
 	// Which column each item goes in. PROMO items first find the column that
@@ -305,7 +322,7 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 			}
 			if (slotCode(slot) === c.code) continue
 			if (slot.state === 'playing') {
-				unplaced.push({ ...base, code: c.code, want: c.want, kind: 'playing', detail: `${layer.name} · ${names[where.column]} is playing` })
+				unplaced.push({ ...base, code: c.code, want: c.want, kind: 'playing', detail: `${layer.name} · ${names[where.column] || `column ${where.column + 1}`} is playing` })
 				continue
 			}
 			placements.push({
@@ -314,7 +331,7 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 				want: c.want,
 				layer: layer.name,
 				column: where.column + 1,
-				columnName: names[where.column] ?? '',
+				columnName: columnNamesOf(layer, status)[where.column] || (names[where.column] ?? ''),
 				clipId: slot.id,
 				replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
 				why: where.why,

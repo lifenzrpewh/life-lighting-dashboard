@@ -45,7 +45,7 @@ export type ArenaTree = {
 	master: Level
 	speed: Level
 	deck: string | null
-	groups: { name: string; master: Level; bypassed: Flag; speed: Level }[]
+	groups: { name: string; master: Level; bypassed: Flag; speed: Level; columns: string[] }[]
 	layers: { id: number; name: string; group: string | null; master: Level; bypassed: Flag; playing: TreeClip | null; slots: ArenaSlot[] }[]
 	columns: ArenaColumn[]
 }
@@ -238,7 +238,16 @@ export function decodeComposition(body: unknown): Decoded<ArenaTree> {
 			if (!isObject(l) || !isId(l['id'])) return { ok: false, detail: `${name.value} names a layer without an id` }
 			groupOf.set(l['id'], name.value)
 		}
-		groups.push({ name: name.value, master: gm.value, bypassed: gb.value, speed: gs.value })
+		// The group's own column names (✅ Arena 7.28, 2026-10-05: HOLDING's read
+		// PRE, POST, WTL, NSL, BIBLES, WTG, PROMO 1 to 6 while the composition's all
+		// said `Column #`). Labels only, so a column without a readable name is
+		// an empty one, which places nothing, rather than a failed read.
+		const gc = Array.isArray(g['columns']) ? g['columns'] : []
+		const columns = gc.map((c: unknown) => {
+			const n = isObject(c) ? text(c['name'], `${name.value}'s column`) : null
+			return n !== null && n.ok ? n.value : ''
+		})
+		groups.push({ name: name.value, master: gm.value, bypassed: gb.value, speed: gs.value, columns })
 	}
 
 	const layers: ArenaTree['layers'] = []
@@ -335,7 +344,7 @@ export function statusOf(tree: ArenaTree): ArenaStatus {
 	return {
 		master: tree.master.value,
 		deck: tree.deck,
-		groups: tree.groups.map((g) => ({ name: g.name, master: g.master.value, bypassed: g.bypassed.value })),
+		groups: tree.groups.map((g) => ({ name: g.name, master: g.master.value, bypassed: g.bypassed.value, columns: g.columns })),
 		layers: tree.layers.map((l) => {
 			const clip = l.playing
 			const t = clip?.transport ?? null

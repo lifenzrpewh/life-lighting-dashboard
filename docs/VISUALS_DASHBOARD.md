@@ -691,8 +691,15 @@ in both the Media row and here (taken without an answer: the owner can trim one)
   which names to use. ✅ Dry run against the live composition and the real Central PM 4 Oct
   run sheet, columns named on a copy: CF588 back into POST (replacing the misplaced CF445),
   CF445 into WTL, CF465 into NSL (replacing the misplaced CF449), CF449 into BIBLES, CF546 into
-  WTG, CF594 into a PROMO column; unnamed, nothing placed. ⚠️ Arena's columns are not named
-  yet: the owner's, in Arena.
+  WTG, CF594 into a PROMO column; unnamed, nothing placed. **The names are the layer
+  group's columns**, not the composition's: the owner named HOLDING's (PRE, POST, WTL, NSL,
+  BIBLES, WTG, PROMO 1 to 6 in columns 1, 2, 5 to 8 and 11 to 16) and A SCREENS's (PRE, POST),
+  and the composition's stayed `Column #` (✅ read over the REST API, 2026-10-05; a first build
+  read only the composition's and said the columns did not exist). Each layer takes its
+  group's names, the composition's only when its group names none. ✅ Dry run against the live,
+  named composition: Central AM and PM 4 Oct each place CF588 in PRE and POST, then WTL, NSL,
+  BIBLES, WTG, and the promo in PROMO 1. ⚠️ A column renamed while Pāua runs may be read only
+  at Arena's next composition push (a rename is a parameter Pāua does not subscribe to).
 - **To place** (was Needs a home): each code not where its item belongs, with the lookbook's
   picture (main shrinks it to 480 px on a `lookbook:` scheme, only library stills) and its
   column; **Place** puts it there, **Choose** makes the next tap on a free slot of its layer

@@ -18,6 +18,7 @@ import { useState } from 'react'
 import { thumbnailUrl, type ArenaLayer, type ArenaSlot, type ArenaStatus } from '../../shared/arena.js'
 import {
 	COLUMN_NAMES,
+	columnNamesOf,
 	clipsToUpdate,
 	codesOn,
 	holdingLayers,
@@ -55,7 +56,8 @@ function Holding({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | 
 	const layers = holdingLayers(status).filter((l) => !/^playback$/i.test(l.name.trim()) || l.slots.some((s) => s.state !== 'empty'))
 	const choosing = picked?.kind === 'choose' ? picked.what : null
 	const total = m.check === null ? 0 : Object.values(m.check.counts).reduce((a, b) => a + b, 0)
-	const named = status.columns.some((c) => !unnamedColumn(c.name))
+	const headerNames = layers[0] === undefined ? status.columns.map((c) => c.name) : columnNamesOf(layers[0], status)
+	const named = headerNames.some((n) => !unnamedColumn(n))
 
 	/** A slot a code may be placed in by hand: on its type's layer, not
 	 *  playing, not a reserved column, and empty or not on this run sheet. */
@@ -74,7 +76,7 @@ function Holding({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | 
 				...choosing,
 				layer: layer.name,
 				column,
-				columnName: status.columns[column - 1]?.name ?? '',
+				columnName: columnNamesOf(layer, status)[column - 1] ?? '',
 				clipId: slot.id,
 				replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
 				why: 'named',
@@ -120,7 +122,7 @@ function Holding({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | 
 						<tr>
 							<th className="sticky top-0 left-0 z-10 h-8 min-w-32 bg-booth-bg" />
 							{(layers[0]?.slots ?? []).map((_, i) => {
-								const name = status.columns[i]?.name ?? ''
+								const name = headerNames[i] ?? ''
 								return (
 									<th key={i} className="sticky top-0 bg-booth-bg px-1 text-xs font-normal text-booth-dim">
 										{unnamedColumn(name) ? i + 1 : `${name} · ${i + 1}`}
@@ -139,7 +141,7 @@ function Holding({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | 
 								{layer.slots.map((slot, i) => {
 									const mark = slotMark(slot, items, today, m.same)
 									const target = choosing !== null && freeFor(choosing, layer, slot, i + 1)
-									const columnName = status.columns[i]?.name ?? ''
+									const columnName = columnNamesOf(layer, status)[i] ?? ''
 									return (
 										<td key={slot.id} className="border-b border-booth-edge/60 p-1">
 											<Tile

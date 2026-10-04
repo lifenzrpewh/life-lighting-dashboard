@@ -160,6 +160,20 @@ test('announcements go in PROMO columns: an older version first, then last week,
 	assert.notEqual(prayer.column, alpha.column)
 })
 
+test("the names are read from the layer group's columns, the composition's only as a fallback", () => {
+	// As Arena had it, 2026-10-05: the composition's columns `Column #`, HOLDING's named.
+	const s = composition(NAMES.map(() => 'Column #'))
+	s.groups = [
+		{ name: 'HOLDING', master: 1, bypassed: false, columns: NAMES.map((n, i) => (n === 'PROMO' ? `PROMO ${i - 7}` : n)) },
+		{ name: 'A SCREENS', master: 1, bypassed: false, columns: ['PRE', 'POST', '', 'Column #'] },
+	]
+	const { placements } = planPlacements(ITEMS, s)
+	assert.equal(at(placements, 'Walk Out', 'CF588').columnName, 'POST')
+	assert.equal(at(placements, 'Walk Out', 'CA636').columnName, 'POST')
+	assert.equal(at(placements, 'Prayer & Fasting', 'CF594').columnName, 'PROMO 2')
+	assert.equal(reserved(s.layers[3], 3, s), true)
+})
+
 test('what has no place is said, never guessed', () => {
 	const { unplaced } = planPlacements(ITEMS, composition())
 	const preach = unplaced.find((u) => u.code === 'CB105')

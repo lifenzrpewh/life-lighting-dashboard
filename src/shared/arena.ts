@@ -148,6 +148,9 @@ export type ArenaGroup = {
 	name: string
 	master: number
 	bypassed: boolean
+	/** The group's own column names, as Arena shows them over the group's
+	 *  layers; where a booth names its slots (PRE, POST, PROMO …). */
+	columns: string[]
 }
 
 /** What Arena is playing (docs/VISUALS_DASHBOARD.md, piece 2). */
