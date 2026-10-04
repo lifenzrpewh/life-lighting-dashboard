@@ -73,8 +73,8 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ⚠️ `src/shared/embeds.ts` · `src/main/embeds.ts` · `src/renderer/components/EmbedPane.tsx` | **Embeds** (2026-10-05): any web page, added by name and address in Connections (operator mode), is a view of its own with its own sign-in (a partition per embed), − / + zoom remembered per embed, Reload, Pop out, and a row saying loaded / loading / not loading that can be turned off. New windows open in the computer's browser; the user agent drops Electron's name, for Google. Removing one clears its session, and its folder at the next start. In the kiosk on the Windows box over CDP, 2026-10-05: added, placed over its slot, zoomed (saved, re-applied after a reload), popped out and back, off and on, renamed, removed. ⚠️ Not signed in to Google (its sign-in raised a Windows passkey dialog, cancelled); a new-window link not tried. |
 | ⚠️ `build/icon.svg` · `scripts/render-icon.cjs` · `src/main/kiosk.ts` (mark, windowed) | **The pāua icon, windowed mode, MARK** (2026-10-05). The icon is a drawn shell (`build/icon.svg`, rendered to `build/icon.png` and `assets/icon.png` by `npx electron scripts/render-icon.cjs`), for the installer, taskbar and Dock; ⚠️ not yet seen in an installed build. **This screen** in Connections (operator mode): Full screen or Window, at once, no restart (watched both ways in the kiosk). **MARK** in the status bar (a flag since the 2026-10-05 look), for anyone: a `[mark] ===== tester's mark N =====` line in the log with the mode, layout and views on screen, and the button says which number (watched). |
-| ⚠️ `src/shared/holding.ts` · `src/renderer/components/HoldingView.tsx` · `src/renderer/useMediaCheck.ts` | **The Holding view** (2026-10-05, the owner's idea): the holding layers as rows of thumbnails, each clip marked against the run sheet the media check follows; inspect only. **Pictures over words since the afternoon of 2026-10-05**: only what needs a look is marked, what belongs in a column stands there as a dashed "+ place" tile, one-offs wait in a No column tray and are placed per service, a clip on screen may be replaced after a red tick at the confirmation, and the Arena view's Media row is one line that opens Holding. **A column is one moment of the service across every layer, found by Arena's column names**: PRE, POST, WTL, NSL, BIBLES, WTG and PROMO (the owner's pattern for every campus, after a first version that guessed per layer placed the PM foregrounds wrongly, 2026-10-05); each item's codes into its column, announcements into PROMO, nothing placed while columns are unnamed. To place, Place or Choose; Update all; every write to Arena confirmed first; operator mode. Names are the layer group's columns. **Files by code and size** (the lookbook's are the drive's byte for byte): the check says "different file" by size; the drive is searched by code; the lookbook's file is the backup, downloaded only when the confirmation's question gets a yes. ✅ Dry runs against the live composition, the drive and the lookbook; ✅ loads through the button (the owner's Place all). ⚠️ A lookbook download through the button not yet watched; not by finger. `docs/VISUALS_DASHBOARD.md` § The Holding view. |
-| ⚠️ `src/shared/media-fetch.ts` · `src/bridge/media-files.ts` · `src/main/media-fetch.ts` | **Fetching media** (2026-10-05): Fetch, Place and Update all copy a code's file into the **local folder** and load it into every clip with the old one, or the column it belongs in. The file is found on the **graphics drive by code and size**, else downloaded from the **lookbook**, only after the confirmation asks (the owner's safeguard). **Browse** for both folders. ✅ Loads through the button: the owner's Place all, 10:21, put five files from `G:` into Arena (in the wrong columns, since fixed: § The Holding view). ⚠️ A lookbook download through the button, and a file replacing another in a clip (do its settings stay), not yet watched. `docs/VISUALS_DASHBOARD.md` § Fetching media. |
+| ⚠️ `src/shared/holding.ts` · `src/renderer/components/HoldingView.tsx` · `src/renderer/useMediaCheck.ts` | **The Holding view** (2026-10-05, the owner's idea): the holding layers as rows of thumbnails, each clip marked against the run sheet the media check follows; inspect only. **Pictures over words since the afternoon of 2026-10-05**: only what needs a look is marked, what belongs in a column stands there as a dashed "+ place" tile, one-offs wait in a No column tray and are placed per service, a clip on screen may be replaced after a red tick at the confirmation, and the Arena view's Media row is one line that opens Holding. **A column is one moment of the service across every layer, found by Arena's column names**: PRE, POST, WTL, NSL, BIBLES, WTG and PROMO (the owner's pattern for every campus, after a first version that guessed per layer placed the PM foregrounds wrongly, 2026-10-05); each item's codes into its column, announcements into PROMO, nothing placed while columns are unnamed. To place, Place or Choose; Update all; every write to Arena confirmed first; operator mode. Names are the layer group's columns. **Files by code and size** (the lookbook's are the drive's byte for byte): the check says "different file" by size; the drive is searched by code; the lookbook's file is the backup, downloaded only when the confirmation's question gets a yes. ✅ Dry runs against the live composition, the drive and the lookbook; ✅ loads through the button (the owner's Place all), ✅ lookbook downloads through it (the owner's Update all, 11:12). ⚠️ Not by finger; the live tick not yet seen. `docs/VISUALS_DASHBOARD.md` § The Holding view. |
+| ⚠️ `src/shared/media-fetch.ts` · `src/bridge/media-files.ts` · `src/main/media-fetch.ts` | **Fetching media** (2026-10-05): Fetch, Place and Update all copy a code's file into the **local folder** and load it into every clip with the old one, or the column it belongs in. The file is found on the **graphics drive by code and size**, else downloaded from the **lookbook**, only after the confirmation asks (the owner's safeguard). **Browse** for both folders. ✅ Loads through the button: the owner's Place all, 10:21, put five files from `G:` into Arena (in the wrong columns, since fixed: § The Holding view). ✅ **A lookbook download through the button**: the owner's Update all, 2026-10-05 11:12, downloaded CF464 and CB105 and loaded them (paua.log). **A clip on screen** is replaced only after the confirmation's red tick, the yes naming the clips (`allowLive`). ⚠️ Whether a file loaded over another keeps the clip's settings, and what the audience sees on a live replace, not yet watched. `docs/VISUALS_DASHBOARD.md` § Fetching media. |
 | ✅ `src/bridge/log-file.ts` · `src/main/log.ts` | **The app's own log**, `paua.log` in the data folder, timed, two 5 MB files at most; the kiosk page's errors and a crashed GPU or page process go in too. Version and path at the foot of Connections. Watched writing on the Windows box, 2026-10-04. |
 | ✅ `src/main/entry.ts` · `src/main/supervisor.ts` · `src/bridge/supervise.ts` | **The installed app's watchdog**: Paua.exe in Node mode runs the app and restarts it 5 s after a crash, gives up after 5 in 2 minutes, leaves a clean quit alone. A checkout is left to kiosk.cmd. Watched on the packaged build on the Windows box, 2026-10-04. |
 | ✅ `.github/workflows/release.yml` · `docs/FIELD_TEST.md` | **Field-test builds**: a tag `v<version>` builds `Paua-Setup-<v>.exe` and `Paua-<v>-arm64.dmg` (ad-hoc signed, Syphon.framework left as upstream signed it) and drafts a release; logs pushed to `release-build-log`. v0.1.0 built green 2026-10-04. ⚠️ Neither file installed anywhere yet; the Mac build never opened on a Mac. |
@@ -309,7 +309,21 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-05, afternoon).** The owner loaded an up-to-date **Central
+**Where things stand (2026-10-05, late afternoon).** **v0.2.2 is tagged and both builds passed**
+(run 37244795777: `Paua-Setup-0.2.2.exe`, `Paua-0.2.2-arm64.dmg`, 289 tests green on the Windows
+runner); the release waits as a draft for the owner. New in it, all from the owner's asks that
+afternoon: the **Holding view as pictures** (only what needs a look is marked, a dashed "+ place"
+tile where an item belongs, a No column tray for **one-offs placed per service**, the inspector's
+"Use the lookbook's" / "Arena's is right"); **a clip on screen may be replaced** after a red tick
+at the confirmation; the lookbook download is a tick too; the **Media row is one line** opening
+Holding; **tabs dragged** in Edit layout; a **slimmer top bar** (60 px) that **folds** to a 36 px
+strip; and the **video addon's ring build** (three staging textures and a GPU fence: fades no
+longer tear, in theory; 47-48 fps from Arena's 50, was 27). `docs/VISUALS_DASHBOARD.md` § The
+Holding view (edge cases), § Windows (tab drag), § The look (bar) and § The video feed (tearing)
+have the details. Left: the owner's eye on a full-screen fade and on a live replace, and
+everything by finger (`docs/FIELD_TEST.md` § 0.2.2).
+
+**Earlier that afternoon.** The owner loaded an up-to-date **Central
 composition** into Arena here, and the media work went from a check to a tool, all on main
 since v0.2.1 (not in a build): the media check **follows the run order's service** (the Cue
 Manager's `/s/<plan>` against the lookbook's `planningCenterPlanId`); the **Holding view**
@@ -322,13 +336,12 @@ on the top bar. One lesson paid for: a first Place guessed slots per layer and t
 Place all put the PM foregrounds in the wrong columns, so the rules now read the names a campus
 gives its columns and place nothing while there are none (memory: confirm a booth program's
 layout before writing to it). `docs/VISUALS_DASHBOARD.md` § The Holding view and § Fetching
-media have it all. Left: a lookbook download through the button, the owner by finger, and the
-pattern at the other campuses.
+media have it all.
 
-**Earlier that morning:** the UI overhaul was tagged **v0.2.1**. Its builds were not watched
-from here (no `gh` or token on this box, and the repo is private, so the API answers 404):
-the owner checks the Actions run, publishes the v0.2.1 draft and deletes the v0.2.0 one.
-Testers get the installer passed on or are added as collaborators (the owner's call).
+**Earlier that morning:** the UI overhaul was tagged **v0.2.1**. Builds are watched from here
+through the `release-build-log` branch (no `gh` or token on this box, and the repo is private,
+so the API answers 404); publishing a draft is the owner's. Testers get the installer passed on
+or are added as collaborators (the owner's call).
 
 **The UI overhaul (2026-10-05).** The owner asked overnight for a deep UI and UX
 clean-up with design options; three directions were mocked (A Pāua, B Console, C Studio)
@@ -372,9 +385,12 @@ gets every reply. The web remote ignores pasted text and drops shifted keys; typ
 and use MA's on-screen Shift. Driving the kiosk: start it with
 `electron . --remote-debugging-port=9223` and send CDP input; a held press can be cancelled
 by a real mouse moving over the window, so check the log said "sent".
-Left on the afternoon of 2026-10-05: the kiosk shows two windows (the run order on the left,
-300 units wide; **Holding** on the right), in volunteer mode, following the run order, running
-c5e1f08. It was started detached (PowerShell `Start-Process` on
+Left on the late afternoon of 2026-10-05: the kiosk runs e900e26's build with the **ring build
+of the addon** (`vendor/texture-bridge/`, BUILD.txt names it; a running kiosk locks the `.node`,
+so stop it before `git checkout origin/texture-bridge-build -- vendor/texture-bridge`), in
+volunteer mode, on the owner's own three windows (run order | MA | Arena, Clips, Holding, Video,
+MA), the Video view on `Arena - MULTIVIEW`. Its bar is expanded (`paua.barCollapsed` unset); the
+saved layouts list is empty (`paua.layouts` is `[]`: the two test layouts are gone). It was started detached (PowerShell `Start-Process` on
 `node_modules\electron\dist\electron.exe . --remote-debugging-port=9223`), because a kiosk
 started as a session's background task is killed at that task's time limit. **The owner uses
 this kiosk too**: read the page (Connections open, operator mode) before sending CDP input.
@@ -402,6 +418,9 @@ owner did the loads through the button themselves. `npm test` clears `dist/`, so
 reloaded after it loses its preload: `npm run build:app` and restart. For edit scripts, a bash
 heredoc holding backticks or backslashes breaks, and so does a regex inside a `node -e`
 template string (backslashes vanish): write the script with the Write tool, or use Edit.
+Watching a GitHub build from here: `git fetch origin <branch>` in a loop, one branch at a time;
+naming a branch that does not exist (`texture-bridge-build-log` before any failure) fails the
+whole fetch silently, and a watcher written that way never sees the build land.
 
 ### Improvements, in order: "work on what is listed in the md"
 
@@ -439,11 +458,17 @@ Later, not tonight:
 
 ### TODO, in order
 
-0. **Watch a lookbook download through the button** (`docs/VISUALS_DASHBOARD.md` § Fetching
-   media), with the owner: Cue Manager on Central AM 4 Oct, Holding › CF464 › Place, and the
-   confirmation must ask "Load, downloading 1 from the lookbook" before anything is sent. Then
-   Update all on the named columns, by the owner, and whether a file loaded over another keeps
-   the clip's settings. Then the real NAS path at a booth.
+0. **v0.2.2 on GitHub** (the owner's): publish the draft (both builds passed, run
+   37244795777), delete the older drafts. `docs/FIELD_TEST.md` § 0.2.2 is what testers check.
+0. **The Video view during a full-screen fade**, by the owner's eye: no tearing or flicker
+   (`docs/VISUALS_DASHBOARD.md` § The video feed, tearing on fades); and Arena's own frame rate
+   with the view at ~48 fps (read in Arena). If "takes a second to update" comes back, the log
+   now has `[video] a frame took N ms to reach the page`.
+0. **A live replace, with the owner**: Update all with a clip on screen, the red tick, and what
+   the audience sees as Arena opens a file into a playing clip. Also whether a file loaded over
+   another keeps the clip's settings, and the real NAS path at a booth.
+0. **The owner's word:** "Copy here" left with the old Media list (bring it back in Holding?);
+   tab drag by finger (does the strip scroll instead of the tab dragging?).
 0. **The column pattern at every campus** (the owner's, in Arena): name the HOLDING group's
    columns PRE, POST, WTL, NSL, BIBLES, WTG and PROMO (`docs/VISUALS_DASHBOARD.md` § The
    Holding view). A column renamed while Pāua runs may be read only at Arena's next composition
@@ -451,8 +476,6 @@ Later, not tonight:
 0. **The owner's word** on the choices taken without an answer: Fetch, Same, Place and Update
    all in both the Media row and Holding (trim one?); a name alike at half its words shared
    (PROMO only now); Update all including different-file codes.
-0. **v0.2.1 on GitHub** (the owner's): check the Actions run went green, publish the draft,
-   delete the v0.2.0 draft. If the run failed, read its log (`release-build-log` branch).
 0. **By finger on the booth screen:** the new look (`docs/FIELD_TEST.md` § The new look),
    Layouts › Edit this layout, the shared-edge drag and its snap, a Google Sheet as an embed
    and its sign-in; and the owner's word on the choices in `docs/VISUALS_DASHBOARD.md`

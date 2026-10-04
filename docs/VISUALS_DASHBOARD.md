@@ -695,7 +695,9 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
     `…Prayer-Fasting-Oct-1`, the same size; it failed by name that morning); CF464 not on the
     drive, so the lookbook, asked; CB095's drive copy another version (`-v4` against `-v5`),
     so the lookbook, asked; the check said CB095 "different file" by size. 287 tests.
-    ⚠️ A download through the button not yet watched.
+    ✅ **Through the button, 2026-10-05 11:12** (the owner's Update all, in paua.log): CF464
+    "not on the drive" and CB105 "another version" downloaded from the lookbook into `D:\Holding`
+    and loaded, into HOLD FG column 6 and HOLD BG column 3.
 - **Browse** (the owner's ask, 2026-10-05): beside each folder on the Arena row, Windows' own
   folder picker over the window that asked; the pick fills the field, Save keeps it. Operator
   mode. ⚠️ Not opened from a session (it would raise a dialog on the owner's screen).
