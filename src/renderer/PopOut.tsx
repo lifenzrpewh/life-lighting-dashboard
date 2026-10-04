@@ -16,7 +16,9 @@ import type { Channel } from '../shared/reading.js'
 import type { ArenaStatus } from '../shared/arena.js'
 import type { CuePaneReport } from '../shared/cue-pane.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
-import { VIEW_LABEL, type ViewId } from '../shared/layout.js'
+import { VIEW_LABEL, type BuiltInView, type ViewId } from '../shared/layout.js'
+import { embedIdOf, type EmbedReport } from '../shared/embeds.js'
+import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
@@ -57,8 +59,14 @@ export function PopOut({ view }: { view: ViewId }) {
 	const cue = usePolled<CuePaneReport>(view === 'cue' ? (api) => api.cuePane() : null, 1000)
 	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' ? (api) => api.arenaStatus() : null, 250)
 	const video = usePolled<VideoFeedState | null>(view === 'video' ? (api) => api.videoFeed() : null, 500)
-	/** The MA and the run order are native pages main moves in here. */
-	const native = view === 'ma' || view === 'cue'
+	const embedId = embedIdOf(view)
+	const embed = usePolled<EmbedReport | undefined>(
+		embedId === null ? null : (api) => api.embeds().then((all) => all.find((r) => r.id === embedId)),
+		1000,
+	)
+	const label = embedId === null ? VIEW_LABEL[view as BuiltInView] : (embed?.name ?? 'Embed')
+	/** The MA, the run order and embeds are native pages main moves in here. */
+	const native = view === 'ma' || view === 'cue' || embedId !== null
 
 	const [videoSpace, setVideoSpace] = useState<VideoSpace | null>(null)
 	/** Fit: size this window to the picture's shape, and keep that shape while
@@ -71,22 +79,28 @@ export function PopOut({ view }: { view: ViewId }) {
 
 	const [box, setBox] = useState<HTMLElement | null>(null)
 	usePanePlacement(box, !native, (rect) =>
-		view === 'ma' ? window.life?.placeMaPane(rect) : window.life?.placeCuePane(rect),
+		embedId !== null
+			? window.life?.placeEmbed(embedId, rect)
+			: view === 'ma'
+				? window.life?.placeMaPane(rect)
+				: window.life?.placeCuePane(rect),
 	)
 
 	useEffect(() => {
-		document.title = `Pāua — ${VIEW_LABEL[view]}`
-	}, [view])
+		document.title = `Pāua — ${label}`
+	}, [label])
 
-	const showing = view === 'ma' ? ma?.pane.state === 'showing' || ma?.pane.state === 'connecting' : cue?.pane.state === 'showing'
+	const showing =
+		embedId !== null
+			? embed?.pane.state === 'showing'
+			: view === 'ma'
+				? ma?.pane.state === 'showing' || ma?.pane.state === 'connecting'
+				: cue?.pane.state === 'showing'
+	const retry = () =>
+		embedId !== null ? window.life?.retryEmbed(embedId) : view === 'ma' ? window.life?.retryMaPane() : window.life?.retryCuePane()
 	const reload =
 		!native || !showing ? null : (
-			<button
-				type="button"
-				onClick={() => (view === 'ma' ? window.life?.retryMaPane() : window.life?.retryCuePane())}
-				className={`${barButton} h-9`}
-				aria-label={view === 'ma' ? 'Reload the MA' : 'Reload the run order'}
-			>
+			<button type="button" onClick={retry} className={`${barButton} h-9`} aria-label={`Reload ${label}`}>
 				↻
 			</button>
 		)
@@ -94,9 +108,12 @@ export function PopOut({ view }: { view: ViewId }) {
 	return (
 		<div className="flex h-full flex-col overflow-hidden bg-booth-panel">
 			<div className="flex h-14 shrink-0 items-center gap-2 border-b border-booth-edge px-2">
-				<h1 className="px-2 text-[10px] font-semibold tracking-widest text-booth-dim uppercase">{VIEW_LABEL[view]}</h1>
+				<h1 className="px-2 text-[10px] font-semibold tracking-widest text-booth-dim uppercase">{label}</h1>
 				<span className="ml-auto" />
 				{view === 'video' && <VideoStrip feed={video} space={videoSpace} onFit={fitVideo} />}
+				{embedId !== null && embed !== undefined && (
+					<ZoomControl name={label} zoom={embed.zoom} onZoom={(by) => window.life?.zoomEmbed(embedId, by)} />
+				)}
 				{reload}
 				{/* Big enough for a finger: the system's own close is not. */}
 				<button
@@ -116,7 +133,13 @@ export function PopOut({ view }: { view: ViewId }) {
 					<VideoView feed={video} now={now} onSpace={setVideoSpace} />
 				) : (
 					<Centered>
-						{view === 'ma' ? <MaMessage pane={ma?.pane ?? null} now={now} /> : <CueMessage pane={cue?.pane ?? null} now={now} />}
+						{embedId !== null ? (
+							<EmbedMessage name={label} pane={embed?.pane ?? null} now={now} onRetry={retry} />
+						) : view === 'ma' ? (
+							<MaMessage pane={ma?.pane ?? null} now={now} />
+						) : (
+							<CueMessage pane={cue?.pane ?? null} now={now} />
+						)}
 					</Centered>
 				)}
 			</div>

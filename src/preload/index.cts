@@ -23,6 +23,7 @@ import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'im
 import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'import' }
 import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
 import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
+import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
 
 /** The page's frame callback, while it shows the video feed. */
 let onVideoFrame: ((frame: VideoFrame) => void) | null = null
@@ -90,10 +91,19 @@ const api = {
 	/** Want it at `rect`; null keeps the page but hides it (the column folded). */
 	placeCuePane: (rect: PaneRect | null): void => ipcRenderer.send('cue-pane:place', rect),
 	retryCuePane: (): void => ipcRenderer.send('cue-pane:retry'),
-	/** Pictures of the MA and the Cue Manager as they are now, each null when
-	 *  it is not on screen. Shown in their place while the divider is dragged,
-	 *  because a page reflowing on every step trails the finger. */
-	snapshotPanes: (): Promise<{ ma: string | null; cue: string | null }> => ipcRenderer.invoke('panes:snapshot'),
+	/** Pictures of every page main draws in the kiosk (the MA, the Cue Manager,
+	 *  each embed), by view, each null when it is not on screen. Shown in their
+	 *  place while a layout is dragged, because a page reflowing on every step
+	 *  trails the finger. */
+	snapshotPanes: (): Promise<Record<string, string | null>> => ipcRenderer.invoke('panes:snapshot'),
+
+	/** Embeds (src/main/embeds.ts): each one's page state and zoom. An embed
+	 *  that is off has no report. */
+	embeds: (): Promise<EmbedReport[]> => ipcRenderer.invoke('embeds:report'),
+	placeEmbed: (id: string, rect: PaneRect | null): void => ipcRenderer.send('embed:place', id, rect),
+	retryEmbed: (id: string): void => ipcRenderer.send('embed:retry', id),
+	/** One step out (-1) or in (1), or back to 100 % (0). Remembered per embed. */
+	zoomEmbed: (id: string, by: -1 | 0 | 1): void => ipcRenderer.send('embed:zoom', id, by),
 	/** Operator mode only: sign the app out and forget what it kept. */
 	resetCuePane: (): Promise<boolean> => ipcRenderer.invoke('cue-pane:reset'),
 

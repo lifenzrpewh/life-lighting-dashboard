@@ -17,6 +17,7 @@
 
 import { DEFAULT_ARENA_PORT } from './arena.js'
 import { CONNECTIONS, type ConnectionId } from './connections.js'
+import { embedsFrom, type Embed } from './embeds.js'
 import { DEFAULT_REMOTE_USER, DEFAULT_WEB_REMOTE_PORT, isConsoleHost, isPort } from './ma-pane.js'
 import { CAMPUS_MAX } from './showfile-write.js'
 
@@ -65,6 +66,10 @@ export type Settings = {
 	 *  (the owner, 2026-10-04). Which programs a booth uses is a fact about the
 	 *  booth, not the show, so it passes the test above. */
 	off: ConnectionId[]
+	/** Web pages added in Connections, each a view of its own
+	 *  (./embeds.ts). Which pages a booth keeps beside the MA is a habit of
+	 *  the booth, not a fact any show holds. */
+	embeds: Embed[]
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -100,6 +105,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	arenaPort: DEFAULT_ARENA_PORT,
 	campus: null,
 	off: [],
+	embeds: [],
 }
 
 /** The settings main works from: a connection turned off is treated as one
@@ -276,6 +282,11 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		if (off === null) errors.off = 'Not a list of connections.'
 		else next.off = off
 	}
+	if (patch.embeds !== undefined) {
+		const embeds = embedsFrom(patch.embeds)
+		if (embeds === null) errors.embeds = 'Each embed needs a name and a web address (https://…).'
+		else next.embeds = embeds
+	}
 	for (const key of ['volunteerPassword', 'operatorPassword'] as const) {
 		const pw = patch[key]
 		if (typeof pw === 'string' && pw === '') errors[key] = 'Leave blank to keep the password; use Remove to clear it.'
@@ -306,6 +317,7 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['arenaPort'] === 'number' && isPort(r['arenaPort'])) out.arenaPort = r['arenaPort']
 	if (typeof r['campus'] === 'string' && campusError(r['campus']) === null) out.campus = r['campus']
 	out.off = offFrom(r['off']) ?? []
+	out.embeds = embedsFrom(r['embeds']) ?? []
 	return out
 }
 
@@ -333,6 +345,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['arenaPort', num],
 		['campus', strOrNull],
 		['off', Array.isArray],
+		['embeds', Array.isArray],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

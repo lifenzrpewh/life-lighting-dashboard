@@ -61,3 +61,10 @@ export function usePanePlacement(
 		[],
 	)
 }
+
+/** The hook as a component, one per page, so a screen can place as many pages
+ *  as it has (every embed) without a hook in a loop. Renders nothing. */
+export function PanePlacer(props: { box: HTMLElement | null; hidden: boolean; send: (rect: PaneRect | null) => void }): null {
+	usePanePlacement(props.box, props.hidden, props.send)
+	return null
+}

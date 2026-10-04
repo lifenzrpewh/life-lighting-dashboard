@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { embedIdOf, embedView, type Embed, type EmbedReport } from '../shared/embeds.js'
+
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
 import type { DeskState } from '../shared/desk.js'
 import { SHOW_STALE_AFTER_MS, type Showfile } from '../shared/showfile.js'
-import type { MaPaneReport } from '../shared/ma-pane.js'
+import type { MaPaneReport, PaneRect } from '../shared/ma-pane.js'
 import type { CuePaneReport } from '../shared/cue-pane.js'
 import { TIMER_STALE_AFTER_MS, type TimerSources } from '../shared/timer.js'
 import { ARENA_STALE_AFTER_MS, arenaVersion, type ArenaSource, type ArenaStatus } from '../shared/arena.js'
 import {
-	CONNECTION_OF_VIEW,
 	consoleStatus,
 	cueStatus,
+	embedStatus,
+	viewIsOn,
 	polledStatus,
 	turnedOff,
 	videoStatus,
@@ -31,10 +34,11 @@ import { currentFrame, fitLeftWidth, type VideoFeedState } from '../shared/video
 import { Centered, FoldedSlot, Slot } from './components/Slot.js'
 import { Still } from './components/Still.js'
 import { barButton } from './components/vocabulary.js'
-import { VIEWS, VIEW_LABEL, offered, slotOf, type Slot as SlotId, type ViewId } from '../shared/layout.js'
+import { VIEWS, isNative, offered, slotOf, viewLabel, type Slot as SlotId, type ViewId } from '../shared/layout.js'
+import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
 import { useSlots } from './slots.js'
 import { usePopouts } from './popouts.js'
-import { usePanePlacement } from './panePlacement.js'
+import { PanePlacer } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
 import { ShowfileSheet } from './components/ShowfileSheet.js'
 import { useMode } from './mode.js'
@@ -82,9 +86,21 @@ export function App() {
 	}
 	// The connections turned off in Connections (../shared/settings.ts `off`):
 	// read on start and again whenever Connections saves.
+	// The embeds (../shared/embeds.ts) are read with it: added, removed and
+	// turned off in the same place.
 	const [off, setOff] = useState<ConnectionId[]>([])
-	const readOff = () => void window.life?.settings().then((s) => setOff(s.off))
+	const [embeds, setEmbeds] = useState<Embed[]>([])
+	// Nothing on screen is moved for a view that is off until the settings
+	// that say so have been read: before then, every embed looks removed.
+	const [settingsRead, setSettingsRead] = useState(false)
+	const readOff = () =>
+		void window.life?.settings().then((s) => {
+			setOff(s.off)
+			setEmbeds(s.embeds)
+			setSettingsRead(true)
+		})
 	useEffect(readOff, [])
+	const label = (view: ViewId) => viewLabel(view, embeds)
 	const leftWidth = useLeftWidth()
 	const { layout, choose } = useSlots()
 	const { popped, popOut, bringBack } = usePopouts()
@@ -243,6 +259,22 @@ export function App() {
 		}
 	}, [])
 
+	// Each embed's page, as main holds it. Polled like the run order.
+	const [embedReports, setEmbedReports] = useState<EmbedReport[]>([])
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.embeds().then((r) => alive && setEmbedReports(r))
+		poll()
+		const id = setInterval(poll, 1000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+	const embedReport = (id: string) => embedReports.find((r) => r.id === id) ?? null
+
 	// The MA pane is real in dev too: it is a page from the console, not a value
 	// the mock desk could fake. Polled, like the link, because main owns it.
 	const [pane, setPane] = useState<MaPaneReport | null>(null)
@@ -265,15 +297,26 @@ export function App() {
 	// its page: the Cue Manager its half-typed note, the MA its connection. A
 	// popped-out view is placed by its own window, and main ignores the kiosk
 	// about it until it is back.
-	const [maBox, setMaBox] = useState<HTMLElement | null>(null)
-	const [cueBox, setCueBox] = useState<HTMLElement | null>(null)
+	// One box per page, by view. Each view's ref callback is made once and
+	// kept, so React does not hand a box over and back on every render.
+	const [boxes, setBoxes] = useState<Record<string, HTMLElement | null>>({})
+	const boxRefs = useRef(new Map<ViewId, (el: HTMLElement | null) => void>())
+	const boxRefOf = (view: ViewId) => {
+		if (!isNative(view)) return undefined
+		let ref = boxRefs.current.get(view)
+		if (ref === undefined) {
+			ref = (el) => setBoxes((b) => (b[view] === el ? b : { ...b, [view]: el }))
+			boxRefs.current.set(view, ref)
+		}
+		return ref
+	}
 
 	// While the divider is dragged, each page stands still as a picture of
 	// itself and the live view is hidden (../main/pane-snapshot.ts): a page
 	// reflowing on every step trailed the finger. A pane with no picture stays
 	// live. The pictures outlast the drag by a moment, so the live view is back
 	// over its box before the picture under it goes.
-	const [stills, setStills] = useState<{ ma: string | null; cue: string | null } | null>(null)
+	const [stills, setStills] = useState<Record<string, string | null> | null>(null)
 	const [frozen, setFrozen] = useState(false)
 	const drag = useRef(0)
 	const startDrag = () => {
@@ -290,16 +333,16 @@ export function App() {
 		setTimeout(() => drag.current === id && setStills(null), 300)
 	}
 
-	usePanePlacement(
-		maBox,
-		popped.has('ma') || (!leftOpen && layout.left === 'ma') || (frozen && stills?.ma != null),
-		(rect) => window.life?.placeMaPane(rect),
-	)
-	usePanePlacement(
-		cueBox,
-		popped.has('cue') || (!leftOpen && layout.left === 'cue') || (frozen && stills?.cue != null),
-		(rect) => window.life?.placeCuePane(rect),
-	)
+	/** Every page main draws, and how this screen places it. */
+	const pages: Array<{ view: ViewId; send: (rect: PaneRect | null) => void }> = [
+		{ view: 'ma', send: (rect) => window.life?.placeMaPane(rect) },
+		{ view: 'cue', send: (rect) => window.life?.placeCuePane(rect) },
+		...embeds
+			.filter((e) => e.on)
+			.map((e) => ({ view: embedView(e.id), send: (rect: PaneRect | null) => window.life?.placeEmbed(e.id, rect) })),
+	]
+	const pageHidden = (view: ViewId) =>
+		popped.has(view) || (!leftOpen && layout.left === view) || (frozen && stills?.[view] != null)
 	// Unmounting closes the MA connection. It happens when the renderer goes
 	// away, which main also covers, since a crashed renderer cannot say goodbye.
 	useEffect(
@@ -331,7 +374,9 @@ export function App() {
 
 	// Input in either pane counts: an LD writing notes in the Cue Manager is
 	// as busy as one working the MA.
-	const inputs = [pane?.lastInputAt ?? null, cue?.lastInputAt ?? null].filter((t): t is number => t !== null)
+	const inputs = [pane?.lastInputAt ?? null, cue?.lastInputAt ?? null, ...embedReports.map((r) => r.lastInputAt)].filter(
+		(t): t is number => t !== null,
+	)
 	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs))
 
 	// The mode is which MA user the pane is (src/renderer/mode.ts). Main does the
@@ -368,7 +413,9 @@ export function App() {
 		polledStatus('arena', 'Arena', arena ?? null, now, ARENA_STALE_AFTER_MS, (p) => `${p.name} ${arenaVersion(p)}`),
 		cueStatus(cue?.pane ?? null),
 		videoStatus(videoFeed ?? null),
-	].map((row) => (off.includes(row.id) ? turnedOff(row.id, row.name) : row))
+	]
+		.map((row) => (off.includes(row.id as ConnectionId) ? turnedOff(row.id, row.name) : row))
+		.concat(embeds.map((e) => embedStatus(e, embedReport(e.id)?.pane ?? null)))
 	const consoleOn = !off.includes('console')
 
 	// What the pickers offer (../shared/layout.ts): a view whose source answers.
@@ -383,17 +430,19 @@ export function App() {
 		video: (videoFeed?.senders.length ?? 0) > 0,
 	}
 	// A view whose connection is off is not offered, even in its own slot.
-	const shown = (v: ViewId) => !off.includes(CONNECTION_OF_VIEW[v])
-	const choices = offered(layout, answering).filter(shown)
+	const shown = (v: ViewId) => viewIsOn(v, off, embeds)
+	const embedViews = embeds.filter((e) => e.on).map((e) => embedView(e.id))
+	const choices = offered(layout, answering, embedViews).filter(shown)
 	// A slot left holding a view that was just turned off takes the first view
 	// still on, answering first. Turning a connection off is someone's choice,
 	// so this is not the screen rearranging itself under a volunteer.
 	useEffect(() => {
+		if (!settingsRead) return
 		for (const side of ['left', 'right'] as const) {
 			if (shown(layout[side])) continue
 			const other = layout[side === 'left' ? 'right' : 'left']
-			const candidates = VIEWS.filter((v) => shown(v) && v !== other)
-			const next = candidates.find((v) => answering[v]) ?? candidates[0]
+			const candidates = [...VIEWS, ...embedViews].filter((v) => shown(v) && v !== other)
+			const next = candidates.find((v) => !(v in answering) || answering[v as keyof typeof answering]) ?? candidates[0]
 			if (next !== undefined) choose(side, next)
 		}
 	})
@@ -414,11 +463,22 @@ export function App() {
 					type="button"
 					onClick={() => popOut(view)}
 					className={`${barButton} h-9`}
-					aria-label={`Pop ${VIEW_LABEL[view]} out into its own window`}
+					aria-label={`Pop ${label(view)} out into its own window`}
 				>
 					Pop out
 				</button>
 			)
+		const embedId = embedIdOf(view)
+		if (embedId !== null) {
+			const r = embedReport(embedId)
+			return (
+				<>
+					{r !== null && <ZoomControl name={label(view)} zoom={r.zoom} onZoom={(by) => window.life?.zoomEmbed(embedId, by)} />}
+					{out}
+					{r?.pane.state === 'showing' && reload(`Reload ${label(view)}`, () => window.life?.retryEmbed(embedId))}
+				</>
+			)
+		}
 		switch (view) {
 			case 'cue':
 				return (
@@ -453,7 +513,7 @@ export function App() {
 		if (popped.has(view)) {
 			return (
 				<Centered>
-					<Say head={`${VIEW_LABEL[view]} is popped out`} body="It is in its own window, on top of this one.">
+					<Say head={`${label(view)} is popped out`} body="It is in its own window, on top of this one.">
 						<button
 							type="button"
 							onClick={() => bringBack(view)}
@@ -465,8 +525,21 @@ export function App() {
 				</Centered>
 			)
 		}
-		const still = view === 'ma' || view === 'cue' ? (stills?.[view] ?? null) : null
+		const still = isNative(view) ? (stills?.[view] ?? null) : null
 		if (still !== null) return <Still src={still} side={side} />
+		const embedId = embedIdOf(view)
+		if (embedId !== null) {
+			return (
+				<Centered>
+					<EmbedMessage
+						name={label(view)}
+						pane={window.life === undefined ? null : (embedReport(embedId)?.pane ?? { state: 'idle', url: embeds.find((e) => e.id === embedId)?.url ?? '' })}
+						now={now}
+						onRetry={() => window.life?.retryEmbed(embedId)}
+					/>
+				</Centered>
+			)
+		}
 		switch (view) {
 			case 'cue':
 				return (
@@ -489,7 +562,6 @@ export function App() {
 		}
 	}
 
-	const boxRefOf = (view: ViewId) => (view === 'ma' ? setMaBox : view === 'cue' ? setCueBox : undefined)
 
 	const slot = (side: SlotId, extra: { width?: number; folded?: boolean; onFold?: () => void }) => {
 		const view = layout[side]
@@ -497,6 +569,7 @@ export function App() {
 			<Slot
 				key={side}
 				view={view}
+				labelOf={label}
 				choices={choices}
 				onPick={(v) => choose(side, v)}
 				actions={actionsOf(view)}
@@ -510,6 +583,9 @@ export function App() {
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden">
+			{pages.map((p) => (
+				<PanePlacer key={p.view} box={boxes[p.view] ?? null} hidden={pageHidden(p.view)} send={p.send} />
+			))}
 			{DEV && (
 				<div className="flex items-center gap-3 bg-warn px-4 py-1.5 text-xs font-semibold text-booth-bg">
 					{scenario === 'real' ? (
@@ -587,7 +663,7 @@ export function App() {
 						onReset={leftWidth.reset}
 					/>
 				) : (
-					<FoldedSlot view={layout.left} onOpen={() => setLeftOpen(true)} />
+					<FoldedSlot label={label(layout.left)} onOpen={() => setLeftOpen(true)} />
 				)}
 				<main className="flex min-w-0 flex-1 flex-col">
 					{connectionsOpen ? (

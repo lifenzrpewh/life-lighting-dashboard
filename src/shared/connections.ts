@@ -13,7 +13,8 @@
 // answering is `down`, whatever it last said.
 
 import type { CuePaneState } from './cue-pane.js'
-import type { ViewId } from './layout.js'
+import { embedIdOf, type Embed, type EmbedPaneState, type EmbedView } from './embeds.js'
+import type { BuiltInView, ViewId } from './layout.js'
 import type { MaPaneState } from './ma-pane.js'
 import type { Channel, LinkState } from './reading.js'
 import { readingOf } from './reading.js'
@@ -32,7 +33,7 @@ export const CONNECTIONS: readonly ConnectionId[] = ['console', 'ontime', 'propr
  *  leaves the slot pickers (the owner, 2026-10-04). The video feed is its own
  *  connection, not Arena's: it reads a Spout or Syphon sender on this computer,
  *  which works with Arena's web server off, or with no Arena at all. */
-export const CONNECTION_OF_VIEW: Record<ViewId, ConnectionId> = {
+export const CONNECTION_OF_VIEW: Record<BuiltInView, ConnectionId> = {
 	cue: 'cue',
 	ma: 'console',
 	arena: 'arena',
@@ -40,15 +41,43 @@ export const CONNECTION_OF_VIEW: Record<ViewId, ConnectionId> = {
 	video: 'video',
 }
 
+/** Whether a view may be on screen: its connection is on, or for an embed,
+ *  the embed still exists and is on. */
+export function viewIsOn(view: ViewId, off: readonly ConnectionId[], embeds: readonly Embed[]): boolean {
+	const id = embedIdOf(view)
+	if (id !== null) return embeds.some((e) => e.id === id && e.on)
+	return !off.includes(CONNECTION_OF_VIEW[view as BuiltInView])
+}
+
+/** An embed's row: whether its page loaded. Not opened yet is not down: an
+ *  embed on no screen has nothing to say. */
+export function embedStatus(embed: Embed, pane: EmbedPaneState | null): ConnectionStatus {
+	const base = { id: `embed:${embed.id}` as const, name: embed.name }
+	if (!embed.on) return { ...base, tone: 'off', status: 'turned off', detail: null }
+	if (pane === null || pane.state === 'idle') return { ...base, tone: 'off', status: 'not on screen', detail: null }
+	switch (pane.state) {
+		case 'showing':
+			return { ...base, tone: 'live', status: 'loaded', detail: null }
+		case 'connecting':
+			return { ...base, tone: 'stale', status: 'loading', detail: null }
+		case 'failed':
+			return { ...base, tone: 'down', status: pane.cause === 'no-answer' ? 'no answer' : 'not loading', detail: pane.detail }
+	}
+}
+
+
 /** A connection someone turned off in Connections: `off`, like one not set
  *  up, so it never touches the dot, and said in its own words. Its address
  *  stays, for turning it back on. */
-export function turnedOff(id: ConnectionId, name: string): ConnectionStatus {
+export function turnedOff(id: RowId, name: string): ConnectionStatus {
 	return { id, name, tone: 'off', status: 'turned off', detail: null }
 }
 
+/** A connection's row: a built-in connection, or an embed's own row. */
+export type RowId = ConnectionId | EmbedView
+
 export type ConnectionStatus = {
-	id: ConnectionId
+	id: RowId
 	name: string
 	tone: Tone
 	/** The state in a word or two: `LIVE`, `4s ago`, `no answer`, `not set up`. */

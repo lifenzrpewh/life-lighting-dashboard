@@ -19,7 +19,7 @@ import { screen, BrowserWindow, type WebContents } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { VIEW_LABEL, type ViewId } from '../shared/layout.js'
+import type { ViewId } from '../shared/layout.js'
 import { POPOUT_MIN, popoutBounds, popoutPlacesFrom, type Box } from '../shared/popout.js'
 import { fitWindow, type Size } from '../shared/video-feed.js'
 
@@ -41,14 +41,18 @@ export type Popouts = {
 
 export function createPopouts(opts: {
 	kiosk: BrowserWindow
-	panes: Partial<Record<ViewId, Movable>>
+	/** The page main draws for `view`, if it is one: the MA, the run order or
+	 *  an embed. Asked each time, because embeds come and go. */
+	paneOf(view: ViewId): Movable | undefined
+	/** What `view` is called, for its window's title and the log. */
+	labelOf(view: ViewId): string
 	/** Load the renderer's page for `view` into `win`. */
 	load(win: BrowserWindow, view: ViewId): void
 	preload: string
 	/** Where each window's place is kept, in the app's own data folder. */
 	placesFile: string
 }): Popouts {
-	const { kiosk, panes } = opts
+	const { kiosk, paneOf, labelOf } = opts
 	const windows = new Map<ViewId, BrowserWindow>()
 
 	const readPlaces = () => {
@@ -64,7 +68,7 @@ export function createPopouts(opts: {
 			fs.writeFileSync(opts.placesFile, JSON.stringify({ ...readPlaces(), [view]: box }))
 		} catch (e) {
 			// Not remembered; it opens in the default place next time.
-			console.error(`[kiosk] could not remember where the ${VIEW_LABEL[view]} pop-out was: ${(e as Error).message}`)
+			console.error(`[kiosk] could not remember where the ${labelOf(view)} pop-out was: ${(e as Error).message}`)
 		}
 	}
 
@@ -84,7 +88,7 @@ export function createPopouts(opts: {
 			...where(view),
 			minWidth: POPOUT_MIN.width,
 			minHeight: POPOUT_MIN.height,
-			title: `Pāua — ${VIEW_LABEL[view]}`,
+			title: `Pāua — ${labelOf(view)}`,
 			backgroundColor: '#0a0a0b',
 			show: false,
 			autoHideMenuBar: true,
@@ -99,7 +103,7 @@ export function createPopouts(opts: {
 		win.once('ready-to-show', () => win.show())
 		win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 		win.webContents.on('render-process-gone', (_e, details) => {
-			console.error(`[kiosk] ${VIEW_LABEL[view]} pop-out's page gone: ${details.reason}. Reloading.`)
+			console.error(`[kiosk] ${labelOf(view)} pop-out's page gone: ${details.reason}. Reloading.`)
 			if (!win.isDestroyed()) win.reload()
 		})
 		// Home on `close`, while the window still stands. A page that closes its
@@ -111,15 +115,15 @@ export function createPopouts(opts: {
 			home = true
 			if (!win.isDestroyed()) remember(view, win.getNormalBounds())
 			if (windows.get(view) === win) windows.delete(view)
-			const pane = panes[view]
+			const pane = paneOf(view)
 			if (pane !== undefined && pane.host() === win && !kiosk.isDestroyed()) pane.moveTo(kiosk)
-			console.log(`[kiosk] ${VIEW_LABEL[view]} back in the kiosk`)
+			console.log(`[kiosk] ${labelOf(view)} back in the kiosk`)
 		}
 		win.on('close', goHome)
 		win.on('closed', goHome)
-		panes[view]?.moveTo(win)
+		paneOf(view)?.moveTo(win)
 		opts.load(win, view)
-		console.log(`[kiosk] ${VIEW_LABEL[view]} popped out`)
+		console.log(`[kiosk] ${labelOf(view)} popped out`)
 	}
 
 	const close = (view: ViewId) => {

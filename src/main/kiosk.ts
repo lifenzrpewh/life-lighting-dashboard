@@ -40,6 +40,9 @@
 // THE VIDEO FEED (./video-feed.ts) is Arena's multiview over Spout or Syphon,
 // handed to the page as a GPU texture, received only while a page shows it.
 //
+// EMBEDS (./embeds.ts): web pages added in Connections, each a view with its
+// own sign-in, placed like the MA and the run order.
+//
 // POP-OUTS (./popout.ts): any view can leave its slot for a window of its own,
 // on top of the kiosk, and comes back when that window closes. A pane takes
 // its place only from the window it is in, so the kiosk and a pop-out never
@@ -72,7 +75,9 @@ import type { LookbookItem, LookbookRead, LookbookService } from '../shared/medi
 import { createPopouts, type Popouts } from './popout.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
-import { VIEWS, type ViewId } from '../shared/layout.js'
+import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
+import { createEmbeds, type EmbedPane, type Embeds } from './embeds.js'
+import { embedIdOf, isEmbedId, type EmbedReport } from '../shared/embeds.js'
 import { settleDataDir } from '../bridge/data-dir.js'
 import { logPage, startLog } from './log.js'
 import type { About } from '../shared/about.js'
@@ -101,6 +106,7 @@ let window: BrowserWindow | null = null
 let maPane: MaPane | null = null
 let cuePane: CuePane | null = null
 let popouts: Popouts | null = null
+let embeds: Embeds | null = null
 let settings: SettingsStore | null = null
 /** The screen's mode, as the renderer last reported it. Main learns it only to
  *  pick the pane's MA user and to keep settings operator-only. It is not a
@@ -152,9 +158,12 @@ function createWindow(): void {
 
 	if (settings !== null) maPane = createMaPane(window, settings)
 	cuePane = createCuePane(window)
+	embeds = createEmbeds(window, app.getPath('userData'))
+	if (settings !== null) embeds.sync(settings.current().embeds)
 	popouts = createPopouts({
 		kiosk: window,
-		panes: { ...(maPane === null ? {} : { ma: maPane }), cue: cuePane },
+		paneOf,
+		labelOf: (view) => viewLabel(view, settings?.current().embeds ?? []),
 		load: loadPage,
 		preload: PRELOAD,
 		placesFile: path.join(app.getPath('userData'), 'popouts.json'),
@@ -188,6 +197,14 @@ function createWindow(): void {
 	})
 
 	loadPage(window, null)
+}
+
+/** The page main draws for `view`, if it is one. */
+function paneOf(view: ViewId): MaPane | CuePane | EmbedPane | undefined {
+	if (view === 'ma') return maPane ?? undefined
+	if (view === 'cue') return cuePane ?? undefined
+	const id = embedIdOf(view)
+	return id === null ? undefined : embeds?.pane(id)
 }
 
 /** The renderer's page: the kiosk's, or a pop-out's for `view`. */
@@ -407,8 +424,8 @@ app.whenReady().then(() => {
 	const fromOurs = (e: IpcMainEvent | IpcMainInvokeEvent) => fromKiosk(e) || popouts?.isPopout(e.sender) === true
 	// Only the window a pane is in may place it or reload it. While the MA is
 	// popped out, whatever the kiosk says about where it goes is not about it.
-	const fromHost = (e: IpcMainEvent | IpcMainInvokeEvent, pane: MaPane | CuePane | null) =>
-		pane !== null && !pane.host().isDestroyed() && e.sender === pane.host().webContents
+	const fromHost = (e: IpcMainEvent | IpcMainInvokeEvent, pane: MaPane | CuePane | EmbedPane | null | undefined) =>
+		pane != null && !pane.host().isDestroyed() && e.sender === pane.host().webContents
 	ipcMain.handle('ma-pane:report', (e) => (fromOurs(e) ? maPane?.report() : undefined))
 	ipcMain.on('ma-pane:place', (e, rect: unknown) => {
 		if (fromHost(e, maPane)) maPane?.place(rect === null ? null : asRect(rect))
@@ -429,13 +446,43 @@ app.whenReady().then(() => {
 		if (fromHost(e, cuePane)) cuePane?.place(rect === null ? null : asRect(rect))
 	})
 	ipcMain.on('cue-pane:retry', (e) => fromHost(e, cuePane) && cuePane?.retry())
-	// Pictures of the panes in the kiosk, to stand in for them while the
-	// divider is dragged. A popped-out pane is not under the divider.
-	ipcMain.handle('panes:snapshot', async (e) => {
-		if (!fromKiosk(e)) return { ma: null, cue: null }
-		const inKiosk = (p: MaPane | CuePane | null) => (p !== null && p.host() === window ? p.snapshot() : null)
-		const [ma, cue] = await Promise.all([inKiosk(maPane), inKiosk(cuePane)])
-		return { ma, cue }
+	// Embeds (./embeds.ts): placed, reloaded and zoomed like the panes above.
+	// Zoom is everyone's, from wherever the embed is drawn.
+	const embedPane = (id: unknown) => (isEmbedId(id) ? embeds?.pane(id) : undefined)
+	ipcMain.handle('embeds:report', (e): EmbedReport[] => (fromOurs(e) ? (embeds?.reports() ?? []) : []))
+	ipcMain.on('embed:place', (e, id: unknown, rect: unknown) => {
+		const pane = embedPane(id)
+		if (fromHost(e, pane)) pane?.place(rect === null ? null : asRect(rect))
+	})
+	ipcMain.on('embed:retry', (e, id: unknown) => {
+		const pane = embedPane(id)
+		if (fromHost(e, pane)) pane?.retry()
+	})
+	ipcMain.on('embed:zoom', (e, id: unknown, by: unknown) => {
+		const pane = embedPane(id)
+		if (fromHost(e, pane) && (by === -1 || by === 0 || by === 1)) pane?.zoom(by)
+	})
+	store.onChange(() => {
+		embeds?.sync(store.current().embeds)
+		// A pop-out of an embed removed or turned off has nothing left to show.
+		for (const view of popouts?.popped() ?? []) {
+			const id = embedIdOf(view)
+			if (id !== null && embeds?.pane(id) === undefined) popouts?.close(view)
+		}
+	})
+
+	// Pictures of the pages in the kiosk, to stand in for them while the
+	// divider is dragged. A popped-out page is not under the divider.
+	ipcMain.handle('panes:snapshot', async (e): Promise<Record<string, string | null>> => {
+		if (!fromKiosk(e)) return {}
+		const inKiosk = (p: MaPane | CuePane | EmbedPane | null) => (p !== null && p.host() === window ? p.snapshot() : null)
+		const entries: Array<[string, MaPane | CuePane | EmbedPane | null]> = [
+			['ma', maPane],
+			['cue', cuePane],
+			...(embeds?.panes() ?? []).map((p): [string, EmbedPane] => [`embed:${p.report().id}`, p]),
+		]
+		const pictures = await Promise.all(entries.map(([, p]) => inKiosk(p)))
+		return Object.fromEntries(entries.map(([k], i) => [k, pictures[i] ?? null]))
 	})
 
 	// The video feed. A page says when it shows the feed, and gets frames
@@ -461,7 +508,7 @@ app.whenReady().then(() => {
 	})
 
 	// Pop-outs. The kiosk opens them; the kiosk or the pop-out itself closes one.
-	const asView = (v: unknown): ViewId | null => ((VIEWS as readonly unknown[]).includes(v) ? (v as ViewId) : null)
+	const asView = (v: unknown): ViewId | null => (isViewId(v) ? v : null)
 	ipcMain.handle('popout:state', (e) => (fromOurs(e) ? (popouts?.popped() ?? []) : []))
 	ipcMain.on('popout:open', (e, v: unknown) => {
 		const view = asView(v)

@@ -11,14 +11,24 @@
 
 import type { ReactNode } from 'react'
 
-import { VIEW_LABEL, type ViewId } from '../../shared/layout.js'
+import type { ViewId } from '../../shared/layout.js'
 
 const label = 'text-[10px] font-semibold tracking-widest uppercase'
 
 /** The picker: every view on offer, the slot's own highlighted. With only its
  *  own on offer it is a heading, not a button that does nothing. */
-function Picker({ view, choices, onPick }: { view: ViewId; choices: readonly ViewId[]; onPick: (v: ViewId) => void }) {
-	if (choices.length <= 1) return <h2 className={`${label} px-3 text-booth-dim`}>{VIEW_LABEL[view]}</h2>
+function Picker({
+	view,
+	labelOf,
+	choices,
+	onPick,
+}: {
+	view: ViewId
+	labelOf: (v: ViewId) => string
+	choices: readonly ViewId[]
+	onPick: (v: ViewId) => void
+}) {
+	if (choices.length <= 1) return <h2 className={`${label} px-3 text-booth-dim`}>{labelOf(view)}</h2>
 	return (
 		// Scrolls within its own room in a narrow slot rather than running under
 		// the view's buttons: four views at the narrowest overlapped them.
@@ -34,7 +44,7 @@ function Picker({ view, choices, onPick }: { view: ViewId; choices: readonly Vie
 						c === view ? 'bg-booth-ink text-booth-bg' : 'text-booth-dim active:bg-booth-edge'
 					}`}
 				>
-					{VIEW_LABEL[c]}
+					{labelOf(c)}
 				</button>
 			))}
 		</div>
@@ -43,6 +53,7 @@ function Picker({ view, choices, onPick }: { view: ViewId; choices: readonly Vie
 
 export function Slot({
 	view,
+	labelOf,
 	choices,
 	onPick,
 	actions,
@@ -53,6 +64,7 @@ export function Slot({
 	children,
 }: {
 	view: ViewId
+	labelOf: (v: ViewId) => string
 	choices: readonly ViewId[]
 	onPick: (v: ViewId) => void
 	/** The view's own buttons, at the strip's far end. */
@@ -73,14 +85,14 @@ export function Slot({
 			className={`${width === undefined ? 'min-w-0 flex-1' : 'shrink-0'} ${folded ? 'hidden' : 'flex'} flex-col bg-booth-panel`}
 		>
 			<div className="flex h-12 shrink-0 items-center gap-2 border-b border-booth-edge px-1">
-				<Picker view={view} choices={choices} onPick={onPick} />
+				<Picker view={view} labelOf={labelOf} choices={choices} onPick={onPick} />
 				<span className="ml-auto" />
 				{actions}
 				{onFold !== undefined && (
 					<button
 						type="button"
 						onClick={onFold}
-						aria-label={`Fold ${VIEW_LABEL[view]} away`}
+						aria-label={`Fold ${labelOf(view)} away`}
 						className="h-10 w-12 shrink-0 rounded-md text-lg text-booth-dim active:bg-booth-edge"
 					>
 						‹
@@ -95,17 +107,17 @@ export function Slot({
 }
 
 /** The left slot, folded to a strip that opens it again. */
-export function FoldedSlot({ view, onOpen }: { view: ViewId; onOpen: () => void }) {
+export function FoldedSlot({ label: name, onOpen }: { label: string; onOpen: () => void }) {
 	return (
 		<nav className="flex w-14 shrink-0 flex-col border-r border-booth-edge bg-booth-panel">
 			<button
 				type="button"
 				onClick={onOpen}
-				aria-label={`Show ${VIEW_LABEL[view]}`}
+				aria-label={`Show ${name}`}
 				className="flex flex-1 flex-col items-center gap-4 pt-5 text-booth-dim active:bg-booth-edge"
 			>
 				<span className="text-lg">›</span>
-				<span className={`${label} [writing-mode:vertical-rl]`}>{VIEW_LABEL[view]}</span>
+				<span className={`${label} [writing-mode:vertical-rl]`}>{name}</span>
 			</button>
 		</nav>
 	)

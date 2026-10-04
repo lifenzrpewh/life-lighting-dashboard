@@ -14,7 +14,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import type { About } from '../../shared/about.js'
-import type { ConnectionId, ConnectionStatus, Tone } from '../../shared/connections.js'
+import type { ConnectionId, ConnectionStatus, RowId, Tone } from '../../shared/connections.js'
+import { EMBEDS_MAX, embedIdOf, embedNameError, embedUrlOf, newEmbedId, type Embed } from '../../shared/embeds.js'
 import type { DeskState } from '../../shared/desk.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
 import { CueManagerSettings } from './CueManagerSettings.js'
@@ -44,7 +45,7 @@ export function ConnectionsPanel({
 	onClose: () => void
 }) {
 	const [view, setView] = useState<SettingsView | null>(null)
-	const [open, setOpen] = useState<ConnectionId | null>(null)
+	const [open, setOpen] = useState<RowId | null>(null)
 	const load = () => window.life?.settings().then(setView)
 	useEffect(() => void load(), [])
 
@@ -60,9 +61,24 @@ export function ConnectionsPanel({
 		onChanged()
 		return null
 	}
-	const isOff = (id: ConnectionId) => view.off.includes(id)
-	const setOn = (id: ConnectionId, on: boolean) =>
-		save({ off: on ? view.off.filter((x) => x !== id) : [...view.off, id] })
+	const embedOf = (id: RowId) => {
+		const e = embedIdOf(id)
+		return e === null ? null : (view.embeds.find((x) => x.id === e) ?? null)
+	}
+	const isOff = (id: RowId) => {
+		const embed = embedOf(id)
+		return embed !== null ? !embed.on : view.off.includes(id as ConnectionId)
+	}
+	const setOn = (id: RowId, on: boolean) => {
+		const embed = embedOf(id)
+		if (embed !== null) return save({ embeds: view.embeds.map((e) => (e.id === embed.id ? { ...e, on } : e)) })
+		return save({ off: on ? view.off.filter((x) => x !== id) : [...view.off, id as ConnectionId] })
+	}
+	const addressOf = (id: RowId): string | null => {
+		const embed = embedOf(id)
+		if (embed !== null) return new URL(embed.url).host
+		return address[id as ConnectionId]
+	}
 
 	const address: Record<ConnectionId, string | null> = {
 		console: view.consoleHost,
@@ -101,7 +117,7 @@ export function ConnectionsPanel({
 								{row.detail !== null && <span className="truncate text-sm text-booth-dim">{row.detail}</span>}
 							</span>
 							<span className={`text-sm whitespace-nowrap text-booth-dim tabular-nums ${isOff(row.id) ? 'line-through opacity-60' : ''}`}>
-								{address[row.id] ?? ''}
+								{addressOf(row.id) ?? ''}
 							</span>
 							<span className="text-booth-dim">{open === row.id ? '▾' : '›'}</span>
 						</button>
@@ -115,7 +131,15 @@ export function ConnectionsPanel({
 									</p>
 								)}
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
-								{!operator ? (
+								{embedOf(row.id) !== null ? (
+									operator ? (
+										<EmbedEditor key={row.id} embed={embedOf(row.id)!} all={view.embeds} save={save} onRemoved={() => setOpen(null)} />
+									) : (
+										<p className="text-sm text-booth-dim">
+											{embedOf(row.id)!.url}. Hold the mode chip for operator mode to change or remove it.
+										</p>
+									)
+								) : !operator ? (
 									row.id !== 'cue' && (
 										<p className="text-sm text-booth-dim">Hold the mode chip for operator mode to change these.</p>
 									)
@@ -134,8 +158,129 @@ export function ConnectionsPanel({
 					</li>
 				))}
 			</ul>
+			{operator && <AddEmbed all={view.embeds} save={save} />}
 			<AboutLine operator={operator} />
 		</Frame>
+	)
+}
+
+/** An embed's name and address, and Remove. Removing forgets its sign-in, so
+ *  it takes a second tap. */
+function EmbedEditor({ embed, all, save, onRemoved }: { embed: Embed; all: readonly Embed[]; save: Save; onRemoved: () => void }) {
+	const [name, setName] = useState(embed.name)
+	const [url, setUrl] = useState(embed.url)
+	const [local, setLocal] = useState<Errors>({})
+	const [removing, setRemoving] = useState(false)
+	useEffect(() => {
+		if (!removing) return
+		const id = setTimeout(() => setRemoving(false), 4_000)
+		return () => clearTimeout(id)
+	}, [removing])
+	return (
+		<>
+			<Editor
+				save={async (patch) => {
+					const errors = embedErrors(name, url)
+					setLocal(errors)
+					if (Object.keys(errors).length > 0) return {}
+					return save(patch)
+				}}
+				patch={() => ({
+					embeds: all.map((e) => (e.id === embed.id ? { ...e, name: name.trim(), url: embedUrlOf(url) ?? url } : e)),
+				})}
+				note="Its page loads the new address."
+			>
+				{(err) => (
+					<EmbedFields name={name} url={url} onName={setName} onUrl={setUrl} errors={{ ...local, form: err('embeds') }} />
+				)}
+			</Editor>
+			<div className="flex items-center gap-4 border-t border-booth-edge pt-4">
+				<button
+					type="button"
+					onClick={() => {
+						if (!removing) return setRemoving(true)
+						void save({ embeds: all.filter((e) => e.id !== embed.id) }).then((e) => e === null && onRemoved())
+					}}
+					className={`h-12 rounded border px-6 text-sm active:scale-[0.98] ${removing ? 'border-state-unreachable text-state-unreachable' : 'border-booth-edge text-booth-dim'}`}
+				>
+					{removing ? 'Tap again to remove' : 'Remove this embed'}
+				</button>
+				<span className="text-sm text-booth-dim">Removing it also signs it out and forgets what it kept on this computer.</span>
+			</div>
+		</>
+	)
+}
+
+type EmbedErrors = { name?: string; url?: string; form?: string | undefined }
+
+function embedErrors(name: string, url: string): EmbedErrors {
+	const out: EmbedErrors = {}
+	const n = embedNameError(name.trim())
+	if (n !== null) out.name = n
+	if (embedUrlOf(url) === null) out.url = 'A web address, such as docs.google.com/spreadsheets/…'
+	return out
+}
+
+function EmbedFields(p: { name: string; url: string; onName: (v: string) => void; onUrl: (v: string) => void; errors: EmbedErrors }) {
+	return (
+		<>
+			<div className="grid grid-cols-[1fr_2fr] gap-4">
+				<Field label="Name" error={p.errors.name} hint="What its tab says.">
+					<Input value={p.name} onChange={p.onName} placeholder="Run sheet" />
+				</Field>
+				<Field label="Web address" error={p.errors.url} hint="Copied from the browser's address bar.">
+					<Input value={p.url} onChange={p.onUrl} placeholder="https://docs.google.com/spreadsheets/…" />
+				</Field>
+			</div>
+			{p.errors.form !== undefined && <p className="text-sm text-state-unreachable">{p.errors.form}</p>}
+		</>
+	)
+}
+
+/** Add a web page as a view of its own (../../shared/embeds.ts). */
+function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
+	const [name, setName] = useState('')
+	const [url, setUrl] = useState('')
+	const [errors, setErrors] = useState<EmbedErrors>({})
+	const [added, setAdded] = useState<string | null>(null)
+	const full = all.length >= EMBEDS_MAX
+	const add = async () => {
+		const e = embedErrors(name, url)
+		setErrors(e)
+		setAdded(null)
+		if (Object.keys(e).length > 0) return
+		const embed: Embed = { id: newEmbedId(Date.now(), Math.random()), name: name.trim(), url: embedUrlOf(url)!, on: true }
+		const result = await save({ embeds: [...all, embed] })
+		if (result !== null) return setErrors({ form: result.embeds ?? result.form ?? 'Not added.' })
+		setAdded(embed.name)
+		setName('')
+		setUrl('')
+	}
+	return (
+		<section className="flex flex-col gap-4 rounded-md border border-booth-edge px-4 py-5">
+			<h3 className="text-xs font-semibold tracking-widest text-booth-dim uppercase">Add a web page</h3>
+			<p className="text-sm text-booth-dim">
+				Any page, such as a Google Sheet, becomes a view of its own, with its own sign-in. Links that open a new window
+				open in this computer's browser.
+			</p>
+			{full ? (
+				<p className="text-sm text-booth-dim">That is {EMBEDS_MAX}, the most there can be. Remove one to add another.</p>
+			) : (
+				<>
+					<EmbedFields name={name} url={url} onName={setName} onUrl={setUrl} errors={errors} />
+					<div className="flex items-center gap-4">
+						<button
+							type="button"
+							onClick={() => void add()}
+							className="h-12 rounded border-2 border-booth-ink bg-booth-ink px-8 text-base font-semibold text-booth-bg active:scale-[0.98]"
+						>
+							Add
+						</button>
+						{added !== null && <span className="text-sm text-state-live">Added {added}. Pick it in a slot's tabs.</span>}
+					</div>
+				</>
+			)}
+		</section>
 	)
 }
 

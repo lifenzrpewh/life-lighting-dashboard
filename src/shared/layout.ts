@@ -10,18 +10,43 @@
 // its own place. So `offered` always includes what the slots already hold, and
 // nothing here ever moves a view because a source went quiet.
 
-export type ViewId = 'cue' | 'ma' | 'arena' | 'clips' | 'video'
+import { embedIdOf, type Embed, type EmbedView } from './embeds.js'
 
-/** Every view, in the picker's order. */
-export const VIEWS: readonly ViewId[] = ['cue', 'ma', 'arena', 'clips', 'video']
+/** The views that come with Pāua. */
+export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'video'
 
-export const VIEW_LABEL: Record<ViewId, string> = {
+/** A built-in view, or an embed someone added in Connections (./embeds.ts). */
+export type ViewId = BuiltInView | EmbedView
+
+/** Every built-in view, in the picker's order. Embeds follow, in theirs. */
+export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'video']
+
+export const VIEW_LABEL: Record<BuiltInView, string> = {
 	cue: 'Run order',
 	ma: 'MA',
 	arena: 'Arena',
 	/** Arena's clip grid, to fire from (./components/ClipsView.tsx). */
 	clips: 'Clips',
 	video: 'Video',
+}
+
+/** A built-in view, or any embed's view by its shape. Whether that embed still
+ *  exists is the caller's question: a layout outlives an embed removed. */
+export function isViewId(v: unknown): v is ViewId {
+	return typeof v === 'string' && ((VIEWS as readonly string[]).includes(v) || embedIdOf(v) !== null)
+}
+
+/** What a view is called: its label, or an embed's own name. */
+export function viewLabel(view: ViewId, embeds: readonly Embed[]): string {
+	const id = embedIdOf(view)
+	if (id === null) return VIEW_LABEL[view as BuiltInView]
+	return embeds.find((e) => e.id === id)?.name ?? 'Embed'
+}
+
+/** The views main draws as pages of their own, over the box that holds them:
+ *  the MA, the run order and every embed. A page is in one place at a time. */
+export function isNative(view: ViewId): boolean {
+	return view === 'ma' || view === 'cue' || embedIdOf(view) !== null
 }
 
 export type Slot = 'left' | 'right'
@@ -41,17 +66,24 @@ export function pick(layout: Layout, slot: Slot, view: ViewId): Layout {
 }
 
 /** What a slot's picker offers: every view that is answering, and both views
- *  already on screen whether answering or not, in the picker's order. */
-export function offered(layout: Layout, answering: Record<ViewId, boolean>): ViewId[] {
-	return VIEWS.filter((v) => answering[v] || v === layout.left || v === layout.right)
+ *  already on screen whether answering or not, in the picker's order. Embeds
+ *  are `extra`, after the built-in views, and always answer: their pages say
+ *  for themselves when they cannot load. */
+export function offered(
+	layout: Layout,
+	answering: Record<BuiltInView, boolean>,
+	extra: readonly ViewId[] = [],
+): ViewId[] {
+	const all: ViewId[] = [...VIEWS, ...extra]
+	return all.filter(
+		(v) => (embedIdOf(v) !== null || answering[v as BuiltInView] === true) || v === layout.left || v === layout.right,
+	)
 }
 
 /** Which slot holds `view`, or null when neither does. */
 export function slotOf(layout: Layout, view: ViewId): Slot | null {
 	return layout.left === view ? 'left' : layout.right === view ? 'right' : null
 }
-
-const isView = (v: unknown): v is ViewId => typeof v === 'string' && (VIEWS as readonly string[]).includes(v)
 
 /** A layout off this machine's storage. Anything that is not two different,
  *  known views is the default: a view removed in a later version, or storage
@@ -66,5 +98,5 @@ export function layoutFrom(stored: unknown): Layout {
 	}
 	if (typeof v !== 'object' || v === null) return DEFAULT_LAYOUT
 	const { left, right } = v as Record<string, unknown>
-	return isView(left) && isView(right) && left !== right ? { left, right } : DEFAULT_LAYOUT
+	return isViewId(left) && isViewId(right) && left !== right ? { left, right } : DEFAULT_LAYOUT
 }

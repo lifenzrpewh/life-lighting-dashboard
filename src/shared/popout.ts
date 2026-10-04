@@ -15,7 +15,7 @@
 //   monitor), and on the kiosk's own when there is not.
 // - Anything off storage that is not a sane rectangle is forgotten, not trusted.
 
-import { VIEWS, type ViewId } from './layout.js'
+import { isViewId, type ViewId } from './layout.js'
 
 export type Box = { x: number; y: number; width: number; height: number }
 
@@ -74,8 +74,8 @@ export function popoutPlacesFrom(stored: unknown): Partial<Record<ViewId, Box>> 
 	}
 	if (typeof v !== 'object' || v === null) return {}
 	const places: Partial<Record<ViewId, Box>> = {}
-	for (const view of VIEWS) {
-		const b = (v as Record<string, unknown>)[view]
+	for (const [view, b] of Object.entries(v)) {
+		if (!isViewId(view)) continue
 		if (isBox(b)) places[view] = { x: b.x, y: b.y, width: b.width, height: b.height }
 	}
 	return places
@@ -85,5 +85,5 @@ export function popoutPlacesFrom(stored: unknown): Partial<Record<ViewId, Box>> 
  *  for the kiosk itself. */
 export function popoutViewOf(search: string): ViewId | null {
 	const v = new URLSearchParams(search).get('popout')
-	return v !== null && (VIEWS as readonly string[]).includes(v) ? (v as ViewId) : null
+	return isViewId(v) ? v : null
 }
