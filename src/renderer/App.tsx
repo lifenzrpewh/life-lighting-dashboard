@@ -592,6 +592,7 @@ export function App() {
 	/** A new id for a window or tab, unlike any in the layout now. */
 	const newId = (prefix: 'w' | 't') => freshId(layout, prefix)
 	const [noRoom, setNoRoom] = useState(false)
+	const [fresh, setFresh] = useState<string | null>(null)
 	useEffect(() => {
 		if (!noRoom) return
 		const t = setTimeout(() => setNoRoom(false), 4_000)
@@ -682,9 +683,13 @@ export function App() {
 						<Button
 							icon={Plus}
 							onClick={() => {
-								const next = addWindow(layout, null, { window: newId('w'), tab: newId('t') })
+								const id = newId('w')
+								const next = addWindow(layout, null, { window: id, tab: newId('t') })
 								if (next === layout) setNoRoom(true)
-								else update(() => next)
+								else {
+									update(() => next)
+									setFresh(id)
+								}
 							}}
 						>
 							Add window
@@ -751,6 +756,7 @@ export function App() {
 						onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
 						onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
 						onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
+						fresh={fresh}
 						onResize={(l) => update(() => l)}
 						onSeamStart={startSeam}
 						onSeamEnd={endSeam}

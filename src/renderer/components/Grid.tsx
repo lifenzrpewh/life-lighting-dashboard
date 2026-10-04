@@ -19,7 +19,7 @@
 // one more room and the other less, as the old divider did. Pages stand in as
 // pictures while it is dragged.
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Move, PanelTop, Plus, Trash2, X } from 'lucide-react'
 
 import {
@@ -84,6 +84,9 @@ export type GridProps = {
 	onRemoveTab: (windowId: string, tabId: string) => void
 	onRemoveWindow: (windowId: string) => void
 	onPlace: (windowId: string, box: Box) => void
+	/** A window just added: its "Add a view" menu opens at once, since an
+	 *  empty window is only ever added to be filled. */
+	fresh?: string | null
 	/** A shared edge was let go here: the whole layout, both sides resized. */
 	onResize: (layout: Layout) => void
 	/** A shared edge is being dragged: pages stand in as pictures until it ends. */
@@ -98,6 +101,9 @@ export function Grid(p: GridProps) {
 	const latest = useRef(drag)
 	latest.current = drag
 	const [adding, setAdding] = useState<string | null>(null)
+	useEffect(() => {
+		if (p.fresh != null) setAdding(p.fresh)
+	}, [p.fresh])
 
 	// A shared edge being dragged, and the layout it would make.
 	const seamStart = useRef<{ seam: Seam; at: number; scale: number } | null>(null)
