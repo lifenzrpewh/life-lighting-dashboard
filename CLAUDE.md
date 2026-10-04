@@ -330,10 +330,14 @@ a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media d
    (show "Together Forever Showfile", interface loopback): row 1 on 8003 receives
    (Receive, Receive Command; Send, Send Command and Echo off); row 3 is the reply row,
    127.0.0.1:8004, Send and Send Command on, Receive off; row 2 is a leftover copy of
-   row 3, all off. **Blocked at the box:** onPC still holds 8004 from when every flag
-   was on, so the dashboard cannot listen. Toggle Enable Input off and on, turn off
-   row 3's Receive Command, then `Get-NetUDPEndpoint` should show app_gma3 on 8003 only.
-   Then from here: a Save As read back, a Load read back. The owner says this onPC is
+   row 3, all off. onPC held 8004 too (0.0.0.0, from when every flag was on), yet the
+   kiosk's 127.0.0.1:8004 still got the replies: link LIVE and the showfile read, 2026-10-04
+   ~20:57. Then onPC restarted (20:59:37, cause unknown, nothing sent but pings and reads)
+   and came back with **no OSC sockets at all**. At the box: see what onPC loaded, check
+   the interface and the rows, turn off row 3's Receive Command; then
+   `Get-NetUDPEndpoint` should show app_gma3 on 8003. Then from here: a Save As read
+   back, a Load read back (the owner approved both, 2026-10-04: Save As twice, then Load
+   the first, so the loaded show carries the rows). The owner says this onPC is
    safe to save and load on (2026-10-04). The web remote ignores pasted text and drops
    shifted keys; type lowercase and use MA's on-screen Shift.
 0. **The media check: built, see it at the booth** (`docs/VISUALS_DASHBOARD.md` §
