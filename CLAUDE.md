@@ -47,7 +47,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 240 checks. |
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
-| ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: run order + MA pane + settings. Builds, runs, renders all four states. Channel B is wired (the "desk heard" pill); the link still reports UNREACHABLE because nothing round-trips yet. |
+| ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: two slots, the status bar and Connections. Builds, runs, renders all four states. The link round-trips through LifeBridge (`src/main/bridge/link.ts`, below). |
 | ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Real web remote on onPC 2.3.2.0, **not a desk**. Never stuck for good (2026-10-01): a 15 s load timeout, and a fresh login after 10 s of MA's own overlay saying something it never recovers from (✅ the read works in the sandbox; the fresh login is unit-tested, not watched firing). **Reload MA** (↻) in its slot's strip. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
 | ✅ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. macOS Keychain, and **Windows DPAPI on the Windows box, 2026-10-04**: an operator password saved sealed (no plaintext on disk), still opened after the data folder was moved for the rename, then removed. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
@@ -300,71 +300,62 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-03).** The lighting screen works against onPC on the
-Mac (2026-10-02: link LIVE, showfile chip, MA pane as `Remote`, Cue Manager signed in
-as a booth device). On the Windows box, 2026-10-03, it became a two-slot dashboard:
-either slot picks Run order, MA or Arena; the Arena view shows every layer's clip,
-fader and time left, read live from Arena 7.28; dragging the divider stays with the
-finger; any view pops out into a window of its own; a Spout sender shows live
-in a Video view, picked from a touch-sized list, with Fit to shape the space to it, and
-16-bit senders converted on the GPU by LIFE's own build of the addon; and the unsigned
-installer installs and runs there. The owner tried the slots and the drag on the touchscreen. What is left for lighting is a real console; for
-visuals, the pieces in `docs/VISUALS_DASHBOARD.md`.
+**Where things stand (2026-10-04).** On the Windows box the dashboard is two slots, each
+picking Run order (the Cue Manager), MA, Arena, Clips or Video; any view pops out. Against
+**onPC** there: link LIVE, the showfile chip, and **Save As and Load from the app, each read
+back** (Save As needed `/NoConfirmation`). Against **Arena 7.28**: what plays with time
+left, the Clips trigger screen, the missing-file notice, the **media check** (a lookbook
+service's codes against what Arena holds), and the **Video** view of Arena's Spout output,
+16 bpc included, with Arena holding its 50 fps. The unsigned installer installs and runs.
+What is left needs a booth: the real console, and Arena with the show's media.
 
-**This Windows box:** Arena serves on **8090** (moved 2026-10-03 off the MA web
-remote's 8080); the dashboard's Arena setting is `127.0.0.2:8090`; VFX 1 column 1 holds
-a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media drive
-(`I:\VFX Media Renamed`) is not on this box.
+**This Windows box:** Arena serves on **8090** (moved 2026-10-03 off the MA web remote's
+8080); the dashboard's Arena setting is `127.0.0.2:8090`; the VFX layer group runs at 1.795×
+speed. The show's media drive (`I:\VFX Media Renamed`) is not on this box, nor is the NAS.
+**onPC** here: interface loopback, show "Dashboard Testing" and the `Show 2026-10-04 …` test
+saves (2154 loaded last); OSC row 1 on 8003 receiving, row 3 replying to 127.0.0.1:8004 (row 2
+a leftover copy, off). onPC also holds 0.0.0.0:8004, and the kiosk's 127.0.0.1:8004 bind still
+gets every reply. The web remote ignores pasted text and drops shifted keys; type lowercase
+and use MA's on-screen Shift. Driving the kiosk: start it with
+`electron . --remote-debugging-port=9223` and send CDP input; a held press can be cancelled
+by a real mouse moving over the window, so check the log said "sent".
 
 ### TODO, in order
 
-0. **The video feed from Arena** (`docs/VISUALS_DASHBOARD.md` § The video feed): Arena's
-   Spout output shows in the Video view. LIFE's own build of the addon
-   (`native/texture-bridge/`, built by GitHub Actions) converts 16-bit (High Detail) on
-   the GPU: ✅ from a 16-bit stand-in and ✅ from Arena at 16 bpc, and ✅ Arena held its
-   50 fps with the view on (2026-10-04). Left: the multiview layout itself, in Arena.
-0. **Showfile Save As and Load: ✅ on onPC, 2026-10-04** (status table above). Left:
-   does a Load ever freeze again (once, after a cancelled confirm dialog). This box's onPC: interface loopback, show "Dashboard Testing" and
-   the `Show 2026-10-04 …` test saves, OSC row 1 on 8003 receiving, row 3 replying to
-   127.0.0.1:8004. onPC also holds 0.0.0.0:8004, and the kiosk's 127.0.0.1:8004 bind
-   still gets every reply. The web remote ignores pasted text and drops shifted keys;
-   type lowercase and use MA's on-screen Shift.
-0. **The media check: built, see it at the booth** (`docs/VISUALS_DASHBOARD.md` §
-   Answered (owner, 2026-10-04): the media check). The Arena view's Media row checks
-   a lookbook service's B, F and A codes against Arena. Seen here only with none
-   loaded; at the booth, with the show's composition: the ✓ and "another version"
-   marks, and a PNG's file read.
-0. **Arena:** the Clips view and the missing-media check are built; see a real missing
-   file in it. The brief slot (6) waits on where a brief's link lives; no countdown chip
-   (dropped). QLab is parked (`docs/QLAB.md`).
-0. **The GitHub repo rename to `paua`** is the owner's to do on GitHub (no `gh` or
-   token on this box); then `git remote set-url origin https://github.com/lifenzrpewh/paua.git`.
-0. **A showfile read that stays off the command line (research).** The watcher
-   pushes a Save As or base change within a second, but a Load ends it, so the new
-   name waits for the next ask: once a quiet minute now (was 5 min, the owner's
-   call 2026-10-02), two lines each. Two leads, both unverified: whether
-   `CmdIndirect` runs `SendOSC` without the echo, and whether a show can start its
-   watcher itself on load. The bare ping cannot carry the name (❌ variables do
-   not expand in `SendOSC`). Also still to see: whether each push is a line.
-0. **Every booth show needs the OSC row and LifeBridge** (✅ 2026-10-02: a Load
-   replaces OSC settings; "Mount Eden Base" as saved has no 8003 row). The work
-   is the Show Creator's: its `docs/ROADMAP.md` § From the Lighting Dashboard.
-1. **After the installer:** record what SmartScreen shows, then decide hosting,
-   self-update and start at login (above, § The installer). On the booth screen, also
-   check the Windows touch keyboard comes up for a note.
-2. **Sign the booth PC's Cue Manager in** with its own QR, as its own booth device,
-   so one lost PC can be revoked alone.
-3. **The MA pane, still to watch firing:** Web Remote off then on, and a console
-   restart. `docs/MA3_READ_MODEL.md` § Stuck pages.
-4. **For a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web remote,
-   and whether listening beside onPC works on Windows. Build the volunteer layout
-   view on the MA user `Remote`; HOLDING and PRE/POST are its biggest targets.
-5. **Showfile, the write half:** Save As and Load (`docs/PLAN.md` Phase 3). Decide
-   first whether MA's own dialog plus SaveGuard is enough. The chip gets its `▸`
-   only when there is something for it to open.
-6. **Housekeeping:** delete the retired run order (`src/backend/`, `src/main/backend/`,
-   `src/shared/{backend,service}.ts`, its tests and the mock's schedule) once the
-   Cue Manager has run a service.
+0. **The media check at the booth** (`docs/VISUALS_DASHBOARD.md` § Answered (owner,
+   2026-10-04): the media check): against the show's composition, the ✓ and "another
+   version" marks, and that a PNG still carries its file path. Open: the real slot names
+   (only if it should say a code is in the wrong slot), and whether countdowns (D) belong.
+0. **Arena:** see a real missing file in the Clips view and the notice; the multiview
+   layout, in Arena (the owner's). The brief slot waits on where a brief's link lives; no
+   countdown chip (dropped). QLab is parked (`docs/QLAB.md`).
+0. **After the installer:** run `Paua-Setup` on a booth machine and record what SmartScreen
+   shows, then decide hosting, self-update and start at login (above, § The installer). On
+   the booth screen, check the Windows touch keyboard comes up for a Cue Manager note.
+0. **The GitHub repo rename to `paua`** is the owner's to do on GitHub (no `gh` or token on
+   this box); then `git remote set-url origin https://github.com/lifenzrpewh/paua.git`.
+0. **Showfile:** does a Load ever freeze onPC again (once, 2026-10-04, after a cancelled
+   confirm dialog). Research: a showfile read that stays off the command line. A Load ends
+   the watcher, so the new name waits for the next ask, once a quiet minute, two lines each.
+   Leads, unverified: whether `CmdIndirect` runs `SendOSC` without the echo, and whether a
+   show can start its watcher itself on load. The bare ping cannot carry the name (❌
+   variables do not expand in `SendOSC`).
+0. **Every booth show needs the OSC rows and LifeBridge** (✅ 2026-10-02: a Load replaces
+   OSC settings). The work is the Show Creator's: its `docs/ROADMAP.md` § From the Lighting
+   Dashboard.
+1. **Sign the booth PC's Cue Manager in** with its own QR, as its own booth device, so one
+   lost PC can be revoked alone.
+2. **The MA pane, still to watch firing:** Web Remote off then on, and a console restart.
+   `docs/MA3_READ_MODEL.md` § Stuck pages.
+3. **For a real console:** the six checks in `docs/MA3_READ_MODEL.md` § Web remote, and
+   Save As and Load against a desk (seen on onPC only). Build the volunteer layout view on
+   the MA user `Remote`; HOLDING and PRE/POST are its biggest targets.
+4. **Housekeeping:** delete the retired run order (`src/backend/`, `src/main/backend/`,
+   `src/shared/{backend,service}.ts`, its tests and the mock's schedule) once the Cue
+   Manager has run a service.
+
+**Ending a session:** `/handoff` (`.claude/skills/handoff/SKILL.md`) commits, pushes,
+brings these docs up to date and clears.
 
 **Decided, not forgotten (2026-09-30):** no start times and no NOW highlight,
 because the backend stores neither (no plan or item times are synced, and
