@@ -1,0 +1,223 @@
+diff --git a/packages/native/cpp/win/spout_bridge.cpp b/packages/native/cpp/win/spout_bridge.cpp
+index c657c5c..522c112 100644
+--- a/packages/native/cpp/win/spout_bridge.cpp
++++ b/packages/native/cpp/win/spout_bridge.cpp
+@@ -144,6 +144,10 @@ int32_t spout_bridge_resize(void* handle, uint32_t width, uint32_t height) {
+ // pre-allocation contract that broke our zero-copy path.
+ // ============================================================
+ 
++// LIFE patch (ring): staging textures in the ring. Three: one the page may
++// still be drawing, one on its way, one being written.
++static const int kRing = 3;
++
+ struct SpoutReceiverBridge {
+     // D3D11 — owned by this bridge (one device per receiver instance).
+     ID3D11Device*        device;
+@@ -183,6 +187,19 @@ struct SpoutReceiverBridge {
+     ID3D11ShaderResourceView* senderSRV;      // on senderTexture
+     ID3D11RenderTargetView*   ntStagingRTV;   // on ntStaging, when converting
+ 
++    // LIFE patch (ring): kRing staging textures used in turn, so a frame
++    // the page is still drawing is never overwritten by the next copy (one
++    // texture tore on full-screen fades), and a fence so a frame is handed
++    // on only once its copy has finished on the GPU. ntStaging,
++    // cachedNtHandle and ntStagingRTV above point at the slot in use; the
++    // ring owns them.
++    ID3D11Texture2D*          ringTex[kRing];
++    HANDLE                    ringHandle[kRing];
++    ID3D11RenderTargetView*   ringRTV[kRing];
++    int                       ringCur;
++    int                       ringNext;
++    ID3D11Query*              copyDone;
++
+     // CPU-mappable staging for the RGBA readback path.
+     ID3D11Texture2D*  cpuStaging;
+     unsigned int      cpuStagingWidth;
+@@ -338,9 +355,11 @@ static bool convert_into_staging(SpoutReceiverBridge* bridge) {
+         }
+     }
+     if (!bridge->ntStagingRTV) {
+-        HRESULT hr = bridge->device->CreateRenderTargetView(bridge->ntStaging, nullptr, &bridge->ntStagingRTV);
++        HRESULT hr = bridge->device->CreateRenderTargetView(bridge->ntStaging, nullptr, &bridge->ringRTV[bridge->ringCur]);
++        bridge->ntStagingRTV = bridge->ringRTV[bridge->ringCur];
+         if (FAILED(hr)) {
+             fprintf(stderr, "[SpoutBridge] staging RTV failed hr=0x%08lx\n", static_cast<unsigned long>(hr));
++            bridge->ringRTV[bridge->ringCur] = nullptr;
+             bridge->ntStagingRTV = nullptr;
+             return false;
+         }
+@@ -365,6 +384,61 @@ static bool convert_into_staging(SpoutReceiverBridge* bridge) {
+     return true;
+ }
+ 
++// LIFE patch (ring): point ntStaging, cachedNtHandle and ntStagingRTV at slot i.
++static void select_slot(SpoutReceiverBridge* bridge, int i) {
++    bridge->ringCur        = i;
++    bridge->ntStaging      = bridge->ringTex[i];
++    bridge->cachedNtHandle = bridge->ringHandle[i];
++    bridge->ntStagingRTV   = bridge->ringRTV[i];
++}
++
++// LIFE patch (ring): release every slot. Duplicates already handed to
++// Electron are independent kernel handles and stay valid.
++static void release_ring(SpoutReceiverBridge* bridge) {
++    for (int i = 0; i < kRing; i++) {
++        if (bridge->ringRTV[i])    { bridge->ringRTV[i]->Release();    bridge->ringRTV[i] = nullptr; }
++        if (bridge->ringTex[i])    { bridge->ringTex[i]->Release();    bridge->ringTex[i] = nullptr; }
++        if (bridge->ringHandle[i]) { CloseHandle(bridge->ringHandle[i]); bridge->ringHandle[i] = nullptr; }
++    }
++    bridge->ntStaging      = nullptr;
++    bridge->cachedNtHandle = nullptr;
++    bridge->ntStagingRTV   = nullptr;
++    bridge->ringCur        = 0;
++    bridge->ringNext       = 0;
++}
++
++// LIFE patch (ring): submit the copy with a fence behind it. Plain Flush when
++// no query could be made.
++static void submit_copy(SpoutReceiverBridge* bridge) {
++    if (!bridge->copyDone) {
++        D3D11_QUERY_DESC qd = {};
++        qd.Query = D3D11_QUERY_EVENT;
++        if (FAILED(bridge->device->CreateQuery(&qd, &bridge->copyDone))) bridge->copyDone = nullptr;
++    }
++    if (!bridge->copyDone) {
++        bridge->context->Flush();
++        return;
++    }
++    bridge->context->End(bridge->copyDone);
++    bridge->context->Flush();
++}
++
++// LIFE patch (ring): wait, at most 20 ms, until the GPU has done the copy, so
++// the page never opens a half-written frame. Called after the sender's texture
++// is let go: Arena's own output never waits on this.
++static void wait_copy(SpoutReceiverBridge* bridge) {
++    if (!bridge->copyDone) return;
++    LARGE_INTEGER freq, start, now;
++    QueryPerformanceFrequency(&freq);
++    QueryPerformanceCounter(&start);
++    BOOL done = FALSE;
++    while (bridge->context->GetData(bridge->copyDone, &done, sizeof(done), D3D11_ASYNC_GETDATA_DONOTFLUSH) == S_FALSE) {
++        QueryPerformanceCounter(&now);
++        if ((now.QuadPart - start.QuadPart) * 1000 > freq.QuadPart * 20) break;
++        SwitchToThread();
++    }
++}
++
+ // Allocate or reallocate the NT-shared staging texture to match dims/format.
+ // Mints a fresh NT HANDLE via CreateSharedHandle and caches it for
+ // per-frame DuplicateHandle.
+@@ -372,26 +446,18 @@ static bool ensure_nt_staging(SpoutReceiverBridge* bridge,
+                               unsigned int width,
+                               unsigned int height,
+                               DWORD format) {
+-    if (bridge->ntStaging &&
++    if (bridge->ringTex[0] &&
+         bridge->ntStagingWidth == width &&
+         bridge->ntStagingHeight == height &&
+         bridge->ntStagingFormat == format) {
+         return true;
+     }
+-    if (bridge->cachedNtHandle) {
+-        CloseHandle(bridge->cachedNtHandle);
+-        bridge->cachedNtHandle = nullptr;
+-    }
+-    if (bridge->ntStagingRTV) {
+-        bridge->ntStagingRTV->Release();
+-        bridge->ntStagingRTV = nullptr;
+-    }
+-    if (bridge->ntStaging) {
+-        bridge->ntStaging->Release();
+-        bridge->ntStaging = nullptr;
+-    }
++    release_ring(bridge);
+     if (!bridge->device || width == 0 || height == 0) return false;
+ 
++    // LIFE patch (ring): each slot made as the single texture was.
++    for (int slot = 0; slot < kRing; slot++) {
++
+     D3D11_TEXTURE2D_DESC desc = {};
+     desc.Width = width;
+     desc.Height = height;
+@@ -409,24 +475,24 @@ static bool ensure_nt_staging(SpoutReceiverBridge* bridge,
+     desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE
+                    | D3D11_RESOURCE_MISC_SHARED;
+ 
+-    HRESULT hr = bridge->device->CreateTexture2D(&desc, nullptr, &bridge->ntStaging);
++    HRESULT hr = bridge->device->CreateTexture2D(&desc, nullptr, &bridge->ringTex[slot]);
+     if (FAILED(hr)) {
+         fprintf(stderr,
+                 "[SpoutBridge] ensure_nt_staging: CreateTexture2D failed hr=0x%08lx w=%u h=%u fmt=%lu\n",
+                 static_cast<unsigned long>(hr), width, height, static_cast<unsigned long>(format));
+-        bridge->ntStaging = nullptr;
++        bridge->ringTex[slot] = nullptr;
++        release_ring(bridge);
+         return false;
+     }
+ 
+     IDXGIResource1* dxgi = nullptr;
+-    hr = bridge->ntStaging->QueryInterface(
++    hr = bridge->ringTex[slot]->QueryInterface(
+         __uuidof(IDXGIResource1), reinterpret_cast<void**>(&dxgi));
+     if (FAILED(hr) || !dxgi) {
+         fprintf(stderr,
+                 "[SpoutBridge] ensure_nt_staging: QueryInterface(IDXGIResource1) failed hr=0x%08lx\n",
+                 static_cast<unsigned long>(hr));
+-        bridge->ntStaging->Release();
+-        bridge->ntStaging = nullptr;
++        release_ring(bridge);
+         return false;
+     }
+ 
+@@ -441,12 +507,13 @@ static bool ensure_nt_staging(SpoutReceiverBridge* bridge,
+         fprintf(stderr,
+                 "[SpoutBridge] ensure_nt_staging: CreateSharedHandle failed hr=0x%08lx\n",
+                 static_cast<unsigned long>(hr));
+-        bridge->ntStaging->Release();
+-        bridge->ntStaging = nullptr;
++        release_ring(bridge);
+         return false;
+     }
+ 
+-    bridge->cachedNtHandle    = nt_handle;
++    bridge->ringHandle[slot]  = nt_handle;
++    }
++    select_slot(bridge, 0);
+     bridge->ntStagingWidth    = width;
+     bridge->ntStagingHeight   = height;
+     bridge->ntStagingFormat   = format;
+@@ -549,14 +616,10 @@ void spout_receiver_destroy(void* handle) {
+     // Release cached NT handle before NT staging. Duplicates already handed
+     // to Electron are independent kernel handles and stay valid until their
+     // owners close them.
+-    if (bridge->cachedNtHandle) {
+-        CloseHandle(bridge->cachedNtHandle);
+-        bridge->cachedNtHandle = nullptr;
+-    }
+-    if (bridge->ntStagingRTV) { bridge->ntStagingRTV->Release(); bridge->ntStagingRTV = nullptr; }
++    release_ring(bridge);
++    if (bridge->copyDone)     { bridge->copyDone->Release();     bridge->copyDone = nullptr; }
+     if (bridge->convertVS)    { bridge->convertVS->Release();    bridge->convertVS = nullptr; }
+     if (bridge->convertPS)    { bridge->convertPS->Release();    bridge->convertPS = nullptr; }
+-    if (bridge->ntStaging)   { bridge->ntStaging->Release();   bridge->ntStaging = nullptr; }
+     if (bridge->cpuStaging)  { bridge->cpuStaging->Release();  bridge->cpuStaging = nullptr; }
+     release_sender_texture(bridge);
+ 
+@@ -692,12 +755,15 @@ int32_t spout_receiver_receive_shared_texture(void* handle,
+     if (!bridge->frameCount->GetNewFrame()) return 1;
+ 
+     if (!bridge->frameCount->CheckTextureAccess(bridge->senderTexture)) return 1;
++    select_slot(bridge, bridge->ringNext);
++    bridge->ringNext = (bridge->ringNext + 1) % kRing;
+     bool staged = true;
+     if (convert) staged = convert_into_staging(bridge);
+     else bridge->context->CopyResource(bridge->ntStaging, bridge->senderTexture);
+-    bridge->context->Flush();
++    submit_copy(bridge);
+     bridge->frameCount->AllowTextureAccess(bridge->senderTexture);
+     if (!staged) return -2;
++    wait_copy(bridge);
+ 
+     HANDLE duplicate = nullptr;
+     BOOL ok_dup = DuplicateHandle(

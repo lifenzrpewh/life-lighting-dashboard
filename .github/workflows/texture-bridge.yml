@@ -1,7 +1,9 @@
 # Builds @napolab/texture-bridge's Windows binary with LIFE's patch
 # (native/texture-bridge/life-16bit.patch): a sender Electron cannot import,
 # such as Arena with High Detail on (16 bits a channel), is converted to BGRA8
-# on the GPU instead of refused.
+# on the GPU instead of refused. Then life-ring.patch: three staging textures
+# in turn and a GPU fence, so a frame the page is drawing is never overwritten
+# and none is handed on half-copied (full-screen fades tore with one).
 #
 # WHY HERE: the booth-class Windows box has no admin rights, and so no C++
 # build tools. GitHub's Windows runners have them. The built binary is
@@ -46,12 +48,14 @@ jobs:
           git -c core.autocrlf=false clone --no-checkout $env:UPSTREAM up
           git -C up -c core.autocrlf=false checkout $env:UPSTREAM_SHA
 
-      - name: Apply the LIFE patch
+      - name: Apply the LIFE patches, in order
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force logs | Out-Null
-          git -C up apply --verbose ../life/native/texture-bridge/life-16bit.patch 2>&1 | Tee-Object -FilePath logs/apply.log
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          foreach ($p in 'life-16bit.patch', 'life-ring.patch') {
+            git -C up apply --verbose ../life/native/texture-bridge/$p 2>&1 | Tee-Object -Append -FilePath logs/apply.log
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
 
       - name: Fetch the Spout2 SDK (pinned)
         shell: pwsh
@@ -92,11 +96,13 @@ jobs:
           New-Item -ItemType Directory -Force $out | Out-Null
           Copy-Item up/packages/native/index.win32-x64-msvc.node $out/
           $patch = (Get-FileHash life/native/texture-bridge/life-16bit.patch -Algorithm SHA256).Hash.ToLower()
+          $ring = (Get-FileHash life/native/texture-bridge/life-ring.patch -Algorithm SHA256).Hash.ToLower()
           @(
-            "@napolab/texture-bridge 0.15.0, Windows x64, with LIFE's 16-bit patch.",
+            "@napolab/texture-bridge 0.15.0, Windows x64, with LIFE's 16-bit and ring patches.",
             "upstream $env:UPSTREAM_SHA",
             "spout2   $env:SPOUT2_SHA",
             "patch    sha256 $patch",
+            "ring     sha256 $ring",
             "built    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
             "from     ${{ github.sha }}"
           ) | Set-Content -Encoding utf8 $out/BUILD.txt
@@ -104,7 +110,7 @@ jobs:
           git -C life config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C life checkout -B texture-bridge-build
           git -C life add vendor/texture-bridge
-          git -C life commit -m "Build texture-bridge with the LIFE 16-bit patch (${{ github.sha }})"
+          git -C life commit -m "Build texture-bridge with the LIFE patches (${{ github.sha }})"
           git -C life push --force origin texture-bridge-build
 
       - name: On failure, push the logs to texture-bridge-build-log

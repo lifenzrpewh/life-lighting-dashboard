@@ -40,8 +40,12 @@ type Receiver = InstanceType<Addon['TextureReceiver']>
  *  sender is likely to run at (Arena's composition here is 50 fps), so the
  *  picture is at most this late, and cheap: a check is a flag read. */
 const POLL_MS = 5
-/** At most this often a frame is sent to the page: 30 fps, enough to watch a
- *  multiview by. ✅ 2026-10-03, on the Windows box:
+/** At most this often a frame is sent to the page. 60 fps with LIFE's ring
+ *  build of the addon (native/texture-bridge/life-ring.patch, the owner,
+ *  2026-10-05: "freaks out when fading down full screen things … higher
+ *  framerate"); 30 with any other, whose one staging texture is overwritten
+ *  while the page may still be drawing it, so a faster rate only tears more.
+ *  ✅ 2026-10-03, on the Windows box, for the cost:
  *  - The addon's new-frame check said yes 162 times a second for a 30 fps
  *    stand-in sender, so without a cap the page redraws repeats as fast as
  *    the loop turns, on the GPU that is playing the show.
@@ -52,7 +56,14 @@ const POLL_MS = 5
  *    fps cost 39%, and nothing moving cost 0. So the rate is the cost, and it
  *    is halved from a screen's 60. A desktop with its screens on the graphics
  *    card should not pay it at all (not yet measured). */
-const MIN_FRAME_MS = 1000 / 30
+const RING_BUILD = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../vendor/texture-bridge/BUILD.txt')
+const hasRing = (): boolean => {
+	try {
+		return process.platform === 'win32' && fs.existsSync(PATCHED) && /^ring\s/m.test(fs.readFileSync(RING_BUILD, 'utf8'))
+	} catch {
+		return false
+	}
+}
 /** How often the machine's senders are listed. */
 const LIST_MS = 2_000
 
@@ -93,6 +104,9 @@ function loadAddon(): Addon | string {
 
 export function startVideoFeed(): VideoFeed {
 	const addon = loadAddon()
+	const ring = typeof addon !== 'string' && hasRing()
+	const MIN_FRAME_MS = 1000 / (ring ? 60 : 30)
+	if (typeof addon !== 'string') console.log(`[video] up to ${ring ? 60 : 30} fps${ring ? ' (ring build: no tearing on fades)' : ''}`)
 	const watchers = new Set<WebContents>()
 	/** Pages already told to stop watching when they are destroyed. */
 	const listening = new WeakSet<WebContents>()
