@@ -68,6 +68,7 @@ test('a corrupt file costs only the bad values', () => {
 		campus: null,
 		off: [],
 		embeds: [],
+		windowed: false,
 	})
 	assert.deepEqual(fromDisk('garbage'), DEFAULT_SETTINGS)
 })

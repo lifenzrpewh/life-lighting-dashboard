@@ -159,6 +159,7 @@ export function ConnectionsPanel({
 				))}
 			</ul>
 			{operator && <AddEmbed all={view.embeds} save={save} />}
+			<ThisScreen windowed={view.windowed} operator={operator} save={save} />
 			<AboutLine operator={operator} />
 		</Frame>
 	)
@@ -280,6 +281,34 @@ function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 					</div>
 				</>
 			)}
+		</section>
+	)
+}
+
+/** Full screen or a window: for testers on a laptop; the booth stays full
+ *  screen. Changes at once, no restart. */
+function ThisScreen({ windowed, operator, save }: { windowed: boolean; operator: boolean; save: Save }) {
+	const option = (value: boolean, text: string) => (
+		<button
+			type="button"
+			disabled={!operator}
+			onClick={() => value !== windowed && void save({ windowed: value })}
+			aria-pressed={value === windowed}
+			className={`h-10 px-5 text-sm ${value === windowed ? 'bg-booth-ink text-booth-bg' : 'text-booth-dim'}`}
+		>
+			{text}
+		</button>
+	)
+	return (
+		<section className="flex items-center gap-4 rounded-md border border-booth-edge px-4 py-4">
+			<h3 className="w-28 text-xs font-semibold tracking-widest text-booth-dim uppercase">This screen</h3>
+			<span className="flex overflow-hidden rounded border border-booth-edge">
+				{option(false, 'Full screen')}
+				{option(true, 'Window')}
+			</span>
+			<span className="text-sm text-booth-dim">
+				{operator ? 'A window is for testing on a laptop; the booth stays full screen.' : 'Operator mode changes it.'}
+			</span>
 		</section>
 	)
 }

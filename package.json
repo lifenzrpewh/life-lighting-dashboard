@@ -52,7 +52,8 @@
 			"dist/src/**/*.cjs",
 			"dist/renderer/**/*",
 			"package.json",
-			"vendor/texture-bridge/**"
+			"vendor/texture-bridge/**",
+			"assets/icon.png"
 		],
 		"asar": true,
 		"asarUnpack": [
@@ -68,7 +69,8 @@
 						"x64"
 					]
 				}
-			]
+			],
+			"icon": "build/icon.png"
 		},
 		"nsis": {
 			"oneClick": true,
@@ -93,7 +95,8 @@
 			"artifactName": "Paua-${version}-arm64.${ext}",
 			"signIgnore": [
 				"Syphon.framework"
-			]
+			],
+			"icon": "build/icon.png"
 		},
 		"dmg": {
 			"title": "Paua ${version}"

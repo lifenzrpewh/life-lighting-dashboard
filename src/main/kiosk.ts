@@ -102,6 +102,17 @@ const PRELOAD = path.join(HERE, '../preload/index.cjs')
  *  built renderer off disk. */
 const DEV_SERVER = process.env['VITE_DEV_SERVER_URL']
 
+/** The pāua shell (build/icon.svg), for the window and the taskbar in a
+ *  checkout; an installed app's own icon comes from the installer. */
+export const ICON = path.join(HERE, '../../../assets/icon.png')
+
+/** Full screen, unless this is dev or settings ask for a window (testers on a
+ *  laptop; the booth stays full screen). */
+const fullScreenFor = (windowed: boolean) => !DEV_SERVER && !windowed
+
+/** Tester's marks, counted this run, so the log's marks can be told apart. */
+let marks = 0
+
 let window: BrowserWindow | null = null
 let maPane: MaPane | null = null
 let cuePane: CuePane | null = null
@@ -137,7 +148,8 @@ const noDesk = (port: number): DeskState => ({
 
 function createWindow(): void {
 	window = new BrowserWindow({
-		fullscreen: !DEV_SERVER,
+		fullscreen: fullScreenFor(settings?.current().windowed ?? false),
+		icon: ICON,
 		width: 1920,
 		height: 1080,
 		backgroundColor: '#0a0a0b',
@@ -166,6 +178,7 @@ function createWindow(): void {
 		labelOf: (view) => viewLabel(view, settings?.current().embeds ?? []),
 		load: loadPage,
 		preload: PRELOAD,
+		icon: ICON,
 		placesFile: path.join(app.getPath('userData'), 'popouts.json'),
 	})
 	// A reloaded renderer boots into volunteer mode, with every view in its
@@ -354,6 +367,7 @@ app.whenReady().then(() => {
 		process.platform === 'darwin' ? Menu.buildFromTemplate([{ label: app.name, submenu: [{ role: 'quit' }] }]) : null,
 	)
 
+	if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(ICON)
 	settings = openSettings()
 	const store = settings
 
@@ -551,6 +565,22 @@ app.whenReady().then(() => {
 	// Operator mode only: it opens a file window over the kiosk.
 	ipcMain.on('app:show-log', (e) => {
 		if (fromKiosk(e) && mode === 'operator' && logPath !== '') shell.showItemInFolder(logPath)
+	})
+
+	// Windowed mode, as it changes: no restart needed.
+	store.onChange(() => {
+		const full = fullScreenFor(store.current().windowed)
+		if (window !== null && !window.isDestroyed() && window.isFullScreen() !== full) window.setFullScreen(full)
+	})
+
+	// "Mark this moment" (the owner, 2026-10-04): anyone may, and it only
+	// writes a line in the log, with what was on screen, for a tester's report.
+	ipcMain.handle('app:mark', (e, context: unknown): number | null => {
+		if (!fromOurs(e)) return null
+		marks += 1
+		const said = typeof context === 'string' ? context.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 300) : ''
+		console.log(`[mark] ===== tester's mark ${marks} =====${said === '' ? '' : ` ${said}`}`)
+		return marks
 	})
 
 	ipcMain.handle('settings:get', (e) => (fromKiosk(e) ? settings?.view() : undefined))

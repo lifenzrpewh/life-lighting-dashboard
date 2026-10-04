@@ -70,6 +70,9 @@ export type Settings = {
 	 *  (./embeds.ts). Which pages a booth keeps beside the MA is a habit of
 	 *  the booth, not a fact any show holds. */
 	embeds: Embed[]
+	/** A window rather than the whole screen: for testers on a laptop (the
+	 *  owner, 2026-10-04). The booth stays full screen. */
+	windowed: boolean
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -106,6 +109,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	campus: null,
 	off: [],
 	embeds: [],
+	windowed: false,
 }
 
 /** The settings main works from: a connection turned off is treated as one
@@ -282,6 +286,7 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		if (off === null) errors.off = 'Not a list of connections.'
 		else next.off = off
 	}
+	if (patch.windowed !== undefined) next.windowed = patch.windowed
 	if (patch.embeds !== undefined) {
 		const embeds = embedsFrom(patch.embeds)
 		if (embeds === null) errors.embeds = 'Each embed needs a name and a web address (https://…).'
@@ -318,6 +323,7 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['campus'] === 'string' && campusError(r['campus']) === null) out.campus = r['campus']
 	out.off = offFrom(r['off']) ?? []
 	out.embeds = embedsFrom(r['embeds']) ?? []
+	out.windowed = r['windowed'] === true
 	return out
 }
 
@@ -346,6 +352,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['campus', strOrNull],
 		['off', Array.isArray],
 		['embeds', Array.isArray],
+		['windowed', (v) => typeof v === 'boolean'],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

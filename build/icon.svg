@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Pāua: a shell seen from inside, its nacre blue, green and violet, the
+       spiral at one end and the row of holes along the rim. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#1b1d22"/>
+      <stop offset="1" stop-color="#0a0a0b"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a3f47"/>
+      <stop offset="1" stop-color="#1c1f24"/>
+    </linearGradient>
+    <radialGradient id="nacre" cx="76%" cy="58%" r="85%">
+      <stop offset="0" stop-color="#e9f6ff"/>
+      <stop offset="0.12" stop-color="#7fe0d2"/>
+      <stop offset="0.32" stop-color="#1fa8a0"/>
+      <stop offset="0.5" stop-color="#1d5fa8"/>
+      <stop offset="0.68" stop-color="#5a3ea8"/>
+      <stop offset="0.84" stop-color="#2a8f6a"/>
+      <stop offset="1" stop-color="#14365e"/>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8fd8" stop-opacity="0.55"/>
+      <stop offset="0.35" stop-color="#ff8fd8" stop-opacity="0"/>
+      <stop offset="0.6" stop-color="#b6ff9e" stop-opacity="0"/>
+      <stop offset="0.85" stop-color="#b6ff9e" stop-opacity="0.35"/>
+    </linearGradient>
+    <clipPath id="inside">
+      <path d="M318 742 C214 640 206 438 312 318 C418 198 628 188 748 290 C868 392 850 566 742 688 C634 810 432 852 318 742 Z"/>
+    </clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <g transform="rotate(-28 512 512) translate(512 512) scale(1.08 0.74) translate(-512 -512)">
+    <!-- the shell's outer lip -->
+    <path d="M296 772 C170 650 160 420 286 282 C412 144 652 132 790 252 C928 372 908 578 780 716 C652 854 418 892 296 772 Z" fill="url(#rim)"/>
+    <!-- the nacre -->
+    <path d="M318 742 C214 640 206 438 312 318 C418 198 628 188 748 290 C868 392 850 566 742 688 C634 810 432 852 318 742 Z" fill="url(#nacre)"/>
+    <g clip-path="url(#inside)">
+      <rect x="150" y="150" width="760" height="760" fill="url(#sheen)"/>
+      <!-- growth lines, curving away from the spiral -->
+      <g fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="10" stroke-linecap="round">
+        <path d="M688 640 C600 700 440 690 380 590 C320 490 370 370 470 330"/>
+        <path d="M700 600 C640 650 520 650 470 580 C420 510 450 430 520 400"/>
+        <path d="M712 560 C680 600 600 610 565 565 C530 520 548 470 590 455"/>
+        <path d="M660 700 C560 770 380 760 320 650 C260 540 300 380 420 300"/>
+      </g>
+      <!-- the spiral, at the shell's back -->
+      <path d="M770 560 C798 546 804 512 782 496 C760 480 730 496 734 522 C738 544 762 548 772 532" fill="none" stroke="#f4fbff" stroke-opacity="0.75" stroke-width="12" stroke-linecap="round"/>
+    </g>
+    <!-- the row of holes along the rim -->
+    <g fill="#0a0a0b" stroke="#5c6470" stroke-width="5">
+      <ellipse cx="300" cy="640" rx="17" ry="13"/>
+      <ellipse cx="276" cy="568" rx="17" ry="13"/>
+      <ellipse cx="270" cy="494" rx="17" ry="13"/>
+      <ellipse cx="282" cy="420" rx="17" ry="13"/>
+      <ellipse cx="310" cy="352" rx="16" ry="12"/>
+      <ellipse cx="350" cy="294" rx="14" ry="11"/>
+    </g>
+  </g>
+</svg>

@@ -152,6 +152,9 @@ const api = {
 
 	/** Which build this is, and where its log is. */
 	about: (): Promise<About> => ipcRenderer.invoke('app:about'),
+	/** Write a tester's mark in the log, with a few words of what is on
+	 *  screen. Answers which mark this is, or null if refused. */
+	mark: (context: string): Promise<number | null> => ipcRenderer.invoke('app:mark', context),
 	/** Operator mode only: open the log's folder. */
 	showLog: (): void => ipcRenderer.send('app:show-log'),
 

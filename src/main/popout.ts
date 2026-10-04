@@ -55,6 +55,7 @@ export function createPopouts(opts: {
 	/** Load the renderer's page for `view` into `win`. */
 	load(win: BrowserWindow, view: ViewId): void
 	preload: string
+	icon: string
 	/** Where each window's place is kept, in the app's own data folder. */
 	placesFile: string
 }): Popouts {
@@ -95,6 +96,7 @@ export function createPopouts(opts: {
 			minWidth: POPOUT_MIN.width,
 			minHeight: POPOUT_MIN.height,
 			title: `Pāua — ${labelOf(view)}`,
+			icon: opts.icon,
 			backgroundColor: '#0a0a0b',
 			show: false,
 			autoHideMenuBar: true,

@@ -633,6 +633,11 @@ export function App() {
 				onLeave={leave}
 				connectionsOpen={connectionsOpen}
 				editing={editing}
+				onMark={() =>
+					window.life?.mark(
+						`${mode}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
+					) ?? Promise.resolve(null)
+				}
 				layoutName={layoutName}
 				layoutsOpen={layoutsOpen}
 				onLayouts={() => {

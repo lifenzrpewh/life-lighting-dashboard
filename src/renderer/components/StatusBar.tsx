@@ -11,6 +11,8 @@
 // other connection's health is in the Connections tab, and the button's dot is
 // the alarm that says to look there.
 
+import { useEffect, useState } from 'react'
+
 import type { LinkState, Reading } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
 import type { Tone } from '../../shared/connections.js'
@@ -113,6 +115,7 @@ export function StatusBar({
 	onEnter,
 	onLeave,
 	connectionsOpen,
+	onMark,
 	layoutName,
 	layoutsOpen,
 	onLayouts,
@@ -133,6 +136,9 @@ export function StatusBar({
 	onEnter: () => void
 	onLeave: () => void
 	connectionsOpen: boolean
+	/** "Mark this moment": a line in the log for a tester. Answers which mark,
+	 *  or null when it could not be written. */
+	onMark: () => Promise<number | null>
 	/** The saved layout on screen, if it is one (../../shared/layout.ts). */
 	layoutName: string | null
 	layoutsOpen: boolean
@@ -178,6 +184,7 @@ export function StatusBar({
 
 			{/* Controls, where the hand rests. None touches the show. */}
 			<span className="flex shrink-0 items-center gap-2 border-l border-booth-edge pl-4">
+				<MarkButton onMark={onMark} />
 				<button
 					type="button"
 					onClick={onLayouts}
@@ -210,5 +217,27 @@ export function StatusBar({
 				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
 			</span>
 		</header>
+	)
+}
+
+/** "Mark this moment" (the owner, 2026-10-04): a tester taps it when something
+ *  happens, and the log has a line at that moment to find. It says which mark
+ *  for a moment, so the tester can write the number down. */
+function MarkButton({ onMark }: { onMark: () => Promise<number | null> }) {
+	const [marked, setMarked] = useState<number | null>(null)
+	useEffect(() => {
+		if (marked === null) return
+		const t = setTimeout(() => setMarked(null), 3_000)
+		return () => clearTimeout(t)
+	}, [marked])
+	return (
+		<button
+			type="button"
+			onClick={() => void onMark().then(setMarked)}
+			aria-label="Mark this moment in the log"
+			className={`${barButton} ${marked !== null ? 'border-state-live text-state-live' : ''}`}
+		>
+			{marked === null ? 'MARK' : `MARKED ${marked}`}
+		</button>
 	)
 }
