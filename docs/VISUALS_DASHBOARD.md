@@ -502,14 +502,27 @@ over the composition and the live lookbook for 4 October's Central AM and PM:
   rule already did, now a test says so).
 - **"May differ", and Same by hand** (the owner's ask, 2026-10-05, built the same day): a
   name that differs reads **may differ**, not "another version", since a name is only a
-  guess at the file. Beside it, **Same** (operator mode) marks it the same file: it then
-  reads "✓ … marked the same by hand", never a plain ✓, with **Undo**; the summary counts
-  them. A mark holds for that pair of names only (code, Arena's file name and the
+  guess at the file. Beside it, **Same** (operator mode) confirms it the same file: it then
+  reads "✓ … confirmed the same by hand", never a plain ✓, with **Undo**; the summary
+  counts them. (The screen avoids the word "mark", which is the testers' MARK flag.) A
+  confirmation holds for that pair of names only (code, Arena's file name and the
   lookbook's, without folder, extension or case), so a new file on either side asks again;
-  a marked file missing from this computer still says so. Main keeps the marks in
-  `media-same.json` in the data folder and logs each. ✅ In the kiosk over CDP: refused in
-  volunteer mode, kept and logged in operator mode, undone. ⚠️ The row itself not yet seen
-  on screen: on a Monday the lookbook offers no service until next week's are in.
+  a confirmed file missing from this computer still says so. Main keeps them in
+  `media-same.json` in the data folder and logs each. ✅ In the kiosk over CDP, 2026-10-05:
+  refused in volunteer mode; in operator mode, Same on CB095 turned all seven of its rows to
+  "confirmed the same by hand" and the summary from 2 to 1 to look at; Undo put it back.
+- **Following the run order** (the owner's ask, 2026-10-05, built the same day): the check
+  takes the service the Cue Manager has open. Its address carries the Planning Center plan
+  (`/s/90226425`), and each lookbook service names its `planningCenterPlanId` (✅ Central AM
+  4 Oct is plan 90226424, the Cue Manager's `/s/90226424`), so the match is exact, never by
+  name or date. Main looks for the plan from 21 days back to 42 ahead (each week's services
+  kept 5 minutes), so last week's service can be checked too. It says when the run order has
+  no service open, and when the lookbook has none for it yet ("isn't in the lookbook yet"),
+  never falling back to another. **Pick by hand** opens the old list and stops following
+  (remembered per machine) until **Follow the run order**. ✅ In the kiosk over CDP: the
+  Cue Manager's home read "no service open"; Central AM 11 Oct read "isn't in the lookbook
+  yet"; Central AM 4 Oct was followed and checked. The run order must be loaded (on screen
+  once since the start) for its plan to be known.
 - **Not loaded**: AM wants CF464 (`EXP-NextStepsLounge`) where Arena has CF447
   (`NextStepsLounge`, PLAYBACK 6); PM wants CF465 (`EXP-NextStepsUpstairs`) where Arena has
   CF446, and CF594 (`AllCampus-Prayer-Fasting-Oct-1`) where Arena has CF593. Arena also

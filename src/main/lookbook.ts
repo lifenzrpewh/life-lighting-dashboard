@@ -5,12 +5,14 @@
 // The decoders and their evidence are ../bridge/lookbook.ts; the comparison
 // is ../shared/media-check.ts.
 
-import { decodeItems, decodeServices, decodeWeeks, LOOKBOOK_ID } from '../bridge/lookbook.js'
+import { decodeItems, decodeServices, decodeWeeks, LOOKBOOK_ID, PLAN_ID } from '../bridge/lookbook.js'
 import {
 	LOOKBOOK_DAYS_AHEAD,
 	LOOKBOOK_TIMEOUT_MS,
 	LOOKBOOK_URL,
 	nzDate,
+	PLAN_DAYS_AHEAD,
+	PLAN_DAYS_BACK,
 	type LookbookItem,
 	type LookbookRead,
 	type LookbookService,
@@ -47,6 +49,44 @@ export async function lookbookServices(): Promise<LookbookRead<LookbookService[]
 		services.push(...s.value)
 	}
 	return { ok: true, value: services, at: Date.now() }
+}
+
+/** A week's services change only when the lookbook links a new plan, so a
+ *  run order flicking between services asks each week once in a while. */
+const WEEK_CACHE_MS = 5 * 60_000
+const weekCache = new Map<string, { at: number; services: LookbookService[] }>()
+
+/** The lookbook's service for one Planning Center plan, the one the run order
+ *  has open; null when the lookbook has none for it (yet). Looked for from
+ *  PLAN_DAYS_BACK before today to PLAN_DAYS_AHEAD after. */
+export async function lookbookServiceForPlan(planId: unknown): Promise<LookbookRead<LookbookService | null>> {
+	if (typeof planId !== 'string' || !PLAN_ID.test(planId)) return fail('not a plan')
+	const weeks = await get('/api/weeks')
+	if (!weeks.ok) return fail(weeks.detail)
+	const decoded = decodeWeeks(weeks.body)
+	if (!decoded.ok) return fail(decoded.detail)
+	const now = new Date()
+	const from = nzDate(now, -PLAN_DAYS_BACK)
+	const to = nzDate(now, PLAN_DAYS_AHEAD)
+	const near = decoded.value.filter((w) => w.date >= from && w.date <= to)
+	const reads = await Promise.all(
+		near.map(async (week): Promise<LookbookRead<LookbookService[]>> => {
+			const hit = weekCache.get(week.id)
+			if (hit !== undefined && Date.now() - hit.at < WEEK_CACHE_MS) return { ok: true, value: hit.services, at: hit.at }
+			const r = await get(`/api/weeks/${week.id}/services`)
+			if (!r.ok) return { ok: false, detail: r.detail, at: Date.now() }
+			const s = decodeServices(r.body, week)
+			if (!s.ok) return { ok: false, detail: s.detail, at: Date.now() }
+			weekCache.set(week.id, { at: Date.now(), services: s.value })
+			return { ok: true, value: s.value, at: Date.now() }
+		}),
+	)
+	for (const r of reads) {
+		if (!r.ok) return fail(r.detail)
+		const found = r.value.find((s) => s.planId === planId)
+		if (found !== undefined) return { ok: true, value: found, at: Date.now() }
+	}
+	return { ok: true, value: null, at: Date.now() }
 }
 
 /** One service's run sheet, resolved to codes and files. */

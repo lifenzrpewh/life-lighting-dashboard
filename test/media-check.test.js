@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { decodeItems, decodeServices, decodeWeeks } from '../dist/src/bridge/lookbook.js'
+import { planOf } from '../dist/src/shared/cue-pane.js'
 import { checkMedia, fileStem, lookbookStem, mediaCodeOf, nzDate, offeredServices, sameKey, sameMarkFrom, sameMarksFrom } from '../dist/src/shared/media-check.js'
 
 // Two items as the lookbook sent them for Central AM, 2026-10-04.
@@ -103,7 +104,12 @@ test('services and their campus decode; an id that is not a UUID never reaches a
 		date: '2026-10-04',
 		time: '09:00',
 		campus: 'central',
+		planId: null,
 	})
+	const linked = decodeServices([{ id: 'bf2f560a-4027-4658-ac53-c1282cde5618', name: 'Central AM 4th October', campusKey: 'central', planningCenterPlanId: '90226424' }], weeks.value[0])
+	assert.equal(linked.value[0].planId, '90226424')
+	const odd = decodeServices([{ id: 'bf2f560a-4027-4658-ac53-c1282cde5618', campusKey: 'central', planningCenterPlanId: '../x' }], weeks.value[0])
+	assert.equal(odd.value[0].planId, null)
 	assert.equal(decodeServices([{ id: 'bf2f560a-4027-4658-ac53-c1282cde5618' }], weeks.value[0]).ok, false)
 })
 
@@ -180,6 +186,15 @@ test('marks from storage and from the page are checked', () => {
 	assert.equal(sameMarkFrom({ code: 'CB095', file: 'a|b', want: 'y', same: true }), null)
 	assert.equal(sameMarkFrom({ code: 'CB0951', file: 'x', want: 'y', same: true }), null)
 	assert.equal(sameMarkFrom({ code: 'CB095', file: 'x', want: 'y' }), null)
+})
+
+test("the run order's plan is read from the Cue Manager's address, nothing else", () => {
+	assert.equal(planOf('https://visuals.prodapps.life/s/90226425'), '90226425')
+	assert.equal(planOf('https://visuals.prodapps.life/s/90226425/booth'), '90226425')
+	assert.equal(planOf('https://visuals.prodapps.life/'), null)
+	assert.equal(planOf('https://visuals.prodapps.life/search?s=90226425'), null)
+	assert.equal(planOf('https://visuals.prodapps.life/s/abc'), null)
+	assert.equal(planOf('not a url'), null)
 })
 
 test('a code the lookbook has no file for is never ok', () => {

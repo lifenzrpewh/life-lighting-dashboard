@@ -9,7 +9,7 @@
 // mark without asking the lookbook again. The run sheet is asked again only by
 // Check again: the lookbook is a hosted app beyond the booth, not a feed.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
@@ -46,6 +46,27 @@ function remember(id: string): void {
 		localStorage.setItem(PICKED_KEY, id)
 	} catch {
 		// A machine that keeps nothing asks again next time.
+	}
+}
+
+/** Set when this machine picks the service by hand rather than following the
+ *  run order (following is the default). */
+const BY_HAND_KEY = 'paua.mediaCheck.byHand'
+
+function picksByHand(): boolean {
+	try {
+		return localStorage.getItem(BY_HAND_KEY) === '1'
+	} catch {
+		return false
+	}
+}
+
+function rememberByHand(on: boolean): void {
+	try {
+		if (on) localStorage.setItem(BY_HAND_KEY, '1')
+		else localStorage.removeItem(BY_HAND_KEY)
+	} catch {
+		// Forgotten at the next start: it follows the run order again.
 	}
 }
 
@@ -100,27 +121,73 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 		setServices({ kind: 'reading' })
 		void life.lookbookServices().then((read) => setServices({ kind: 'read', read }))
 	}
+	// Which service the items are for: a late answer for a service no longer
+	// wanted is dropped.
+	const [itemsFor, setItemsFor] = useState<string | null>(null)
+	const itemsWanted = useRef<string | null>(null)
 	const readItems = (id: string) => {
 		if (life === undefined) return
+		itemsWanted.current = id
+		setItemsFor(id)
 		setItems({ kind: 'reading' })
-		void life.lookbookItems(id).then((read) => setItems({ kind: 'read', read }))
+		void life.lookbookItems(id).then((read) => {
+			if (itemsWanted.current === id) setItems({ kind: 'read', read })
+		})
 	}
 
-	// Asked the first time the check opens, not before: a closed panel costs
-	// the lookbook nothing.
+	// Following the run order (the owner's ask, 2026-10-05): the Cue Manager's
+	// address names the Planning Center plan it has open, and the lookbook's
+	// services carry the same plan id, so the check takes that service. Picking
+	// one by hand stops following until Follow the run order is tapped.
+	const [byHand, setByHand] = useState(picksByHand)
+	const [plan, setPlan] = useState<string | null>(null)
 	useEffect(() => {
-		if (!open || services.kind !== 'idle') return
+		const api = window.life
+		if (!open || byHand || api === undefined) return
+		let alive = true
+		const poll = () => void api.cuePane().then((r) => alive && setPlan(r?.plan ?? null))
+		poll()
+		const id = setInterval(poll, 2_000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [open, byHand])
+	const [followed, setFollowed] = useState<{ plan: string; load: Load<LookbookService | null> } | null>(null)
+	const readFollowed = (p: string) => {
+		if (life === undefined) return
+		setFollowed({ plan: p, load: { kind: 'reading' } })
+		void life.lookbookServiceForPlan(p).then((read) => setFollowed((f) => (f?.plan === p ? { plan: p, load: { kind: 'read', read } } : f)))
+	}
+	useEffect(() => {
+		if (open && !byHand && plan !== null && followed?.plan !== plan) readFollowed(plan)
+	}, [open, byHand, plan])
+	const follow = (on: boolean) => {
+		setByHand(!on)
+		rememberByHand(!on)
+		if (on && plan !== null) readFollowed(plan)
+	}
+
+	// The list to pick from is asked only when picking by hand, the first time:
+	// a closed panel costs the lookbook nothing.
+	useEffect(() => {
+		if (!open || !byHand || services.kind !== 'idle') return
 		readServices()
 		// The campus orders the list; a pop-out has no settings, and lists all.
 		void life?.settings().then((s) => setCampus(s?.campus ?? null))
-	}, [open])
+	}, [open, byHand])
 
 	const offered = services.kind === 'read' && services.read.ok ? offeredServices(services.read.value, nzDate(new Date(now)), campus) : []
-	const service = offered.find((s) => s.id === picked) ?? null
+	const followedLoad = !byHand && plan !== null && followed?.plan === plan ? followed.load : null
+	const service = byHand
+		? (offered.find((s) => s.id === picked) ?? null)
+		: followedLoad?.kind === 'read' && followedLoad.read.ok
+			? followedLoad.read.value
+			: null
 
-	// A remembered service is read once the lookbook still lists it.
+	// The service's run sheet is read as it becomes the one checked.
 	useEffect(() => {
-		if (service !== null && items.kind === 'idle') readItems(service.id)
+		if (service !== null && itemsFor !== service.id) readItems(service.id)
 	}, [service?.id])
 
 	const pick = (id: string) => {
@@ -129,20 +196,20 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 		readItems(id)
 	}
 
-	const check = items.kind === 'read' && items.read.ok ? checkMedia(items.read.value, status, same) : null
+	const check = service !== null && itemsFor === service.id && items.kind === 'read' && items.read.ok ? checkMedia(items.read.value, status, same) : null
 	const trouble = check === null ? 0 : check.counts['not-loaded'] + check.counts['not-on-disk'] + check.counts['other-version']
 	const unsettled = check?.counts['no-lookbook-file'] ?? 0
 	const total = check === null ? 0 : Object.values(check.counts).reduce((a, b) => a + b, 0)
 
 	let summary: React.ReactNode
-	if (service === null) summary = <span className="text-booth-dim">Pick a service</span>
+	if (service === null) summary = byHand ? <span className="text-booth-dim">Pick a service</span> : <FollowWords plan={plan} load={followedLoad} short />
 	else if (items.kind === 'reading') summary = <span className="text-booth-dim">Reading the lookbook…</span>
 	else if (items.kind === 'read' && !items.read.ok) summary = <span className="text-warn">The lookbook could not be read</span>
 	else if (check === null) summary = <span className="text-booth-dim">Not checked</span>
 	else if (total === 0) summary = <span className="text-booth-dim">No Arena media on this run sheet</span>
 	else if (trouble > 0) summary = <span className="text-warn">{trouble === 1 ? '1 to look at' : `${trouble} to look at`}</span>
 	else if (unsettled > 0) summary = <span className="text-booth-dim">{unsettled === 1 ? '1 the lookbook has no file for' : `${unsettled} the lookbook has no file for`}</span>
-	else if (check.counts['same-by-hand'] > 0) summary = <span>All {total} loaded, {check.counts['same-by-hand']} marked the same by hand</span>
+	else if (check.counts['same-by-hand'] > 0) summary = <span>All {total} loaded, {check.counts['same-by-hand']} confirmed the same by hand</span>
 	else summary = <span>All {total} loaded</span>
 
 	return (
@@ -156,7 +223,17 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 			</button>
 			{open && (
 				<div className="max-h-[60vh] overflow-y-auto px-4 pb-3">
-					<ServicePicker load={services} offered={offered} picked={service?.id ?? null} onPick={pick} onRetry={readServices} />
+					<div className="flex min-w-0 items-center gap-3 py-2 text-sm">
+						{byHand ? (
+							<span className="min-w-0 flex-1 text-booth-dim">Picked by hand</span>
+						) : (
+							<span className="min-w-0 flex-1 truncate">
+								<FollowWords plan={plan} load={followedLoad} short={false} />
+							</span>
+						)}
+						<SmallButton onClick={() => follow(byHand)}>{byHand ? 'Follow the run order' : 'Pick by hand'}</SmallButton>
+					</div>
+					{byHand && <ServicePicker load={services} offered={offered} picked={service?.id ?? null} onPick={pick} onRetry={readServices} />}
 					{service !== null && (
 						<Result
 							load={items}
@@ -172,6 +249,28 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 				</div>
 			)}
 		</div>
+	)
+}
+
+/** Where following the run order has got to. Never a guess: a run order with
+ *  no service open, or one the lookbook does not have, says so. */
+function FollowWords({ plan, load, short }: { plan: string | null; load: Load<LookbookService | null> | null; short: boolean }) {
+	const lead = short ? '' : 'Following the run order: '
+	if (plan === null) return <span className="text-booth-dim">{short ? 'The run order has no service open' : `${lead}it has no service open`}</span>
+	if (load === null || load.kind !== 'read') return <span className="text-booth-dim">{short ? 'Finding the run order’s service…' : 'Following the run order…'}</span>
+	if (!load.read.ok) return <span className="text-warn">{short ? 'The lookbook could not be read' : `${lead}${load.read.detail}`}</span>
+	if (load.read.value === null) return <span className="text-booth-dim">{short ? 'This service isn’t in the lookbook yet' : `${lead}its service isn’t in the lookbook yet`}</span>
+	const s = load.read.value
+	return (
+		<span>
+			{lead}
+			{s.name}
+			<span className="text-booth-dim">
+				{' '}
+				· {s.date}
+				{s.time !== null && ` · ${s.time}`}
+			</span>
+		</span>
 	)
 }
 
@@ -301,7 +400,7 @@ function CodeRow({
 			detail = `${where(check.at)} has ${fileName(check.at.file)}; the lookbook has ${check.want}`
 			break
 		case 'same-by-hand':
-			state = <span className="text-booth-dim">✓ {where(check.at)} · marked the same by hand</span>
+			state = <span className="text-booth-dim">✓ {where(check.at)} · confirmed the same by hand</span>
 			detail = `${fileName(check.at.file)}; the lookbook has ${check.want}`
 			break
 		case 'no-lookbook-file':

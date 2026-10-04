@@ -79,6 +79,9 @@ const api = {
 	/** The media check's reads from the lookbook app, asked on demand: the
 	 *  services from today to a week ahead, then one service's run sheet. */
 	lookbookServices: (): Promise<LookbookRead<LookbookService[]>> => ipcRenderer.invoke('lookbook:services'),
+	/** The lookbook's service for the plan the run order has open, or null
+	 *  when the lookbook has none for it. */
+	lookbookServiceForPlan: (planId: string): Promise<LookbookRead<LookbookService | null>> => ipcRenderer.invoke('lookbook:for-plan', planId),
 	lookbookItems: (serviceId: string): Promise<LookbookRead<LookbookItem[]>> => ipcRenderer.invoke('lookbook:items', serviceId),
 	/** Fetch a code the media check found wrong: copy the lookbook's file
 	 *  from the graphics folder, and load it into `clipId` unless that is null.

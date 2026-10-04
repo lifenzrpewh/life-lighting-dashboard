@@ -24,9 +24,9 @@
 //
 // A name that differs is only a guess at a different file (the owner,
 // 2026-10-05: CB095 was the same picture, uploaded to the lookbook as `-v5`),
-// so it reads "may differ", and an operator may mark it the same by hand. The
+// so it reads "may differ", and an operator may confirm it the same by hand. The
 // mark holds for that pair of names only: a new file on either side, and the
-// check asks again. It is shown as marked by hand, never as a plain ✓.
+// check asks again. It is shown as confirmed by hand, never as a plain ✓.
 
 import type { ArenaStatus } from './arena.js'
 
@@ -39,6 +39,11 @@ export const LOOKBOOK_TIMEOUT_MS = 8_000
 /** How far ahead the service list reaches: this week's services, for a check
  *  during the week as well as on the day. */
 export const LOOKBOOK_DAYS_AHEAD = 7
+
+/** How far back and ahead the run order's plan is looked for: the Cue
+ *  Manager can be on last week's service or one weeks off. */
+export const PLAN_DAYS_BACK = 21
+export const PLAN_DAYS_AHEAD = 42
 
 /** The code types Arena holds (the owner, 2026-10-04). */
 export const ARENA_TYPES: readonly string[] = ['B', 'F', 'A']
@@ -93,6 +98,9 @@ export type LookbookService = {
 	time: string | null
 	/** `central`, as the lookbook keys campuses. */
 	campus: string
+	/** The Planning Center plan it is linked to, or null: how the check finds
+	 *  the service the run order has open. */
+	planId: string | null
 }
 
 /** One run-sheet item, as the lookbook resolves it. */

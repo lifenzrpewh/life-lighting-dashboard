@@ -21,7 +21,7 @@
 import { WebContentsView, session, type BrowserWindow, type Rectangle } from 'electron'
 
 import { BACKEND_URL } from '../backend/endpoint.js'
-import { KIOSK_USER_AGENT_MARK, type CuePaneReport, type CuePaneState } from '../shared/cue-pane.js'
+import { KIOSK_USER_AGENT_MARK, planOf, type CuePaneReport, type CuePaneState } from '../shared/cue-pane.js'
 import { PANE_LOAD_TIMEOUT_MS, PANE_RETRY_MS, isWebRemote as sameOrigin, type PaneRect } from '../shared/ma-pane.js'
 import { clampToWindow } from './ma-pane.js'
 import { snapshotOf } from './pane-snapshot.js'
@@ -158,7 +158,8 @@ export function createCuePane(window: BrowserWindow): CuePane {
 	})
 
 	return {
-		report: () => ({ pane: state, lastInputAt }),
+		// `at`, not the state's url: the app moves between services in-page.
+		report: () => ({ pane: state, lastInputAt, plan: planOf(at) }),
 
 		snapshot: () => snapshotOf(view, wanted && rect !== null && state.state === 'showing'),
 

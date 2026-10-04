@@ -26,6 +26,9 @@ const isStr = (v: unknown): v is string => typeof v === 'string'
 /** The lookbook's ids are UUIDs. Anything else is never put in a URL. */
 export const LOOKBOOK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** A Planning Center plan id: digits only, so it can sit in a URL. */
+export const PLAN_ID = /^\d{1,12}$/
+
 export type LookbookWeek = { id: string; date: string; name: string; time: string | null }
 
 export function decodeWeeks(body: unknown): Decoded<LookbookWeek[]> {
@@ -49,7 +52,15 @@ export function decodeServices(body: unknown, week: LookbookWeek): Decoded<Lookb
 	for (const [i, s] of body.entries()) {
 		if (!isObject(s) || !isStr(s['id']) || !LOOKBOOK_ID.test(s['id'])) return { ok: false, detail: `${week.name}: service ${i + 1} has no id` }
 		if (!isStr(s['campusKey'])) return { ok: false, detail: `${week.name}: service ${i + 1} has no campus` }
-		out.push({ id: s['id'], name: isStr(s['name']) && s['name'].trim() !== '' ? s['name'].trim() : week.name, date: week.date, time: week.time, campus: s['campusKey'] })
+		const plan = s['planningCenterPlanId']
+		out.push({
+			id: s['id'],
+			name: isStr(s['name']) && s['name'].trim() !== '' ? s['name'].trim() : week.name,
+			date: week.date,
+			time: week.time,
+			campus: s['campusKey'],
+			planId: isStr(plan) && PLAN_ID.test(plan) ? plan : null,
+		})
 	}
 	return { ok: true, value: out }
 }

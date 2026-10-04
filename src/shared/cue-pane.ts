@@ -35,4 +35,18 @@ export type CuePaneReport = {
 	/** The last touch or key inside the pane, which the renderer cannot see:
 	 *  an LD writing notes for a quarter of an hour must not look idle. */
 	lastInputAt: number | null
+	/** The Planning Center plan the app has open, from its address, or null on
+	 *  any other page. The media check follows it. */
+	plan: string | null
+}
+
+/** The plan in one of the app's addresses: `/s/90226425` is PCO plan
+ *  90226425 (✅ 2026-10-05: the lookbook's Central AM 4 Oct names plan
+ *  90226424, the app's `/s/90226424`), `/s/90226425/booth` too. */
+export function planOf(url: string): string | null {
+	try {
+		return /^\/s\/(\d{1,12})(?:\/|$)/.exec(new URL(url).pathname)?.[1] ?? null
+	} catch {
+		return null
+	}
 }
