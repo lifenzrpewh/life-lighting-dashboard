@@ -416,6 +416,18 @@ on macOS (where on-top over a full-screen space is set but unseen).
 
 ## Open questions
 
+- **Announcements against Arena's designated columns** (the owner, 2026-10-04; talk
+  first, do not build blind). LIFE keeps designated slots in Arena for the service's
+  messages (announcements). The wish: read the run sheet, from PCO or from LIFE's
+  "lookbook" app (which pulls from PCO), compare each announcement against those
+  columns, and say what is up to date, what is missing, and where. **The gap:** PCO's
+  item names follow no convention that matches Arena's, and the comms team names the
+  media files, with no number or pattern of ours. So the first job is a conversation:
+  which columns are designated for what, what a PCO announcement item looks like, how
+  the lookbook app names things, and what "up to date" would mean (file date, the
+  clip's name, something the comms team sets). The missing-file check already built
+  is the base it builds on.
+
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
