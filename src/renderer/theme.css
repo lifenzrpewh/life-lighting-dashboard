@@ -5,20 +5,23 @@
 
    The look (2026-10-05, the owner's "smooth and professional, clean but not
    too sterile"): named for the shell, so it borrows the shell. The neutrals
-   lean towards deep sea-green, and one iridescent accent, nacre, appears only
-   where it means something: the tab showing, operator mode, editing the
-   layout. Everything else is quiet so the state colours can speak. */
+   are a cool slate, halfway between the first look's near-neutral greys and
+   the deep sea-green the overhaul first tried (the owner liked the original
+   colours a bit more: "somewhere between", 2026-10-05). One iridescent
+   accent, nacre, appears only where it means something: the tab showing,
+   operator mode, editing the layout. Everything else is quiet so the state
+   colours can speak. */
 @theme {
 	/* The ground and its layers, darkest to lightest. */
-	--color-booth-bg: #070b0d;
-	--color-booth-panel: #0c1417;
-	--color-booth-strip: #0f191c;
-	--color-booth-raise: #15222a;
-	--color-booth-hover: #1b2b33;
-	--color-booth-edge: #1f2f36;
-	--color-booth-ink: #e6f0f1;
-	--color-booth-dim: #8a9ea3;
-	--color-booth-faint: #5d7177;
+	--color-booth-bg: #090b0c;
+	--color-booth-panel: #101417;
+	--color-booth-strip: #13181b;
+	--color-booth-raise: #191f25;
+	--color-booth-hover: #20282e;
+	--color-booth-edge: #232b31;
+	--color-booth-ink: #edf2f3;
+	--color-booth-dim: #8b959d;
+	--color-booth-faint: #5e686f;
 
 	/* Nacre: the accent. Teal to violet, as a pāua shell turns in the light.
 	   Used as a gradient on lines and tints, never as a fill behind text. */
@@ -29,7 +32,7 @@
 	/* The state vocabulary, one colour each, used identically everywhere. */
 	--color-state-live: #34d399;
 	--color-state-stale: #fbbf24;
-	--color-state-unknown: #6b7d83;
+	--color-state-unknown: #6b7882;
 	--color-state-unreachable: #f87171;
 
 	/* Amber is reserved for "you must look at this": the unconfirmed-cook strip
