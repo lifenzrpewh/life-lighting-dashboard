@@ -145,6 +145,13 @@ test('a right copy anywhere wins over a wrong one; the name is matched without c
 	assert.equal(cb.at.column, 2)
 })
 
+test('a format change alone is the same version (owner, 2026-10-05)', () => {
+	// The lookbook's CB095 is a JPG; a PNG of the same name is not another version.
+	const items = decodeItems([ITEMS[0]]).value
+	const check = checkMedia(items, status([['Holding BG', [slot('bg', 'D:\\CB095-Sunday-RelationshipSeries-v5.png')]]]))
+	assert.equal(check.items[0].codes.find((c) => c.code === 'CB095').state, 'ok')
+})
+
 test('a code the lookbook has no file for is never ok', () => {
 	const items = decodeItems([{ ...ITEMS[0], resolvedAssetPaths: { mask: 'applied' }, missingCodes: ['CB095', 'CF588', 'CA635'] }]).value
 	const loaded = checkMedia(items, status([['Holding BG', [slot('bg', 'D:\\CB095-Sunday-RelationshipSeries-v5.jpg')]]]))

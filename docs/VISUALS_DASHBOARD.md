@@ -496,8 +496,10 @@ over the composition and the live lookbook for 4 October's Central AM and PM:
 - ✅ **"Another version" seen for real, and it is a naming difference only**: CB095 in Arena
   is `CB095-Sunday-RelationshipSeries.png` (16 MB, 17 Sep), the lookbook's is
   `…-RelationshipSeries-v5.jpg` (6.6 MB, uploaded the same evening). Same picture, same
-  5800 × 2037 by eye. The rule compares names, so it is right by its own terms; whether
-  the booth's file should be the lookbook's `-v5` is the owner's call.
+  5800 × 2037 by eye. What differs is the name's `-v5`, which is how the file was uploaded
+  to the lookbook; the rule compares names without the extension, so the PNG / JPG
+  difference plays no part. **A format change alone passes** (the owner, 2026-10-05; the
+  rule already did, now a test says so).
 - **Not loaded**: AM wants CF464 (`EXP-NextStepsLounge`) where Arena has CF447
   (`NextStepsLounge`, PLAYBACK 6); PM wants CF465 (`EXP-NextStepsUpstairs`) where Arena has
   CF446, and CF594 (`AllCampus-Prayer-Fasting-Oct-1`) where Arena has CF593. Arena also
