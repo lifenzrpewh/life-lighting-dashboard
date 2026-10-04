@@ -384,7 +384,18 @@ A **chip in the status bar**, not a panel, opening to a sheet.
 > not offered. The rules are `src/shared/showfile-write.ts`; main checks the link is live and the
 > mode is operator before sending, and logs each. **Not built:** an in-place Save (MA's own does
 > it, and SaveGuard guards it) and the "a service is underway" second confirm (nothing here knows
-> PCO's times). **Still to see on onPC:** both commands' read-back.
+> PCO's times).
+>
+> ✅ **Both, on onPC 2.3.2.0 on the Windows box, 2026-10-04,** from the app over OSC, each
+> confirmed by LifeBridge reading the name back. **Save As needs `/NoConfirmation`:** a bare
+> `SaveShow "<new name>"` left MA's confirm dialog on the console and saved nothing (the
+> 2026-08-27 save that proved the 31-character cut was typed at the console, where the
+> dialog was answered by hand). With it, the file was written and read back in ~2 s. **Load**
+> read back in 22 s once and over 60 s once, so the sheet waits 120 s before it says "look at
+> the console". One Load froze onPC on its progress bar (idle, not working) in the session
+> where the bare SaveShow's dialog had been cancelled; the same Load on a fresh onPC worked.
+> ⚠️ **"Save it first" is not yet seen saving:** in both Loads the current show's file kept its
+> earlier time, but neither show had changed since it was saved.
 >
 > ✅ **`shows` on onPC 2.3.2.0, Windows, 2026-10-04:** called from the web remote's command line,
 > it found the folder by `GetPath(Enums.PathType.Showfiles)` (the first way it tries) and packed

@@ -18,9 +18,12 @@
 //   confirm the save.
 // - The base show is never a Save As target. Overwriting it is not in this
 //   app at all (docs/PLAN.md); Base File Saver stays a console plugin.
-// - A Load always sends /NoConfirmation, so the console asks nothing the
-//   screen cannot see, and /Save or /NoSave, so what happens to the show
-//   being replaced is decided here, out loud, never by a default.
+// - Both always send /NoConfirmation, so the console asks nothing the screen
+//   cannot see. ✅ onPC 2.3.2.0, 2026-10-04: a bare `SaveShow "<new name>"`
+//   left a confirm dialog on the console and saved nothing; with
+//   /NoConfirmation the file was written and LifeBridge read the name back.
+//   A Load also sends /Save or /NoSave, so what happens to the show being
+//   replaced is decided here, out loud, never by a default.
 
 /** MA's limit on a show name: longer is cut there without a word. */
 export const SHOW_NAME_MAX = 31
@@ -87,7 +90,7 @@ export function loadProblem(name: string): string | null {
 }
 
 export function saveAsCommand(name: string): string {
-	return `SaveShow "${name}"`
+	return `SaveShow "${name}" /NoConfirmation`
 }
 
 export function loadCommand(name: string, saveFirst: boolean): string {
@@ -108,6 +111,8 @@ export type ShowWriteResult = { ok: true } | { ok: false; detail: string }
 /** How long the sheet waits for the read-back before saying it has not
  *  come. A Save As is pushed by LifeBridge's watcher within about a second
  *  (✅ 2026-10-02); a Load ends the watcher and waits for the link to come
- *  back and ask, so it gets longer. */
+ *  back and ask, so it gets longer: ✅ onPC 2.3.2.0, 2026-10-04, a Save As read
+ *  back in ~2 s, and Loads in 22 s and in over 60 s (which read "look at the
+ *  console" for a while, wrongly). */
 export const SAVE_CONFIRM_MS = 10_000
-export const LOAD_CONFIRM_MS = 60_000
+export const LOAD_CONFIRM_MS = 120_000

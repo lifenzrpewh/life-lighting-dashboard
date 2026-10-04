@@ -45,7 +45,8 @@ test('a Save As name is refused if MA would cut it, the link would change it, or
 })
 
 test('the commands are exactly what is sent, and a Load always says what happens to the old show', () => {
-	assert.equal(saveAsCommand('Central 2026-10-04 0915'), 'SaveShow "Central 2026-10-04 0915"')
+	// A bare SaveShow left a confirm dialog on the console (✅ onPC, 2026-10-04).
+	assert.equal(saveAsCommand('Central 2026-10-04 0915'), 'SaveShow "Central 2026-10-04 0915" /NoConfirmation')
 	assert.equal(loadCommand('Mount Eden Base', true), 'LoadShow "Mount Eden Base" /NoConfirmation /Save')
 	assert.equal(loadCommand('Mount Eden Base', false), 'LoadShow "Mount Eden Base" /NoConfirmation /NoSave')
 	assert.equal(loadProblem("Lee's show & more"), null)

@@ -55,7 +55,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
 | ✅ `src/bridge/coalesce.ts` | Newest-wins per object, time-free so the caller owns the frame rate. Drops superseded values, never unseen ones. |
 | ✅ `spikes/channel-b-live.mjs` | Points the **shipped** decoder at the desk, so the unit tests are not the only evidence. Sends nothing. |
-| ⚠️ `src/renderer/components/ShowfileSheet.tsx` · `src/shared/showfile-write.ts` · LifeBridge `shows` | **Save As and Load** from the showfile chip's ▸ (2026-10-04): offered names (campus + NZ date and time, 31-char meter), read back before "saved"; Load from the console's own list, operator mode, live link, save-first ticked, 3 s hold. Unit-tested and harness-green, ⚠️ not yet on a console. `docs/PLAN.md` Phase 3. |
+| ✅ `src/renderer/components/ShowfileSheet.tsx` · `src/shared/showfile-write.ts` · LifeBridge `shows` | **Save As and Load** from the showfile chip's ▸ (2026-10-04): offered names (campus + NZ date and time, 31-char meter), read back before "saved"; Load from the console's own list, operator mode, live link, save-first ticked, 3 s hold. **On onPC 2.3.2.0 on the Windows box, 2026-10-04:** Save As read back in ~2 s once it sent `/NoConfirmation` (a bare `SaveShow` left a confirm dialog on the console and saved nothing); Loads read back in 22 s and in over 60 s. One Load froze onPC on its progress bar, in the session where that dialog had been cancelled; the same Load on a fresh onPC worked. ⚠️ Whether "save first" saves: an unchanged show's file was not rewritten. `docs/PLAN.md` Phase 3. |
 | ✅ `src/bridge/showfile.ts` · LifeBridge `show` · `watch` | The showfile chip. **LIVE against onPC 2.3.2.0, 2026-09-30**: `ON BASE SHOW Mount Eden Base`, read on link-up and again 5:04 later in a quiet gap. **Watched since 2026-10-02**: the ask is `watch`, and LifeBridge then pushes any change within a second (the chip went amber 1.8 s after a base change, in the kiosk). A Load ends the watcher, so a Load still waits for the next link-up or ask. An older plugin's `unknown verb watch` falls back to `show`. `docs/MA3_READ_MODEL.md` § The showfile, watched. |
 | ✅ `src/main/cue-pane.ts` | The Cue Manager (`visuals.prodapps.life`) as a `WebContentsView` in the run order's column. Persistent session (sign-in, service worker, offline queue survive a restart), locked to its origin, 15 s load timeout, Reload beside it, its Connections row can clear it. **Working on this Mac, 2026-10-02 (owner-observed):** signed in by the app's own QR as a booth device, songs-only and note editing both work. Server side: `visuals-song-comms` `2675660` (booth devices edit), migrations `20261002090000_pairing_kind` and `20261002100000_booth_device_edit`. Not yet on Windows. |
 | ✅ `src/renderer/components/ConnectionsPanel.tsx` · `src/shared/connections.ts` | **Connections**: one row per connection (Console, OnTime, ProPresenter, Arena, Cue Manager), status in a word, tap to open its fields with its own Save. Replaced the Settings form 2026-10-02; the status bar keeps LIVE, show, countdown, clock and a Connections button whose dot is the worst connection that is set up. Everyone sees it, operator mode edits. A connection not set up is `off`, never `down`. Owner-checked on the Windows box, 2026-10-02: "functionally works". |
@@ -324,22 +324,14 @@ a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media d
    the GPU: ✅ every value exact from a 16-bit stand-in sender, ⚠️ not yet seen from
    Arena with High Detail on (switch it on, pick Arena's sender; it should just show). Then: watch Arena's
    own output for dropped frames with the view on; the multiview layout itself, in Arena.
-0. **Showfile Save As and Load: built, see it on onPC** (`docs/PLAN.md` Phase 3).
-   LifeBridge is imported on this box's onPC and `shows` runs there (✅ 2026-10-04,
-   found the folder by `GetPath(Enums.PathType.Showfiles)`). OSC on that onPC
-   (show "Together Forever Showfile", interface loopback): row 1 on 8003 receives
-   (Receive, Receive Command; Send, Send Command and Echo off); row 3 is the reply row,
-   127.0.0.1:8004, Send and Send Command on, Receive off; row 2 is a leftover copy of
-   row 3, all off. onPC held 8004 too (0.0.0.0, from when every flag was on), yet the
-   kiosk's 127.0.0.1:8004 still got the replies: link LIVE and the showfile read, 2026-10-04
-   ~20:57. Then onPC restarted (20:59:37, cause unknown, nothing sent but pings and reads)
-   and came back with **no OSC sockets at all**. At the box: see what onPC loaded, check
-   the interface and the rows, turn off row 3's Receive Command; then
-   `Get-NetUDPEndpoint` should show app_gma3 on 8003. Then from here: a Save As read
-   back, a Load read back (the owner approved both, 2026-10-04: Save As twice, then Load
-   the first, so the loaded show carries the rows). The owner says this onPC is
-   safe to save and load on (2026-10-04). The web remote ignores pasted text and drops
-   shifted keys; type lowercase and use MA's on-screen Shift.
+0. **Showfile Save As and Load: ✅ on onPC, 2026-10-04** (status table above). Left:
+   does "save first" save a show with changes (change something, Load with it ticked,
+   see the file's time); and does a Load freeze again (once, after a cancelled
+   confirm dialog). This box's onPC: interface loopback, show "Dashboard Testing" and
+   the `Show 2026-10-04 …` test saves, OSC row 1 on 8003 receiving, row 3 replying to
+   127.0.0.1:8004. onPC also holds 0.0.0.0:8004, and the kiosk's 127.0.0.1:8004 bind
+   still gets every reply. The web remote ignores pasted text and drops shifted keys;
+   type lowercase and use MA's on-screen Shift.
 0. **The media check: built, see it at the booth** (`docs/VISUALS_DASHBOARD.md` §
    Answered (owner, 2026-10-04): the media check). The Arena view's Media row checks
    a lookbook service's B, F and A codes against Arena. Seen here only with none
