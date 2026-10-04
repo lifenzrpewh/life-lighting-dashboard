@@ -526,6 +526,14 @@ app.whenReady().then(() => {
 		const s = size(space)
 		if (view !== null && p !== null && s !== null && popouts?.isPopout(e.sender, view) === true) popouts.fit(view, p, s)
 	})
+	ipcMain.on('popout:show', (e, v: unknown) => {
+		const view = asView(v)
+		if (view !== null && (fromKiosk(e) || popouts?.isPopout(e.sender, view) === true)) popouts?.show(view)
+	})
+	ipcMain.on('popout:behind', (e, v: unknown) => {
+		const view = asView(v)
+		if (view !== null && (fromKiosk(e) || popouts?.isPopout(e.sender, view) === true)) popouts?.sendBehind(view)
+	})
 	ipcMain.on('popout:close', (e, v: unknown) => {
 		const view = asView(v)
 		if (view !== null && (fromKiosk(e) || popouts?.isPopout(e.sender, view) === true)) popouts?.close(view)

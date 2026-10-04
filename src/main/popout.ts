@@ -8,8 +8,10 @@
 // - Closing the window, however it closes, puts the view back in the kiosk.
 //   The view is moved home on `close`, before the window is torn down, so a
 //   page is never destroyed along with the window it happened to be in.
-// - On top. The kiosk is full-screen; a window that fell behind it would be lost
-//   to a volunteer with no taskbar.
+// - On top, until someone sends it behind (the owner, 2026-10-04): then the
+//   kiosk comes forward over it, and Show on its tab brings it forward again,
+//   on top. The kiosk is full-screen; a window behind it is reached only by
+//   that tab, which always says it is out.
 // - The kiosk going away takes its pop-outs with it: a reloaded kiosk starts
 //   with every view in its slot, and a closed one must not leave a window
 //   holding the app open.
@@ -31,6 +33,10 @@ export type Popouts = {
 	popped(): ViewId[]
 	open(view: ViewId): void
 	close(view: ViewId): void
+	/** Bring `view`'s window forward, on top of the kiosk. */
+	show(view: ViewId): void
+	/** Let `view`'s window go behind the kiosk. */
+	sendBehind(view: ViewId): void
 	closeAll(): void
 	/** Size `view`'s window so its picture space takes the picture's shape, and
 	 *  hold that shape while it is resized. */
@@ -131,6 +137,27 @@ export function createPopouts(opts: {
 		if (win !== undefined && !win.isDestroyed()) win.close()
 	}
 
+	const show = (view: ViewId) => {
+		const win = windows.get(view)
+		if (win === undefined || win.isDestroyed()) return
+		win.setAlwaysOnTop(true)
+		if (win.isMinimized()) win.restore()
+		win.show()
+		win.moveTop()
+		win.focus()
+	}
+
+	const sendBehind = (view: ViewId) => {
+		const win = windows.get(view)
+		if (win === undefined || win.isDestroyed()) return
+		win.setAlwaysOnTop(false)
+		if (!kiosk.isDestroyed()) {
+			kiosk.moveTop()
+			kiosk.focus()
+		}
+		console.log(`[kiosk] ${labelOf(view)} pop-out sent behind`)
+	}
+
 	const closeAll = () => {
 		for (const view of [...windows.keys()]) close(view)
 	}
@@ -162,6 +189,8 @@ export function createPopouts(opts: {
 		popped: () => [...windows.keys()],
 		open,
 		close,
+		show,
+		sendBehind,
 		closeAll,
 		fit,
 		isPopout: (sender, view) =>

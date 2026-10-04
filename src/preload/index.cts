@@ -127,6 +127,10 @@ const api = {
 	 *  and keep that shape while the window is resized. */
 	fitPopout: (view: ViewId, picture: { width: number; height: number }, space: { width: number; height: number }): void =>
 		ipcRenderer.send('popout:fit', view, picture, space),
+	/** Bring `view`'s window forward, on top of the kiosk. */
+	showPopout: (view: ViewId): void => ipcRenderer.send('popout:show', view),
+	/** Let `view`'s window go behind the kiosk, until Show. */
+	sendPopoutBehind: (view: ViewId): void => ipcRenderer.send('popout:behind', view),
 	/** Close `view`'s window, which puts it back in the kiosk. */
 	bringBack: (view: ViewId): void => ipcRenderer.send('popout:close', view),
 

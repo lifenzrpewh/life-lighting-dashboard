@@ -507,14 +507,23 @@ export function App() {
 		if (popped.has(view)) {
 			return (
 				<Centered>
-					<Say head={`${label(view)} is popped out`} body="It is in its own window, on top of this one.">
-						<button
-							type="button"
-							onClick={() => bringBack(view)}
-							className="mt-5 h-12 rounded-md border border-booth-edge px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
-						>
-							Bring back
-						</button>
+					<Say head={`${label(view)} is popped out`} body="It is in its own window. Show brings it to the front; Bring back puts it here again.">
+						<div className="mt-5 flex justify-center gap-3">
+							<button
+								type="button"
+								onClick={() => window.life?.showPopout(view)}
+								className="h-12 rounded-md border-2 border-booth-ink px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
+							>
+								Show
+							</button>
+							<button
+								type="button"
+								onClick={() => bringBack(view)}
+								className="h-12 rounded-md border border-booth-edge px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
+							>
+								Bring back
+							</button>
+						</div>
 					</Say>
 				</Centered>
 			)

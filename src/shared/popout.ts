@@ -7,6 +7,10 @@
 // layout never changes by itself. Closing the window, by its Back button or the
 // system's own close, brings the view home.
 //
+// And on 2026-10-04, with the windows on a grid: a tab pops out (every tab of
+// that view says so, offering Show and Bring back), and a pop-out can be sent
+// behind the kiosk; Show brings it forward, on top again.
+//
 // THE RULES THIS FILE ENFORCES:
 // - A pop-out opens where it can be reached. A remembered place is used only
 //   while its top edge is still on a display, because a window whose title bar

@@ -114,6 +114,14 @@ export function PopOut({ view }: { view: ViewId }) {
 					<ZoomControl name={label} zoom={embed.zoom} onZoom={(by) => window.life?.zoomEmbed(embedId, by)} />
 				)}
 				{reload}
+				{/* Behind the kiosk until its tab's Show (src/main/popout.ts). */}
+				<button
+					type="button"
+					onClick={() => window.life?.sendPopoutBehind(view)}
+					className="h-11 rounded-md border border-booth-edge px-4 text-sm text-booth-dim active:scale-[0.98] active:bg-booth-edge"
+				>
+					Send behind
+				</button>
 				{/* Big enough for a finger: the system's own close is not. */}
 				<button
 					type="button"
