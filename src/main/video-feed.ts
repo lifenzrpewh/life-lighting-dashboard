@@ -118,6 +118,8 @@ export function startVideoFeed(): VideoFeed {
 	let lastSentAt = 0
 	let lastFrame: VideoFeedState['lastFrame'] = null
 	let failure: string | null = typeof addon === 'string' ? `the video addon did not load: ${addon}` : null
+	/** When a slow frame was last logged: at most one line every 10 s. */
+	let slowLoggedAt = 0
 	/** Frames delivered in the current second, and the last whole second's count. */
 	let counted = { second: 0, frames: 0, fps: 0 }
 
@@ -223,6 +225,13 @@ export function startVideoFeed(): VideoFeed {
 			.finally(() => {
 				imported.release()
 				inFlight = false
+				// A frame slow to reach the page is the picture "taking a second to
+				// update" (the owner, 2026-10-05): said in the log, to find which.
+				const took = performance.now() - lastSentAt
+				if (took > 250 && performance.now() - slowLoggedAt > 10_000) {
+					slowLoggedAt = performance.now()
+					console.log(`[video] a frame took ${Math.round(took)} ms to reach the page (${sender})`)
+				}
 			})
 	}
 

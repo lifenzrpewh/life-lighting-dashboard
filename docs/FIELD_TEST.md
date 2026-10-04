@@ -82,6 +82,14 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Clips fire from the Clips view; faders move
 - [ ] The Video view shows Arena's output and keeps up
 
+**Media, the bar, tabs and video** (0.2.2)
+- [ ] Holding view: a clip that's right shows only its code; amber marks one to look at; a dashed "+ place" tile sits where a run-sheet item belongs and isn't yet
+- [ ] A one-off with no column waits in the "No column" tray: tap it, then a lit slot; it stays placed for that service
+- [ ] Update all with a clip on screen: the red tick asks first, and the picture changes cleanly when you say yes (say what the audience saw)
+- [ ] The top bar's ⌃ (far right) folds it to a thin strip; ⌄ brings it back; it stays as you left it after a restart
+- [ ] Edit layout: drag a tab along its strip to reorder it, and onto another window to move it (by finger: does the strip scroll instead?)
+- [ ] Video view during a full-screen fade in Arena: smooth, no tearing or flicker; the frame rate (it may now reach 60)
+
 **The new look** (0.2.1)
 - [ ] Hold Volunteer (top right) for 3 s: it turns to Operator with a coloured line under the bar; one tap goes back
 - [ ] Anything that reads too dim, too small or too close together from where a volunteer stands

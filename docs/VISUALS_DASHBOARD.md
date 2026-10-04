@@ -348,6 +348,17 @@ Arena's own display): 50 fps, its target, with the Video view off, and still 50 
 and pulling 1920×1080 at 26 fps. Arena and the kiosk share this machine's GPU, so this is
 the case the booth will have.
 
+**Tearing on fades, and 60 fps (2026-10-05).** The owner: the view "freaks out when fading
+down full screen things and takes a second to update". The addon copied every frame into one
+staging texture and handed it on after a plain `Flush`: the next copy could land while the
+page still drew the last, and the page could open a frame not yet copied. `life-ring.patch`
+(`native/texture-bridge/README.md`) keeps three in turn with a GPU fence, waited on after
+Arena's texture is let go; the kiosk allows 60 fps only with that build. ✅ Built by the
+workflow (run 37242740953) and loaded on this box against Arena's `MULTIVIEW` (1920×1080, 16
+bpc): **47-48 fps, up from 27**, Arena's own target being 50; no frame slower than 250 ms to
+reach the page (the log now says when one is). ⚠️ Not yet watched by the owner during a
+full-screen fade, nor Arena's own frame rate with the view at this rate.
+
 **Still to do:** lay out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
 
