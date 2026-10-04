@@ -11,11 +11,10 @@
 // into the old one's clip keeping its fades and effects (⚠️ not yet watched).
 //
 // What each check result gets:
-// - another version, or the file missing on this computer: found, copied,
-//   and loaded into the clip that has the old one;
-// - not in Arena at all: found and copied only. Which clip it belongs in is
-//   not known (the slot names are an open question), so placing it is the
-//   operator's, by hand.
+// - may differ, or the file missing on this computer: found, copied, and
+//   loaded into every clip that has the old one (./holding.ts, clipsToUpdate);
+// - not in Arena at all: placed in the slot the operator confirmed (a home
+//   ./holding.ts suggests), or copied only.
 //
 // THE RULES THIS FILE ENFORCES, with ../bridge/media-files.ts and
 // ../main/media-fetch.ts:
@@ -34,16 +33,17 @@ export type FetchRequest = {
 	code: string
 	/** The lookbook's file name, without folder or extension (`lookbookStem`). */
 	want: string
-	/** The clip to load it into, or null to copy only. */
-	clipId: number | null
+	/** The clips to load it into: every clip with the old file, or the one
+	 *  slot a new code is placed in. None copies only. */
+	clipIds: number[]
 }
 
 export type FetchState =
 	| { state: 'finding' }
 	| { state: 'copying'; done: number; total: number }
-	| { state: 'loading'; file: string }
+	| { state: 'loading'; file: string; done: number; of: number }
 	/** Arena took the load; the media check confirms the clip has it. */
-	| { state: 'sent'; file: string }
+	| { state: 'sent'; file: string; clips: number }
 	/** Copied, not loaded: nothing in Arena to load it into. */
 	| { state: 'copied'; file: string }
 	| { state: 'failed'; detail: string }
@@ -60,11 +60,12 @@ export function isPlainName(name: string): boolean {
 /** A request off the IPC boundary, or null. */
 export function fetchRequestFrom(raw: unknown): FetchRequest | null {
 	if (typeof raw !== 'object' || raw === null) return null
-	const { code, want, clipId } = raw as Record<string, unknown>
+	const { code, want, clipIds } = raw as Record<string, unknown>
 	if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return null
 	if (typeof want !== 'string' || !isPlainName(want)) return null
-	if (clipId !== null && !(typeof clipId === 'number' && Number.isSafeInteger(clipId) && clipId > 0)) return null
-	return { code, want, clipId }
+	if (!Array.isArray(clipIds) || clipIds.length > 100) return null
+	if (!clipIds.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)) return null
+	return { code, want, clipIds: [...new Set(clipIds as number[])] }
 }
 
 /** A folder setting: a whole path on this computer or the network, `D:\Media`,

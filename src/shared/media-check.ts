@@ -73,6 +73,32 @@ export function mediaCodeOf(name: string): MediaCode | null {
 	return { code, campus: campus.toUpperCase(), type: type.toUpperCase() }
 }
 
+/** The scheme main answers the lookbook's pictures on, shrunk to a thumbnail
+ *  (src/main/arena-thumbnails.ts): the renderer's page allows no remote
+ *  origins, so main asks the lookbook, and only for one of its library files. */
+export const LOOKBOOK_SCHEME = 'lookbook'
+
+/** A lookbook library file: `/storage/library/C/CF588-…_1789857226772.png`. */
+const LIBRARY_PATH = /^\/storage\/library\/[A-Za-z]\/[^/\\]{1,200}\.(?:png|jpe?g|webp|gif)$/i
+
+/** The thumbnail address for a lookbook file, or null for one that is not a
+ *  still picture (a video has nothing to shrink). */
+export function lookbookThumbUrl(path: string): string | null {
+	return LIBRARY_PATH.test(path) ? `${LOOKBOOK_SCHEME}://thumbnail${path.split('/').map(encodeURIComponent).join('/')}` : null
+}
+
+/** The library path in a lookbook thumbnail address, or null. */
+export function lookbookPathOf(url: string): string | null {
+	try {
+		const u = new URL(url)
+		if (u.protocol !== `${LOOKBOOK_SCHEME}:` || u.host !== 'thumbnail') return null
+		const path = u.pathname.split('/').map(decodeURIComponent).join('/')
+		return LIBRARY_PATH.test(path) ? path : null
+	} catch {
+		return null
+	}
+}
+
 /** A file's name without its folder or extension, whichever separator the
  *  path uses: Arena's are Windows paths, the lookbook's are URL paths. */
 export function fileStem(path: string): string {

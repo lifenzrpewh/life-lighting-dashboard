@@ -8,7 +8,7 @@
 // controls are 48.
 
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { Globe, Layers, LayoutGrid, ListChecks, MonitorPlay, SlidersHorizontal, X } from 'lucide-react'
+import { GalleryHorizontalEnd, Globe, Layers, LayoutGrid, ListChecks, MonitorPlay, SlidersHorizontal, X } from 'lucide-react'
 
 import type { Tone } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -231,6 +231,8 @@ export function viewIcon(view: ViewId): Icon {
 			return Layers
 		case 'clips':
 			return LayoutGrid
+		case 'holding':
+			return GalleryHorizontalEnd
 		case 'video':
 			return MonitorPlay
 		default:

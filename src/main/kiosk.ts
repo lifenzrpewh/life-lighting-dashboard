@@ -69,7 +69,7 @@ import { startTimers, type TimersHandle } from './timers.js'
 import { startArena, type ArenaHandle } from './arena.js'
 import type { ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js'
 import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js'
-import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
+import { registerThumbnailScheme, serveLookbookThumbnails, serveThumbnails } from './arena-thumbnails.js'
 import { lookbookItems, lookbookServiceForPlan, lookbookServices } from './lookbook.js'
 import type { LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js'
 import { createPopouts, type Popouts } from './popout.js'
@@ -457,6 +457,7 @@ app.whenReady().then(() => {
 		const m = sameMarkFrom(raw)
 		return m === null ? { ok: false, detail: 'not a mark' } : mediaSame.mark(m)
 	})
+	serveLookbookThumbnails()
 	serveThumbnails(() => {
 		const s = store.current()
 		return s.arenaHost === null ? null : { host: s.arenaHost, port: s.arenaPort }

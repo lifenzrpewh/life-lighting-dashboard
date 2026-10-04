@@ -28,6 +28,7 @@ import { CueMessage } from './components/CuePane.js'
 import { Centered, MaMessage, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
+import { HoldingView } from './components/HoldingView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { Still } from './components/Still.js'
@@ -497,6 +498,7 @@ export function App() {
 				)
 			case 'arena':
 			case 'clips':
+			case 'holding':
 				return out
 			case 'video':
 				return (
@@ -583,6 +585,8 @@ export function App() {
 				return <ArenaView status={arenaStatus} now={now} />
 			case 'clips':
 				return <ClipsView status={arenaStatus} now={now} />
+			case 'holding':
+				return <HoldingView status={arenaStatus} now={now} />
 			case 'video':
 				return <VideoView feed={videoFeed} now={now} onSpace={setVideoSpace} />
 		}

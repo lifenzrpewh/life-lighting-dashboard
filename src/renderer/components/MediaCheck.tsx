@@ -1,254 +1,83 @@
-// The media check, inside the Arena view (the owner's choice, 2026-10-04): pick
-// a service from the lookbook, and every B, F and A code its run sheet calls for
-// is marked loaded, not in Arena, file missing, may differ, or not
-// checkable. A name that may differ can be marked the same by hand (operator
-// mode; main keeps the marks). The rules are ../../shared/media-check.ts; the reads are main's
-// (src/main/lookbook.ts), asked only when someone opens or re-checks.
+// The media check, inside the Arena view (the owner's choice, 2026-10-04):
+// every B, F and A code the run sheet calls for, in run-sheet order, marked
+// loaded, not in Arena, file missing, may differ, or not checkable. The service
+// is the run order's, or one picked by hand. Its state is ../useMediaCheck.ts,
+// shared with the Holding view (./HoldingView.tsx), which shows the same
+// answers laid out as Arena's columns; the rules are ../../shared/media-check.ts
+// and ../../shared/holding.ts.
 //
+// Operator mode for every change (main refuses otherwise): Fetch (into every
+// clip with the old file), Place (into the suggested slot), Same, Update all.
 // It re-compares on every Arena update, so loading the right clip clears its
-// mark without asking the lookbook again. The run sheet is asked again only by
-// Check again: the lookbook is a hosted app beyond the booth, not a feed.
+// mark without asking the lookbook again.
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
-import {
-	checkMedia,
-	nzDate,
-	offeredServices,
-	TYPE_NAMES,
-	mediaCodeOf,
-	type CodeCheck,
-	type LookbookItem,
-	type LookbookRead,
-	type LookbookService,
-	type SameMark,
-} from '../../shared/media-check.js'
+import { clipsToUpdate, type HomeFor, type UpdateStep } from '../../shared/holding.js'
+import { TYPE_NAMES, mediaCodeOf, type CodeCheck, type LookbookService, type SameMark } from '../../shared/media-check.js'
 import { megabytes, type FetchRequest, type FetchStates } from '../../shared/media-fetch.js'
+import { useMediaCheck, type Load, type MediaCheckState } from '../useMediaCheck.js'
 import { chipLabel, formatAge } from './vocabulary.js'
-
-/** The service last picked on this machine: a convenience, so a re-opened
- *  kiosk checks the same service. Only offered again while the lookbook still
- *  lists it. */
-const PICKED_KEY = 'paua.mediaCheck.service'
-
-function remembered(): string | null {
-	try {
-		return localStorage.getItem(PICKED_KEY)
-	} catch {
-		return null
-	}
-}
-
-function remember(id: string): void {
-	try {
-		localStorage.setItem(PICKED_KEY, id)
-	} catch {
-		// A machine that keeps nothing asks again next time.
-	}
-}
-
-/** Set when this machine picks the service by hand rather than following the
- *  run order (following is the default). */
-const BY_HAND_KEY = 'paua.mediaCheck.byHand'
-
-function picksByHand(): boolean {
-	try {
-		return localStorage.getItem(BY_HAND_KEY) === '1'
-	} catch {
-		return false
-	}
-}
-
-function rememberByHand(on: boolean): void {
-	try {
-		if (on) localStorage.setItem(BY_HAND_KEY, '1')
-		else localStorage.removeItem(BY_HAND_KEY)
-	} catch {
-		// Forgotten at the next start: it follows the run order again.
-	}
-}
-
-type Load<T> = { kind: 'idle' } | { kind: 'reading' } | { kind: 'read'; read: LookbookRead<T> }
 
 export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }) {
 	const [open, setOpen] = useState(false)
-	const [campus, setCampus] = useState<string | null>(null)
-	const [services, setServices] = useState<Load<LookbookService[]>>({ kind: 'idle' })
-	const [picked, setPicked] = useState<string | null>(remembered)
-	const [items, setItems] = useState<Load<LookbookItem[]>>({ kind: 'idle' })
-	// Fetches under way or done (../../shared/media-fetch.ts), as main holds
-	// them, asked while the check is open; and what main said to a tap it
-	// refused, by code.
-	const [fetches, setFetches] = useState<FetchStates>({})
-	const [refused, setRefused] = useState<Record<string, string>>({})
-	useEffect(() => {
-		const api = window.life
-		if (!open || api === undefined) return
-		let alive = true
-		const poll = () => void api.mediaFetches().then((f) => alive && setFetches(f))
-		poll()
-		const id = setInterval(poll, 500)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [open])
-	// The "same" marks, read as the check opens and after each change.
-	const [same, setSame] = useState<ReadonlySet<string>>(new Set())
-	const readSame = () => void window.life?.sameMarks().then((m) => setSame(new Set(m)))
-	useEffect(() => {
-		if (open) readSame()
-	}, [open])
-	const markSame = (mark: SameMark) => {
-		setRefused(({ [mark.code]: _, ...rest }) => rest)
-		void window.life?.markSame(mark).then((r) => {
-			if (!r.ok) setRefused((x) => ({ ...x, [mark.code]: r.detail }))
-			readSame()
-		})
-	}
-	const fetchCode = (req: FetchRequest) => {
-		setRefused(({ [req.code]: _, ...rest }) => rest)
-		void window.life?.fetchMedia(req).then((r) => {
-			if (!r.ok) setRefused((x) => ({ ...x, [req.code]: r.detail }))
-		})
-	}
-
-	const life = window.life
-	const readServices = () => {
-		if (life === undefined) return
-		setServices({ kind: 'reading' })
-		void life.lookbookServices().then((read) => setServices({ kind: 'read', read }))
-	}
-	// Which service the items are for: a late answer for a service no longer
-	// wanted is dropped.
-	const [itemsFor, setItemsFor] = useState<string | null>(null)
-	const itemsWanted = useRef<string | null>(null)
-	const readItems = (id: string) => {
-		if (life === undefined) return
-		itemsWanted.current = id
-		setItemsFor(id)
-		setItems({ kind: 'reading' })
-		void life.lookbookItems(id).then((read) => {
-			if (itemsWanted.current === id) setItems({ kind: 'read', read })
-		})
-	}
-
-	// Following the run order (the owner's ask, 2026-10-05): the Cue Manager's
-	// address names the Planning Center plan it has open, and the lookbook's
-	// services carry the same plan id, so the check takes that service. Picking
-	// one by hand stops following until Follow the run order is tapped.
-	const [byHand, setByHand] = useState(picksByHand)
-	const [plan, setPlan] = useState<string | null>(null)
-	useEffect(() => {
-		const api = window.life
-		if (!open || byHand || api === undefined) return
-		let alive = true
-		const poll = () => void api.cuePane().then((r) => alive && setPlan(r?.plan ?? null))
-		poll()
-		const id = setInterval(poll, 2_000)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [open, byHand])
-	const [followed, setFollowed] = useState<{ plan: string; load: Load<LookbookService | null> } | null>(null)
-	const readFollowed = (p: string) => {
-		if (life === undefined) return
-		setFollowed({ plan: p, load: { kind: 'reading' } })
-		void life.lookbookServiceForPlan(p).then((read) => setFollowed((f) => (f?.plan === p ? { plan: p, load: { kind: 'read', read } } : f)))
-	}
-	useEffect(() => {
-		if (open && !byHand && plan !== null && followed?.plan !== plan) readFollowed(plan)
-	}, [open, byHand, plan])
-	const follow = (on: boolean) => {
-		setByHand(!on)
-		rememberByHand(!on)
-		if (on && plan !== null) readFollowed(plan)
-	}
-
-	// The list to pick from is asked only when picking by hand, the first time:
-	// a closed panel costs the lookbook nothing.
-	useEffect(() => {
-		if (!open || !byHand || services.kind !== 'idle') return
-		readServices()
-		// The campus orders the list; a pop-out has no settings, and lists all.
-		void life?.settings().then((s) => setCampus(s?.campus ?? null))
-	}, [open, byHand])
-
-	const offered = services.kind === 'read' && services.read.ok ? offeredServices(services.read.value, nzDate(new Date(now)), campus) : []
-	const followedLoad = !byHand && plan !== null && followed?.plan === plan ? followed.load : null
-	const service = byHand
-		? (offered.find((s) => s.id === picked) ?? null)
-		: followedLoad?.kind === 'read' && followedLoad.read.ok
-			? followedLoad.read.value
-			: null
-
-	// The service's run sheet is read as it becomes the one checked.
-	useEffect(() => {
-		if (service !== null && itemsFor !== service.id) readItems(service.id)
-	}, [service?.id])
-
-	const pick = (id: string) => {
-		setPicked(id)
-		remember(id)
-		readItems(id)
-	}
-
-	const check = service !== null && itemsFor === service.id && items.kind === 'read' && items.read.ok ? checkMedia(items.read.value, status, same) : null
-	const trouble = check === null ? 0 : check.counts['not-loaded'] + check.counts['not-on-disk'] + check.counts['other-version']
-	const unsettled = check?.counts['no-lookbook-file'] ?? 0
-	const total = check === null ? 0 : Object.values(check.counts).reduce((a, b) => a + b, 0)
-
-	let summary: React.ReactNode
-	if (service === null) summary = byHand ? <span className="text-booth-dim">Pick a service</span> : <FollowWords plan={plan} load={followedLoad} short />
-	else if (items.kind === 'reading') summary = <span className="text-booth-dim">Reading the lookbook…</span>
-	else if (items.kind === 'read' && !items.read.ok) summary = <span className="text-warn">The lookbook could not be read</span>
-	else if (check === null) summary = <span className="text-booth-dim">Not checked</span>
-	else if (total === 0) summary = <span className="text-booth-dim">No Arena media on this run sheet</span>
-	else if (trouble > 0) summary = <span className="text-warn">{trouble === 1 ? '1 to look at' : `${trouble} to look at`}</span>
-	else if (unsettled > 0) summary = <span className="text-booth-dim">{unsettled === 1 ? '1 the lookbook has no file for' : `${unsettled} the lookbook has no file for`}</span>
-	else if (check.counts['same-by-hand'] > 0) summary = <span>All {total} loaded, {check.counts['same-by-hand']} confirmed the same by hand</span>
-	else summary = <span>All {total} loaded</span>
-
+	const m = useMediaCheck(status, now, open)
+	const total = m.check === null ? 0 : Object.values(m.check.counts).reduce((a, b) => a + b, 0)
 	return (
-		<div className={`shrink-0 border-b border-booth-edge ${trouble > 0 ? 'bg-warn/10' : ''}`}>
+		<div className={`shrink-0 border-b border-booth-edge ${m.trouble > 0 ? 'bg-warn/10' : ''}`}>
 			<button type="button" onClick={() => setOpen(!open)} className="flex h-12 w-full min-w-0 items-center gap-3 px-4 text-left text-sm">
 				<span className={chipLabel}>Media</span>
 				{/* The verdict keeps its room; the service's name gives way first. */}
-				{service !== null && <span className="min-w-0 truncate text-booth-dim">{service.name}</span>}
-				<span className="shrink-0">{summary}</span>
+				{m.service !== null && <span className="min-w-0 truncate text-booth-dim">{m.service.name}</span>}
+				<span className="shrink-0">
+					<Summary m={m} total={total} />
+				</span>
 				<ChevronDown size={18} className={`ml-auto shrink-0 text-booth-dim transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
 			</button>
 			{open && (
 				<div className="max-h-[60vh] overflow-y-auto px-4 pb-3">
-					<div className="flex min-w-0 items-center gap-3 py-2 text-sm">
-						{byHand ? (
-							<span className="min-w-0 flex-1 text-booth-dim">Picked by hand</span>
-						) : (
-							<span className="min-w-0 flex-1 truncate">
-								<FollowWords plan={plan} load={followedLoad} short={false} />
-							</span>
-						)}
-						<SmallButton onClick={() => follow(byHand)}>{byHand ? 'Follow the run order' : 'Pick by hand'}</SmallButton>
-					</div>
-					{byHand && <ServicePicker load={services} offered={offered} picked={service?.id ?? null} onPick={pick} onRetry={readServices} />}
-					{service !== null && (
-						<Result
-							load={items}
-							check={check}
-							now={now}
-							onAgain={() => readItems(service.id)}
-							fetches={fetches}
-							refused={refused}
-							onFetch={fetchCode}
-							onMarkSame={markSame}
-						/>
-					)}
+					<ServiceLine m={m} />
+					{m.service !== null && <Result m={m} status={status} now={now} />}
 				</div>
 			)}
 		</div>
+	)
+}
+
+/** The check in a few words: what to look at, or that all is loaded. */
+export function Summary({ m, total }: { m: MediaCheckState; total: number }) {
+	const { check } = m
+	if (m.service === null) return m.byHand ? <span className="text-booth-dim">Pick a service</span> : <FollowWords plan={m.plan} load={m.followedLoad} short />
+	if (m.items.kind === 'reading') return <span className="text-booth-dim">Reading the lookbook…</span>
+	if (m.items.kind === 'read' && !m.items.read.ok) return <span className="text-warn">The lookbook could not be read</span>
+	if (check === null) return <span className="text-booth-dim">Not checked</span>
+	if (total === 0) return <span className="text-booth-dim">No Arena media on this run sheet</span>
+	if (m.trouble > 0) return <span className="text-warn">{m.trouble === 1 ? '1 to look at' : `${m.trouble} to look at`}</span>
+	const unsettled = check.counts['no-lookbook-file']
+	if (unsettled > 0) return <span className="text-booth-dim">{unsettled === 1 ? '1 the lookbook has no file for' : `${unsettled} the lookbook has no file for`}</span>
+	if (check.counts['same-by-hand'] > 0) return <span>All {total} loaded, {check.counts['same-by-hand']} confirmed the same by hand</span>
+	return <span>All {total} loaded</span>
+}
+
+/** Which service is checked, and the switch between following the run order
+ *  and picking by hand. */
+export function ServiceLine({ m }: { m: MediaCheckState }) {
+	return (
+		<>
+			<div className="flex min-w-0 items-center gap-3 py-2 text-sm">
+				{m.byHand ? (
+					<span className="min-w-0 flex-1 text-booth-dim">Picked by hand</span>
+				) : (
+					<span className="min-w-0 flex-1 truncate">
+						<FollowWords plan={m.plan} load={m.followedLoad} short={false} />
+					</span>
+				)}
+				<SmallButton onClick={() => m.follow(m.byHand)}>{m.byHand ? 'Follow the run order' : 'Pick by hand'}</SmallButton>
+			</div>
+			{m.byHand && <ServicePicker load={m.services} offered={m.offered} picked={m.service?.id ?? null} onPick={m.pick} onRetry={m.readServices} />}
+		</>
 	)
 }
 
@@ -319,36 +148,78 @@ function ServicePicker({
 	)
 }
 
-function Result({
-	load,
-	check,
-	now,
-	onAgain,
-	fetches,
-	refused,
-	onFetch,
-	onMarkSame,
-}: {
-	load: Load<LookbookItem[]>
-	check: ReturnType<typeof checkMedia> | null
-	now: number
-	onAgain: () => void
-	fetches: FetchStates
-	refused: Record<string, string>
-	onFetch: (req: FetchRequest) => void
-	onMarkSame: (mark: SameMark) => void
-}) {
-	if (load.kind !== 'read') return <p className="py-2 text-sm text-booth-dim">Reading the run sheet…</p>
-	const read = load.read
+/** When the run sheet was read, Check again, and Update all. */
+export function ReadLine({ m, now }: { m: MediaCheckState; now: number }) {
+	if (m.items.kind !== 'read') return <p className="py-2 text-sm text-booth-dim">Reading the run sheet…</p>
+	const read = m.items.read
+	return (
+		<div className="flex items-center gap-3 border-t border-booth-edge py-2 text-xs text-booth-dim">
+			<span className="min-w-0 flex-1 truncate">
+				{read.ok ? `Run sheet read ${formatAge(Math.max(0, now - read.at))}` : <span className="text-warn">{read.detail}</span>}
+			</span>
+			{m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
+			<SmallButton onClick={m.readItemsAgain}>Check again</SmallButton>
+		</div>
+	)
+}
+
+/** What a Fetch, a Place or Update all will copy and load into Arena, before
+ *  it does: nothing is sent until Load (the owner, 2026-10-05). */
+export function Confirm({ m }: { m: MediaCheckState }) {
+	if (m.asking === null) return null
+	const { title, steps, homeless } = m.asking
+	return (
+		<div className="my-2 rounded-lg bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
+			<p className="mb-2 font-medium">{title}</p>
+			<ul className="mb-2 flex flex-col gap-1 text-xs">
+				{steps.map((s) => (
+					<li key={s.request.code} className="truncate">
+						{s.what}
+					</li>
+				))}
+				{homeless.map((h) => (
+					<li key={h.code} className="truncate text-booth-dim">
+						{h.code}: left out, {h.detail}
+					</li>
+				))}
+			</ul>
+			<p className="mb-2 text-xs text-booth-dim">
+				Copied from the graphics folder into the local folder, then loaded into Arena. Never into a playing clip; nothing is overwritten. Operator mode.
+			</p>
+			<div className="flex gap-2">
+				<SmallButton onClick={m.confirm}>Load</SmallButton>
+				<SmallButton onClick={m.cancel}>Cancel</SmallButton>
+			</div>
+		</div>
+	)
+}
+
+/** One step, said: what goes where. */
+export function stepFor(req: FetchRequest, status: ArenaStatus, home: NonNullable<HomeFor['home']> | null): UpdateStep {
+	if (home !== null) {
+		const replacing = home.replaces === null ? '' : `, replacing ${home.replaces.name}`
+		return { request: req, what: `${req.code}: place ${req.want} in ${home.layer} · column ${home.column}${replacing}` }
+	}
+	if (req.clipIds.length === 0) return { request: req, what: `${req.code}: copy ${req.want} into the local folder only (no place in Arena)` }
+	const places = req.clipIds.map((id) => placeOf(id, status)).filter((p) => p !== null)
+	const where = places.length === 1 ? places[0] : `${req.clipIds.length} clips`
+	return { request: req, what: `${req.code}: load ${req.want} into ${where}` }
+}
+
+function placeOf(clipId: number, status: ArenaStatus): string | null {
+	for (const layer of status.layers) {
+		const i = layer.slots.findIndex((s) => s.id === clipId)
+		if (i >= 0) return `${layer.name} · column ${i + 1}`
+	}
+	return null
+}
+
+function Result({ m, status, now }: { m: MediaCheckState; status: ArenaStatus; now: number }) {
 	return (
 		<div>
-			<div className="flex items-center gap-3 border-t border-booth-edge py-2 text-xs text-booth-dim">
-				<span className="min-w-0 flex-1 truncate">
-					{read.ok ? `Run sheet read ${formatAge(Math.max(0, now - read.at))}` : <span className="text-warn">{read.detail}</span>}
-				</span>
-				<SmallButton onClick={onAgain}>Check again</SmallButton>
-			</div>
-			{check?.items.map((item, i) => (
+			<ReadLine m={m} now={now} />
+			<Confirm m={m} />
+			{m.check?.items.map((item, i) => (
 				<div key={i} className="border-t border-booth-edge/60 py-2">
 					<div className="truncate text-sm">
 						{item.title}
@@ -356,7 +227,7 @@ function Result({
 					</div>
 					<ul className="mt-1 flex flex-col gap-1">
 						{item.codes.map((c, j) => (
-							<CodeRow key={j} check={c} fetch={fetches[c.code]} refused={refused[c.code]} onFetch={onFetch} onMarkSame={onMarkSame} />
+							<CodeRow key={j} check={c} m={m} status={status} home={m.homes.find((h) => h.code === c.code) ?? null} />
 						))}
 					</ul>
 				</div>
@@ -367,21 +238,10 @@ function Result({
 
 /** One code: what it is, and what became of it. Amber only where someone must
  *  act; a code the check could not settle is said, never shown as loaded. */
-function CodeRow({
-	check,
-	fetch,
-	refused,
-	onFetch,
-	onMarkSame,
-}: {
-	check: CodeCheck
-	fetch: FetchStates[string] | undefined
-	refused: string | undefined
-	onFetch: (req: FetchRequest) => void
-	onMarkSame: (mark: SameMark) => void
-}) {
+function CodeRow({ check, m, status, home }: { check: CodeCheck; m: MediaCheckState; status: ArenaStatus; home: HomeFor | null }) {
 	const type = TYPE_NAMES[mediaCodeOf(check.code)?.type ?? ''] ?? ''
 	const where = (at: { layer: string; column: number }) => `${at.layer} · column ${at.column}`
+	const fetch = m.fetches[check.code]
 	let state: React.ReactNode
 	let detail: string | null = null
 	switch (check.state) {
@@ -390,6 +250,7 @@ function CodeRow({
 			break
 		case 'not-loaded':
 			state = <span className="text-warn">not in Arena</span>
+			detail = home === null ? null : home.home === null ? `No place found: ${home.detail}` : homeWords(home.home)
 			break
 		case 'not-on-disk':
 			state = <span className="text-warn">file missing on this computer</span>
@@ -407,15 +268,16 @@ function CodeRow({
 			state = <span className="text-booth-dim">? the lookbook has no file{check.at !== null && ` · in ${where(check.at)}`}</span>
 			break
 	}
-	// What a fetch would do here: load into the clip that has the old or
-	// missing file, or only copy, when Arena does not have it at all.
-	const request: FetchRequest | null =
+	// A fetch loads every clip with the old or missing file; a code not in
+	// Arena goes into its suggested home, or is only copied when none is found.
+	const request: { req: FetchRequest; label: string } | null =
 		check.state === 'other-version' || check.state === 'not-on-disk'
-			? { code: check.code, want: check.want, clipId: check.at.clipId }
+			? { req: { code: check.code, want: check.want, clipIds: clipsToUpdate(check.code, check.want, status, m.same) }, label: 'Fetch' }
 			: check.state === 'not-loaded'
-				? { code: check.code, want: check.want, clipId: null }
+				? home?.home != null
+					? { req: { code: check.code, want: check.want, clipIds: [home.home.clipId] }, label: 'Place' }
+					: { req: { code: check.code, want: check.want, clipIds: [] }, label: 'Copy here' }
 				: null
-	// Marking: "Same" where a name may differ, "Undo" where it was marked.
 	const mark: SameMark | null =
 		check.state === 'other-version' || check.state === 'same-by-hand'
 			? { code: check.code, file: check.at.file, want: check.want, same: check.state === 'other-version' }
@@ -428,10 +290,10 @@ function CodeRow({
 				<span className="min-w-0 truncate">{state}</span>
 				{(request !== null || mark !== null) && (
 					<span className="ml-auto flex shrink-0 items-center gap-2">
-						<FetchWords fetch={fetch} refused={refused} />
-						{mark !== null && !under(fetch) && <SmallButton onClick={() => onMarkSame(mark)}>{mark.same ? 'Same' : 'Undo'}</SmallButton>}
+						<FetchWords fetch={fetch} refused={m.refused[check.code]} />
+						{mark !== null && !under(fetch) && <SmallButton onClick={() => m.markSame(mark)}>{mark.same ? 'Same' : 'Undo'}</SmallButton>}
 						{request !== null && !under(fetch) && (
-							<SmallButton onClick={() => onFetch(request)}>{request.clipId === null ? 'Copy here' : 'Fetch'}</SmallButton>
+							<SmallButton onClick={() => m.ask(request.label, [stepFor(request.req, status, request.label === 'Place' ? (home?.home ?? null) : null)])}>{request.label}</SmallButton>
 						)}
 					</span>
 				)}
@@ -441,11 +303,28 @@ function CodeRow({
 	)
 }
 
+/** A suggested home, with its reason, for a person to agree with. */
+export function homeWords(h: NonNullable<HomeFor['home']>): string {
+	const where = `${h.layer} · column ${h.column}`
+	switch (h.why) {
+		case 'pre':
+			return `Goes in ${where}, Pre${h.replaces === null ? '' : `, replacing ${h.replaces.name}`}`
+		case 'post':
+			return `Goes in ${where}, Post${h.replaces === null ? '' : `, replacing ${h.replaces.name}`}`
+		case 'looks-like':
+			return `Looks like a newer ${h.replaces?.name ?? 'version'}: ${where}`
+		case 'not-used-today':
+			return `${where}, replacing ${h.replaces?.name ?? 'a clip'} (not on this run sheet)`
+		case 'empty':
+			return `${where}, empty`
+	}
+}
+
 /** A fetch still going: no second tap until it ends. */
-const under = (f: FetchStates[string] | undefined) => f?.state === 'finding' || f?.state === 'copying' || f?.state === 'loading'
+export const under = (f: FetchStates[string] | undefined) => f?.state === 'finding' || f?.state === 'copying' || f?.state === 'loading'
 
 /** How a fetch is going, in a few words beside its code. */
-function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | undefined; refused: string | undefined }) {
+export function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | undefined; refused: string | undefined }) {
 	if (refused !== undefined) return <span className="max-w-72 truncate text-xs text-warn">{refused}</span>
 	if (fetch === undefined) return null
 	switch (fetch.state) {
@@ -461,9 +340,18 @@ function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | undefined
 				</span>
 			)
 		case 'loading':
-			return <span className="text-xs text-booth-dim">loading into Arena…</span>
+			return (
+				<span className="text-xs text-booth-dim">
+					loading into Arena{fetch.of > 1 ? ` (${fetch.done + 1} of ${fetch.of})` : ''}…
+				</span>
+			)
 		case 'sent':
-			return <span className="max-w-72 truncate text-xs text-booth-dim">sent {fetch.file}; checking…</span>
+			return (
+				<span className="max-w-72 truncate text-xs text-booth-dim">
+					sent {fetch.file}
+					{fetch.clips > 1 ? ` to ${fetch.clips} clips` : ''}; checking…
+				</span>
+			)
 		case 'copied':
 			return <span className="max-w-72 truncate text-xs text-booth-dim">copied {fetch.file} here; put it in Arena by hand</span>
 		case 'failed':
@@ -475,11 +363,11 @@ function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | undefined
 	}
 }
 
-function fileName(path: string): string {
+export function fileName(path: string): string {
 	return path.split(/[\\/]/).at(-1) ?? path
 }
 
-function SmallButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+export function SmallButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
 	return (
 		<button type="button" onClick={onClick} className="h-10 shrink-0 rounded-lg bg-booth-raise px-3.5 text-sm font-medium hover:bg-booth-hover active:scale-[0.98]">
 			{children}

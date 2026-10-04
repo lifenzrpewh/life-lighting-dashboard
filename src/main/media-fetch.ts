@@ -59,15 +59,25 @@ export function createMediaFetch(opts: {
 		}
 		console.log(`[media] ${req.code}: ${copy.copied ? 'copied' : 'already in the local folder'}: ${copy.path}`)
 		const file = path.basename(copy.path)
-		if (req.clipId === null) return set(req.code, { state: 'copied', file })
+		if (req.clipIds.length === 0) return set(req.code, { state: 'copied', file })
 
-		set(req.code, { state: 'loading', file })
-		const opened = await opts.open(req.clipId, copy.path)
-		if (!opened.ok) {
-			console.log(`[media] ${req.code}: not loaded: ${opened.detail}`)
-			return set(req.code, { state: 'failed', detail: `copied, but not loaded into Arena: ${opened.detail}` })
+		// One clip at a time, each checked as it is sent (never a playing one).
+		const failed: string[] = []
+		for (const [i, clipId] of req.clipIds.entries()) {
+			set(req.code, { state: 'loading', file, done: i, of: req.clipIds.length })
+			const opened = await opts.open(clipId, copy.path)
+			if (!opened.ok) {
+				console.log(`[media] ${req.code}: not loaded into clip ${clipId}: ${opened.detail}`)
+				failed.push(opened.detail)
+			}
 		}
-		set(req.code, { state: 'sent', file })
+		const loaded = req.clipIds.length - failed.length
+		console.log(`[media] ${req.code}: ${file} sent to ${loaded} of ${req.clipIds.length} clips`)
+		if (failed.length > 0) {
+			const of = req.clipIds.length === 1 ? '' : ` (${loaded} of ${req.clipIds.length} clips)`
+			return set(req.code, { state: 'failed', detail: `copied, but not loaded into Arena${of}: ${failed[0]}` })
+		}
+		set(req.code, { state: 'sent', file, clips: loaded })
 	}
 
 	const next = async () => {

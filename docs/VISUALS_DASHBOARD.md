@@ -629,13 +629,16 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
   possible", and lists `/composition/clips/open` for several at once.
 - **Another version or a missing file**: found by name (any case, any media extension, newest
   if several; Synology's `@eaDir` and recycle bins skipped) under the graphics folder, copied
-  with progress (`.partial` then renamed), loaded into the clip that has the old one, and
-  confirmed by the check's own next reading. **Not in Arena**: copied only ("Copy here"), since
-  which clip it belongs in is still open (columns are unnamed, by position: § Answered, the
-  media check).
+  with progress (`.partial` then renamed), loaded into **every** clip that has the old one
+  (CB095 sits in 18 columns of HOLD BG; since 2026-10-05, before only the first), and
+  confirmed by the check's own next reading. **Not in Arena**: **Place** into its suggested
+  home (§ The Holding view), or copied only ("Copy here") when no home is found.
+- **Nothing goes into Arena without a confirmation** (the owner, 2026-10-05): Fetch, Place,
+  Update all and the Holding view's Update each list what they will copy and load, and only
+  **Load** sends it. Same and Undo touch only Pāua's own record, so they stay one tap.
 - **Guards**: never into a playing clip (checked at sending), nothing overwritten (a same-size
   file of that name is reused, a different one left alone and said), the page sends a code, a
-  file name and a clip id and main builds every path, operator mode only.
+  file name and clip ids (at most 100) and main builds every path, operator mode only.
 - ✅ Copy, 2026-10-05, in the kiosk: a 60 MB file found two folders down, progress shown,
   copied, and reused on a second fetch; the folders-not-set message. 260+ tests cover finding,
   copying, no overwrite, a cut-off copy, the `file:///` address and the open request's guards.
@@ -646,7 +649,46 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
   test clip left in PRE & POST, column 9 went with that composition: the Central one
   loaded on 2026-10-05 has nothing there.)
 - Not built: fetching straight from the lookbook when the graphics folder lacks a file
-  (the lookbook holds the same files), and placing a not-loaded code into a slot.
+  (the lookbook holds the same files).
+- **Browse** (the owner's ask, 2026-10-05): beside each folder on the Arena row, Windows' own
+  folder picker over the window that asked; the pick fills the field, Save keeps it. Operator
+  mode. ⚠️ Not opened from a session (it would raise a dialog on the owner's screen).
+
+## The Holding view (owner's idea, 2026-10-05; built the same day)
+
+A view of its own (Holding, in the + menu), run off the Arena reading: the holding layers
+(HOLD FG, HOLD BG), then PRE & POST where a composition has it, then PLAYBACK only when it
+holds something ("rarely used"), each a row of its clips' thumbnails, every clip marked against
+the run sheet the media check follows: ✓ on it, **may differ**, **file missing**, faded when
+not on this run sheet (free to replace) or carrying no code (left alone), green when playing
+as in Clips. HOLD BG's columns 3 and 4 say Countdown and Broadcast BG when empty. The rules
+are `src/shared/holding.ts`; the state is shared with the Media row (`src/renderer/useMediaCheck.ts`).
+
+The owner's answers (2026-10-05): **inspect only** (a tap never fires; Clips is for playing);
+operator mode for every change; the lookbook's own pictures for media not yet in Arena;
+nothing from the lookbook on PLAYBACK ("normally we wouldn't have anything in the lookbook for
+it"); HOLD BG's columns 3 and 4 kept, no other layer's; each service has its own deck, so a
+clip not on this run sheet may be replaced. Keep the Fetch, Same, Place and Update all buttons
+in both the Media row and here (taken without an answer: the owner can trim one).
+
+- **Needs a home**: every code the run sheet calls for that is not in Arena, with the
+  lookbook's picture (main shrinks it to 480 px on a `lookbook:` scheme, only library stills)
+  and a suggested slot, in this order: an A-screen's Pre (Walk In) or Post (Walk Out) column;
+  a clip on the type's layer whose name is alike (words without code, Sunday, versions, months,
+  campuses; half or more shared) and not on this run sheet; a clip not on this run sheet;
+  an empty column. Never a playing clip, a clip the run sheet uses, a reserved column, or two
+  codes into one slot. **Place** takes it, **Choose** makes the next tap on a free slot the home
+  (only free slots light up). None found is said ("No place found: no free column on HOLD FG").
+- **Tap a clip** to inspect it: what it is, Arena's picture beside the lookbook's for one that
+  may differ, **Same** / **Undo** and **Update** (every clip with the old file).
+- **Update all** (here and in the Media row): every may-differ or missing code into all its
+  clips, then every code placed in its home; the homeless listed apart, never guessed.
+- ✅ In the kiosk over CDP, 2026-10-05, against the owner's Central composition with the run
+  order on Central PM 4 Oct and HOLD FG emptied in Arena: six PM foregrounds in Needs a home
+  with their lookbook pictures and HOLD FG columns 1 to 6 suggested; HOLD BG's CB095 clips may
+  differ, CB105 faded, CA635 and CA636 ✓, PLAYBACK's CF447 shown as rarely used.
+  ⚠️ Not yet: Choose, Inspect and the confirmation driven (the owner was at the kiosk), a
+  Load into Arena (needs the owner's go-ahead), and anything by finger.
 
 ## Open questions
 

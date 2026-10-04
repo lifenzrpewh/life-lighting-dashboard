@@ -38,6 +38,7 @@ export const CONNECTION_OF_VIEW: Record<BuiltInView, ConnectionId> = {
 	ma: 'console',
 	arena: 'arena',
 	clips: 'arena',
+	holding: 'arena',
 	video: 'video',
 }
 

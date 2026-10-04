@@ -68,15 +68,17 @@ test('Arena is given a file:/// address, spaces encoded', () => {
 	assert.match(url, /Media%20dir\/CF588%20Walk%20In\.mov$/)
 })
 
-test('a request from the page is a code, a plain name and a clip, and nothing else', () => {
-	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'CF588-Walk In V2', clipId: 12 }), { code: 'CF588', want: 'CF588-Walk In V2', clipId: 12 })
-	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'x', clipId: null }).clipId, null)
+test('a request from the page is a code, a plain name and clips, and nothing else', () => {
+	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'CF588-Walk In V2', clipIds: [12, 13, 12] }), { code: 'CF588', want: 'CF588-Walk In V2', clipIds: [12, 13] })
+	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'x', clipIds: [] }).clipIds, [])
 	for (const bad of [
 		null,
-		{ code: 'cf588', want: 'x', clipId: 1 },
-		{ code: 'CF588', want: '..\\..\\Windows\\x', clipId: 1 },
-		{ code: 'CF588', want: 'C:x', clipId: 1 },
-		{ code: 'CF588', want: 'x', clipId: -1 },
+		{ code: 'cf588', want: 'x', clipIds: [1] },
+		{ code: 'CF588', want: '..\\..\\Windows\\x', clipIds: [1] },
+		{ code: 'CF588', want: 'C:x', clipIds: [1] },
+		{ code: 'CF588', want: 'x', clipIds: [-1] },
+		{ code: 'CF588', want: 'x', clipIds: 12 },
+		{ code: 'CF588', want: 'x', clipIds: Array.from({ length: 101 }, (_, i) => i + 1) },
 		{ code: 'CF588', want: 'x' },
 	]) {
 		assert.equal(fetchRequestFrom(bad), null, JSON.stringify(bad))
