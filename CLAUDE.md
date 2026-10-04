@@ -307,7 +307,8 @@ run: one kiosk per computer, so the second only focuses the first.
 ## Next session starts here
 
 **Where things stand (2026-10-05, morning).** The overnight list is done and **v0.2.0**
-is tagged: GitHub Actions builds Windows and Apple Silicon and drafts the release, for the
+is tagged and **both builds passed** (run 37199608805: `Paua-Setup-0.2.0.exe`, `Paua-0.2.0-arm64.dmg`,
+257 tests green on the Windows runner); the release waits as a draft for the
 owner to publish (`docs/FIELD_TEST.md` has what to check). New in it: **embeds** (any web
 page as a view, own sign-in each, zoom), **windows on a 12 × 8 grid** with tabs and Edit
 layout (replacing the two slots and the divider), **saved layouts**, pop-outs that offer
