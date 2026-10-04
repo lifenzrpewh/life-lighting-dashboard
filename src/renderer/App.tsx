@@ -42,6 +42,7 @@ import {
 	placeWindow,
 	removeTab,
 	removeWindow,
+	sameArrangement,
 	selectTab,
 	viewLabel,
 	viewsShown,
@@ -50,6 +51,7 @@ import {
 	type ViewId,
 } from '../shared/layout.js'
 import { Grid } from './components/Grid.js'
+import { LayoutsPanel } from './components/LayoutsPanel.js'
 import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
 import { useLayout } from './layoutStore.js'
 import { usePopouts } from './popouts.js'
@@ -96,6 +98,7 @@ export function App() {
 	const [showfileOpen, setShowfileOpen] = useState(false)
 	const [campus, setCampus] = useState<string | null>(null)
 	const openShowfile = () => {
+		setLayoutsOpen(false)
 		setConnectionsOpen(false)
 		setEditing(false)
 		setShowfileOpen(!showfileOpen)
@@ -118,7 +121,10 @@ export function App() {
 		})
 	useEffect(readOff, [])
 	const label = (view: ViewId) => viewLabel(view, embeds)
-	const { layout, update } = useLayout()
+	const { layout, update, saved, setSaved } = useLayout()
+	// The saved layouts (./components/LayoutsPanel.tsx), in the grid's place.
+	const [layoutsOpen, setLayoutsOpen] = useState(false)
+	const layoutName = saved.find((l) => sameArrangement(l.layout, layout))?.name ?? null
 	const { popped, popOut, bringBack } = usePopouts()
 
 	// The clock is real time; ages derive from it, so STALE arrives on its own
@@ -618,13 +624,23 @@ export function App() {
 				onLeave={leave}
 				connectionsOpen={connectionsOpen}
 				editing={editing}
+				layoutName={layoutName}
+				layoutsOpen={layoutsOpen}
+				onLayouts={() => {
+					setConnectionsOpen(false)
+					setShowfileOpen(false)
+					setEditing(false)
+					setLayoutsOpen(!layoutsOpen)
+				}}
 				onEdit={() => {
+					setLayoutsOpen(false)
 					setConnectionsOpen(false)
 					setShowfileOpen(false)
 					if (editing) setEditing(false)
 					else startEditing()
 				}}
 				onConnections={() => {
+					setLayoutsOpen(false)
 					setShowfileOpen(false)
 					setEditing(false)
 					setConnectionsOpen(!connectionsOpen)
@@ -693,6 +709,15 @@ export function App() {
 						now={now}
 						onChanged={readOff}
 						onClose={() => setConnectionsOpen(false)}
+					/>
+				) : layoutsOpen ? (
+					<LayoutsPanel
+						layout={layout}
+						saved={saved}
+						operator={mode === 'operator'}
+						onSwitch={(l) => update(() => l)}
+						onSaved={setSaved}
+						onClose={() => setLayoutsOpen(false)}
 					/>
 				) : showfileOpen ? (
 					<ShowfileSheet

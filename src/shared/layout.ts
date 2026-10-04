@@ -302,3 +302,77 @@ export function freshId(layout: Layout, prefix: 'w' | 't', random: () => number 
 		if (!taken.has(id)) return id
 	}
 }
+
+// ─── Saved layouts ─────────────────────────────────────────────────────────
+//
+// Named layouts on this machine (the owner, 2026-10-04): everyone may switch
+// between them, from the status bar; saving and deleting is arranging, so
+// operator mode's. A saved layout keeps its windows, their tabs and which tab
+// shows.
+
+export type SavedLayout = { name: string; layout: Layout }
+
+export const LAYOUT_NAME_MAX = 24
+export const SAVED_LAYOUTS_MAX = 12
+
+/** Why `name` will not do, or null. */
+export function layoutNameError(name: string): string | null {
+	if (name.trim() === '') return 'A name is needed.'
+	if (name.trim().length > LAYOUT_NAME_MAX) return `At most ${LAYOUT_NAME_MAX} characters.`
+	if (/[\u0000-\u001f\u007f]/.test(name)) return 'Letters, numbers and punctuation only.'
+	return null
+}
+
+/** Save `layout` as `name`, replacing one of the same name (any case), in
+ *  place. Null when the list is full and the name is new. */
+export function saveLayout(saved: readonly SavedLayout[], name: string, layout: Layout): SavedLayout[] | null {
+	const n = name.trim()
+	const i = saved.findIndex((s) => s.name.toLowerCase() === n.toLowerCase())
+	if (i >= 0) return saved.map((s, j) => (j === i ? { name: n, layout } : s))
+	if (saved.length >= SAVED_LAYOUTS_MAX) return null
+	return [...saved, { name: n, layout }]
+}
+
+export function deleteLayout(saved: readonly SavedLayout[], name: string): SavedLayout[] {
+	return saved.filter((s) => s.name !== name)
+}
+
+/** Whether two layouts are the same arrangement: the same windows in the same
+ *  places with the same tabs. Which tab shows is not compared, so switching a
+ *  tab still reads as the layout it came from. */
+export function sameArrangement(a: Layout, b: Layout): boolean {
+	const key = (l: Layout) =>
+		JSON.stringify(
+			l.windows
+				.map((w) => [w.x, w.y, w.w, w.h, w.tabs.map((t) => t.view)])
+				.sort((p, q) => (p[1] as number) - (q[1] as number) || (p[0] as number) - (q[0] as number)),
+		)
+	return key(a) === key(b)
+}
+
+/** The saved layouts off this machine's storage. A layout that does not hold
+ *  is dropped on its own; the rest stay. */
+export function savedLayoutsFrom(stored: unknown): SavedLayout[] {
+	if (typeof stored !== 'string') return []
+	let v: unknown
+	try {
+		v = JSON.parse(stored)
+	} catch {
+		return []
+	}
+	if (!Array.isArray(v)) return []
+	const out: SavedLayout[] = []
+	for (const s of v) {
+		if (typeof s !== 'object' || s === null) continue
+		const { name, layout } = s as Record<string, unknown>
+		if (typeof name !== 'string' || layoutNameError(name) !== null) continue
+		if (out.some((o) => o.name.toLowerCase() === name.trim().toLowerCase())) continue
+		// layoutFrom falls back to the default for anything broken; a saved
+		// layout that broke is not the default, so it is dropped instead.
+		const l = layoutFrom(layout)
+		if (l === DEFAULT_LAYOUT && JSON.stringify(layout) !== JSON.stringify(DEFAULT_LAYOUT)) continue
+		out.push({ name: name.trim(), layout: l })
+		if (out.length === SAVED_LAYOUTS_MAX) break
+	}
+	return out
+}

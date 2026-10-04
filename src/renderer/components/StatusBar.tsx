@@ -113,6 +113,9 @@ export function StatusBar({
 	onEnter,
 	onLeave,
 	connectionsOpen,
+	layoutName,
+	layoutsOpen,
+	onLayouts,
 	editing,
 	onEdit,
 	onConnections,
@@ -130,6 +133,11 @@ export function StatusBar({
 	onEnter: () => void
 	onLeave: () => void
 	connectionsOpen: boolean
+	/** The saved layout on screen, if it is one (../../shared/layout.ts). */
+	layoutName: string | null
+	layoutsOpen: boolean
+	/** Open the saved layouts: everyone may switch. */
+	onLayouts: () => void
 	/** Arranging the windows (./Grid.tsx), operator mode only. */
 	editing: boolean
 	onEdit: () => void
@@ -170,6 +178,14 @@ export function StatusBar({
 
 			{/* Controls, where the hand rests. None touches the show. */}
 			<span className="flex shrink-0 items-center gap-2 border-l border-booth-edge pl-4">
+				<button
+					type="button"
+					onClick={onLayouts}
+					className={`${barButton} max-w-56 gap-2 ${layoutsOpen ? 'border-booth-ink bg-booth-ink text-booth-bg' : ''}`}
+				>
+					LAYOUT
+					{layoutName !== null && <span className="truncate normal-case">{layoutName}</span>}
+				</button>
 				{operator && (
 					<button
 						type="button"

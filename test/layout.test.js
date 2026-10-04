@@ -7,15 +7,20 @@ import {
 	ROWS,
 	addTab,
 	addWindow,
+	deleteLayout,
 	fits,
 	freeBox,
 	freshId,
 	homeOf,
 	layoutFrom,
+	layoutNameError,
 	makeHome,
 	placeWindow,
 	removeTab,
 	removeWindow,
+	sameArrangement,
+	saveLayout,
+	savedLayoutsFrom,
 	selectTab,
 	shownTab,
 	viewsShown,
@@ -128,4 +133,34 @@ test('fresh ids are unused', () => {
 	const taken = addTab(DEFAULT_LAYOUT, 'w1', 'arena', id)
 	n = 0
 	assert.notEqual(freshId(taken, 't', () => seq[n++]), id)
+})
+
+test('saved layouts: save, replace by name, delete, and a full list', () => {
+	const wide = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })
+	let saved = saveLayout([], ' Sunday ', DEFAULT_LAYOUT)
+	assert.deepEqual(saved.map((s) => s.name), ['Sunday'])
+	saved = saveLayout(saved, 'sunday', wide)
+	assert.deepEqual(saved, [{ name: 'sunday', layout: wide }])
+	saved = deleteLayout(saved, 'sunday')
+	assert.deepEqual(saved, [])
+	let full = []
+	for (let i = 0; i < 12; i++) full = saveLayout(full, `L${i}`, DEFAULT_LAYOUT)
+	assert.equal(saveLayout(full, 'one more', DEFAULT_LAYOUT), null)
+	assert.equal(saveLayout(full, 'L3', wide)[3].layout, wide)
+	assert.equal(layoutNameError(''), 'A name is needed.')
+	assert.equal(layoutNameError('x'.repeat(25)), 'At most 24 characters.')
+})
+
+test('the same arrangement, whichever tab shows', () => {
+	const two = addTab(DEFAULT_LAYOUT, 'w2', 'arena', 't3')
+	assert.equal(sameArrangement(two, selectTab(two, 'w2', 't2')), true)
+	assert.equal(sameArrangement(two, DEFAULT_LAYOUT), false)
+	assert.equal(sameArrangement(DEFAULT_LAYOUT, placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })), false)
+})
+
+test('saved layouts off storage: a broken one is dropped, the rest kept', () => {
+	const good = { name: 'Sunday', layout: DEFAULT_LAYOUT }
+	const broken = { name: 'Broken', layout: { windows: [{ id: 'w1', x: 0, y: 0, w: 99, h: 8, tabs: [], active: null }] } }
+	assert.deepEqual(savedLayoutsFrom(JSON.stringify([good, broken, { name: '', layout: DEFAULT_LAYOUT }, good])), [good])
+	for (const bad of [null, 'x', '{}']) assert.deepEqual(savedLayoutsFrom(bad), [])
 })
