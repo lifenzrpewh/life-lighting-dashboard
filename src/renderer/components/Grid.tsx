@@ -1,4 +1,4 @@
-// The windows on the grid (../../shared/layout.ts): each with a strip of tabs
+// The windows on the screen (../../shared/layout.ts): each with a strip of tabs
 // and a body its view fills.
 //
 // A native page (the MA, the run order, an embed) is drawn by main over the
@@ -7,28 +7,32 @@
 // buttons live in it.
 //
 // EDITING (operator mode, behind Edit layout): every page stands in as a
-// picture of itself, so the grid can be drawn over. Drag a window's body to
-// move it, its edges or corners to resize it; it snaps to cells, and a place
-// over another window is shown in red and not taken. + adds a tab, × takes one
-// away, and the strip's × removes the window.
+// picture of itself, so the windows can be drawn over. Drag a window's body to
+// move it, its edges or corners to resize it. The drag follows the finger; an
+// edge near the screen's edge or another window's snaps onto it, a resized
+// edge stops flush against a window in its way, and a move onto another window
+// is shown in red and not taken. + adds a tab, × takes one away, and the
+// strip's × removes the window.
 //
 // OUT OF EDITING, for everyone: tap a tab, and drag the edge two windows share
 // (a grip in the gap between them, the one place a page cannot cover) to give
 // one more room and the other less, as the old divider did. Pages stand in as
 // pictures while it is dragged.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 
 import {
-	COLS,
-	MIN_H,
-	MIN_W,
-	ROWS,
+	HEIGHT,
+	MOVE,
+	WIDTH,
+	dragBox,
 	fits,
 	moveSeam,
 	seams,
 	shownTab,
+	snapLine,
 	type Box,
+	type Edges,
 	type GridWindow,
 	type Layout,
 	type Seam,
@@ -36,39 +40,30 @@ import {
 	type ViewId,
 } from '../../shared/layout.js'
 
-/** The grid's padding and the gap between windows, in px: the gap is where a
- *  shared edge is grabbed, so it is a finger's width, as the divider was. */
+/** The padding round the windows and the gap between them, in px: the gap is
+ *  where a shared edge is grabbed, so it is a finger's width, as the divider
+ *  was. */
 const PAD = 4
 const GAP = 12
 
+/** How near, in px, an edge comes to another before it snaps onto it. */
+const SNAP = 16
+
 const label = 'text-[10px] font-semibold tracking-widest uppercase'
 
-/** Which edges a handle moves. All four is the whole window. */
-type Edges = { l: boolean; r: boolean; t: boolean; b: boolean }
-const MOVE: Edges = { l: true, r: true, t: true, b: true }
+/** Units along one axis as CSS, inside the padding: a window at 0 starts at
+ *  the padding, one ending at the far edge ends at it, and two that meet are a
+ *  gap apart. `less` takes the gap off a size. */
+const INNER = `(100% + ${GAP - 2 * PAD}px)`
+const along = (units: number, total: number, less = 0) => `calc(${PAD}px + ${INNER} * ${units / total} - ${less}px)`
+const span = (units: number, total: number) => `calc(${INNER} * ${units / total} - ${GAP}px)`
+const place = (b: Box) => ({ left: along(b.x, WIDTH), top: along(b.y, HEIGHT), width: span(b.w, WIDTH), height: span(b.h, HEIGHT) })
 
-const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi)
-
-/** Where a window goes when `edges` are dragged `dx`, `dy` cells. */
-export function dragged(from: Box, edges: Edges, dx: number, dy: number): Box {
-	if (edges.l && edges.r && edges.t && edges.b) {
-		return { ...from, x: clamp(from.x + dx, 0, COLS - from.w), y: clamp(from.y + dy, 0, ROWS - from.h) }
-	}
-	let { x, y, w, h } = from
-	if (edges.l) {
-		x = clamp(from.x + dx, 0, from.x + from.w - MIN_W)
-		w = from.x + from.w - x
-	}
-	if (edges.r) w = clamp(from.w + dx, MIN_W, COLS - from.x)
-	if (edges.t) {
-		y = clamp(from.y + dy, 0, from.y + from.h - MIN_H)
-		h = from.y + from.h - y
-	}
-	if (edges.b) h = clamp(from.h + dy, MIN_H, ROWS - from.y)
-	return { x, y, w, h }
+/** Px per unit across and down, from the screen's size now. */
+function scaleOf(el: HTMLElement): { x: number; y: number } {
+	const r = el.getBoundingClientRect()
+	return { x: (r.width - 2 * PAD + GAP) / WIDTH, y: (r.height - 2 * PAD + GAP) / HEIGHT }
 }
-
-const area = (b: Box) => ({ gridColumn: `${b.x + 1} / span ${b.w}`, gridRow: `${b.y + 1} / span ${b.h}` })
 
 export type GridProps = {
 	layout: Layout
@@ -98,29 +93,17 @@ export type GridProps = {
 
 export function Grid(p: GridProps) {
 	const gridRef = useRef<HTMLDivElement>(null)
-	const start = useRef<{ id: string; from: Box; px: number; py: number; edges: Edges } | null>(null)
+	const start = useRef<{ id: string; from: Box; px: number; py: number; edges: Edges; scale: { x: number; y: number } } | null>(null)
 	const [drag, setDrag] = useState<{ id: string; box: Box; ok: boolean } | null>(null)
 	const latest = useRef(drag)
 	latest.current = drag
 	const [adding, setAdding] = useState<string | null>(null)
 
 	// A shared edge being dragged, and the layout it would make.
-	const seamStart = useRef<{ seam: Seam; at: number } | null>(null)
+	const seamStart = useRef<{ seam: Seam; at: number; scale: number } | null>(null)
 	const [seamDrag, setSeamDrag] = useState<Layout | null>(null)
 	const seamLatest = useRef(seamDrag)
 	seamLatest.current = seamDrag
-	const [size, setSize] = useState<{ width: number; height: number } | null>(null)
-	useEffect(() => {
-		const grid = gridRef.current
-		if (grid === null) return
-		// Measured now as well: a window not being painted (behind another) gets
-		// no observer callback, and the grips would wait for one.
-		const measure = () => setSize({ width: grid.clientWidth, height: grid.clientHeight })
-		measure()
-		const ro = new ResizeObserver(measure)
-		ro.observe(grid)
-		return () => ro.disconnect()
-	}, [])
 	const shown = seamDrag ?? p.layout
 	/** A seam drag over: keep where it got to, or not. Once only. */
 	const endSeam = (keep: boolean) => {
@@ -131,28 +114,26 @@ export function Grid(p: GridProps) {
 		if (keep && next !== null && next !== p.layout) p.onResize(next)
 		p.onSeamEnd()
 	}
-	const cellW = size === null ? 0 : (size.width - 2 * PAD - GAP * (COLS - 1)) / COLS
-	const cellH = size === null ? 0 : (size.height - 2 * PAD - GAP * (ROWS - 1)) / ROWS
 
 	/** Pointer handlers for a handle that moves `edges` of `win`. A press keeps
 	 *  every move until it lifts (pointer capture), so a drag that runs off the
 	 *  handle, or off the window, still lands. */
 	const handle = (win: GridWindow, edges: Edges) => ({
 		onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+			const grid = gridRef.current
+			if (grid === null) return
 			e.currentTarget.setPointerCapture(e.pointerId)
 			e.stopPropagation()
 			const from = { x: win.x, y: win.y, w: win.w, h: win.h }
-			start.current = { id: win.id, from, px: e.clientX, py: e.clientY, edges }
+			start.current = { id: win.id, from, px: e.clientX, py: e.clientY, edges, scale: scaleOf(grid) }
 			setDrag({ id: win.id, box: from, ok: true })
 		},
 		onPointerMove: (e: ReactPointerEvent<HTMLElement>) => {
 			const s = start.current
-			const grid = gridRef.current
-			if (s === null || grid === null) return
-			const r = grid.getBoundingClientRect()
-			const dx = Math.round((e.clientX - s.px) / (r.width / COLS))
-			const dy = Math.round((e.clientY - s.py) / (r.height / ROWS))
-			const box = dragged(s.from, s.edges, dx, dy)
+			if (s === null) return
+			const dx = Math.round((e.clientX - s.px) / s.scale.x)
+			const dy = Math.round((e.clientY - s.py) / s.scale.y)
+			const box = dragBox(p.layout, s.id, s.from, s.edges, dx, dy, { x: SNAP / s.scale.x, y: SNAP / s.scale.y })
 			const d = latest.current
 			if (d !== null && d.box.x === box.x && d.box.y === box.y && d.box.w === box.w && d.box.h === box.h) return
 			setDrag({ id: s.id, box, ok: fits(p.layout, box, s.id) })
@@ -170,26 +151,7 @@ export function Grid(p: GridProps) {
 	})
 
 	return (
-		<div
-			ref={gridRef}
-			className="relative grid min-h-0 flex-1 bg-booth-bg"
-			style={{
-				padding: PAD,
-				gap: GAP,
-				gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
-				gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
-			}}
-		>
-			{/* The cells, while editing: where a window can go. */}
-			{p.editing &&
-				Array.from({ length: COLS * ROWS }, (_, i) => (
-					<div
-						key={`cell${i}`}
-						aria-hidden
-						className="rounded-sm border border-dashed border-booth-edge/60"
-						style={area({ x: i % COLS, y: Math.floor(i / COLS), w: 1, h: 1 })}
-					/>
-				))}
+		<div ref={gridRef} className="relative min-h-0 flex-1 bg-booth-bg">
 			{shown.windows.map((win) => {
 				const tab = shownTab(win, p.visible)
 				const tabs = win.tabs.filter((t) => p.visible(t.view))
@@ -198,8 +160,8 @@ export function Grid(p: GridProps) {
 				return (
 					<section
 						key={win.id}
-						style={area(box)}
-						className={`relative z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-sm bg-booth-panel ${
+						style={place(box)}
+						className={`absolute z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-sm bg-booth-panel ${
 							moving === null ? '' : moving.ok ? 'ring-2 ring-booth-ink' : 'ring-2 ring-state-unreachable opacity-80'
 						}`}
 					>
@@ -297,18 +259,18 @@ export function Grid(p: GridProps) {
 				)
 			})}
 			{!p.editing &&
-				size !== null &&
 				seams(p.layout).map((seam) => {
 					const upright = seam.axis === 'x'
+					const [total, cross] = upright ? [WIDTH, HEIGHT] : [HEIGHT, WIDTH]
 					// Kept while dragged, so the grip keeps its press: `at` moves.
 					const key = seamKey(seam)
 					const dragging = seamStart.current !== null && seamKey(seamStart.current.seam) === key
 					// The dragged grip follows the windows it moves.
 					const first = shown.windows.find((w) => w.id === seam.before[0])
 					const at = dragging && first !== undefined ? (upright ? first.x + first.w : first.y + first.h) : seam.at
-					const line = PAD + at * ((upright ? cellW : cellH) + GAP) - GAP
-					const from = PAD + seam.from * ((upright ? cellH : cellW) + GAP)
-					const to = PAD + seam.to * ((upright ? cellH : cellW) + GAP) - GAP
+					const line = along(at, total, GAP)
+					const from = along(seam.from, cross)
+					const length = span(seam.to - seam.from, cross)
 					return (
 						<div
 							key={key}
@@ -316,17 +278,24 @@ export function Grid(p: GridProps) {
 							aria-orientation={upright ? 'vertical' : 'horizontal'}
 							aria-label="Drag to give one window more room and the other less"
 							onPointerDown={(e) => {
+								const grid = gridRef.current
+								if (grid === null) return
 								e.currentTarget.setPointerCapture(e.pointerId)
-								seamStart.current = { seam, at: upright ? e.clientX : e.clientY }
+								const scale = scaleOf(grid)
+								seamStart.current = { seam, at: upright ? e.clientX : e.clientY, scale: upright ? scale.x : scale.y }
 								setSeamDrag(p.layout)
 								p.onSeamStart()
 							}}
 							onPointerMove={(e) => {
 								const s = seamStart.current
 								if (s === null) return
-								const step = (s.seam.axis === 'x' ? cellW : cellH) + GAP
-								const by = Math.round(((s.seam.axis === 'x' ? e.clientX : e.clientY) - s.at) / step)
-								const next = moveSeam(p.layout, s.seam, s.seam.at + by)
+								const x = s.seam.axis === 'x'
+								const want = s.seam.at + ((x ? e.clientX : e.clientY) - s.at) / s.scale
+								// Snaps to the edges of windows not on the seam, so it can
+								// line up with them.
+								const off = p.layout.windows.filter((w) => !s.seam.before.includes(w.id) && !s.seam.after.includes(w.id))
+								const lines = off.flatMap((w) => (x ? [w.x, w.x + w.w] : [w.y, w.y + w.h]))
+								const next = moveSeam(p.layout, s.seam, snapLine(want, lines, SNAP / s.scale) ?? want)
 								if (next !== seamLatest.current) setSeamDrag(next)
 							}}
 							onPointerUp={() => endSeam(true)}
@@ -338,8 +307,8 @@ export function Grid(p: GridProps) {
 							onContextMenu={(e) => e.preventDefault()}
 							style={
 								upright
-									? { left: line, top: from, width: GAP, height: to - from }
-									: { top: line, left: from, height: GAP, width: to - from }
+									? { left: line, top: from, width: GAP, height: length }
+									: { top: line, left: from, height: GAP, width: length }
 							}
 							className={`group absolute z-20 flex touch-none items-center justify-center ${upright ? 'cursor-col-resize' : 'cursor-row-resize'}`}
 						>

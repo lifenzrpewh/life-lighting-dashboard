@@ -490,7 +490,7 @@ is in the wrong slot), and whether countdowns (D) belong in it.
 ## Windows, embeds and layouts (owner, 2026-10-04; built 2026-10-05)
 
 The owner's decisions are in CLAUDE.md § Improvements; the rules are in the code's
-headers: `src/shared/layout.ts` (the grid, tabs, saved layouts) and
+headers: `src/shared/layout.ts` (the windows, tabs, saved layouts) and
 `src/shared/embeds.ts` (embeds). Built overnight on the Windows box and driven over
 CDP, not yet by a finger.
 
@@ -507,12 +507,22 @@ CDP, not yet by a finger.
 - **While editing, every page is a picture** for the whole edit, not only while
   dragging: the handles are drawn over the windows, and nothing can be drawn over a
   live page. The pictures are taken as Edit layout is tapped.
-- **The smallest window is 2 × 2 cells.** A window with all its tabs removed stays,
-  empty, until it is removed or given a tab. Add window takes the biggest free place;
-  with no room, it says so.
-- **Video's Fit is a pop-out's only.** On the grid a window snaps to cells, so it
-  cannot take a picture's exact shape; the picture letterboxes.
-- **Saved layouts open in the grid's place** (like Connections), from LAYOUT in the
+- **No grid since 2026-10-05, the owner's ask** ("freeform with no grid, but keep the
+  logic of the grid so they don't overlap"; the cells made a drag jump a twelfth of the
+  screen at a time). A window's place is in units of a 1200 × 800 screen, whole numbers
+  so edges that meet are equal; a drag follows the finger and an edge within 16 px of
+  the screen's edge or another window's snaps onto it. A resized edge stops flush
+  against a window in its way; a move onto one is red and not taken; a shared edge
+  dragged past its limit lands on the limit. A grid layout's cells, and saved
+  layouts, come across × 100, each window where it was.
+- **The smallest window is an eighth of the screen each way** (150 × 100 units, about
+  240 × 125 px on the booth's 1920 × 1080; it was 2 × 2 cells). A share of the screen
+  rather than pixels, so a layout means the same on any screen. A window with all its
+  tabs removed stays, empty, until it is removed or given a tab. Add window takes the
+  biggest free place; with no room, it says so.
+- **Video's Fit is a pop-out's only.** Built when windows snapped to cells; with free
+  windows, a Fit in a window is possible again but not built.
+- **Saved layouts open in the windows' place** (like Connections), from LAYOUT in the
   status bar, because a menu over a live page cannot be drawn. The button names the
   layout on screen; switching a tab still counts as that layout. Up to 12.
 - **Embeds open only once a window shows them**, so a booth can add many without each

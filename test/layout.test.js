@@ -2,12 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-	COLS,
 	DEFAULT_LAYOUT,
-	ROWS,
+	HEIGHT,
+	MOVE,
+	WIDTH,
 	addTab,
 	addWindow,
 	deleteLayout,
+	dragBox,
 	fits,
 	freeBox,
 	freshId,
@@ -22,6 +24,7 @@ import {
 	sameArrangement,
 	saveLayout,
 	savedLayoutsFrom,
+	seamRange,
 	seams,
 	selectTab,
 	shownTab,
@@ -32,36 +35,70 @@ const all = () => true
 
 test('the default is the screen before windows: run order on the left third, MA on the rest', () => {
 	const [left, right] = DEFAULT_LAYOUT.windows
-	assert.deepEqual([left.x, left.w, left.h, left.tabs[0].view], [0, COLS / 3, ROWS, 'cue'])
-	assert.deepEqual([right.x, right.w, right.h, right.tabs[0].view], [COLS / 3, (COLS * 2) / 3, ROWS, 'ma'])
+	assert.deepEqual([left.x, left.w, left.h, left.tabs[0].view], [0, WIDTH / 3, HEIGHT, 'cue'])
+	assert.deepEqual([right.x, right.w, right.h, right.tabs[0].view], [WIDTH / 3, (WIDTH * 2) / 3, HEIGHT, 'ma'])
 	assert.deepEqual(viewsShown(DEFAULT_LAYOUT, all), ['cue', 'ma'])
 })
 
-test('a window fits inside the grid, at least 2 × 2, over no other', () => {
-	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 4, h: 8 }, 'w1'), true)
-	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 5, h: 8 }, 'w1'), false) // over the MA
-	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 1, h: 8 }, 'w1'), false) // too thin
-	assert.equal(fits(DEFAULT_LAYOUT, { x: 11, y: 0, w: 2, h: 2 }, 'w2'), false) // off the edge
-	assert.equal(fits(DEFAULT_LAYOUT, { x: 0.5, y: 0, w: 2, h: 2 }, 'w1'), false) // not on a cell
+test('a window fits on the screen, at least the smallest, over no other', () => {
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 400, h: 800 }, 'w1'), true)
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 401, h: 800 }, 'w1'), false) // over the MA, by a unit
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0, y: 0, w: 149, h: 800 }, 'w1'), false) // too thin
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 1100, y: 0, w: 200, h: 200 }, 'w2'), false) // off the edge
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 37, y: 0, w: 213, h: 200 }, 'w1'), true) // anywhere, any size
+	assert.equal(fits(DEFAULT_LAYOUT, { x: 0.5, y: 0, w: 200, h: 200 }, 'w1'), false) // whole units only
+})
+
+test('a drag follows the finger, and an edge near another snaps onto it', () => {
+	const run = DEFAULT_LAYOUT.windows[0]
+	const tol = { x: 10, y: 10 }
+	// The run order's right edge pulled in by 37 units: exactly that.
+	assert.deepEqual(dragBox(DEFAULT_LAYOUT, 'w1', run, { l: false, r: true, t: false, b: false }, -37, 0, tol), { x: 0, y: 0, w: 363, h: 800 })
+	// A short window beside a tall one: its bottom 6 units off the screen's edge snaps to it.
+	let l = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 400, h: 500 })
+	const short = l.windows[0]
+	assert.deepEqual(dragBox(l, 'w1', short, { l: false, r: false, t: false, b: true }, 0, 294, tol), { x: 0, y: 0, w: 400, h: 800 })
+	assert.deepEqual(dragBox(l, 'w1', short, { l: false, r: false, t: false, b: true }, 0, 200, tol), { x: 0, y: 0, w: 400, h: 700 })
+	// A moved window lines its nearer edge up: right edge 4 units short of the MA's left.
+	l = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 200, h: 400 })
+	assert.deepEqual(dragBox(l, 'w1', l.windows[0], MOVE, 196, 7, tol), { x: 200, y: 0, w: 200, h: 400 })
+})
+
+test('a resized edge stops flush against a window in its way; a move over one is refused', () => {
+	const run = DEFAULT_LAYOUT.windows[0]
+	const right = { l: false, r: true, t: false, b: false }
+	const box = dragBox(DEFAULT_LAYOUT, 'w1', run, right, 300, 0, { x: 10, y: 10 })
+	assert.deepEqual(box, { x: 0, y: 0, w: 400, h: 800 })
+	// Room made, then a corner dragged down and right into the MA.
+	const l = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 300, h: 400 })
+	const corner = dragBox(l, 'w1', l.windows[0], { l: false, r: true, t: false, b: true }, 250, 250, { x: 0, y: 0 })
+	assert.deepEqual(corner, { x: 0, y: 0, w: 400, h: 650 })
+	assert.equal(fits(l, corner, 'w1'), true)
+	const moved = dragBox(l, 'w1', l.windows[0], MOVE, 200, 0, { x: 0, y: 0 })
+	assert.equal(fits(l, moved, 'w1'), false)
 })
 
 test('moving or resizing onto another window does nothing', () => {
-	assert.equal(placeWindow(DEFAULT_LAYOUT, 'w1', { x: 2, y: 0, w: 4, h: 8 }), DEFAULT_LAYOUT)
-	const narrower = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })
-	assert.deepEqual(narrower.windows[0], { ...DEFAULT_LAYOUT.windows[0], w: 3 })
-	const moved = placeWindow(narrower, 'w1', { x: 1, y: 0, w: 3, h: 8 })
-	assert.equal(moved.windows[0].x, 1)
-	assert.equal(placeWindow(DEFAULT_LAYOUT, 'nope', { x: 0, y: 0, w: 2, h: 2 }), DEFAULT_LAYOUT)
+	assert.equal(placeWindow(DEFAULT_LAYOUT, 'w1', { x: 200, y: 0, w: 400, h: 800 }), DEFAULT_LAYOUT)
+	const narrower = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 300, h: 800 })
+	assert.deepEqual(narrower.windows[0], { ...DEFAULT_LAYOUT.windows[0], w: 300 })
+	const moved = placeWindow(narrower, 'w1', { x: 100, y: 0, w: 300, h: 800 })
+	assert.equal(moved.windows[0].x, 100)
+	assert.equal(placeWindow(DEFAULT_LAYOUT, 'nope', { x: 0, y: 0, w: 200, h: 200 }), DEFAULT_LAYOUT)
 })
 
-test('a new window takes the biggest free place, or none when the grid is full', () => {
+test('a new window takes the biggest free place, or none when the screen is full', () => {
 	assert.equal(freeBox(DEFAULT_LAYOUT), null)
 	assert.equal(addWindow(DEFAULT_LAYOUT, 'arena', { window: 'w3', tab: 't3' }), DEFAULT_LAYOUT)
-	const room = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 4, y: 0, w: 8, h: 5 })
-	assert.deepEqual(freeBox(room), { x: 4, y: 5, w: 8, h: 3 })
+	const room = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 400, y: 0, w: 800, h: 500 })
+	assert.deepEqual(freeBox(room), { x: 400, y: 500, w: 800, h: 300 })
 	const three = addWindow(room, 'arena', { window: 'w3', tab: 't3' })
-	assert.deepEqual(three.windows[2], { x: 4, y: 5, w: 8, h: 3, id: 'w3', tabs: [{ id: 't3', view: 'arena' }], active: 't3' })
+	assert.deepEqual(three.windows[2], { x: 400, y: 500, w: 800, h: 300, id: 'w3', tabs: [{ id: 't3', view: 'arena' }], active: 't3' })
 	assert.equal(removeWindow(three, 'w3').windows.length, 2)
+	// Free places are found between edges anywhere, not on cells.
+	const odd = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 237, h: 613 })
+	assert.deepEqual(freeBox(odd), { x: 237, y: 0, w: 163, h: 800 }) // 163 × 800 beats 400 × 187 below
+	assert.deepEqual(freeBox(placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 260, h: 800 })), null) // 140 wide: too thin
 })
 
 test('tabs: add shows it, select switches, remove shows the neighbour', () => {
@@ -88,7 +125,7 @@ test('a tab turned off is passed over, and comes back when it is on', () => {
 })
 
 test('the MA is drawn in one tab: the first showing it, unless moved', () => {
-	let l = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 4, y: 0, w: 8, h: 4 })
+	let l = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 400, y: 0, w: 800, h: 400 })
 	l = addWindow(l, 'ma', { window: 'w3', tab: 't3' })
 	assert.equal(homeOf(l, 'ma', all), 't2')
 	l = makeHome(l, 'ma', 't3')
@@ -103,16 +140,38 @@ test('a stored layout holds, or is the default', () => {
 	const l = addTab(DEFAULT_LAYOUT, 'w1', 'embed:abc123', 't9')
 	assert.deepEqual(layoutFrom(JSON.stringify(l)), l)
 	assert.deepEqual(layoutFrom(l), l)
-	const overlapping = { windows: [DEFAULT_LAYOUT.windows[0], { ...DEFAULT_LAYOUT.windows[1], x: 3 }] }
-	const twice = { windows: [DEFAULT_LAYOUT.windows[0], { ...DEFAULT_LAYOUT.windows[1], id: 'w1' }] }
-	const badView = { windows: [{ ...DEFAULT_LAYOUT.windows[0], tabs: [{ id: 't1', view: 'brief' }] }] }
+	const overlapping = { windows: [DEFAULT_LAYOUT.windows[0], { ...DEFAULT_LAYOUT.windows[1], x: 300 }], v: 2 }
+	const twice = { windows: [DEFAULT_LAYOUT.windows[0], { ...DEFAULT_LAYOUT.windows[1], id: 'w1' }], v: 2 }
+	const badView = { windows: [{ ...DEFAULT_LAYOUT.windows[0], tabs: [{ id: 't1', view: 'brief' }] }], v: 2 }
 	for (const bad of [null, 'not json', '[]', '{"windows":3}', overlapping, twice, badView]) {
 		assert.deepEqual(layoutFrom(typeof bad === 'string' || bad === null ? bad : JSON.stringify(bad)), DEFAULT_LAYOUT, JSON.stringify(bad))
 	}
 	// A home naming a tab that is not there is dropped, not trusted.
 	assert.deepEqual(layoutFrom({ ...DEFAULT_LAYOUT, homes: { ma: 'gone', cue: 't1' } }).homes, { cue: 't1' })
 	// An active tab that is not there falls to the first.
-	assert.equal(layoutFrom({ windows: [{ ...DEFAULT_LAYOUT.windows[0], active: 'zz' }] }).windows[0].active, 't1')
+	assert.equal(layoutFrom({ windows: [{ ...DEFAULT_LAYOUT.windows[0], active: 'zz' }], v: 2 }).windows[0].active, 't1')
+})
+
+test('a grid layout (cells, no v) comes back in units, each window where it was', () => {
+	const grid = {
+		windows: [
+			{ id: 'w1', x: 0, y: 0, w: 3, h: 8, tabs: [{ id: 't1', view: 'cue' }], active: 't1' },
+			{ id: 'w2', x: 3, y: 0, w: 9, h: 5, tabs: [{ id: 't2', view: 'ma' }], active: 't2' },
+			{ id: 'w3', x: 3, y: 5, w: 9, h: 3, tabs: [{ id: 't3', view: 'arena' }], active: 't3' },
+		],
+		homes: { ma: 't2' },
+	}
+	const l = layoutFrom(JSON.stringify(grid))
+	assert.deepEqual(l.windows.map((w) => [w.x, w.y, w.w, w.h]), [
+		[0, 0, 300, 800],
+		[300, 0, 900, 500],
+		[300, 500, 900, 300],
+	])
+	assert.deepEqual([l.homes, l.v], [{ ma: 't2' }, 2])
+	// A grid layout's place was whole cells.
+	assert.deepEqual(layoutFrom({ windows: [{ ...grid.windows[0], w: 2.5 }] }), DEFAULT_LAYOUT)
+	// And saved layouts come across the same way.
+	assert.deepEqual(savedLayoutsFrom(JSON.stringify([{ name: 'Old', layout: grid }]))[0].layout, l)
 })
 
 test('the slots layout from before the grid becomes two windows holding the same', () => {
@@ -120,8 +179,8 @@ test('the slots layout from before the grid becomes two windows holding the same
 	assert.deepEqual(
 		l.windows.map((w) => [w.x, w.w, w.tabs[0].view]),
 		[
-			[0, 4, 'arena'],
-			[4, 8, 'ma'],
+			[0, 400, 'arena'],
+			[400, 800, 'ma'],
 		],
 	)
 	assert.deepEqual(layoutFrom('{"left":"ma","right":"ma"}'), DEFAULT_LAYOUT)
@@ -138,7 +197,7 @@ test('fresh ids are unused', () => {
 })
 
 test('saved layouts: save, replace by name, delete, and a full list', () => {
-	const wide = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })
+	const wide = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 300, h: 800 })
 	let saved = saveLayout([], ' Sunday ', DEFAULT_LAYOUT)
 	assert.deepEqual(saved.map((s) => s.name), ['Sunday'])
 	saved = saveLayout(saved, 'sunday', wide)
@@ -157,7 +216,7 @@ test('the same arrangement, whichever tab shows', () => {
 	const two = addTab(DEFAULT_LAYOUT, 'w2', 'arena', 't3')
 	assert.equal(sameArrangement(two, selectTab(two, 'w2', 't2')), true)
 	assert.equal(sameArrangement(two, DEFAULT_LAYOUT), false)
-	assert.equal(sameArrangement(DEFAULT_LAYOUT, placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })), false)
+	assert.equal(sameArrangement(DEFAULT_LAYOUT, placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 300, h: 800 })), false)
 })
 
 test('saved layouts off storage: a broken one is dropped, the rest kept', () => {
@@ -169,40 +228,55 @@ test('saved layouts off storage: a broken one is dropped, the rest kept', () => 
 
 test('the seam between the default windows drags both, and stops at the smallest', () => {
 	const [seam] = seams(DEFAULT_LAYOUT)
-	assert.deepEqual(seam, { axis: 'x', at: 4, from: 0, to: 8, before: ['w1'], after: ['w2'] })
-	const wider = moveSeam(DEFAULT_LAYOUT, seam, 6)
+	assert.deepEqual(seam, { axis: 'x', at: 400, from: 0, to: 800, before: ['w1'], after: ['w2'] })
+	const wider = moveSeam(DEFAULT_LAYOUT, seam, 613.4)
 	assert.deepEqual(wider.windows.map((w) => [w.x, w.w]), [
-		[0, 6],
-		[6, 6],
+		[0, 613],
+		[613, 587],
 	])
-	assert.equal(moveSeam(DEFAULT_LAYOUT, seam, 1), DEFAULT_LAYOUT) // run order under 2 wide
-	assert.equal(moveSeam(DEFAULT_LAYOUT, seam, 11), DEFAULT_LAYOUT) // MA under 2 wide
+	assert.deepEqual(seamRange(DEFAULT_LAYOUT, seam), { lo: 150, hi: 1050 })
+	// A fast drag past the limit lands on it.
+	assert.deepEqual(moveSeam(DEFAULT_LAYOUT, seam, 20).windows.map((w) => w.w), [150, 1050])
+	assert.deepEqual(moveSeam(DEFAULT_LAYOUT, seam, 1190).windows.map((w) => w.w), [1050, 150])
+	assert.equal(moveSeam(DEFAULT_LAYOUT, seam, 400), DEFAULT_LAYOUT)
 })
 
 test('windows on one line move together; a stacked pair has a seam of its own', () => {
-	let l = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 4, y: 0, w: 8, h: 5 })
-	l = addWindow(l, 'arena', { window: 'w3', tab: 't3' }) // 4,5 8×3, under the MA
+	let l = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 400, y: 0, w: 800, h: 500 })
+	l = addWindow(l, 'arena', { window: 'w3', tab: 't3' }) // 400,500 800×300, under the MA
 	const all = seams(l)
 	const upright = all.find((s) => s.axis === 'x')
 	assert.deepEqual([upright.before, upright.after.sort()], [['w1'], ['w2', 'w3']])
 	const level = all.find((s) => s.axis === 'y')
-	assert.deepEqual([level.at, level.from, level.to, level.before, level.after], [5, 4, 12, ['w2'], ['w3']])
-	const moved = moveSeam(l, upright, 3)
+	assert.deepEqual([level.at, level.from, level.to, level.before, level.after], [500, 400, 1200, ['w2'], ['w3']])
+	const moved = moveSeam(l, upright, 300)
 	assert.deepEqual(moved.windows.map((w) => [w.x, w.w]), [
-		[0, 3],
-		[3, 9],
-		[3, 9],
+		[0, 300],
+		[300, 900],
+		[300, 900],
 	])
-	assert.deepEqual(moveSeam(l, level, 6).windows.map((w) => [w.y, w.h]), [
-		[0, 8],
-		[0, 6],
-		[6, 2],
+	assert.deepEqual(moveSeam(l, level, 600).windows.map((w) => [w.y, w.h]), [
+		[0, 800],
+		[0, 600],
+		[600, 200],
 	])
-	assert.equal(moveSeam(l, level, 7), l) // Arena under 2 high
+	assert.deepEqual(moveSeam(l, level, 790).windows.map((w) => w.h), [800, 700, 100]) // Arena at its smallest
 })
 
 test('a seam never runs a window into one that is not on it', () => {
-	// Run order 0–3, a gap at column 3, MA 4–12: no seam at 3 or 4.
-	const gap = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })
+	// Run order 0–300, a gap, MA 400–1200: no seam at 300 or 400.
+	const gap = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 300, h: 800 })
 	assert.deepEqual(seams(gap), [])
+	// The MA above Arena, which starts 200 in from the MA's left: the run
+	// order grows into the MA only as far as Arena's left edge.
+	let l = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 400, y: 0, w: 800, h: 500 })
+	l = { ...l, windows: [...l.windows, { id: 'w3', x: 600, y: 500, w: 600, h: 300, tabs: [], active: null }] }
+	const [upright] = seams(l).filter((s) => s.axis === 'x' && s.at === 400)
+	assert.deepEqual([upright.before, upright.after], [['w1'], ['w2']])
+	assert.deepEqual(seamRange(l, upright), { lo: 150, hi: 600 }) // stops at Arena's left
+	assert.deepEqual(moveSeam(l, upright, 900).windows.map((w) => [w.x, w.w]), [
+		[0, 600],
+		[600, 600],
+		[600, 600],
+	])
 })

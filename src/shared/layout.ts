@@ -1,10 +1,14 @@
-// The screen's layout: windows on a grid, MA3-style, each with tabs (the
-// owner, 2026-10-04). It replaces the two slots and their divider.
+// The screen's layout: windows that never overlap, MA3-style, each with tabs
+// (the owner, 2026-10-04). It replaces the two slots and their divider.
 //
 // The owner's decisions:
-// - A 12 × 8 grid. Windows never overlap: a native page (the MA, the run
-//   order, an embed) cannot be drawn over, and MA3's windows do not overlap
-//   either. Added, moved and resized by dragging, snapping to cells.
+// - Windows go anywhere, any size (2026-10-05: "freeform with no grid, but
+//   keep the logic of the grid so they don't overlap"; the 12 × 8 grid of
+//   2026-10-04 snapped every drag to a cell, a twelfth of the width at a
+//   time). A dragged edge snaps to the screen's edge or another window's edge
+//   when it comes near one, so edges meant to meet meet exactly. Windows never
+//   overlap: a native page (the MA, the run order, an embed) cannot be drawn
+//   over, and MA3's windows do not overlap either.
 // - Each window has tabs: tap to switch, + to add a view, × to remove one. Any
 //   view in any tab, duplicates allowed.
 // - The MA shows once. A second MA tab says so and offers "Move it here". The
@@ -18,7 +22,7 @@
 //   the MA on the right two-thirds, as the slots were.
 //
 // THE RULE THIS FILE ENFORCES: a layout always holds. Every change here returns
-// a layout whose windows are inside the grid and overlap nothing, or returns
+// a layout whose windows are on the screen and overlap nothing, or returns
 // the layout it was given. Nothing off storage is trusted until it passes the
 // same test. And the screen never rearranges itself: a view that stops
 // answering keeps its tab, which says so in its own place.
@@ -62,15 +66,19 @@ export function isNative(view: ViewId): boolean {
 	return view === 'ma' || view === 'cue' || embedIdOf(view) !== null
 }
 
-export const COLS = 12
-export const ROWS = 8
+/** The screen in units, whatever its size in pixels. Fine enough that a drag
+ *  follows a finger (a unit is under 2 px on a 1920 screen), and whole numbers,
+ *  so two edges that meet are exactly equal: the shared-edge drag finds its
+ *  windows by that. A grid layout's cells (until 2026-10-05) are these × 100. */
+export const WIDTH = 1200
+export const HEIGHT = 800
 
-/** The smallest a window may be, in cells: room for a strip of tabs and
- *  something under it. */
-export const MIN_W = 2
-export const MIN_H = 2
+/** The smallest a window may be, in units: an eighth of the screen each way,
+ *  room for a strip of tabs and something under it. */
+export const MIN_W = 150
+export const MIN_H = 100
 
-/** A place on the grid, in cells: column, row, width, height. */
+/** A place on the screen, in units: left, top, width, height. */
 export type Box = { x: number; y: number; w: number; h: number }
 
 export type Tab = { id: string; view: ViewId }
@@ -88,47 +96,156 @@ export type Layout = {
 	 *  someone tapped "Move it here". By view; a tab id that has gone, or is not
 	 *  showing, is passed over (`homeOf`). */
 	homes: Partial<Record<ViewId, string>>
+	/** In units (2), not a grid's cells: so storage can tell the two apart. */
+	v: 2
 }
 
 /** The screen as it was before there were windows: the run order on the
  *  left third, the MA on the right two-thirds. */
 export const DEFAULT_LAYOUT: Layout = {
 	windows: [
-		{ id: 'w1', x: 0, y: 0, w: 4, h: 8, tabs: [{ id: 't1', view: 'cue' }], active: 't1' },
-		{ id: 'w2', x: 4, y: 0, w: 8, h: 8, tabs: [{ id: 't2', view: 'ma' }], active: 't2' },
+		{ id: 'w1', x: 0, y: 0, w: 400, h: 800, tabs: [{ id: 't1', view: 'cue' }], active: 't1' },
+		{ id: 'w2', x: 400, y: 0, w: 800, h: 800, tabs: [{ id: 't2', view: 'ma' }], active: 't2' },
 	],
 	homes: {},
+	v: 2,
 }
 
 // ─── Geometry ──────────────────────────────────────────────────────────────
 
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-const inGrid = (b: Box) =>
+const onScreen = (b: Box) =>
 	[b.x, b.y, b.w, b.h].every(Number.isInteger) &&
 	b.x >= 0 &&
 	b.y >= 0 &&
 	b.w >= MIN_W &&
 	b.h >= MIN_H &&
-	b.x + b.w <= COLS &&
-	b.y + b.h <= ROWS
+	b.x + b.w <= WIDTH &&
+	b.y + b.h <= HEIGHT
 
-/** Whether `box` may be where it is: inside the grid, big enough, and over no
+/** Whether `box` may be where it is: on the screen, big enough, and over no
  *  other window. `self` is the window being moved, which may overlap itself. */
 export function fits(layout: Layout, box: Box, self: string | null = null): boolean {
-	return inGrid(box) && layout.windows.every((w) => w.id === self || !overlaps(w, box))
+	return onScreen(box) && layout.windows.every((w) => w.id === self || !overlaps(w, box))
 }
 
-/** The biggest free place on the grid, or null when there is no room for even
- *  the smallest window. Ties go to the top-left. */
+/** The lines along one axis an edge may come to rest on: the screen's two
+ *  edges and both edges of every window but `self`. */
+function linesOf(layout: Layout, axis: 'x' | 'y', self: string | null): number[] {
+	const out = new Set([0, axis === 'x' ? WIDTH : HEIGHT])
+	for (const w of layout.windows) {
+		if (w.id === self) continue
+		out.add(axis === 'x' ? w.x : w.y)
+		out.add(axis === 'x' ? w.x + w.w : w.y + w.h)
+	}
+	return [...out].sort((a, b) => a - b)
+}
+
+/** The line nearest `v` within `tol`, or null: a magnet, not a grid. */
+export function snapLine(v: number, lines: readonly number[], tol: number): number | null {
+	let best: number | null = null
+	for (const l of lines) if (Math.abs(l - v) <= tol && (best === null || Math.abs(l - v) < Math.abs(best - v))) best = l
+	return best
+}
+
+/** Which edges a drag moves. All four is the whole window. */
+export type Edges = { l: boolean; r: boolean; t: boolean; b: boolean }
+export const MOVE: Edges = { l: true, r: true, t: true, b: true }
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi)
+const crosses = (a: Box, b: Box, axis: 'x' | 'y') =>
+	axis === 'x' ? a.y < b.y + b.h && b.y < a.y + a.h : a.x < b.x + b.w && b.x < a.x + a.w
+
+/** One axis of a resize: the moving edge where the drag puts it, snapped to a
+ *  line within `tol`, kept on the screen and at least the smallest size. */
+function resizeAxis(box: Box, from: Box, lo: boolean, hi: boolean, d: number, lines: readonly number[], tol: number, axis: 'x' | 'y'): Box {
+	const [p, s, min, max] = axis === 'x' ? (['x', 'w', MIN_W, WIDTH] as const) : (['y', 'h', MIN_H, HEIGHT] as const)
+	const end = from[p] + from[s]
+	if (lo) {
+		const raw = clamp(from[p] + d, 0, end - min)
+		const at = snapLine(raw, lines, tol)
+		const start = at !== null && at <= end - min ? at : raw
+		return { ...box, [p]: start, [s]: end - start }
+	}
+	if (hi) {
+		const raw = clamp(end + d, from[p] + min, max)
+		const at = snapLine(raw, lines, tol)
+		const stop = at !== null && at >= from[p] + min ? at : raw
+		return { ...box, [s]: stop - from[p] }
+	}
+	return box
+}
+
+/** A resized edge stopped flush against the first window in its way, along
+ *  `axis`. The windows in the way are those across from the box now and on
+ *  the far side of where the edge started. */
+function stopAxis(layout: Layout, id: string, box: Box, from: Box, lo: boolean, hi: boolean, axis: 'x' | 'y'): Box {
+	const [p, s] = axis === 'x' ? (['x', 'w'] as const) : (['y', 'h'] as const)
+	const others = layout.windows.filter((w) => w.id !== id && crosses(w, box, axis))
+	if (lo) {
+		const limit = Math.max(0, ...others.filter((w) => w[p] + w[s] <= from[p]).map((w) => w[p] + w[s]))
+		if (box[p] >= limit) return box
+		return { ...box, [p]: limit, [s]: box[p] + box[s] - limit }
+	}
+	if (hi) {
+		const limit = Math.min(axis === 'x' ? WIDTH : HEIGHT, ...others.filter((w) => w[p] >= from[p] + from[s]).map((w) => w[p]))
+		if (box[p] + box[s] <= limit) return box
+		return { ...box, [s]: limit - box[p] }
+	}
+	return box
+}
+
+/** Where window `id` goes when `edges` of `start` are dragged by `dx`, `dy`
+ *  units. The drag follows the finger, and an edge within `tol` units of the
+ *  screen's edge or another window's snaps onto it. A resized edge stops flush
+ *  against a window in its way rather than going over it. A moved window is
+ *  not stopped: where it would land on another, `fits` says no and the caller
+ *  shows it refused. */
+export function dragBox(layout: Layout, id: string, start: Box, edges: Edges, dx: number, dy: number, tol: { x: number; y: number }): Box {
+	const from = { x: start.x, y: start.y, w: start.w, h: start.h }
+	const xs = linesOf(layout, 'x', id)
+	const ys = linesOf(layout, 'y', id)
+	if (edges.l && edges.r && edges.t && edges.b) {
+		/** The nearer snap of either edge, as a shift. */
+		const shift = (start: number, size: number, lines: readonly number[], t: number) => {
+			const a = snapLine(start, lines, t)
+			const b = snapLine(start + size, lines, t)
+			const da = a === null ? null : a - start
+			const db = b === null ? null : b - (start + size)
+			if (da === null) return db ?? 0
+			if (db === null) return da
+			return Math.abs(da) <= Math.abs(db) ? da : db
+		}
+		let x = clamp(from.x + dx, 0, WIDTH - from.w)
+		let y = clamp(from.y + dy, 0, HEIGHT - from.h)
+		x = clamp(x + shift(x, from.w, xs, tol.x), 0, WIDTH - from.w)
+		y = clamp(y + shift(y, from.h, ys, tol.y), 0, HEIGHT - from.h)
+		return { x, y, w: from.w, h: from.h }
+	}
+	const sized = resizeAxis(resizeAxis(from, from, edges.l, edges.r, dx, xs, tol.x, 'x'), from, edges.t, edges.b, dy, ys, tol.y, 'y')
+	// A corner moves both ways: stop one axis, then the other, whichever order
+	// lands somewhere that fits.
+	const xFirst = stopAxis(layout, id, stopAxis(layout, id, sized, from, edges.l, edges.r, 'x'), from, edges.t, edges.b, 'y')
+	if (fits(layout, xFirst, id)) return xFirst
+	const yFirst = stopAxis(layout, id, stopAxis(layout, id, sized, from, edges.t, edges.b, 'y'), from, edges.l, edges.r, 'x')
+	return fits(layout, yFirst, id) ? yFirst : sized
+}
+
+/** The biggest free place on the screen, or null when there is no room for
+ *  even the smallest window. Ties go to the top-left. The biggest free place
+ *  always has each edge on the screen's or a window's, so only those lines are
+ *  tried. */
 export function freeBox(layout: Layout): Box | null {
+	const xs = linesOf(layout, 'x', null)
+	const ys = linesOf(layout, 'y', null)
 	let best: Box | null = null
-	for (let y = 0; y < ROWS; y++) {
-		for (let x = 0; x < COLS; x++) {
-			for (let h = ROWS - y; h >= MIN_H; h--) {
-				for (let w = COLS - x; w >= MIN_W; w--) {
-					if (best !== null && w * h <= best.w * best.h) break
-					const box = { x, y, w, h }
+	for (const [i, y] of ys.entries()) {
+		for (const [j, x] of xs.entries()) {
+			for (const y2 of ys.slice(i + 1)) {
+				for (const x2 of xs.slice(j + 1)) {
+					const box = { x, y, w: x2 - x, h: y2 - y }
+					if (best !== null && box.w * box.h <= best.w * best.h) continue
 					if (fits(layout, box)) best = box
 				}
 			}
@@ -223,13 +340,15 @@ export function viewsShown(layout: Layout, visible: (view: ViewId) => boolean): 
 
 const ID = /^[A-Za-z0-9_-]{1,32}$/
 
-function windowFrom(v: unknown): GridWindow | null {
+/** A window off storage, its place × `scale`: 100 for a grid layout's cells. */
+function windowFrom(v: unknown, scale: number): GridWindow | null {
 	if (typeof v !== 'object' || v === null) return null
 	const r = v as Record<string, unknown>
 	const { id, x, y, w, h, tabs, active } = r
 	if (typeof id !== 'string' || !ID.test(id) || !Array.isArray(tabs)) return null
-	const box = { x, y, w, h } as Box
-	if (!inGrid(box)) return null
+	if (![x, y, w, h].every(Number.isInteger)) return null
+	const box = { x: (x as number) * scale, y: (y as number) * scale, w: (w as number) * scale, h: (h as number) * scale }
+	if (!onScreen(box)) return null
 	const goodTabs: Tab[] = []
 	for (const t of tabs) {
 		const tr = t as Record<string, unknown> | null
@@ -242,9 +361,11 @@ function windowFrom(v: unknown): GridWindow | null {
 }
 
 /** A layout off this machine's storage. Anything that does not hold (windows
- *  off the grid or over each other, an id used twice) is the default: a layout
- *  that half-loaded could hide the MA. The two slots' layout, from before the
- *  grid, becomes the default's two windows holding what the slots held. */
+ *  off the screen or over each other, an id used twice) is the default: a
+ *  layout that half-loaded could hide the MA. The two slots' layout, from
+ *  before windows, becomes the default's two windows holding what the slots
+ *  held; a grid layout's cells (no `v`) become units, each window where it
+ *  was. */
 export function layoutFrom(stored: unknown): Layout {
 	let v: unknown = stored
 	if (typeof stored === 'string') {
@@ -268,19 +389,22 @@ export function layoutFrom(stored: unknown): Layout {
 				{ ...b, tabs: [{ id: 't2', view: right }] },
 			],
 			homes: {},
+			v: 2,
 		}
 	}
 
 	if (!Array.isArray(r['windows'])) return DEFAULT_LAYOUT
+	// The 12 × 8 grid's layout (2026-10-04 to 2026-10-05) has no `v`.
+	const scale = r['v'] === 2 ? 1 : WIDTH / 12
 	const windows: GridWindow[] = []
 	for (const raw of r['windows']) {
-		const w = windowFrom(raw)
+		const w = windowFrom(raw, scale)
 		if (w === null) return DEFAULT_LAYOUT
 		windows.push(w)
 	}
 	const ids = [...windows.map((w) => w.id), ...windows.flatMap((w) => w.tabs.map((t) => t.id))]
 	if (new Set(ids).size !== ids.length) return DEFAULT_LAYOUT
-	const layout: Layout = { windows: [], homes: {} }
+	const layout: Layout = { windows: [], homes: {}, v: 2 }
 	for (const w of windows) {
 		if (!fits(layout, w)) return DEFAULT_LAYOUT
 		layout.windows.push(w)
@@ -385,9 +509,9 @@ export function savedLayoutsFrom(stored: unknown): SavedLayout[] {
 // the other shrink, so nothing is added, removed or moved, and the windows
 // still fill what they filled. Arranging stays in Edit layout.
 
-/** A shared edge: the line `at` (a column for 'x', a row for 'y'), the windows
+/** A shared edge: the line `at` (upright for 'x', level for 'y'), the windows
  *  ending on it (`before`) and starting on it (`after`), and the stretch of it
- *  they share, in cells along the other axis. */
+ *  they share, in units along the other axis. */
 export type Seam = { axis: 'x' | 'y'; at: number; from: number; to: number; before: string[]; after: string[] }
 
 /** Every seam in the layout. Windows meeting on the same line and touching
@@ -400,8 +524,8 @@ export function seams(layout: Layout): Seam[] {
 		const size = (w: Box) => (axis === 'x' ? w.w : w.h)
 		const crossLo = (w: Box) => (axis === 'x' ? w.y : w.x)
 		const crossHi = (w: Box) => (axis === 'x' ? w.y + w.h : w.x + w.w)
-		const limit = axis === 'x' ? COLS : ROWS
-		for (let at = 1; at < limit; at++) {
+		// Every line a window starts on, but the screen's own edge.
+		for (const at of [...new Set(layout.windows.map(lo))].filter((n) => n > 0).sort((a, b) => a - b)) {
 			const before = layout.windows.filter((w) => lo(w) + size(w) === at)
 			const after = layout.windows.filter((w) => lo(w) === at)
 			const pairs = before.flatMap((a) =>
@@ -435,9 +559,29 @@ export function seams(layout: Layout): Seam[] {
 	return out
 }
 
-/** Move a seam to the line `to`. Unchanged when that would make a window
- *  smaller than MIN_W × MIN_H or run it into another one. */
-export function moveSeam(layout: Layout, seam: Seam, to: number): Layout {
+/** How far a seam may go, as the lines it may sit on: no window on it smaller
+ *  than MIN_W × MIN_H, and none growing into a window that is not on it. */
+export function seamRange(layout: Layout, seam: Seam): { lo: number; hi: number } {
+	const axis = seam.axis
+	const [p, s] = axis === 'x' ? (['x', 'w'] as const) : (['y', 'h'] as const)
+	const min = axis === 'x' ? MIN_W : MIN_H
+	const before = layout.windows.filter((w) => seam.before.includes(w.id))
+	const after = layout.windows.filter((w) => seam.after.includes(w.id))
+	const others = layout.windows.filter((w) => !seam.before.includes(w.id) && !seam.after.includes(w.id))
+	// A window before the seam grows towards the far side; one after, back.
+	const ahead = others.filter((o) => o[p] >= seam.at && before.some((b) => crosses(o, b, axis))).map((o) => o[p])
+	const behind = others.filter((o) => o[p] + o[s] <= seam.at && after.some((a) => crosses(o, a, axis))).map((o) => o[p] + o[s])
+	return {
+		lo: Math.max(...before.map((b) => b[p] + min), ...behind),
+		hi: Math.min(...after.map((a) => a[p] + a[s] - min), ...ahead),
+	}
+}
+
+/** Move a seam towards the line `want`, as far as it may go (`seamRange`), so
+ *  a fast drag past the limit still lands on it. */
+export function moveSeam(layout: Layout, seam: Seam, want: number): Layout {
+	const range = seamRange(layout, seam)
+	const to = clamp(Math.round(want), range.lo, range.hi)
 	if (to === seam.at) return layout
 	const x = seam.axis === 'x'
 	const next: Layout = {
