@@ -522,8 +522,8 @@ CDP, not yet by a finger.
   biggest free place; with no room, it says so.
 - **Video's Fit is a pop-out's only.** Built when windows snapped to cells; with free
   windows, a Fit in a window is possible again but not built.
-- **Saved layouts open in the windows' place** (like Connections), from LAYOUT in the
-  status bar, because a menu over a live page cannot be drawn. The button names the
+- **Saved layouts open in the windows' place** (like Connections), from Layouts in the
+  top bar, because a menu over a live page cannot be drawn. The button names the
   layout on screen; switching a tab still counts as that layout. Up to 12.
 - **Embeds open only once a window shows them**, so a booth can add many without each
   loading in the background. Off closes the page and keeps its sign-in; removing one
@@ -533,6 +533,35 @@ CDP, not yet by a finger.
 - **MARK** is for everyone and writes the mode, the layout and the views on screen
   beside the mark's number. **This screen** (Full screen / Window) is in Connections,
   operator mode.
+
+## The look (owner, 2026-10-05)
+
+The owner asked overnight for a deep UI and UX clean-up ("starting to feel a bit messy",
+"the more intuitive the better, even if this means more actions", "move away from the
+'claude' like design"). Three directions were mocked on a review page
+(https://claude.ai/artifact/X8nXYSif8rgrES2PqeWM3i, private to the owner: A Pāua, B
+Console, C Studio). **The owner chose A**, and asked for the neutrals to sit "somewhere
+between" A's sea-green and the original greys; they are the midpoint of the two. The
+tokens and their reasons are in `src/renderer/theme.css`; the shared pieces in
+`src/renderer/components/ui.tsx`.
+
+**Choices made without asking** (kept by the owner so far):
+
+- **Edit layout lives in Layouts** (operator mode), not on the bar: one Layouts button
+  instead of LAYOUT and EDIT LAYOUT side by side. One more tap to arrange.
+- **MARK is a flag icon**, for testers; it says "Mark N" for 3 s when tapped.
+- **The mode button is a lock**: Volunteer, closed and quiet; Operator, open, with the
+  nacre line under the bar. The words "hold the mode chip" became "hold Volunteer (top
+  right)" everywhere.
+- **The countdown has no surface while live**, so it reads as a reading, not a button;
+  stale and unknown keep their dashed and dotted outlines.
+- **Connections is a list and a detail**; Add a web page and This computer are rows of
+  their own. It opens on the first connection that is down.
+- **Showfile's Save As and Load are two cards a screen apart**, which is how "Load never
+  shares a neighbourhood with Save As" is kept now (it was a gap down the page).
+- **Add window opens its view menu** at once.
+- **Status words are sentence case on screen** ("Live", not "LIVE"); the shared code
+  still says them in capitals (`sentence()` in `vocabulary.tsx`).
 
 ## Fetching media (owner's ask, 2026-10-05; built the same day)
 

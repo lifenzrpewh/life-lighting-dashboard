@@ -270,7 +270,9 @@ the cheap ones pulled forward because one of them may save the architecture.
 - **The status bar is read-only** and keeps only what a volunteer acts on: link, Showfile, the
   countdown, clock, the mode chip, and **Connections**, whose dot is the worst of every connection
   that is set up. The pane's status (`MA · <host> · <user>`, never "live") and channel B's traffic
-  moved into the Console row there (2026-10-02).
+  moved into the Console row there (2026-10-02). Since 2026-10-05 it is three zones: the link and
+  the show as one console card, the time centred, Layouts, Connections, the Mark flag and the mode
+  (a lock) on the right (`docs/VISUALS_DASHBOARD.md` § The look).
 
 **The MA pane** (`src/main/ma-pane.ts`, `src/renderer/components/MaPane.tsx`):
 
