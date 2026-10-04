@@ -20,6 +20,7 @@
 // pictures while it is dragged.
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { Move, PanelTop, Plus, Trash2, X } from 'lucide-react'
 
 import {
 	HEIGHT,
@@ -39,6 +40,7 @@ import {
 	type Tab,
 	type ViewId,
 } from '../../shared/layout.js'
+import { Button, IconButton, Placeholder, viewIcon } from './ui.js'
 
 /** The padding round the windows and the gap between them, in px: the gap is
  *  where a shared edge is grabbed, so it is a finger's width, as the divider
@@ -48,8 +50,6 @@ const GAP = 12
 
 /** How near, in px, an edge comes to another before it snaps onto it. */
 const SNAP = 16
-
-const label = 'text-[10px] font-semibold tracking-widest uppercase'
 
 /** Units along one axis as CSS, inside the padding: a window at 0 starts at
  *  the padding, one ending at the far edge ends at it, and two that meet are a
@@ -157,88 +157,107 @@ export function Grid(p: GridProps) {
 				const tabs = win.tabs.filter((t) => p.visible(t.view))
 				const moving = drag?.id === win.id ? drag : null
 				const box = moving?.box ?? win
+				const ring =
+					moving !== null
+						? moving.ok
+							? 'ring-2 ring-nacre-blue'
+							: 'ring-2 ring-state-unreachable'
+						: p.editing
+							? 'ring-1 ring-nacre-blue/50'
+							: 'ring-1 ring-booth-edge'
 				return (
 					<section
 						key={win.id}
 						style={place(box)}
-						className={`absolute z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-sm bg-booth-panel ${
-							moving === null ? '' : moving.ok ? 'ring-2 ring-booth-ink' : 'ring-2 ring-state-unreachable opacity-80'
-						}`}
+						className={`absolute z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-booth-panel ${ring}`}
 					>
-						<div className="flex h-12 shrink-0 items-center gap-1 border-b border-booth-edge px-1">
-							<div role="tablist" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none]">
-								{tabs.map((t) => (
-									<span key={t.id} className="flex shrink-0 items-center">
-										<button
-											type="button"
-											role="tab"
-											aria-selected={t.id === tab?.id}
-											onClick={() => p.onSelect(win.id, t.id)}
-											className={`${label} h-10 shrink-0 rounded-md px-3 active:scale-[0.98] ${
-												t.id === tab?.id ? 'bg-booth-ink text-booth-bg' : 'text-booth-dim active:bg-booth-edge'
-											}`}
-										>
-											{p.labelOf(t.view)}
-										</button>
-										{p.editing && (
+						<div className="flex h-12 shrink-0 items-stretch gap-0.5 border-b border-booth-edge bg-booth-strip pr-1.5 pl-1">
+							<div role="tablist" className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+								{tabs.map((t) => {
+									const on = t.id === tab?.id
+									const TabIcon = viewIcon(t.view)
+									return (
+										<span key={t.id} className="relative flex shrink-0 items-center">
 											<button
 												type="button"
-												onClick={() => p.onRemoveTab(win.id, t.id)}
-												aria-label={`Remove the ${p.labelOf(t.view)} tab`}
-												className="h-10 w-8 shrink-0 rounded-md text-booth-dim active:bg-booth-edge"
+												role="tab"
+												aria-selected={on}
+												onClick={() => p.onSelect(win.id, t.id)}
+												className={`flex h-full shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${
+													on ? 'text-booth-ink' : 'text-booth-dim hover:text-booth-ink'
+												}`}
 											>
-												×
+												<TabIcon size={17} strokeWidth={1.8} aria-hidden />
+												{p.labelOf(t.view)}
 											</button>
-										)}
-									</span>
-								))}
-								{tabs.length === 0 && !p.editing && <span className={`${label} px-3 text-booth-dim`}>Empty</span>}
+											{p.editing && (
+												<button
+													type="button"
+													onClick={() => p.onRemoveTab(win.id, t.id)}
+													aria-label={`Remove the ${p.labelOf(t.view)} tab`}
+													title={`Remove the ${p.labelOf(t.view)} tab`}
+													className="-ml-2 mr-1 grid size-8 shrink-0 place-items-center rounded-md text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
+												>
+													<X size={15} aria-hidden />
+												</button>
+											)}
+											{on && <span aria-hidden className="nacre-line absolute inset-x-2.5 bottom-0 h-[3px] rounded-t-full" />}
+										</span>
+									)
+								})}
+								{tabs.length === 0 && !p.editing && <span className="flex items-center px-3.5 text-sm text-booth-dim">Empty</span>}
 							</div>
 							{p.editing && (
-								<button
-									type="button"
-									onClick={() => setAdding(adding === win.id ? null : win.id)}
-									aria-label="Add a tab"
-									aria-expanded={adding === win.id}
-									className="h-10 w-10 shrink-0 rounded-md border border-booth-edge text-lg text-booth-dim active:bg-booth-edge"
-								>
-									+
-								</button>
+								<span className="flex items-center">
+									<IconButton
+										icon={Plus}
+										size="sm"
+										label="Add a tab"
+										pressed={adding === win.id}
+										onClick={() => setAdding(adding === win.id ? null : win.id)}
+									/>
+								</span>
 							)}
 							<span className="ml-auto" />
-							{!p.editing && tab !== null && p.actions(win, tab)}
-							{p.editing && (
-								<button
-									type="button"
-									onClick={() => p.onRemoveWindow(win.id)}
-									aria-label="Remove this window"
-									className="h-10 shrink-0 rounded-md border border-booth-edge px-3 text-xs text-booth-dim active:bg-booth-edge"
-								>
-									Remove window
-								</button>
-							)}
+							<span className="flex items-center gap-1">
+								{!p.editing && tab !== null && p.actions(win, tab)}
+								{p.editing && (
+									<Button size="sm" variant="ghost" icon={Trash2} onClick={() => p.onRemoveWindow(win.id)}>
+										Remove window
+									</Button>
+								)}
+							</span>
 						</div>
 						<div ref={tab === null ? undefined : p.boxRef(win, tab)} className="relative flex min-h-0 min-w-0 flex-1 bg-booth-bg">
 							{tab === null ? (
-								<div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-booth-dim">
-									{win.tabs.length === 0
-										? p.editing
-											? 'Tap + to put a view here, or remove this window.'
-											: 'Nothing here. In operator mode, Edit layout puts a view here.'
-										: 'Its views are turned off in Connections.'}
+								<div className="flex flex-1 items-center justify-center">
+									<Placeholder
+										icon={PanelTop}
+										head={win.tabs.length === 0 ? 'An empty window' : 'Its views are turned off'}
+										body={
+											win.tabs.length === 0
+												? p.editing
+													? 'Tap + in its strip to put a view here, or remove the window.'
+													: 'In operator mode, Layouts › Edit this layout puts a view here.'
+												: 'Turn them on again in Connections.'
+										}
+									/>
 								</div>
 							) : (
 								p.body(win, tab)
 							)}
 							{p.editing && (
 								<>
-									{/* The body moves the window; its edges resize it. */}
+									{/* The body moves the window; its edges and corners resize it. */}
 									<div
 										{...handle(win, MOVE)}
-										className="absolute inset-0 flex cursor-move touch-none items-end justify-center bg-booth-bg/40 pb-6"
+										className={`absolute inset-0 flex cursor-grab touch-none items-end justify-center pb-12 active:cursor-grabbing ${
+											moving !== null && !moving.ok ? 'bg-state-unreachable/15' : 'bg-booth-bg/55'
+										}`}
 									>
-										<span className="rounded-md bg-booth-panel px-4 py-2 text-xs text-booth-dim">
-											Drag to move · drag an edge to resize
+										<span className="pointer-events-none flex items-center gap-2.5 rounded-xl bg-booth-raise px-4 py-3 text-sm text-booth-ink shadow-lg ring-1 ring-booth-edge">
+											<Move size={19} strokeWidth={1.8} aria-hidden />
+											{moving !== null && !moving.ok ? 'Not over another window' : 'Drag to move'}
 										</span>
 									</div>
 									<EdgeHandles win={win} handle={handle} />
@@ -313,8 +332,8 @@ export function Grid(p: GridProps) {
 							className={`group absolute z-20 flex touch-none items-center justify-center ${upright ? 'cursor-col-resize' : 'cursor-row-resize'}`}
 						>
 							<span
-								className={`rounded-full ${upright ? 'h-12 w-1.5' : 'h-1.5 w-12'} ${
-									dragging ? 'bg-booth-ink' : 'bg-booth-edge group-hover:bg-booth-dim'
+								className={`rounded-full transition-colors ${upright ? 'h-14 w-1.5' : 'h-1.5 w-14'} ${
+									dragging ? 'bg-nacre-blue' : 'bg-booth-faint group-hover:bg-booth-dim group-active:bg-nacre-blue'
 								}`}
 							/>
 						</div>
@@ -326,33 +345,64 @@ export function Grid(p: GridProps) {
 
 const seamKey = (seam: Seam) => `${seam.axis}:${seam.before.join(',')}|${seam.after.join(',')}`
 
-/** Bands along each edge and squares at each corner, big enough for a finger. */
+/** Bands along each edge and squares at each corner, big enough for a
+ *  finger, each drawn: a bracket at the corners and a pill mid-edge, so what
+ *  can be dragged is seen rather than found by hovering, which a finger
+ *  cannot do. */
 function EdgeHandles({ win, handle }: { win: GridWindow; handle: (win: GridWindow, edges: Edges) => object }) {
-	const band = 'absolute touch-none bg-booth-ink/0 hover:bg-booth-ink/20 active:bg-booth-ink/30'
+	const band = 'group absolute z-10 touch-none flex items-center justify-center'
+	const pill = 'rounded-full bg-nacre-blue/70 transition-colors group-hover:bg-nacre-blue group-active:bg-nacre-blue'
+	const corner = 'pointer-events-none absolute size-5 border-nacre-blue/80 transition-colors group-hover:border-nacre-blue'
 	const e = (l: boolean, r: boolean, t: boolean, b: boolean): Edges => ({ l, r, t, b })
 	return (
 		<>
-			<div {...handle(win, e(true, false, false, false))} className={`${band} inset-y-6 left-0 w-5 cursor-ew-resize`} />
-			<div {...handle(win, e(false, true, false, false))} className={`${band} inset-y-6 right-0 w-5 cursor-ew-resize`} />
-			<div {...handle(win, e(false, false, true, false))} className={`${band} inset-x-6 top-0 h-5 cursor-ns-resize`} />
-			<div {...handle(win, e(false, false, false, true))} className={`${band} inset-x-6 bottom-0 h-5 cursor-ns-resize`} />
-			<div {...handle(win, e(true, false, true, false))} className={`${band} top-0 left-0 size-6 cursor-nwse-resize`} />
-			<div {...handle(win, e(false, true, true, false))} className={`${band} top-0 right-0 size-6 cursor-nesw-resize`} />
-			<div {...handle(win, e(true, false, false, true))} className={`${band} bottom-0 left-0 size-6 cursor-nesw-resize`} />
-			<div {...handle(win, e(false, true, false, true))} className={`${band} right-0 bottom-0 size-6 cursor-nwse-resize`} />
+			<div {...handle(win, e(true, false, false, false))} className={`${band} inset-y-10 left-0 w-6 cursor-ew-resize`}>
+				<span className={`${pill} h-12 w-1.5`} />
+			</div>
+			<div {...handle(win, e(false, true, false, false))} className={`${band} inset-y-10 right-0 w-6 cursor-ew-resize`}>
+				<span className={`${pill} h-12 w-1.5`} />
+			</div>
+			<div {...handle(win, e(false, false, true, false))} className={`${band} inset-x-10 top-0 h-6 cursor-ns-resize`}>
+				<span className={`${pill} h-1.5 w-12`} />
+			</div>
+			<div {...handle(win, e(false, false, false, true))} className={`${band} inset-x-10 bottom-0 h-6 cursor-ns-resize`}>
+				<span className={`${pill} h-1.5 w-12`} />
+			</div>
+			<div {...handle(win, e(true, false, true, false))} className={`${band} top-0 left-0 size-10 cursor-nwse-resize`}>
+				<span className={`${corner} top-1.5 left-1.5 rounded-tl-md border-t-4 border-l-4`} />
+			</div>
+			<div {...handle(win, e(false, true, true, false))} className={`${band} top-0 right-0 size-10 cursor-nesw-resize`}>
+				<span className={`${corner} top-1.5 right-1.5 rounded-tr-md border-t-4 border-r-4`} />
+			</div>
+			<div {...handle(win, e(true, false, false, true))} className={`${band} bottom-0 left-0 size-10 cursor-nesw-resize`}>
+				<span className={`${corner} bottom-1.5 left-1.5 rounded-bl-md border-b-4 border-l-4`} />
+			</div>
+			<div {...handle(win, e(false, true, false, true))} className={`${band} right-0 bottom-0 size-10 cursor-nwse-resize`}>
+				<span className={`${corner} right-1.5 bottom-1.5 rounded-br-md border-r-4 border-b-4`} />
+			</div>
 		</>
 	)
 }
 
-/** + : every view that may be on screen. */
+/** + : every view that may be on screen, each with its icon. */
 function AddMenu({ offer, labelOf, onPick }: { offer: readonly ViewId[]; labelOf: (v: ViewId) => string; onPick: (v: ViewId) => void }) {
 	return (
-		<div className="absolute top-2 left-2 z-20 flex max-h-[calc(100%-1rem)] w-56 flex-col overflow-y-auto rounded-md border border-booth-edge bg-booth-panel py-1 shadow-lg">
-			{offer.map((v) => (
-				<button key={v} type="button" onClick={() => onPick(v)} className="h-12 shrink-0 px-4 text-left text-sm active:bg-booth-edge">
-					{labelOf(v)}
-				</button>
-			))}
+		<div className="absolute top-2 left-2 z-20 flex max-h-[calc(100%-1rem)] w-64 animate-rise flex-col overflow-y-auto rounded-xl bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
+			<span className="px-3 pt-2 pb-1.5 text-xs font-medium text-booth-dim">Add a view</span>
+			{offer.map((v) => {
+				const ViewIcon = viewIcon(v)
+				return (
+					<button
+						key={v}
+						type="button"
+						onClick={() => onPick(v)}
+						className="flex h-12 shrink-0 items-center gap-3 rounded-lg px-3 text-left text-sm hover:bg-booth-hover active:bg-booth-hover"
+					>
+						<ViewIcon size={18} strokeWidth={1.8} className="text-booth-dim" aria-hidden />
+						{labelOf(v)}
+					</button>
+				)
+			})}
 		</div>
 	)
 }

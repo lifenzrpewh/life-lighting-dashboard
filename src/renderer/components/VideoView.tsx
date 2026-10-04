@@ -11,6 +11,7 @@
 // words saying for how long, because a frozen multiview looks like a quiet one.
 
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, MonitorPlay } from 'lucide-react'
 
 import { currentFrame, videoFit, videoPicture, type VideoFeedState } from '../../shared/video-feed.js'
 import { Centered, Say } from './MaPane.js'
@@ -80,7 +81,7 @@ export function VideoView({
 	if (feed === undefined || feed === null) {
 		return (
 			<Centered>
-				<Say head="Video" body={window.life === undefined ? 'The video feed is shown only inside the kiosk.' : 'Not heard yet.'} />
+				<Say icon={MonitorPlay} head="Video" body={window.life === undefined ? 'The video feed is shown only inside the kiosk.' : 'Not heard yet.'} />
 			</Centered>
 		)
 	}
@@ -115,7 +116,7 @@ export function VideoView({
 			/>
 			{said !== null && (
 				<div className="absolute inset-0 flex items-center justify-center">
-					<Say head={said.head} body={said.body} />
+					<Say icon={MonitorPlay} head={said.head} body={said.body} />
 				</div>
 			)}
 		</div>
@@ -159,7 +160,7 @@ export function VideoStrip({
 				</span>
 			)}
 			{onFit !== undefined && fit !== null && (
-				<button type="button" onClick={onFit} className={`${barButton} h-9`} aria-label="Fit the space to the picture's shape">
+				<button type="button" onClick={onFit} className={barButton} aria-label="Fit the space to the picture's shape">
 					Fit
 				</button>
 			)}
@@ -169,13 +170,13 @@ export function VideoStrip({
 						type="button"
 						onClick={() => setOpen(!open)}
 						aria-expanded={open}
-						className={`${barButton} h-9 max-w-56`}
+						className={`${barButton} max-w-56 gap-2`}
 					>
 						<span className="truncate">{short(feed.showing ?? 'Source')}</span>
-						<span className="ml-2">▾</span>
+						<ChevronDown size={16} className="shrink-0 text-booth-dim" aria-hidden />
 					</button>
 					{open && (
-						<ul className="absolute top-11 right-0 z-20 min-w-64 overflow-hidden rounded-md border border-booth-edge bg-booth-panel shadow-lg">
+						<ul className="absolute top-12 right-0 z-20 min-w-64 animate-rise overflow-hidden rounded-xl bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
 							{feed.senders.map((name) => (
 								<li key={name}>
 									<button
@@ -184,7 +185,7 @@ export function VideoStrip({
 											window.life?.chooseVideo(name)
 											setOpen(false)
 										}}
-										className={`flex h-12 w-full items-center px-4 text-left text-sm active:bg-booth-edge ${
+										className={`flex h-12 w-full items-center rounded-lg px-3 text-left text-sm hover:bg-booth-hover ${
 											name === feed.showing ? 'text-booth-ink' : 'text-booth-dim'
 										}`}
 									>

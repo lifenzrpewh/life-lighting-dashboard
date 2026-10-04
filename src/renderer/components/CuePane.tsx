@@ -6,17 +6,20 @@
 // app does not notice.
 
 import type { CuePaneState } from '../../shared/cue-pane.js'
+import { ListChecks, RotateCw } from 'lucide-react'
+
 import { Say } from './MaPane.js'
+import { Button } from './ui.js'
 
 export function CueMessage({ pane, now }: { pane: CuePaneState | null; now: number }) {
-	if (pane === null) return <Say head="No Cue Manager here" body="The Cue Manager is shown only inside the kiosk." />
+	if (pane === null) return <Say icon={ListChecks} head="No Cue Manager here" body="The Cue Manager is shown only inside the kiosk." />
 	switch (pane.state) {
 		case 'idle':
 		case 'connecting':
-			return <Say head="Opening the Cue Manager…" body={new URL(pane.url).host} />
+			return <Say icon={ListChecks} head="Opening the Cue Manager…" body={new URL(pane.url).host} />
 		case 'showing':
 			// Under the app itself; seen only for the instant before it is shown.
-			return <Say head="Cue Manager" body={new URL(pane.url).host} />
+			return <Say icon={ListChecks} head="Cue Manager" body={new URL(pane.url).host} />
 		case 'failed': {
 			const wait = Math.max(0, Math.ceil((pane.retryAt - now) / 1000))
 			return (
@@ -24,15 +27,11 @@ export function CueMessage({ pane, now }: { pane: CuePaneState | null; now: numb
 					head="Cue Manager not reachable"
 					body={`${new URL(pane.url).host}: ${pane.detail}. Once it has opened here, it keeps working offline; until then it needs the internet.`}
 				>
-					<div className="mt-5 flex items-center justify-center gap-4 text-sm">
+					<div className="mt-6 flex items-center justify-center gap-4 text-sm">
 						<span className="text-booth-dim">{wait > 0 ? `trying again in ${wait}s` : 'trying again…'}</span>
-						<button
-							type="button"
-							onClick={() => window.life?.retryCuePane()}
-							className="rounded border border-booth-edge px-5 py-2 active:scale-[0.98]"
-						>
+<Button size="sm" icon={RotateCw} onClick={() => window.life?.retryCuePane()}>
 							Try now
-						</button>
+						</Button>
 					</div>
 				</Say>
 			)

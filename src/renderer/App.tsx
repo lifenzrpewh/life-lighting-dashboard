@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArrowLeftRight, Check, PictureInPicture2, Plus, RotateCw, SquareStack, Unplug } from 'lucide-react'
 
 import { embedIdOf, embedView, type Embed, type EmbedReport } from '../shared/embeds.js'
 
@@ -24,13 +25,13 @@ import {
 } from '../shared/connections.js'
 import { StatusBar } from './components/StatusBar.js'
 import { CueMessage } from './components/CuePane.js'
-import { Centered, MaMessage, Say, paneSummary } from './components/MaPane.js'
+import { Centered, MaMessage, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { Still } from './components/Still.js'
-import { barButton } from './components/vocabulary.js'
+import { Button, IconButton, Placeholder } from './components/ui.js'
 import {
 	VIEWS,
 	addTab,
@@ -462,21 +463,10 @@ export function App() {
 	 *  and fires nothing. A popped-out view's buttons are in its own window. */
 	const actionsOf = (view: ViewId) => {
 		if (popped.has(view)) return null
-		const reload = (label: string, onClick: () => void) => (
-			<button type="button" onClick={onClick} className={`${barButton} h-9`} aria-label={label}>
-				↻
-			</button>
-		)
+		const reload = (text: string, onClick: () => void) => <IconButton icon={RotateCw} size="sm" label={text} onClick={onClick} />
 		const out =
 			window.life === undefined ? null : (
-				<button
-					type="button"
-					onClick={() => popOut(view)}
-					className={`${barButton} h-9`}
-					aria-label={`Pop ${label(view)} out into its own window`}
-				>
-					Pop out
-				</button>
+				<IconButton icon={PictureInPicture2} size="sm" label={`Pop ${label(view)} out into its own window`} onClick={() => popOut(view)} />
 			)
 		const embedId = embedIdOf(view)
 		if (embedId !== null) {
@@ -524,24 +514,18 @@ export function App() {
 		if (popped.has(view)) {
 			return (
 				<Centered>
-					<Say head={`${label(view)} is popped out`} body="It is in its own window. Show brings it to the front; Bring back puts it here again.">
-						<div className="mt-5 flex justify-center gap-3">
-							<button
-								type="button"
-								onClick={() => window.life?.showPopout(view)}
-								className="h-12 rounded-md border-2 border-booth-ink px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
-							>
+					<Placeholder
+						icon={PictureInPicture2}
+						head={`${label(view)} is in its own window`}
+						body="Show brings that window to the front. Bring back puts it here again."
+					>
+						<div className="mt-6 flex justify-center gap-3">
+							<Button variant="primary" onClick={() => window.life?.showPopout(view)}>
 								Show
-							</button>
-							<button
-								type="button"
-								onClick={() => bringBack(view)}
-								className="h-12 rounded-md border border-booth-edge px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
-							>
-								Bring back
-							</button>
+							</Button>
+							<Button onClick={() => bringBack(view)}>Bring back</Button>
 						</div>
-					</Say>
+					</Placeholder>
 				</Centered>
 			)
 		}
@@ -550,15 +534,11 @@ export function App() {
 			// offer to bring it here. Everyone may: it moves a page, not a window.
 			return (
 				<Centered>
-					<Say head={`Only one ${label(view)} window at a time`} body={`${label(view)} is showing in another window.`}>
-						<button
-							type="button"
-							onClick={() => update((l) => makeHome(l, view, tab.id))}
-							className="mt-5 h-12 rounded-md border border-booth-edge px-6 text-sm active:scale-[0.98] active:bg-booth-edge"
-						>
+					<Placeholder icon={SquareStack} head={`${label(view)} is showing in another window`} body="It can be in one place at a time.">
+						<Button icon={ArrowLeftRight} className="mt-6" onClick={() => update((l) => makeHome(l, view, tab.id))}>
 							Move it here
-						</button>
-					</Say>
+						</Button>
+					</Placeholder>
 				</Centered>
 			)
 		}
@@ -568,7 +548,7 @@ export function App() {
 			if (editing) {
 				return (
 					<Centered>
-						<Say head={label(view)} body="Shown again when the layout is done." />
+						<Placeholder head={label(view)} body="Shown again when the layout is done." />
 					</Centered>
 				)
 			}
@@ -650,7 +630,7 @@ export function App() {
 				onEnter={enter}
 				onLeave={leave}
 				connectionsOpen={connectionsOpen}
-				editing={editing}
+				showfileOpen={showfileOpen}
 				onMark={() =>
 					window.life?.mark(
 						`${mode}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
@@ -663,13 +643,6 @@ export function App() {
 					setShowfileOpen(false)
 					setEditing(false)
 					setLayoutsOpen(!layoutsOpen)
-				}}
-				onEdit={() => {
-					setLayoutsOpen(false)
-					setConnectionsOpen(false)
-					setShowfileOpen(false)
-					if (editing) setEditing(false)
-					else startEditing()
 				}}
 				onConnections={() => {
 					setLayoutsOpen(false)
@@ -688,10 +661,9 @@ export function App() {
 			    Only while a window shows the MA: an Arena machine with no console
 			    has nothing to be told about one. */}
 			{maShown && sources.link.state === 'unreachable' && (
-				<div className="border-b border-state-unreachable/40 bg-state-unreachable/15 px-6 py-2 text-sm">
-					<span className="text-state-unreachable">
-						No console link — console readings are unknown, and the dashboard can't confirm the MA picture is current.
-					</span>{' '}
+				<div className="flex shrink-0 items-center gap-3 border-b border-state-unreachable/30 bg-state-unreachable/10 px-5 py-2.5 text-sm">
+					<Unplug size={18} className="shrink-0 text-state-unreachable" aria-hidden />
+					<span className="text-state-unreachable">The console is not answering, so Pāua can't confirm the MA picture is current.</span>
 					<span className="text-booth-dim">The web remote shows its own “disconnected” once it notices.</span>
 				</div>
 			)}
@@ -699,31 +671,28 @@ export function App() {
 			{editing && (
 				// Above the grid: while editing, pages are pictures, and the bar says
 				// what can be done and how to finish.
-				<div className="flex h-14 shrink-0 items-center gap-4 border-b border-booth-edge bg-booth-panel px-4 text-sm">
-					<span className="text-xs font-semibold tracking-widest text-booth-ink uppercase">Editing the layout</span>
-					<span className="text-booth-dim">
+				<div className="nacre-tint relative flex h-16 shrink-0 animate-rise items-center gap-4 border-b border-nacre-blue/40 bg-booth-panel px-5">
+					<span className="text-base font-medium">Editing the layout</span>
+					<span className={`min-w-0 truncate text-sm ${noRoom ? 'text-state-stale' : 'text-booth-dim'}`}>
 						{noRoom
-							? 'No room for another window: make one smaller first.'
-							: 'Drag a window to move it, its edges to resize. + adds a tab, × takes one away.'}
+							? 'No room for another window. Make one smaller first.'
+							: 'Drag a window to move it, or an edge or corner to resize. + adds a tab, × takes one away.'}
 					</span>
-					<button
-						type="button"
-						onClick={() => {
-							const next = addWindow(layout, null, { window: newId('w'), tab: newId('t') })
-							if (next === layout) setNoRoom(true)
-							else update(() => next)
-						}}
-						className={`${barButton} ml-auto`}
-					>
-						Add window
-					</button>
-					<button
-						type="button"
-						onClick={() => setEditing(false)}
-						className="h-10 rounded-md border-2 border-booth-ink bg-booth-ink px-6 text-sm font-semibold text-booth-bg active:scale-[0.98]"
-					>
-						Done
-					</button>
+					<span className="ml-auto flex shrink-0 items-center gap-2">
+						<Button
+							icon={Plus}
+							onClick={() => {
+								const next = addWindow(layout, null, { window: newId('w'), tab: newId('t') })
+								if (next === layout) setNoRoom(true)
+								else update(() => next)
+							}}
+						>
+							Add window
+						</Button>
+						<Button variant="primary" icon={Check} onClick={() => setEditing(false)} className="px-6">
+							Done
+						</Button>
+					</span>
 				</div>
 			)}
 
@@ -749,6 +718,11 @@ export function App() {
 						operator={mode === 'operator'}
 						onSwitch={(l) => update(() => l)}
 						onSaved={setSaved}
+						labelOf={label}
+						onEdit={() => {
+							setLayoutsOpen(false)
+							startEditing()
+						}}
 						onClose={() => setLayoutsOpen(false)}
 					/>
 				) : showfileOpen ? (

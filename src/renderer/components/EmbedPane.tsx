@@ -3,8 +3,10 @@
 // the zoom on its strip.
 
 import type { EmbedPaneState } from '../../shared/embeds.js'
+import { Globe, Minus, Plus, RotateCw } from 'lucide-react'
+
 import { Say } from './MaPane.js'
-import { barButton } from './vocabulary.js'
+import { Button } from './ui.js'
 
 const hostOf = (url: string) => {
 	try {
@@ -15,23 +17,23 @@ const hostOf = (url: string) => {
 }
 
 export function EmbedMessage({ name, pane, now, onRetry }: { name: string; pane: EmbedPaneState | null; now: number; onRetry: () => void }) {
-	if (pane === null) return <Say head={name} body="Embeds are shown only inside the kiosk." />
+	if (pane === null) return <Say icon={Globe} head={name} body="Embeds are shown only inside the kiosk." />
 	switch (pane.state) {
 		case 'idle':
 		case 'connecting':
-			return <Say head={`Opening ${name}…`} body={hostOf(pane.url)} />
+			return <Say icon={Globe} head={`Opening ${name}…`} body={hostOf(pane.url)} />
 		case 'showing':
 			// Under the page itself; seen only for the instant before it is shown.
-			return <Say head={name} body={hostOf(pane.url)} />
+			return <Say icon={Globe} head={name} body={hostOf(pane.url)} />
 		case 'failed': {
 			const wait = Math.max(0, Math.ceil((pane.retryAt - now) / 1000))
 			return (
-				<Say head={`${name} is not loading`} body={`${hostOf(pane.url)}: ${pane.detail}.`}>
-					<div className="mt-5 flex items-center justify-center gap-4 text-sm">
+				<Say icon={Globe} head={`${name} is not loading`} body={`${hostOf(pane.url)}: ${pane.detail}.`}>
+					<div className="mt-6 flex items-center justify-center gap-4 text-sm">
 						<span className="text-booth-dim">{wait > 0 ? `trying again in ${wait}s` : 'trying again…'}</span>
-						<button type="button" onClick={onRetry} className="rounded border border-booth-edge px-5 py-2 active:scale-[0.98]">
+<Button size="sm" icon={RotateCw} onClick={onRetry}>
 							Try now
-						</button>
+						</Button>
 					</div>
 				</Say>
 			)
@@ -42,20 +44,21 @@ export function EmbedMessage({ name, pane, now, onRetry }: { name: string; pane:
 /** − 100 % +, on an embed's strip. Tapping the number goes back to 100 %. */
 export function ZoomControl({ name, zoom, onZoom }: { name: string; zoom: number; onZoom: (by: -1 | 0 | 1) => void }) {
 	return (
-		<span className="flex shrink-0 items-center">
-			<button type="button" onClick={() => onZoom(-1)} className={`${barButton} h-9 rounded-r-none px-3 text-base`} aria-label={`Zoom ${name} out`}>
-				−
+		<span className="flex h-10 shrink-0 items-center rounded-lg bg-booth-raise">
+			<button type="button" onClick={() => onZoom(-1)} className="grid h-10 w-9 place-items-center rounded-l-lg text-booth-dim hover:text-booth-ink" aria-label={`Zoom ${name} out`} title="Zoom out">
+				<Minus size={16} aria-hidden />
 			</button>
 			<button
 				type="button"
 				onClick={() => onZoom(0)}
-				className={`${barButton} h-9 w-16 justify-center rounded-none border-x-0 tabular-nums`}
+				className="h-10 w-14 text-center text-sm tabular-nums"
 				aria-label={`${name} at ${Math.round(zoom * 100)} %; tap for 100 %`}
+				title="Back to 100%"
 			>
 				{Math.round(zoom * 100)}%
 			</button>
-			<button type="button" onClick={() => onZoom(1)} className={`${barButton} h-9 rounded-l-none px-3 text-base`} aria-label={`Zoom ${name} in`}>
-				+
+			<button type="button" onClick={() => onZoom(1)} className="grid h-10 w-9 place-items-center rounded-r-lg text-booth-dim hover:text-booth-ink" aria-label={`Zoom ${name} in`} title="Zoom in">
+				<Plus size={16} aria-hidden />
 			</button>
 		</span>
 	)

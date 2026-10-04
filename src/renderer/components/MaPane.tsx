@@ -8,8 +8,10 @@
 // Where it goes is ../panePlacement.ts, from the App.
 
 import type { ReactNode } from 'react'
+import { RotateCw, SlidersHorizontal } from 'lucide-react'
 
 import type { MaPaneReport, MaPaneState, Mode } from '../../shared/ma-pane.js'
+import { Button, Placeholder, type Icon } from './ui.js'
 
 function hostOf(url: string): string {
 	return new URL(url).hostname
@@ -69,15 +71,11 @@ export function MaMessage({ pane, now }: { pane: MaPaneState | null; now: number
 					: ['MA web remote not reachable', `${pane.url} — ${pane.detail}. Is Web Remote on at the console (Menu › Network)?`]
 			return (
 				<Say head={head} body={body}>
-					<div className="mt-5 flex items-center justify-center gap-4 text-sm">
+					<div className="mt-6 flex items-center justify-center gap-4 text-sm">
 						<span className="text-booth-dim">{wait > 0 ? `trying again in ${wait}s` : 'trying again…'}</span>
-						<button
-							type="button"
-							onClick={() => window.life?.retryMaPane()}
-							className="rounded border border-booth-edge px-5 py-2 active:scale-[0.98]"
-						>
+<Button size="sm" icon={RotateCw} onClick={() => window.life?.retryMaPane()}>
 							Try now
-						</button>
+						</Button>
 					</div>
 				</Say>
 			)
@@ -85,13 +83,13 @@ export function MaMessage({ pane, now }: { pane: MaPaneState | null; now: number
 	}
 }
 
-export function Say({ head, body, children }: { head: string; body: string; children?: ReactNode }) {
+/** A view's words when its page is not there (./ui.tsx `Placeholder`). The
+ *  MA's own icon unless the caller names another. */
+export function Say({ head, body, icon = SlidersHorizontal, children }: { head: string; body: string; icon?: Icon; children?: ReactNode }) {
 	return (
-		<div className="max-w-md px-6 text-center">
-			<p className="text-lg">{head}</p>
-			<p className="mt-2 text-sm break-words text-booth-dim">{body}</p>
+		<Placeholder icon={icon} head={head} body={body}>
 			{children}
-		</div>
+		</Placeholder>
 	)
 }
 

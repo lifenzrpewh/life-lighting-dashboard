@@ -19,7 +19,7 @@ import {
 	type ProPresenterNow,
 	type TimerSources,
 } from '../../shared/timer.js'
-import { Unknown, chip, chipLabel, formatAge, staleContent, stateClass, unknownWhy } from './vocabulary.js'
+import { formatAge, staleContent, stateClass, unknownWhy } from './vocabulary.js'
 
 /** Finer than the status bar's one-second clock, so a countdown does not hold a
  *  number for nearly two seconds when its tick and the clock's fall apart. */
@@ -47,8 +47,8 @@ export function TimerChip({ sources }: { sources: TimerSources | null }) {
 				live: (v) => <OnTime value={v} remaining={onTimeRemaining(v, view.readAt ?? now, now, true)} ageMs={null} />,
 				stale: (v, ageMs) => <OnTime value={v} remaining={onTimeRemaining(v, view.readAt ?? now, now, false)} ageMs={ageMs} />,
 				unknown: (why) => (
-					<Frame source="OnTime" ageMs={null} unknown>
-						<Unknown why={why} />
+					<Frame source="OnTime" ageMs={null} unknown caption={`? ${unknownWhy[why]}`}>
+						{null}
 					</Frame>
 				),
 			})
@@ -57,8 +57,8 @@ export function TimerChip({ sources }: { sources: TimerSources | null }) {
 				live: (v) => <ProPresenter value={v} wanted={view.wanted} ageMs={null} ontime={view.ontimeAside} />,
 				stale: (v, ageMs) => <ProPresenter value={v} wanted={view.wanted} ageMs={ageMs} ontime={view.ontimeAside} />,
 				unknown: (why) => (
-					<Frame source="ProPresenter" ageMs={null} unknown note={view.ontimeAside}>
-						<Unknown why={why} />
+					<Frame source="ProPresenter" ageMs={null} unknown note={view.ontimeAside} caption={`? ${unknownWhy[why]}`}>
+						{null}
 					</Frame>
 				),
 			})
@@ -68,8 +68,8 @@ export function TimerChip({ sources }: { sources: TimerSources | null }) {
 function OnTime({ value, remaining, ageMs }: { value: OnTimeNow; remaining: number | null; ageMs: number | null }) {
 	if (!onTimeRunning(value)) {
 		return (
-			<Frame source="OnTime" ageMs={ageMs}>
-				<span className="text-sm text-booth-dim">no event running</span>
+			<Frame source="OnTime" ageMs={ageMs} caption="No event running">
+				{null}
 			</Frame>
 		)
 	}
@@ -81,10 +81,10 @@ function OnTime({ value, remaining, ageMs }: { value: OnTimeNow; remaining: numb
 			: value.nowTitle !== null
 				? `End of ${value.nowTitle || 'this event'}`
 				: 'End of rundown'
+	const over = remaining !== null && remaining < 0
 	return (
-		<Frame source="OnTime" ageMs={ageMs}>
-			<Countdown label={label} ms={remaining} />
-			{value.playback === 'pause' && <span className="text-xs tracking-widest text-booth-dim">PAUSED</span>}
+		<Frame source="OnTime" ageMs={ageMs} caption={label} over={over} extra={value.playback === 'pause' ? 'Paused' : null}>
+			<Big ms={remaining} />
 		</Frame>
 	)
 }
@@ -101,60 +101,74 @@ function ProPresenter({
 	ontime: OnTimeAside
 }) {
 	const shown = proPresenterShown(value, wanted)
+	if (shown.kind === 'timer') {
+		const ms = shown.timer.seconds * 1000
+		// The stage message labels the timer, `Wrap up: 3:38`, and the timer's
+		// own name is never shown (the owner's call, 2026-10-02): the message
+		// is what the stage is being told, the name is just ProPresenter's.
+		return (
+			<Frame source="ProPresenter" ageMs={ageMs} note={ontime} caption={value.message ?? 'Timer'} over={ms < 0}>
+				<Big ms={ms} />
+			</Frame>
+		)
+	}
+	// Said, not hidden: the booth asked for this timer, and an empty chip
+	// would read as "nothing running" when it is "renamed or deleted".
+	const caption =
+		shown.kind === 'missing' ? `No timer “${shown.name}” in ProPresenter` : value.message === null ? 'No timer running' : null
 	return (
-		<Frame source="ProPresenter" ageMs={ageMs} note={ontime}>
-			{/* The stage message labels the timer, `Wrap up: 3:38`, and the timer's
-			    own name is never shown (the owner's call, 2026-10-02): the message
-			    is what the stage is being told, the name is just ProPresenter's. */}
-			{shown.kind === 'timer' && (
-				<Countdown label={value.message === null ? null : `${value.message}:`} ms={shown.timer.seconds * 1000} />
-			)}
-			{/* Said, not hidden: the booth asked for this timer, and an empty chip
-			    would read as "nothing running" when it is "renamed or deleted". */}
-			{shown.kind === 'missing' && (
-				<span className="max-w-[20rem] truncate text-sm text-booth-dim">no timer “{shown.name}” in ProPresenter</span>
-			)}
-			{shown.kind !== 'timer' && value.message !== null && (
-				<span className="max-w-[24rem] truncate text-sm">{value.message}</span>
-			)}
-			{shown.kind === 'idle' && value.message === null && <span className="text-sm text-booth-dim">no timer running</span>}
+		<Frame source="ProPresenter" ageMs={ageMs} note={ontime} caption={caption ?? 'Stage message'}>
+			{value.message !== null && <span className="max-w-[24rem] truncate text-lg">{value.message}</span>}
 		</Frame>
 	)
 }
 
-/** Red once it passes zero and counts up, from either program (the owner's
- *  call, 2026-10-02): the number and its label both, so it reads across the
- *  booth. Zero itself is not yet over. */
-function Countdown({ label, ms }: { label: string | null; ms: number | null }) {
-	const over = ms !== null && ms < 0
-	return (
-		<span className={`flex min-w-0 items-baseline gap-3 ${over ? 'text-overtime' : ''}`}>
-			{label !== null && <span className="max-w-[20rem] truncate text-sm">{label}</span>}
-			<span className="text-2xl font-medium tabular-nums">{ms === null ? '–:––' : formatCountdown(ms)}</span>
-		</span>
-	)
+/** The number, big. Red once it passes zero and counts up, from either
+ *  program (the owner's call, 2026-10-02), with its caption, so it reads
+ *  across the booth. Zero itself is not yet over. */
+function Big({ ms }: { ms: number | null }) {
+	return <span className="text-[30px] leading-none font-medium tracking-tight tabular-nums">{ms === null ? '–:––' : formatCountdown(ms)}</span>
 }
 
+/** A countdown is a reading, not a control: no surface while live, so it can
+ *  never be mistaken for a button. STALE and UNKNOWN take their outlines. */
 function Frame({
 	source,
 	ageMs,
+	caption,
 	unknown = false,
+	over = false,
+	extra = null,
 	note = null,
 	children,
 }: {
 	source: 'OnTime' | 'ProPresenter'
 	ageMs: number | null
+	/** What the number counts to, or why there is none. */
+	caption: string
 	unknown?: boolean
+	over?: boolean
+	extra?: string | null
 	/** What OnTime is, when it is not answering. */
 	note?: OnTimeAside
 	children: ReactNode
 }) {
 	const stale = ageMs !== null
 	const frame = unknown ? stateClass.unknown : stale ? stateClass.stale : stateClass.live
+	// Nothing to count: one line, quieter, so an idle or silent program does
+	// not take the room a running countdown would.
+	const quiet = children === null || children === undefined || children === false
 	return (
-		<span className={`${chip} ${frame}`}>
-			<span className={chipLabel}>{source}</span>
-			<span className={`flex min-w-0 items-center gap-3 ${stale ? staleContent : ''}`}>{children}</span>
+		<span className={`flex min-w-0 items-center gap-3 rounded-lg border px-3 ${quiet ? 'h-11' : 'py-1.5'} ${frame} ${over ? 'text-overtime' : ''}`}>
+			<span className={`flex min-w-0 flex-col items-end gap-1 ${stale ? staleContent : ''}`}>
+				<span className={`flex max-w-[22rem] items-center gap-1.5 truncate ${quiet ? 'text-sm' : 'text-xs'} ${over ? '' : 'text-booth-dim'}`}>
+					<span className="font-medium">{source}</span>
+					<span>·</span>
+					<span className="truncate">{caption}</span>
+					{extra !== null && <span className="rounded bg-booth-raise px-1.5 text-booth-ink">{extra}</span>}
+				</span>
+				{children}
+			</span>
 			{stale && <span className="text-xs whitespace-nowrap text-state-stale">{formatAge(ageMs)}</span>}
 			{/* An event may be running in OnTime that nobody can see: said here,
 			    beside the ProPresenter timer standing in for it. */}

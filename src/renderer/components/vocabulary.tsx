@@ -7,12 +7,14 @@
 
 import type { UnknownReason } from '../../shared/reading.js'
 
-/** LIVE full contrast, solid. STALE 60% contrast, dashed underline. UNKNOWN
- *  dotted border and a `?` in place of the value. */
+/** LIVE full contrast, no outline. STALE 60% contrast and a dashed outline.
+ *  UNKNOWN a dotted outline and a `?` in place of the value. (Since the 2026-10-05
+ *  look, a live card has no outline at all: the outline appears only when there
+ *  is something to say.) */
 export const stateClass: Record<'live' | 'stale' | 'unknown', string> = {
-	live: 'border-solid border-booth-edge',
-	stale: 'border-dashed border-state-stale/50',
-	unknown: 'border-dotted border-state-unknown/60',
+	live: 'border-solid border-transparent',
+	stale: 'border-dashed border-state-stale/60',
+	unknown: 'border-dotted border-state-unknown',
 }
 
 /** STALE's 60% contrast, as opacity on the CONTENT rather than a text colour on
@@ -28,14 +30,21 @@ export const staleContent = 'opacity-60'
 /** The one shape every chip in the status bar takes, so the bar reads as a
  *  row of like things: same height, same corners, same spacing. The state
  *  classes above go on top of it. */
-export const chip = 'flex h-10 min-w-0 items-center gap-3 rounded-md border px-3'
+export const chip = 'flex h-12 min-w-0 items-center gap-3 rounded-lg border bg-booth-raise px-3.5'
 
-/** The small caps naming what a chip is (SHOW, ONTIME). */
-export const chipLabel = 'text-[10px] font-semibold tracking-widest whitespace-nowrap text-booth-dim uppercase'
+/** The small label naming what a value is (Show, OnTime, Deck). Sentence
+ *  case since 2026-10-05: a screen of uppercase labels all shouted at once. */
+export const chipLabel = 'text-xs font-medium whitespace-nowrap text-booth-dim'
 
 /** A quiet button in a bar: chip-sized, so it lines up with the chips. */
 export const barButton =
-	'flex h-10 shrink-0 items-center rounded-md border border-booth-edge px-3 text-xs tracking-wide whitespace-nowrap text-booth-dim active:scale-[0.98] active:bg-booth-edge'
+	'inline-flex h-10 shrink-0 items-center rounded-lg bg-booth-raise px-3.5 text-sm font-medium whitespace-nowrap text-booth-ink transition-colors hover:bg-booth-hover active:scale-[0.98]'
+
+/** A status word as a person writes it: "LIVE" as "Live". The shared code
+ *  speaks in the old capitals; the screen does not shout them. */
+export function sentence(word: string): string {
+	return word === word.toUpperCase() && /[A-Z]/.test(word) ? word.charAt(0) + word.slice(1).toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)
+}
 
 export function formatAge(ms: number): string {
 	const s = Math.round(ms / 1000)
@@ -61,7 +70,7 @@ export function Unknown({ why }: { why: UnknownReason }) {
 	return (
 		<span className="text-booth-dim">
 			<span className="text-2xl leading-none">?</span>
-			<span className="ml-2 text-xs uppercase tracking-wide">{unknownWhy[why]}</span>
+			<span className="ml-2 text-sm">{unknownWhy[why]}</span>
 		</span>
 	)
 }

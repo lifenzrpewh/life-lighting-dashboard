@@ -9,6 +9,7 @@
 // Check again: the lookbook is a hosted app beyond the booth, not a feed.
 
 import { useEffect, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
 import {
@@ -130,12 +131,12 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 
 	return (
 		<div className={`shrink-0 border-b border-booth-edge ${trouble > 0 ? 'bg-warn/10' : ''}`}>
-			<button type="button" onClick={() => setOpen(!open)} className="flex h-11 w-full min-w-0 items-center gap-3 px-4 text-left text-sm">
+			<button type="button" onClick={() => setOpen(!open)} className="flex h-12 w-full min-w-0 items-center gap-3 px-4 text-left text-sm">
 				<span className={chipLabel}>Media</span>
 				{/* The verdict keeps its room; the service's name gives way first. */}
 				{service !== null && <span className="min-w-0 truncate text-booth-dim">{service.name}</span>}
 				<span className="shrink-0">{summary}</span>
-				<span className="ml-auto shrink-0 text-xs text-booth-dim">{open ? 'Hide' : 'Show'}</span>
+				<ChevronDown size={18} className={`ml-auto shrink-0 text-booth-dim transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
 			</button>
 			{open && (
 				<div className="max-h-[60vh] overflow-y-auto px-4 pb-3">
@@ -187,8 +188,8 @@ function ServicePicker({
 					key={s.id}
 					type="button"
 					onClick={() => onPick(s.id)}
-					className={`flex h-11 min-w-0 flex-col justify-center rounded-md border px-3 text-left text-xs active:scale-[0.98] ${
-						s.id === picked ? 'border-booth-ink bg-booth-edge' : 'border-booth-edge'
+					className={`flex h-12 min-w-0 flex-col justify-center rounded-lg px-3.5 text-left text-xs transition-colors active:scale-[0.98] ${
+						s.id === picked ? 'bg-booth-raise nacre-ring' : 'bg-booth-panel ring-1 ring-booth-edge ring-inset hover:bg-booth-strip'
 					}`}
 				>
 					<span className="truncate text-sm">{s.name}</span>
@@ -350,7 +351,7 @@ function fileName(path: string): string {
 
 function SmallButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
 	return (
-		<button type="button" onClick={onClick} className="h-9 shrink-0 rounded-md border border-booth-edge px-3 text-xs text-booth-dim active:bg-booth-edge">
+		<button type="button" onClick={onClick} className="h-10 shrink-0 rounded-lg bg-booth-raise px-3.5 text-sm font-medium hover:bg-booth-hover active:scale-[0.98]">
 			{children}
 		</button>
 	)

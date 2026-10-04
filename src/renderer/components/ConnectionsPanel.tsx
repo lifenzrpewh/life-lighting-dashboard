@@ -1,6 +1,11 @@
 // Connections: every program the dashboard talks to, one row each, status
-// beside the settings that fix it. Opens in the MA pane's place, because a
-// native view cannot be drawn over, and closes back to it.
+// beside the settings that fix it. Opens in the windows' place, because a
+// native view cannot be drawn over, and closes back to them.
+//
+// A list and a detail since 2026-10-05: the connections down the left, always
+// all in view with their status, and the one tapped on the right. It was one
+// long accordion, where opening the Console pushed every other row off the
+// screen.
 //
 // Everyone sees it; only operator mode can change it (the owner's call,
 // 2026-10-02). A volunteer can see what is down and tell someone, and cannot
@@ -18,12 +23,20 @@ import type { ConnectionId, ConnectionStatus, RowId, Tone } from '../../shared/c
 import { EMBEDS_MAX, embedIdOf, embedNameError, embedUrlOf, newEmbedId, type Embed } from '../../shared/embeds.js'
 import type { DeskState } from '../../shared/desk.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
+import { Monitor, Plus, Save, Trash2 } from 'lucide-react'
+
 import { CueManagerSettings } from './CueManagerSettings.js'
 import { Field, Input, Select, User, portOf, useProPresenterNames } from './form.js'
-import { formatAge } from './vocabulary.js'
+import { Button, Card, Dot, SectionTitle, Segmented, Sheet } from './ui.js'
+import { formatAge, sentence } from './vocabulary.js'
+
+export { Dot }
 
 type Errors = Partial<Record<SettingsField, string>>
 type Save = (patch: SettingsPatch) => Promise<Errors | null>
+
+/** What the right side shows: a connection, or one of the two extras. */
+type Selected = RowId | 'add' | 'computer'
 
 export function ConnectionsPanel({
 	rows,
@@ -45,12 +58,27 @@ export function ConnectionsPanel({
 	onClose: () => void
 }) {
 	const [view, setView] = useState<SettingsView | null>(null)
-	const [open, setOpen] = useState<RowId | null>(null)
+	// Opens on the first connection that is down, since that is usually why
+	// someone came; otherwise on the first.
+	const [picked, setPicked] = useState<Selected | null>(null)
 	const load = () => window.life?.settings().then(setView)
 	useEffect(() => void load(), [])
 
-	if (window.life === undefined) return <Frame onClose={onClose}>Connections exist only inside the kiosk.</Frame>
-	if (view === null) return <Frame onClose={onClose}>Reading settings…</Frame>
+	const description = operator ? 'What Pāua talks to. Tap one to see it or change it.' : 'What Pāua talks to. Tap one to see it.'
+	if (window.life === undefined) {
+		return (
+			<Sheet title="Connections" description={description} onClose={onClose}>
+				<Empty>Connections exist only inside the kiosk.</Empty>
+			</Sheet>
+		)
+	}
+	if (view === null) {
+		return (
+			<Sheet title="Connections" description={description} onClose={onClose}>
+				<Empty>Reading settings…</Empty>
+			</Sheet>
+		)
+	}
 
 	/** Null on success. The row keeps its draft on failure, so nothing typed is lost. */
 	const save: Save = async (patch) => {
@@ -90,42 +118,81 @@ export function ConnectionsPanel({
 		video: null,
 	}
 
+	const fallback = rows.find((r) => r.tone === 'down')?.id ?? rows[0]?.id ?? 'computer'
+	const selected: Selected =
+		picked === null || (picked !== 'add' && picked !== 'computer' && !rows.some((r) => r.id === picked)) ? fallback : picked
+	const row = rows.find((r) => r.id === selected) ?? null
+	const notOperator = 'Hold Volunteer (top right) for 3 seconds for operator mode to change these.'
+
 	return (
-		<Frame onClose={onClose}>
-			{rows.every((row) => row.tone === 'off') && (
-				// A fresh install: every row off, which reads as a broken screen
-				// unless something says it is only empty.
-				<p className="rounded-md border border-booth-edge bg-booth-panel px-4 py-3 text-base">
-					Nothing is set up yet.{' '}
-					{operator
-						? 'Tap a row to give it an address; start with the Console.'
-						: 'Hold the mode chip for operator mode, then tap a row to give it an address.'}
-				</p>
-			)}
-			<ul className="flex flex-col divide-y divide-booth-edge rounded-md border border-booth-edge">
-				{rows.map((row) => (
-					<li key={row.id}>
-						<button
-							type="button"
-							onClick={() => setOpen(open === row.id ? null : row.id)}
-							className="grid min-h-16 w-full grid-cols-[1.5rem_9rem_1fr_auto_1.5rem] items-center gap-3 px-4 text-left active:bg-booth-edge"
-						>
-							<Dot tone={row.tone} />
-							<span className="text-base">{row.name}</span>
-							<span className="flex min-w-0 items-baseline gap-2">
-								<span className={`whitespace-nowrap text-sm ${toneText[row.tone]}`}>{row.status}</span>
-								{row.detail !== null && <span className="truncate text-sm text-booth-dim">{row.detail}</span>}
-							</span>
-							<span className={`text-sm whitespace-nowrap text-booth-dim tabular-nums ${isOff(row.id) ? 'line-through opacity-60' : ''}`}>
-								{addressOf(row.id) ?? ''}
-							</span>
-							<span className="text-booth-dim">{open === row.id ? '▾' : '›'}</span>
-						</button>
-						{open === row.id && (
-							<div className="flex flex-col gap-4 border-t border-booth-edge bg-booth-panel px-4 py-5">
+		<Sheet title="Connections" description={description} onClose={onClose}>
+			<div className="grid min-h-0 flex-1 grid-cols-[minmax(22rem,28rem)_1fr]">
+				<nav className="flex min-h-0 flex-col gap-1 overflow-y-auto border-r border-booth-edge bg-booth-panel p-3">
+					{rows.every((r) => r.tone === 'off') && (
+						// A fresh install: every row off, which reads as a broken screen
+						// unless something says it is only empty.
+						<p className="mb-2 rounded-lg bg-booth-raise px-4 py-3 text-sm">
+							Nothing is set up yet.{' '}
+							{operator ? 'Tap a connection to give it an address; start with the Console.' : 'Operator mode sets them up.'}
+						</p>
+					)}
+					{rows.map((r) => (
+						<ListRow
+							key={r.id}
+							selected={selected === r.id}
+							onClick={() => setPicked(r.id)}
+							lead={<Dot tone={r.tone} />}
+							title={r.name}
+							sub={<span className={toneText[r.tone]}>{sentence(r.status)}</span>}
+							aside={addressOf(r.id)}
+							struck={isOff(r.id)}
+						/>
+					))}
+					<span className="mx-3 my-2 h-px bg-booth-edge" />
+					{operator && (
+						<ListRow
+							selected={selected === 'add'}
+							onClick={() => setPicked('add')}
+							lead={<Plus size={18} className="text-booth-dim" aria-hidden />}
+							title="Add a web page"
+							sub={<span className="text-booth-dim">A Google Sheet or any page, as a view</span>}
+						/>
+					)}
+					<ListRow
+						selected={selected === 'computer'}
+						onClick={() => setPicked('computer')}
+						lead={<Monitor size={18} className="text-booth-dim" aria-hidden />}
+						title="This computer"
+						sub={<span className="text-booth-dim">Full screen or window, version, log</span>}
+					/>
+				</nav>
+
+				<div className="min-h-0 overflow-y-auto">
+					<div key={selected} className="flex max-w-4xl animate-rise flex-col gap-6 px-10 py-8 select-text">
+						{selected === 'add' ? (
+							<AddEmbed all={view.embeds} save={save} />
+						) : selected === 'computer' ? (
+							<>
+								<DetailHead title="This computer" />
+								<ThisScreen windowed={view.windowed} operator={operator} save={save} />
+								<AboutLine operator={operator} />
+							</>
+						) : row === null ? null : (
+							<>
+								<DetailHead
+									title={row.name}
+									status={
+										<span className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm ${tonePill[row.tone]}`}>
+											<Dot tone={row.tone} size="sm" />
+											{sentence(row.status)}
+											{row.detail !== null && <span className="text-booth-dim">· {row.detail}</span>}
+										</span>
+									}
+									address={addressOf(row.id)}
+								/>
 								{operator && <OnOff on={!isOff(row.id)} onSet={(on) => void setOn(row.id, on)} />}
 								{row.id === 'video' && (
-									<p className="text-sm text-booth-dim">
+									<p className="max-w-prose text-sm text-booth-dim">
 										A picture another program on this computer sends over Spout (Windows) or Syphon (Mac), such as Arena’s
 										multiview. Separate from Arena: it works with Arena’s web server off.
 									</p>
@@ -133,16 +200,20 @@ export function ConnectionsPanel({
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
 								{embedOf(row.id) !== null ? (
 									operator ? (
-										<EmbedEditor key={row.id} embed={embedOf(row.id)!} all={view.embeds} save={save} onRemoved={() => setOpen(null)} />
+										<EmbedEditor
+											key={row.id}
+											embed={embedOf(row.id)!}
+											all={view.embeds}
+											save={save}
+											onRemoved={() => setPicked(null)}
+										/>
 									) : (
 										<p className="text-sm text-booth-dim">
-											{embedOf(row.id)!.url}. Hold the mode chip for operator mode to change or remove it.
+											<span className="font-mono text-booth-ink">{embedOf(row.id)!.url}</span>. {notOperator}
 										</p>
 									)
 								) : !operator ? (
-									row.id !== 'cue' && (
-										<p className="text-sm text-booth-dim">Hold the mode chip for operator mode to change these.</p>
-									)
+									row.id !== 'cue' && <p className="text-sm text-booth-dim">{notOperator}</p>
 								) : row.id === 'console' ? (
 									<ConsoleEditor view={view} save={save} />
 								) : row.id === 'ontime' ? (
@@ -153,16 +224,67 @@ export function ConnectionsPanel({
 									<ArenaEditor view={view} save={save} />
 								) : null}
 								{row.id === 'cue' && <CueInfo operator={operator} />}
-							</div>
+							</>
 						)}
-					</li>
-				))}
-			</ul>
-			{operator && <AddEmbed all={view.embeds} save={save} />}
-			<ThisScreen windowed={view.windowed} operator={operator} save={save} />
-			<AboutLine operator={operator} />
-		</Frame>
+					</div>
+				</div>
+			</div>
+		</Sheet>
 	)
+}
+
+/** One line in the list: what it is, its state in a word, its address. */
+function ListRow({
+	selected,
+	onClick,
+	lead,
+	title,
+	sub,
+	aside = null,
+	struck = false,
+}: {
+	selected: boolean
+	onClick: () => void
+	lead: ReactNode
+	title: string
+	sub: ReactNode
+	aside?: string | null
+	struck?: boolean
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			aria-current={selected}
+			className={`relative grid min-h-16 w-full grid-cols-[1.25rem_1fr_auto] items-center gap-3.5 rounded-xl px-4 py-2 text-left transition-colors ${
+				selected ? 'bg-booth-raise' : 'hover:bg-booth-strip'
+			}`}
+		>
+			{selected && <span aria-hidden className="nacre-line absolute inset-y-3 left-0 w-[3px] rounded-r-full" />}
+			<span className="flex justify-center">{lead}</span>
+			<span className="flex min-w-0 flex-col leading-tight">
+				<span className="truncate text-base font-medium">{title}</span>
+				<span className="mt-0.5 truncate text-sm">{sub}</span>
+			</span>
+			{aside !== null && (
+				<span className={`max-w-40 truncate font-mono text-xs text-booth-dim ${struck ? 'line-through opacity-60' : ''}`}>{aside}</span>
+			)}
+		</button>
+	)
+}
+
+function DetailHead({ title, status, address = null }: { title: string; status?: ReactNode; address?: string | null }) {
+	return (
+		<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+			<h3 className="text-2xl font-medium">{title}</h3>
+			{status}
+			{address !== null && <span className="font-mono text-sm text-booth-dim">{address}</span>}
+		</div>
+	)
+}
+
+function Empty({ children }: { children: ReactNode }) {
+	return <div className="flex flex-1 items-center justify-center text-booth-dim">{children}</div>
 }
 
 /** An embed's name and address, and Remove. Removing forgets its sign-in, so
@@ -195,17 +317,17 @@ function EmbedEditor({ embed, all, save, onRemoved }: { embed: Embed; all: reado
 					<EmbedFields name={name} url={url} onName={setName} onUrl={setUrl} errors={{ ...local, form: err('embeds') }} />
 				)}
 			</Editor>
-			<div className="flex items-center gap-4 border-t border-booth-edge pt-4">
-				<button
-					type="button"
+			<div className="flex items-center gap-4 border-t border-booth-edge pt-5">
+				<Button
+					variant={removing ? 'danger' : 'quiet'}
+					icon={Trash2}
 					onClick={() => {
 						if (!removing) return setRemoving(true)
 						void save({ embeds: all.filter((e) => e.id !== embed.id) }).then((e) => e === null && onRemoved())
 					}}
-					className={`h-12 rounded border px-6 text-sm active:scale-[0.98] ${removing ? 'border-state-unreachable text-state-unreachable' : 'border-booth-edge text-booth-dim'}`}
 				>
-					{removing ? 'Tap again to remove' : 'Remove this embed'}
-				</button>
+					{removing ? 'Tap again to remove' : 'Remove this page'}
+				</Button>
 				<span className="text-sm text-booth-dim">Removing it also signs it out and forgets what it kept on this computer.</span>
 			</div>
 		</>
@@ -258,9 +380,9 @@ function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 		setUrl('')
 	}
 	return (
-		<section className="flex flex-col gap-4 rounded-md border border-booth-edge px-4 py-5">
-			<h3 className="text-xs font-semibold tracking-widest text-booth-dim uppercase">Add a web page</h3>
-			<p className="text-sm text-booth-dim">
+		<section className="flex flex-col gap-5">
+			<DetailHead title="Add a web page" />
+			<p className="max-w-prose text-sm text-booth-dim">
 				Any page, such as a Google Sheet, becomes a view of its own, with its own sign-in. Links that open a new window
 				open in this computer's browser.
 			</p>
@@ -270,14 +392,12 @@ function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 				<>
 					<EmbedFields name={name} url={url} onName={setName} onUrl={setUrl} errors={errors} />
 					<div className="flex items-center gap-4">
-						<button
-							type="button"
-							onClick={() => void add()}
-							className="h-12 rounded border-2 border-booth-ink bg-booth-ink px-8 text-base font-semibold text-booth-bg active:scale-[0.98]"
-						>
+						<Button variant="primary" icon={Plus} onClick={() => void add()}>
 							Add
-						</button>
-						{added !== null && <span className="text-sm text-state-live">Added {added}. In Edit layout, a window's + puts it on screen.</span>}
+						</Button>
+						{added !== null && (
+							<span className="text-sm text-state-live">Added {added}. Layouts › Edit this layout, then a window's +, puts it on screen.</span>
+						)}
 					</div>
 				</>
 			)}
@@ -288,28 +408,25 @@ function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 /** Full screen or a window: for testers on a laptop; the booth stays full
  *  screen. Changes at once, no restart. */
 function ThisScreen({ windowed, operator, save }: { windowed: boolean; operator: boolean; save: Save }) {
-	const option = (value: boolean, text: string) => (
-		<button
-			type="button"
-			disabled={!operator}
-			onClick={() => value !== windowed && void save({ windowed: value })}
-			aria-pressed={value === windowed}
-			className={`h-10 px-5 text-sm ${value === windowed ? 'bg-booth-ink text-booth-bg' : 'text-booth-dim'}`}
-		>
-			{text}
-		</button>
-	)
 	return (
-		<section className="flex items-center gap-4 rounded-md border border-booth-edge px-4 py-4">
-			<h3 className="w-28 text-xs font-semibold tracking-widest text-booth-dim uppercase">This screen</h3>
-			<span className="flex overflow-hidden rounded border border-booth-edge">
-				{option(false, 'Full screen')}
-				{option(true, 'Window')}
-			</span>
-			<span className="text-sm text-booth-dim">
-				{operator ? 'A window is for testing on a laptop; the booth stays full screen.' : 'Operator mode changes it.'}
-			</span>
-		</section>
+		<Card>
+			<SectionTitle>This screen</SectionTitle>
+			<div className="flex flex-wrap items-center gap-4">
+				<Segmented
+					label="This screen"
+					disabled={!operator}
+					value={windowed}
+					onChange={(v) => void save({ windowed: v })}
+					options={[
+						{ value: false, label: 'Full screen' },
+						{ value: true, label: 'Window' },
+					]}
+				/>
+				<span className="text-sm text-booth-dim">
+					{operator ? 'A window is for testing on a laptop; the booth stays full screen.' : 'Operator mode changes it.'}
+				</span>
+			</div>
+		</Card>
 	)
 }
 
@@ -319,20 +436,19 @@ function AboutLine({ operator }: { operator: boolean }) {
 	useEffect(() => void window.life?.about().then((a) => setAbout(a ?? null)), [])
 	if (about === null) return null
 	return (
-		<div className="flex items-center gap-4 text-sm text-booth-dim">
-			<span className="min-w-0">
-				Pāua {about.version} · Log <span className="break-all">{about.logPath}</span>
-			</span>
-			{operator && (
-				<button
-					type="button"
-					onClick={() => window.life?.showLog()}
-					className="h-10 shrink-0 rounded border border-booth-edge px-4 text-booth-ink active:scale-[0.98]"
-				>
-					Show the log
-				</button>
-			)}
-		</div>
+		<Card>
+			<SectionTitle aside={`Version ${about.version}`}>Pāua</SectionTitle>
+			<div className="flex items-center gap-4 text-sm text-booth-dim">
+				<span className="min-w-0">
+					The log is at <span className="font-mono break-all text-booth-ink">{about.logPath}</span>
+				</span>
+				{operator && (
+					<Button size="sm" onClick={() => window.life?.showLog()}>
+						Show the log
+					</Button>
+				)}
+			</div>
+		</Card>
 	)
 }
 
@@ -343,36 +459,27 @@ const toneText: Record<Tone, string> = {
 	off: 'text-booth-dim',
 }
 
-/** Filled in the state's colour; hollow when the connection is not set up. */
-export function Dot({ tone }: { tone: Tone }) {
-	const fill: Record<Tone, string> = {
-		live: 'bg-state-live',
-		stale: 'bg-state-stale',
-		down: 'bg-state-unreachable',
-		off: 'border border-booth-dim',
-	}
-	return <span className={`size-2.5 rounded-full ${fill[tone]}`} />
+const tonePill: Record<Tone, string> = {
+	live: 'bg-state-live/12 text-state-live',
+	stale: 'bg-state-stale/12 text-state-stale',
+	down: 'bg-state-unreachable/12 text-state-unreachable',
+	off: 'bg-booth-raise text-booth-dim',
 }
 
 /** Whether this booth uses a connection. Off keeps the address but stops
  *  asking, leaves the dot alone, and takes its views and chips off the screen. */
 function OnOff({ on, onSet }: { on: boolean; onSet: (on: boolean) => void }) {
-	const option = (value: boolean, label: string) => (
-		<button
-			type="button"
-			onClick={() => value !== on && onSet(value)}
-			aria-pressed={value === on}
-			className={`h-10 px-5 text-sm ${value === on ? 'bg-booth-ink text-booth-bg' : 'text-booth-dim'}`}
-		>
-			{label}
-		</button>
-	)
 	return (
 		<div className="flex items-center gap-4">
-			<span className="flex overflow-hidden rounded border border-booth-edge">
-				{option(true, 'On')}
-				{option(false, 'Off')}
-			</span>
+			<Segmented
+				label="Used at this booth"
+				value={on}
+				onChange={onSet}
+				options={[
+					{ value: true, label: 'On' },
+					{ value: false, label: 'Off' },
+				]}
+			/>
 			<span className="text-sm text-booth-dim">
 				{on ? 'Used at this booth.' : 'Not used here: not asked, not in the dot, and its views and chips are hidden.'}
 			</span>
@@ -401,18 +508,19 @@ function Editor({
 			{children((field) => errors[field])}
 			{errors.form !== undefined && <p className="text-sm text-state-unreachable">{errors.form}</p>}
 			<div className="flex items-center gap-4">
-				<button
-					type="button"
+				<Button
+					variant="primary"
+					icon={Save}
 					onClick={() =>
 						void save(patch()).then((e) => {
 							setErrors(e ?? {})
 							setSaved(e === null)
 						})
 					}
-					className="h-12 rounded border-2 border-booth-ink bg-booth-ink px-8 text-base font-semibold text-booth-bg active:scale-[0.98]"
+					className="px-7"
 				>
 					Save
-				</button>
+				</Button>
 				{saved && <span className="text-sm text-state-live">Saved.{note === undefined ? '' : ` ${note}`}</span>}
 			</div>
 		</>
@@ -436,7 +544,7 @@ function HostPort(p: {
 	return (
 		<div className="grid grid-cols-2 gap-4">
 			<Field label={p.hostLabel} error={p.err(p.hostField)}>
-				<Input value={p.host} onChange={p.onHost} placeholder={p.placeholder ?? 'not used'} />
+				<Input value={p.host} onChange={p.onHost} placeholder={p.placeholder ?? 'not used'} mono />
 			</Field>
 			<Field label="Port" error={p.err(p.portField)} hint={p.portHint}>
 				<Input value={p.port} onChange={p.onPort} inputMode="numeric" />
@@ -568,10 +676,10 @@ function ArenaEditor({ view, save }: { view: SettingsView; save: Save }) {
 					</p>
 					<div className="grid grid-cols-2 gap-4">
 						<Field label="Graphics folder" error={err('graphicsFolder')} hint="The NAS or drive the media comes from.">
-							<Input value={graphics} onChange={setGraphics} placeholder="\\LC-NAS-01\Graphics\Sunday Media" />
+							<Input value={graphics} onChange={setGraphics} placeholder="\\LC-NAS-01\Graphics\Sunday Media" mono />
 						</Field>
 						<Field label="Local folder" error={err('localMediaFolder')} hint="On this computer, for Arena to play from.">
-							<Input value={local} onChange={setLocal} placeholder="D:\VFX Media" />
+							<Input value={local} onChange={setLocal} placeholder="D:\VFX Media" mono />
 						</Field>
 					</div>
 				</>
@@ -616,7 +724,7 @@ function ConsoleEditor({ view, save }: { view: SettingsView; save: Save }) {
 				<>
 					<div className="grid grid-cols-2 gap-4">
 						<Field label="Console address" error={err('consoleHost')}>
-							<Input value={host} onChange={setHost} placeholder="10.11.60.40" />
+							<Input value={host} onChange={setHost} placeholder="10.11.60.40" mono />
 						</Field>
 						<Field label="Web remote port" error={err('webRemotePort')} hint="8080 unless the console says otherwise.">
 							<Input value={webPort} onChange={setWebPort} inputMode="numeric" />
@@ -735,23 +843,5 @@ function CueInfo({ operator }: { operator: boolean }) {
 			</p>
 			{operator && <CueManagerSettings />}
 		</>
-	)
-}
-
-function Frame({ onClose, children }: { onClose: () => void; children: ReactNode }) {
-	return (
-		<div className="flex min-h-0 min-w-0 flex-1 flex-col bg-booth-bg">
-			<div className="flex items-center border-b border-booth-edge bg-booth-panel px-6 py-2">
-				<h2 className="text-xs font-semibold uppercase tracking-widest text-booth-dim">Connections</h2>
-				<button
-					type="button"
-					onClick={onClose}
-					className="ml-auto h-10 rounded border border-booth-edge px-5 text-sm active:scale-[0.98]"
-				>
-					Back
-				</button>
-			</div>
-			<div className="flex max-w-3xl flex-col gap-6 overflow-y-auto px-6 py-6 select-text">{children}</div>
-		</div>
 	)
 }

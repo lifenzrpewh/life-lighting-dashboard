@@ -1,9 +1,12 @@
-// The mode chip. Hold 3 seconds to become the operator; tap once to stop.
+// The mode button. Hold 3 seconds to become the operator; tap once to stop.
+// A closed lock while volunteer, an open one in nacre while operator.
 //
 // Entering operator mode reveals, it never acts: holding this changes what is
 // on screen and sends nothing to the console.
 
 import { useRef, useState } from 'react'
+
+import { Lock, LockOpen } from 'lucide-react'
 
 import { HOLD_MS, type Mode } from '../mode.js'
 
@@ -49,20 +52,23 @@ export function ModeChip({ mode, onEnter, onLeave }: { mode: Mode; onEnter: () =
 			onClick={() => pressedIn.current === 'operator' && onLeave()}
 			// A long press on a touchscreen opens a context menu. Not here.
 			onContextMenu={(e) => e.preventDefault()}
-			className={`relative flex h-10 shrink-0 items-center overflow-hidden rounded-md border px-4 text-xs tracking-widest ${
-				mode === 'operator'
-					? 'border-booth-ink bg-booth-ink font-semibold text-booth-bg'
-					: 'border-booth-edge text-booth-dim'
+			aria-label={mode === 'operator' ? 'Operator mode. Tap to go back to volunteer.' : 'Volunteer mode. Hold for 3 seconds for operator mode.'}
+			title={mode === 'operator' ? 'Tap to go back to volunteer' : 'Hold for 3 seconds for operator mode'}
+			className={`relative inline-flex h-12 w-36 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-lg text-sm font-medium transition-colors ${
+				mode === 'operator' ? 'nacre-tint nacre-ring text-booth-ink' : 'bg-booth-raise text-booth-dim hover:text-booth-ink'
 			}`}
 		>
 			{holding && (
 				<span
 					aria-hidden
-					className="absolute inset-0 origin-left bg-booth-ink/25"
+					className="nacre-line absolute inset-0 origin-left opacity-35"
 					style={{ animation: `hold-fill ${HOLD_MS}ms linear forwards` }}
 				/>
 			)}
-			<span className="relative">{mode === 'operator' ? 'OPERATOR' : holding ? 'HOLD…' : 'VOLUNTEER'}</span>
+			<span className="relative flex items-center gap-2">
+				{mode === 'operator' ? <LockOpen size={18} strokeWidth={1.9} aria-hidden /> : <Lock size={18} strokeWidth={1.9} aria-hidden />}
+				{mode === 'operator' ? 'Operator' : holding ? 'Keep holding…' : 'Volunteer'}
+			</span>
 		</button>
 	)
 }

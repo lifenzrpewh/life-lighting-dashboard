@@ -1,18 +1,35 @@
 @import 'tailwindcss';
 
 /* Dark only, deliberately. This screen lives in a dim booth beside a console at
-   9am on a Sunday; there is no light mode because there is no lit room. */
+   9am on a Sunday; there is no light mode because there is no lit room.
+
+   The look (2026-10-05, the owner's "smooth and professional, clean but not
+   too sterile"): named for the shell, so it borrows the shell. The neutrals
+   lean towards deep sea-green, and one iridescent accent, nacre, appears only
+   where it means something: the tab showing, operator mode, editing the
+   layout. Everything else is quiet so the state colours can speak. */
 @theme {
-	--color-booth-bg: #0a0a0b;
-	--color-booth-panel: #141417;
-	--color-booth-edge: #26262c;
-	--color-booth-ink: #f4f4f5;
-	--color-booth-dim: #8b8b96;
+	/* The ground and its layers, darkest to lightest. */
+	--color-booth-bg: #070b0d;
+	--color-booth-panel: #0c1417;
+	--color-booth-strip: #0f191c;
+	--color-booth-raise: #15222a;
+	--color-booth-hover: #1b2b33;
+	--color-booth-edge: #1f2f36;
+	--color-booth-ink: #e6f0f1;
+	--color-booth-dim: #8a9ea3;
+	--color-booth-faint: #5d7177;
+
+	/* Nacre: the accent. Teal to violet, as a pāua shell turns in the light.
+	   Used as a gradient on lines and tints, never as a fill behind text. */
+	--color-nacre-teal: #3fd2c7;
+	--color-nacre-blue: #6f8cff;
+	--color-nacre-violet: #a879ff;
 
 	/* The state vocabulary, one colour each, used identically everywhere. */
-	--color-state-live: #4ade80;
+	--color-state-live: #34d399;
 	--color-state-stale: #fbbf24;
-	--color-state-unknown: #6b7280;
+	--color-state-unknown: #6b7d83;
 	--color-state-unreachable: #f87171;
 
 	/* Amber is reserved for "you must look at this": the unconfirmed-cook strip
@@ -22,16 +39,58 @@
 	/* A countdown past zero, counting up. Its own token, not the state red: a
 	   link going UNREACHABLE and a song running long are different news. */
 	--color-overtime: #ef4444;
+
+	/* Bundled with the app (../main.tsx), never fetched: this box may have no
+	   internet on a Sunday. Plex for the interface, Plex Mono for the things
+	   that are typed exactly: show names, media codes, addresses. */
+	--font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
 }
 
-/* The mode chip's hold, filling left to right so a held finger can see it is
-   being counted. components/ModeChip.tsx. */
+/* The nacre line and tint, for the few places the accent belongs. */
+@utility nacre-line {
+	background-image: linear-gradient(90deg, var(--color-nacre-teal), var(--color-nacre-blue) 55%, var(--color-nacre-violet));
+}
+@utility nacre-tint {
+	background-image: linear-gradient(
+		120deg,
+		color-mix(in srgb, var(--color-nacre-teal) 16%, transparent),
+		color-mix(in srgb, var(--color-nacre-violet) 20%, transparent)
+	);
+}
+@utility nacre-ring {
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-nacre-blue) 60%, transparent);
+}
+
+/* The mode button's hold, filling left to right so a held finger can see it
+   is being counted. components/ModeChip.tsx. */
 @keyframes hold-fill {
 	from {
 		transform: scaleX(0);
 	}
 	to {
 		transform: scaleX(1);
+	}
+}
+
+/* A sheet or panel arriving: a short rise, so a change of screen reads as one
+   thing replacing another rather than a flash. */
+@keyframes rise {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+@utility animate-rise {
+	animation: rise 160ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+	.animate-rise {
+		animation: none;
 	}
 }
 
@@ -42,7 +101,8 @@ body,
 	margin: 0;
 	background: var(--color-booth-bg);
 	color: var(--color-booth-ink);
-	font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
 	/* A touchscreen in a booth: no text selection, no rubber-banding, no
 	   accidental pinch-zoom leaving the board at 140% mid-service. */
 	user-select: none;
@@ -51,4 +111,16 @@ body,
 	/* Chromium's own parts (scrollbars, form controls) drawn dark too: a view
 	   that scrolls, as Arena does in a small pop-out, got a white bar. */
 	color-scheme: dark;
+}
+
+/* Thin, quiet scrollbars that still take a finger's drag. */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-booth-edge) transparent;
+}
+
+/* Keyboard focus is shown; a tap is not. */
+:focus-visible {
+	outline: 2px solid var(--color-nacre-blue);
+	outline-offset: 2px;
 }

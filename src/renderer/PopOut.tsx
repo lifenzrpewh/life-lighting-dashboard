@@ -25,7 +25,8 @@ import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.j
 import { currentFrame, type VideoFeedState } from '../shared/video-feed.js'
 import { CueMessage } from './components/CuePane.js'
 import { Centered, MaMessage } from './components/MaPane.js'
-import { barButton } from './components/vocabulary.js'
+import { Button, IconButton, viewIcon } from './components/ui.js'
+import { RotateCw, SendToBack, Undo2 } from 'lucide-react'
 import { usePanePlacement } from './panePlacement.js'
 
 /** What main last said, asked every `ms`. Undefined until it has answered. */
@@ -64,6 +65,7 @@ export function PopOut({ view }: { view: ViewId }) {
 		1000,
 	)
 	const label = embedId === null ? VIEW_LABEL[view as BuiltInView] : (embed?.name ?? 'Embed')
+	const ViewIcon = viewIcon(view)
 	/** The MA, the run order and embeds are native pages main moves in here. */
 	const native = view === 'ma' || view === 'cue' || embedId !== null
 
@@ -99,37 +101,32 @@ export function PopOut({ view }: { view: ViewId }) {
 		embedId !== null ? window.life?.retryEmbed(embedId) : view === 'ma' ? window.life?.retryMaPane() : window.life?.retryCuePane()
 	const reload =
 		!native || !showing ? null : (
-			<button type="button" onClick={retry} className={`${barButton} h-9`} aria-label={`Reload ${label}`}>
-				↻
-			</button>
+			<IconButton icon={RotateCw} size="sm" label={`Reload ${label}`} onClick={retry} />
 		)
 
 	return (
 		<div className="flex h-full flex-col overflow-hidden bg-booth-panel">
-			<div className="flex h-14 shrink-0 items-center gap-2 border-b border-booth-edge px-2">
-				<h1 className="px-2 text-[10px] font-semibold tracking-widest text-booth-dim uppercase">{label}</h1>
-				<span className="ml-auto" />
+			<div className="flex h-14 shrink-0 items-stretch gap-2 border-b border-booth-edge bg-booth-strip pr-2 pl-1">
+				<h1 className="relative flex items-center gap-2 px-4 text-sm font-medium">
+					<ViewIcon size={17} strokeWidth={1.8} aria-hidden />
+					{label}
+					<span aria-hidden className="nacre-line absolute inset-x-3 -bottom-px h-[3px] rounded-t-full" />
+				</h1>
+				<span className="ml-auto flex items-center gap-2">
 				{view === 'video' && <VideoStrip feed={video} space={videoSpace} onFit={fitVideo} />}
 				{embedId !== null && embed !== undefined && (
 					<ZoomControl name={label} zoom={embed.zoom} onZoom={(by) => window.life?.zoomEmbed(embedId, by)} />
 				)}
 				{reload}
 				{/* Behind the kiosk until its tab's Show (src/main/popout.ts). */}
-				<button
-					type="button"
-					onClick={() => window.life?.sendPopoutBehind(view)}
-					className="h-11 rounded-md border border-booth-edge px-4 text-sm text-booth-dim active:scale-[0.98] active:bg-booth-edge"
-				>
+				<Button size="sm" variant="ghost" icon={SendToBack} onClick={() => window.life?.sendPopoutBehind(view)}>
 					Send behind
-				</button>
+				</Button>
 				{/* Big enough for a finger: the system's own close is not. */}
-				<button
-					type="button"
-					onClick={() => window.life?.bringBack(view)}
-					className="h-11 rounded-md border border-booth-edge px-5 text-sm active:scale-[0.98] active:bg-booth-edge"
-				>
+				<Button size="sm" icon={Undo2} onClick={() => window.life?.bringBack(view)}>
 					Back to the dashboard
-				</button>
+				</Button>
+				</span>
 			</div>
 			<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-bg">
 				{view === 'arena' ? (

@@ -19,6 +19,7 @@
 // empty composition.
 
 import { useState, type ReactNode } from 'react'
+import { ChevronDown, Layers } from 'lucide-react'
 
 import {
 	ARENA_STALE_AFTER_MS,
@@ -55,14 +56,14 @@ export function ArenaReading({
 	if (status === undefined) {
 		return (
 			<Centered>
-				<Say head="Arena" body={window.life === undefined ? 'Arena is shown only inside the kiosk.' : 'Not heard yet.'} />
+				<Say icon={Layers} head="Arena" body={window.life === undefined ? 'Arena is shown only inside the kiosk.' : 'Not heard yet.'} />
 			</Centered>
 		)
 	}
 	if (status === null) {
 		return (
 			<Centered>
-				<Say head="No Arena set up" body="Set Arena's address in Connections, in operator mode." />
+				<Say icon={Layers} head="No Arena set up" body="Set Arena's address in Connections, in operator mode." />
 			</Centered>
 		)
 	}
@@ -74,6 +75,7 @@ export function ArenaReading({
 		unknown: (why) => (
 			<Centered>
 				<Say
+					icon={Layers}
 					head="Arena not answering"
 					body={`${failure ?? unknownWhy[why]}. Is Arena open, with its web server on (Preferences › Web Server)?`}
 				/>
@@ -99,7 +101,7 @@ function Board({ status, ageMs, failure, now }: { status: ArenaStatus; ageMs: nu
 	const stale = ageMs !== null
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
-			<div className="flex h-11 shrink-0 items-center gap-3 border-b border-booth-edge px-4 text-sm">
+			<div className="flex h-12 shrink-0 items-center gap-3 border-b border-booth-edge px-4 text-sm">
 				<span className={`flex min-w-0 items-center gap-3 ${stale ? staleContent : ''}`}>
 					<span className={chipLabel}>Deck</span>
 					{status.deck === null ? <span className="text-booth-dim">none selected</span> : <span className="truncate">{status.deck}</span>}
@@ -124,7 +126,7 @@ function Board({ status, ageMs, failure, now }: { status: ArenaStatus; ageMs: nu
 				{sectionsOf(status).map((section, i) => (
 					<section key={i}>
 						{section.group !== null && (
-							<div className="flex h-9 items-center gap-3 bg-booth-panel px-4">
+							<div className="flex h-10 items-center gap-3 bg-booth-strip px-4">
 								<span className={chipLabel}>{section.group.name}</span>
 								{section.group.bypassed && <Bypassed />}
 								<span className="ml-auto" />
@@ -144,10 +146,10 @@ function Board({ status, ageMs, failure, now }: { status: ArenaStatus; ageMs: nu
 function LayerRow({ layer }: { layer: ArenaLayer }) {
 	const clip = layer.playing
 	return (
-		<div className="flex h-14 items-center gap-3 border-b border-booth-edge/60 px-4">
+		<div className="flex h-16 items-center gap-3.5 border-b border-booth-edge/60 px-4">
 			<Thumbnail clip={clip} />
 			<div className="min-w-0 flex-1">
-				<div className={chipLabel}>{layer.name}</div>
+				<div className="text-xs text-booth-dim">{layer.name}</div>
 				<div className="flex min-w-0 items-center gap-2 text-sm">
 					{clip === null ? <span className="text-booth-dim">—</span> : <span className="truncate">{clip.name}</span>}
 					{/* Amber: connected, and Arena cannot find its file, so the
@@ -167,7 +169,7 @@ function LayerRow({ layer }: { layer: ArenaLayer }) {
 function TimeLeft({ clip }: { clip: ArenaClip }) {
 	const t = clipTime(clip.transport)
 	const box = 'flex w-24 shrink-0 items-baseline justify-end gap-1.5 tabular-nums'
-	const note = 'text-[10px] font-semibold tracking-widest text-booth-dim uppercase'
+	const note = 'text-xs text-booth-dim'
 	switch (t.kind) {
 		case 'none':
 			return null
@@ -204,7 +206,7 @@ function Thumbnail({ clip }: { clip: ArenaClip | null }) {
 	// A picture that would not load leaves the frame empty, not broken.
 	const [failed, setFailed] = useState<string | null>(null)
 	return (
-		<span className="h-10 w-[72px] shrink-0 overflow-hidden rounded bg-booth-panel">
+		<span className="h-11 w-20 shrink-0 overflow-hidden rounded-md bg-booth-raise">
 			{url !== null && failed !== url && (
 				<img src={url} alt="" draggable={false} onError={() => setFailed(url)} className="size-full object-cover" />
 			)}
@@ -221,11 +223,11 @@ export function MissingMediaNotice({ status }: { status: ArenaStatus }) {
 	if (missing.length === 0) return null
 	return (
 		<div className="shrink-0 border-b border-booth-edge bg-warn/10">
-			<button type="button" onClick={() => setOpen(!open)} className="flex h-11 w-full items-center gap-3 px-4 text-left text-sm text-warn">
+			<button type="button" onClick={() => setOpen(!open)} className="flex h-12 w-full items-center gap-3 px-4 text-left text-sm text-warn">
 				<span className="truncate">
 					{missing.length === 1 ? '1 clip cannot find its file' : `${missing.length} clips cannot find their files`} on this computer
 				</span>
-				<span className="ml-auto shrink-0 text-xs">{open ? 'Hide' : 'Show'}</span>
+				<ChevronDown size={18} className={`ml-auto shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
 			</button>
 			{open && (
 				<ul className="max-h-60 overflow-y-auto px-4 pb-3 text-sm">
@@ -244,7 +246,7 @@ export function MissingMediaNotice({ status }: { status: ArenaStatus }) {
 }
 
 function Bypassed() {
-	return <span className="shrink-0 rounded bg-booth-edge px-2 py-0.5 text-[10px] font-semibold tracking-widest">BYPASSED</span>
+	return <span className="shrink-0 rounded-full bg-booth-raise px-2.5 py-0.5 text-xs text-booth-dim">Bypassed</span>
 }
 
 /** A fader, 0–1, as a bar and a percentage. */

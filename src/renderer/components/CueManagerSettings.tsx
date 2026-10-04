@@ -6,13 +6,15 @@
 // got itself into a state a reload does not clear.
 
 import { useState } from 'react'
+import { LogOut } from 'lucide-react'
+
+import { Button } from './ui.js'
 
 export function CueManagerSettings() {
 	// Clearing drops the sign-in and any notes still waiting to send. One tap
 	// must not do that.
 	const [confirming, setConfirming] = useState(false)
 	const [cleared, setCleared] = useState(false)
-	const button = 'h-12 rounded border-2 px-6 text-base active:scale-[0.98]'
 
 	return (
 		<section className="flex flex-col gap-4">
@@ -21,32 +23,29 @@ export function CueManagerSettings() {
 					<span className="text-sm">
 						This signs the Cue Manager out here and forgets everything it kept, including notes not yet sent.
 					</span>
-					<button
-						type="button"
+					<Button
+						variant="danger"
+						icon={LogOut}
 						onClick={() => {
 							setConfirming(false)
 							void window.life?.resetCuePane().then((ok) => setCleared(ok === true))
 						}}
-						className={`${button} border-state-unreachable text-state-unreachable`}
 					>
 						Sign out and clear
-					</button>
-					<button type="button" onClick={() => setConfirming(false)} className={`${button} border-booth-edge`}>
-						Keep
-					</button>
+					</Button>
+					<Button onClick={() => setConfirming(false)}>Keep</Button>
 				</div>
 			) : (
 				<div className="flex items-center gap-4">
-					<button
-						type="button"
+					<Button
+						icon={LogOut}
 						onClick={() => {
 							setCleared(false)
 							setConfirming(true)
 						}}
-						className={`${button} border-booth-edge text-booth-dim`}
 					>
 						Sign the Cue Manager out…
-					</button>
+					</Button>
 					{cleared && <span className="text-sm text-state-live">Cleared. It is ready to sign in again.</span>}
 				</div>
 			)}
