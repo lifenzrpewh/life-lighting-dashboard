@@ -532,8 +532,18 @@ function ProPresenterEditor({ view, save }: { view: SettingsView; save: Save }) 
 function ArenaEditor({ view, save }: { view: SettingsView; save: Save }) {
 	const [host, setHost] = useState(view.arenaHost ?? '')
 	const [port, setPort] = useState(String(view.arenaPort))
+	const [graphics, setGraphics] = useState(view.graphicsFolder ?? '')
+	const [local, setLocal] = useState(view.localMediaFolder ?? '')
 	return (
-		<Editor save={save} patch={() => ({ arenaHost: host, arenaPort: portOf(port) })}>
+		<Editor
+			save={save}
+			patch={() => ({
+				arenaHost: host,
+				arenaPort: portOf(port),
+				graphicsFolder: graphics.trim() === '' ? null : graphics,
+				localMediaFolder: local.trim() === '' ? null : local,
+			})}
+		>
 			{(err) => (
 				<>
 					<p className="text-sm text-booth-dim">
@@ -551,6 +561,19 @@ function ArenaEditor({ view, save }: { view: SettingsView; save: Save }) {
 						hostLabel="Arena address"
 						portHint="8080 unless Arena says otherwise."
 					/>
+					<p className="text-sm text-booth-dim">
+						For the media check's Fetch: the lookbook's file is found by name in the graphics folder (only ever read),
+						copied into the local folder, and loaded into Arena's clip. Never into a clip that is playing, and nothing is
+						overwritten.
+					</p>
+					<div className="grid grid-cols-2 gap-4">
+						<Field label="Graphics folder" error={err('graphicsFolder')} hint="The NAS or drive the media comes from.">
+							<Input value={graphics} onChange={setGraphics} placeholder="\\LC-NAS-01\Graphics\Sunday Media" />
+						</Field>
+						<Field label="Local folder" error={err('localMediaFolder')} hint="On this computer, for Arena to play from.">
+							<Input value={local} onChange={setLocal} placeholder="D:\VFX Media" />
+						</Field>
+					</div>
 				</>
 			)}
 		</Editor>

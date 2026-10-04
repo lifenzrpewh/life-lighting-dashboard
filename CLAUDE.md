@@ -72,6 +72,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ⚠️ `src/shared/embeds.ts` · `src/main/embeds.ts` · `src/renderer/components/EmbedPane.tsx` | **Embeds** (2026-10-05): any web page, added by name and address in Connections (operator mode), is a view of its own with its own sign-in (a partition per embed), − / + zoom remembered per embed, Reload, Pop out, and a row saying loaded / loading / not loading that can be turned off. New windows open in the computer's browser; the user agent drops Electron's name, for Google. Removing one clears its session, and its folder at the next start. In the kiosk on the Windows box over CDP, 2026-10-05: added, placed over its slot, zoomed (saved, re-applied after a reload), popped out and back, off and on, renamed, removed. ⚠️ Not signed in to Google (its sign-in raised a Windows passkey dialog, cancelled); a new-window link not tried. |
 | ⚠️ `build/icon.svg` · `scripts/render-icon.cjs` · `src/main/kiosk.ts` (mark, windowed) | **The pāua icon, windowed mode, MARK** (2026-10-05). The icon is a drawn shell (`build/icon.svg`, rendered to `build/icon.png` and `assets/icon.png` by `npx electron scripts/render-icon.cjs`), for the installer, taskbar and Dock; ⚠️ not yet seen in an installed build. **This screen** in Connections (operator mode): Full screen or Window, at once, no restart (watched both ways in the kiosk). **MARK** in the status bar, for anyone: a `[mark] ===== tester's mark N =====` line in the log with the mode, layout and views on screen, and the button says which number (watched). |
+| ⚠️ `src/shared/media-fetch.ts` · `src/bridge/media-files.ts` · `src/main/media-fetch.ts` | **Fetching media** (2026-10-05): Fetch beside a media check code copies the lookbook's file from the **graphics folder** to the **local folder** (both on the Arena row) and loads it into the clip that has the old or missing one; "Copy here" for a code not in Arena. ✅ Arena 7.28 loads a file into a clip over REST (`/clips/by-id/<id>/open`, 204, read back), by hand; ✅ the copy in the kiosk (60 MB, progress, reuse). ⚠️ A load through the button, and a file replacing another in a clip, not yet watched. `docs/VISUALS_DASHBOARD.md` § Fetching media. |
 | ✅ `src/bridge/log-file.ts` · `src/main/log.ts` | **The app's own log**, `paua.log` in the data folder, timed, two 5 MB files at most; the kiosk page's errors and a crashed GPU or page process go in too. Version and path at the foot of Connections. Watched writing on the Windows box, 2026-10-04. |
 | ✅ `src/main/entry.ts` · `src/main/supervisor.ts` · `src/bridge/supervise.ts` | **The installed app's watchdog**: Paua.exe in Node mode runs the app and restarts it 5 s after a crash, gives up after 5 in 2 minutes, leaves a clean quit alone. A checkout is left to kiosk.cmd. Watched on the packaged build on the Windows box, 2026-10-04. |
 | ✅ `.github/workflows/release.yml` · `docs/FIELD_TEST.md` | **Field-test builds**: a tag `v<version>` builds `Paua-Setup-<v>.exe` and `Paua-<v>-arm64.dmg` (ad-hoc signed, Syphon.framework left as upstream signed it) and drafts a release; logs pushed to `release-build-log`. v0.1.0 built green 2026-10-04. ⚠️ Neither file installed anywhere yet; the Mac build never opened on a Mac. |
@@ -359,11 +360,10 @@ edge, a corner), a Google Sheet as an embed and its sign-in, and whether 2 × 2 
 sensible smallest window.
 
 Later, not tonight:
-- **Fetch missing media** (the owner wants to explore it): the media check finds a
-  code missing or an old version; copy the right file from the graphics drive / NAS
-  down to this machine, then load it into the right Arena slot. Pāua's first writer
-  to a media drive and to Arena's composition: never during a service, progress for
-  big files. Design with the owner first. Today the check only reads.
+- **Fetch missing media**: built 2026-10-05 (§ status, `docs/VISUALS_DASHBOARD.md` §
+  Fetching media). Next: watch a Fetch load into a clip on this box (and clear the
+  **ZZ999 Paua test** clip left in PRE & POST, column 9), then the real NAS path at a booth.
+  Open: where a code not in Arena belongs.
 - Start at login; self-update once hosting is decided.
 - **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per

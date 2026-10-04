@@ -24,6 +24,7 @@ import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'imp
 import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
 import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
+import type { FetchRequest, FetchStates } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
 
 /** The page's frame callback, while it shows the video feed. */
 let onVideoFrame: ((frame: VideoFrame) => void) | null = null
@@ -79,6 +80,12 @@ const api = {
 	 *  services from today to a week ahead, then one service's run sheet. */
 	lookbookServices: (): Promise<LookbookRead<LookbookService[]>> => ipcRenderer.invoke('lookbook:services'),
 	lookbookItems: (serviceId: string): Promise<LookbookRead<LookbookItem[]>> => ipcRenderer.invoke('lookbook:items', serviceId),
+	/** Fetch a code the media check found wrong: copy the lookbook's file
+	 *  from the graphics folder, and load it into `clipId` unless that is null.
+	 *  Operator mode only. Sent is not done: `mediaFetches` says how it goes,
+	 *  and the media check says when Arena has it. */
+	fetchMedia: (request: FetchRequest): Promise<{ ok: true } | { ok: false; detail: string }> => ipcRenderer.invoke('media:fetch', request),
+	mediaFetches: (): Promise<FetchStates> => ipcRenderer.invoke('media:fetch-state'),
 	/** The showfile's write half, operator mode only (main refuses otherwise).
 	 *  Sent is not done: the new name comes back in `showfile`. */
 	listShows: (): Promise<ShowList> => ipcRenderer.invoke('showfile:shows'),

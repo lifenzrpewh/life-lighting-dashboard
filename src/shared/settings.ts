@@ -18,6 +18,7 @@
 import { DEFAULT_ARENA_PORT } from './arena.js'
 import { CONNECTIONS, type ConnectionId } from './connections.js'
 import { embedsFrom, type Embed } from './embeds.js'
+import { isFolderPath } from './media-fetch.js'
 import { DEFAULT_REMOTE_USER, DEFAULT_WEB_REMOTE_PORT, isConsoleHost, isPort } from './ma-pane.js'
 import { CAMPUS_MAX } from './showfile-write.js'
 
@@ -73,6 +74,12 @@ export type Settings = {
 	/** A window rather than the whole screen: for testers on a laptop (the
 	 *  owner, 2026-10-04). The booth stays full screen. */
 	windowed: boolean
+	/** Where the comms team's media is, the NAS or its drive: only ever read,
+	 *  for the media fetch (./media-fetch.ts). Null: no fetching. */
+	graphicsFolder: string | null
+	/** Where fetched media is copied on this computer, for Arena to play from.
+	 *  Null: no fetching. Where a booth keeps files is a fact about the booth. */
+	localMediaFolder: string | null
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -110,6 +117,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	off: [],
 	embeds: [],
 	windowed: false,
+	graphicsFolder: null,
+	localMediaFolder: null,
 }
 
 /** The settings main works from: a connection turned off is treated as one
@@ -287,6 +296,23 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		else next.off = off
 	}
 	if (patch.windowed !== undefined) next.windowed = patch.windowed
+	const folderError = 'A whole folder path: D:\\Media, \\\\NAS\\Graphics, or /Volumes/Graphics.'
+	for (const key of ['graphicsFolder', 'localMediaFolder'] as const) {
+		const v = patch[key]
+		if (v === undefined) continue
+		const text = v === null ? '' : v.trim()
+		if (text === '') next[key] = null
+		else if (isFolderPath(text)) next[key] = text
+		else errors[key] = folderError
+	}
+	if (
+		next.graphicsFolder !== null &&
+		next.localMediaFolder !== null &&
+		next.graphicsFolder.toLowerCase().replace(/[\\/]+$/, '') === next.localMediaFolder.toLowerCase().replace(/[\\/]+$/, '') &&
+		errors.localMediaFolder === undefined
+	) {
+		errors.localMediaFolder = 'Copies go to a folder of their own, not back into the graphics folder.'
+	}
 	if (patch.embeds !== undefined) {
 		const embeds = embedsFrom(patch.embeds)
 		if (embeds === null) errors.embeds = 'Each embed needs a name and a web address (https://…).'
@@ -324,6 +350,10 @@ export function fromDisk(raw: unknown): Settings {
 	out.off = offFrom(r['off']) ?? []
 	out.embeds = embedsFrom(r['embeds']) ?? []
 	out.windowed = r['windowed'] === true
+	for (const key of ['graphicsFolder', 'localMediaFolder'] as const) {
+		const v = r[key]
+		if (typeof v === 'string' && isFolderPath(v)) out[key] = v
+	}
 	return out
 }
 
@@ -353,6 +383,8 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['off', Array.isArray],
 		['embeds', Array.isArray],
 		['windowed', (v) => typeof v === 'boolean'],
+		['graphicsFolder', strOrNull],
+		['localMediaFolder', strOrNull],
 		['volunteerUser', str],
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],

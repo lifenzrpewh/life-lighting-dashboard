@@ -15,7 +15,8 @@
 // status, so an Arena that stops answering takes its status STALE with it.
 
 import { decodeArenaProduct } from '../bridge/arena.js'
-import { checkCommand, type ArenaWire } from '../bridge/arena-control.js'
+import { checkCommand, openWire, type ArenaWire } from '../bridge/arena-control.js'
+import { fileUrlOf } from '../bridge/media-files.js'
 import {
 	applyParameter,
 	decodeComposition,
@@ -49,12 +50,16 @@ export type ArenaHandle = {
 	/** Something from the Clips view: checked against the composition held
 	 *  here, then sent (../bridge/arena-control.ts). */
 	command(raw: unknown): Promise<ArenaCommandResult>
+	/** The media fetch: load `file`, which main copied, into a clip that is
+	 *  not playing (../bridge/arena-control.ts `openWire`). */
+	open(clipId: number, file: string): Promise<ArenaCommandResult>
 	stop(): void
 }
 
 export function startArena(s: Settings): ArenaHandle {
 	if (s.arenaHost === null) {
-		return { source: () => null, status: () => null, command: async () => ({ ok: false, detail: 'no Arena is set up' }), stop() {} }
+		const none = async () => ({ ok: false, detail: 'no Arena is set up' }) as const
+		return { source: () => null, status: () => null, command: none, open: none, stop() {} }
 	}
 	const live = watchArena(`ws://${s.arenaHost}:${s.arenaPort}/api/v1`, `http://${s.arenaHost}:${s.arenaPort}/api/v1`)
 	const link = poll<ArenaProduct>({
@@ -72,6 +77,7 @@ export function startArena(s: Settings): ArenaHandle {
 		source: () => link.channel(),
 		status: () => live.status(),
 		command: (raw) => live.command(raw),
+		open: (clipId, file) => live.open(clipId, file),
 		stop() {
 			link.stop()
 			live.stop()
@@ -82,7 +88,13 @@ export function startArena(s: Settings): ArenaHandle {
 function watchArena(
 	url: string,
 	rest: string,
-): { status(): Channel<ArenaStatus>; answered(): void; command(raw: unknown): Promise<ArenaCommandResult>; stop(): void } {
+): {
+	status(): Channel<ArenaStatus>
+	answered(): void
+	command(raw: unknown): Promise<ArenaCommandResult>
+	open(clipId: number, file: string): Promise<ArenaCommandResult>
+	stop(): void
+} {
 	let channel = unread<ArenaTree>()
 	let socket: WebSocket | null = null
 	let open = false
@@ -194,10 +206,11 @@ function watchArena(
 		}
 		for (const call of wire.calls) {
 			try {
+				const text = call.body !== null && typeof call.body === 'object'
 				const r = await fetch(rest + call.path, {
 					method: 'POST',
-					headers: call.body === null ? {} : { 'content-type': 'application/json' },
-					body: call.body === null ? null : JSON.stringify(call.body),
+					headers: call.body === null ? {} : { 'content-type': text ? 'text/plain' : 'application/json' },
+					body: call.body === null ? null : typeof call.body === 'object' ? call.body.text : JSON.stringify(call.body),
 					signal: AbortSignal.timeout(ARENA_REQUEST_TIMEOUT_MS),
 				})
 				if (!r.ok) return { ok: false, detail: `Arena answered ${r.status}` }
@@ -230,6 +243,16 @@ function watchArena(
 			const { command, wire } = checked.value
 			if (command.kind !== 'fader') console.log(`[arena] ${describe(command, latest.value)}`)
 			return send(wire)
+		},
+		async open(clipId, file) {
+			const latest = channel.latest
+			if (!open || latest === null || !latest.ok) return { ok: false, detail: 'Arena is not answering, so nothing was loaded' }
+			const wire = openWire(latest.value, clipId, fileUrlOf(file))
+			if (!wire.ok) return { ok: false, detail: wire.detail }
+			const layer = latest.value.layers.find((l) => l.slots.some((s) => s.id === clipId))
+			const column = (layer?.slots.findIndex((s) => s.id === clipId) ?? -1) + 1
+			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}`)
+			return send(wire.value)
 		},
 		answered() {
 			const latest = channel.latest

@@ -524,6 +524,39 @@ CDP, not yet by a finger.
   beside the mark's number. **This screen** (Full screen / Window) is in Connections,
   operator mode.
 
+## Fetching media (owner's ask, 2026-10-05; built the same day)
+
+The media check finds a code missing or an old version; **Fetch** beside it puts the
+lookbook's file right. Two settings on the Arena row in Connections: the **graphics folder**
+(the NAS or its drive, only ever read) and the **local folder** (copies go there, for Arena to
+play from). Rules and states: `src/shared/media-fetch.ts`.
+
+- **Arena can load a file into a clip.** ✅ Arena 7.28, 2026-10-05, on this box:
+  `POST /api/v1/composition/clips/by-id/<id>/open`, body `text/plain`
+  `file:///C:/…/local%20media/ZZ999%20Paua%20test.png`, answered **204**; the clip read back
+  with that file, named after it, `Disconnected` (not playing). Arena's own API description
+  (served at `/api/docs/rest/`, `swagger.yaml`) says `open` "will retain settings as much as
+  possible", and lists `/composition/clips/open` for several at once.
+- **Another version or a missing file**: found by name (any case, any media extension, newest
+  if several; Synology's `@eaDir` and recycle bins skipped) under the graphics folder, copied
+  with progress (`.partial` then renamed), loaded into the clip that has the old one, and
+  confirmed by the check's own next reading. **Not in Arena**: copied only ("Copy here"), since
+  which clip it belongs in is still open (§ Answered, the media check: the real slot names).
+- **Guards**: never into a playing clip (checked at sending), nothing overwritten (a same-size
+  file of that name is reused, a different one left alone and said), the page sends a code, a
+  file name and a clip id and main builds every path, operator mode only.
+- ✅ Copy, 2026-10-05, in the kiosk: a 60 MB file found two folders down, progress shown,
+  copied, and reused on a second fetch; the folders-not-set message. 260+ tests cover finding,
+  copying, no overwrite, a cut-off copy, the `file:///` address and the open request's guards.
+- ⚠️ **Not yet watched**: a load through the Fetch button (the live load above was by hand);
+  a second file into a clip that already has one (whether its settings stay); what Arena says
+  for a path that is not there; copying from the real NAS (speed, the share's path). The
+  check's ask to repeat the load test was stopped by this box's safety check, so the test
+  clip **ZZ999 Paua test is still in PRE & POST, column 9** of the open composition: clear it
+  by hand.
+- Not built: fetching straight from the lookbook when the graphics folder lacks a file
+  (the lookbook holds the same files), and placing a not-loaded code into a slot.
+
 ## Open questions
 
 - **Briefs:** where should a brief's link live? The candidates were the item in the

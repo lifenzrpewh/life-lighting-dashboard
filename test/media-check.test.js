@@ -118,7 +118,11 @@ test('every state: loaded, not in Arena, missing on disk, another version; T is 
 	)
 	const byCode = Object.fromEntries(check.items.flatMap((i) => i.codes).map((c) => [c.code, c]))
 	assert.equal(byCode.CB095.state, 'ok')
-	assert.deepEqual(byCode.CB095.at, { layer: 'Holding BG', column: 1, file: 'D:\\Media\\CB095-Sunday-RelationshipSeries-v5.jpg' })
+	assert.deepEqual(byCode.CB095.at, { layer: 'Holding BG', column: 1, clipId: 1, file: 'D:\\Media\\CB095-Sunday-RelationshipSeries-v5.jpg' })
+	// What the media fetch needs: the clip, and the lookbook's name.
+	assert.equal(byCode.CF588.at.clipId, 1)
+	assert.equal(byCode.CA635.want, 'CA635-Sunday-Relationship-WalkIn')
+	assert.equal(byCode.CF445.want, 'CF445-Sunday-WelcometoLIFE')
 	assert.equal(byCode.CF588.state, 'other-version')
 	assert.equal(byCode.CF588.want, 'CF588-Sunday-ReloSeries-WalkInV2')
 	assert.equal(byCode.CA635.state, 'not-loaded')

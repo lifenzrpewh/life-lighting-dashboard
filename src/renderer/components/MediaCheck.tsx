@@ -22,6 +22,7 @@ import {
 	type LookbookRead,
 	type LookbookService,
 } from '../../shared/media-check.js'
+import { megabytes, type FetchRequest, type FetchStates } from '../../shared/media-fetch.js'
 import { chipLabel, formatAge } from './vocabulary.js'
 
 /** The service last picked on this machine: a convenience, so a re-opened
@@ -53,6 +54,29 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 	const [services, setServices] = useState<Load<LookbookService[]>>({ kind: 'idle' })
 	const [picked, setPicked] = useState<string | null>(remembered)
 	const [items, setItems] = useState<Load<LookbookItem[]>>({ kind: 'idle' })
+	// Fetches under way or done (../../shared/media-fetch.ts), as main holds
+	// them, asked while the check is open; and what main said to a tap it
+	// refused, by code.
+	const [fetches, setFetches] = useState<FetchStates>({})
+	const [refused, setRefused] = useState<Record<string, string>>({})
+	useEffect(() => {
+		const api = window.life
+		if (!open || api === undefined) return
+		let alive = true
+		const poll = () => void api.mediaFetches().then((f) => alive && setFetches(f))
+		poll()
+		const id = setInterval(poll, 500)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [open])
+	const fetchCode = (req: FetchRequest) => {
+		setRefused(({ [req.code]: _, ...rest }) => rest)
+		void window.life?.fetchMedia(req).then((r) => {
+			if (!r.ok) setRefused((x) => ({ ...x, [req.code]: r.detail }))
+		})
+	}
 
 	const life = window.life
 	const readServices = () => {
@@ -116,7 +140,17 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 			{open && (
 				<div className="max-h-[60vh] overflow-y-auto px-4 pb-3">
 					<ServicePicker load={services} offered={offered} picked={service?.id ?? null} onPick={pick} onRetry={readServices} />
-					{service !== null && <Result load={items} check={check} now={now} onAgain={() => readItems(service.id)} />}
+					{service !== null && (
+						<Result
+							load={items}
+							check={check}
+							now={now}
+							onAgain={() => readItems(service.id)}
+							fetches={fetches}
+							refused={refused}
+							onFetch={fetchCode}
+						/>
+					)}
 				</div>
 			)}
 		</div>
@@ -168,7 +202,23 @@ function ServicePicker({
 	)
 }
 
-function Result({ load, check, now, onAgain }: { load: Load<LookbookItem[]>; check: ReturnType<typeof checkMedia> | null; now: number; onAgain: () => void }) {
+function Result({
+	load,
+	check,
+	now,
+	onAgain,
+	fetches,
+	refused,
+	onFetch,
+}: {
+	load: Load<LookbookItem[]>
+	check: ReturnType<typeof checkMedia> | null
+	now: number
+	onAgain: () => void
+	fetches: FetchStates
+	refused: Record<string, string>
+	onFetch: (req: FetchRequest) => void
+}) {
 	if (load.kind !== 'read') return <p className="py-2 text-sm text-booth-dim">Reading the run sheet…</p>
 	const read = load.read
 	return (
@@ -187,7 +237,7 @@ function Result({ load, check, now, onAgain }: { load: Load<LookbookItem[]>; che
 					</div>
 					<ul className="mt-1 flex flex-col gap-1">
 						{item.codes.map((c, j) => (
-							<CodeRow key={j} check={c} />
+							<CodeRow key={j} check={c} fetch={fetches[c.code]} refused={refused[c.code]} onFetch={onFetch} />
 						))}
 					</ul>
 				</div>
@@ -198,7 +248,17 @@ function Result({ load, check, now, onAgain }: { load: Load<LookbookItem[]>; che
 
 /** One code: what it is, and what became of it. Amber only where someone must
  *  act; a code the check could not settle is said, never shown as loaded. */
-function CodeRow({ check }: { check: CodeCheck }) {
+function CodeRow({
+	check,
+	fetch,
+	refused,
+	onFetch,
+}: {
+	check: CodeCheck
+	fetch: FetchStates[string] | undefined
+	refused: string | undefined
+	onFetch: (req: FetchRequest) => void
+}) {
 	const type = TYPE_NAMES[mediaCodeOf(check.code)?.type ?? ''] ?? ''
 	const where = (at: { layer: string; column: number }) => `${at.layer} · column ${at.column}`
 	let state: React.ReactNode
@@ -222,16 +282,66 @@ function CodeRow({ check }: { check: CodeCheck }) {
 			state = <span className="text-booth-dim">? the lookbook has no file{check.at !== null && ` · in ${where(check.at)}`}</span>
 			break
 	}
+	// What a fetch would do here: load into the clip that has the old or
+	// missing file, or only copy, when Arena does not have it at all.
+	const request: FetchRequest | null =
+		check.state === 'other-version' || check.state === 'not-on-disk'
+			? { code: check.code, want: check.want, clipId: check.at.clipId }
+			: check.state === 'not-loaded'
+				? { code: check.code, want: check.want, clipId: null }
+				: null
 	return (
 		<li className="flex min-w-0 flex-col text-sm">
-			<span className="flex min-w-0 items-baseline gap-2">
+			<span className="flex min-w-0 items-center gap-2">
 				<span className="w-14 shrink-0 font-mono text-xs">{check.code}</span>
 				<span className="w-20 shrink-0 text-xs text-booth-dim">{type}</span>
 				<span className="min-w-0 truncate">{state}</span>
+				{request !== null && (
+					<span className="ml-auto flex shrink-0 items-center gap-2">
+						<FetchWords fetch={fetch} refused={refused} />
+						{!under(fetch) && (
+							<SmallButton onClick={() => onFetch(request)}>{request.clipId === null ? 'Copy here' : 'Fetch'}</SmallButton>
+						)}
+					</span>
+				)}
 			</span>
 			{detail !== null && <span className="truncate pl-[8.5rem] text-xs text-booth-dim">{detail}</span>}
 		</li>
 	)
+}
+
+/** A fetch still going: no second tap until it ends. */
+const under = (f: FetchStates[string] | undefined) => f?.state === 'finding' || f?.state === 'copying' || f?.state === 'loading'
+
+/** How a fetch is going, in a few words beside its code. */
+function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | undefined; refused: string | undefined }) {
+	if (refused !== undefined) return <span className="max-w-72 truncate text-xs text-warn">{refused}</span>
+	if (fetch === undefined) return null
+	switch (fetch.state) {
+		case 'finding':
+			return <span className="text-xs text-booth-dim">finding it…</span>
+		case 'copying':
+			return (
+				<span className="flex items-center gap-2 text-xs text-booth-dim tabular-nums">
+					<span className="h-1.5 w-24 overflow-hidden rounded-full bg-booth-edge">
+						<span className="block h-full bg-booth-ink" style={{ width: `${fetch.total === 0 ? 100 : (fetch.done / fetch.total) * 100}%` }} />
+					</span>
+					{megabytes(fetch.done)} of {megabytes(fetch.total)} MB
+				</span>
+			)
+		case 'loading':
+			return <span className="text-xs text-booth-dim">loading into Arena…</span>
+		case 'sent':
+			return <span className="max-w-72 truncate text-xs text-booth-dim">sent {fetch.file}; checking…</span>
+		case 'copied':
+			return <span className="max-w-72 truncate text-xs text-booth-dim">copied {fetch.file} here; put it in Arena by hand</span>
+		case 'failed':
+			return (
+				<span className="max-w-72 truncate text-xs text-warn" title={fetch.detail}>
+					{fetch.detail}
+				</span>
+			)
+	}
 }
 
 function fileName(path: string): string {

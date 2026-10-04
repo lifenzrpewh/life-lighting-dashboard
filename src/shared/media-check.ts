@@ -105,16 +105,22 @@ export type LookbookItem = {
 export type LookbookRead<T> = { ok: true; value: T; at: number } | { ok: false; detail: string; at: number }
 
 /** Where a code was found in Arena. */
-export type Place = { layer: string; column: number; file: string }
+export type Place = {
+	layer: string
+	column: number
+	file: string
+	/** Arena's clip id, for the media fetch. */
+	clipId: number
+}
 
 /** What became of one code. */
 export type CodeCheck =
 	/** Loaded, on this computer, and the lookbook's version. */
 	| { code: string; state: 'ok'; at: Place }
-	/** Nowhere in Arena. */
-	| { code: string; state: 'not-loaded' }
+	/** Nowhere in Arena. `want` is the lookbook's name, for the media fetch. */
+	| { code: string; state: 'not-loaded'; want: string }
 	/** Loaded, but Arena cannot find the file on this computer. */
-	| { code: string; state: 'not-on-disk'; at: Place }
+	| { code: string; state: 'not-on-disk'; at: Place; want: string }
 	/** Loaded, but not the lookbook's version: `want` is the lookbook's name. */
 	| { code: string; state: 'other-version'; at: Place; want: string }
 	/** The lookbook has no file for it, so its version cannot be checked. Where
@@ -140,7 +146,7 @@ function loadedCodes(status: ArenaStatus): Map<string, (Place & { onDisk: boolea
 			const code = mediaCodeOf(fileStem(file)) ?? mediaCodeOf(slot.name)
 			if (code === null) return
 			const places = found.get(code.code) ?? []
-			places.push({ layer: layer.name, column: i + 1, file, onDisk: slot.missingFile === null })
+			places.push({ layer: layer.name, column: i + 1, file, clipId: slot.id, onDisk: slot.missingFile === null })
 			found.set(code.code, places)
 		})
 	}
@@ -151,13 +157,13 @@ function loadedCodes(status: ArenaStatus): Map<string, (Place & { onDisk: boolea
  *  answer wins, so a right copy anywhere is enough. */
 function checkCode(code: string, want: string | null, places: (Place & { onDisk: boolean })[]): CodeCheck {
 	const strip = ({ onDisk: _, ...p }: Place & { onDisk: boolean }): Place => p
-	if (places.length === 0) return want === null ? { code, state: 'no-lookbook-file', at: null } : { code, state: 'not-loaded' }
+	if (places.length === 0) return want === null ? { code, state: 'no-lookbook-file', at: null } : { code, state: 'not-loaded', want }
 	if (want === null) return { code, state: 'no-lookbook-file', at: strip(places[0] as Place & { onDisk: boolean }) }
 	const same = (p: Place) => fileStem(p.file).toLowerCase() === want.toLowerCase()
 	const right = places.find((p) => same(p) && p.onDisk)
 	if (right !== undefined) return { code, state: 'ok', at: strip(right) }
 	const rightButGone = places.find(same)
-	if (rightButGone !== undefined) return { code, state: 'not-on-disk', at: strip(rightButGone) }
+	if (rightButGone !== undefined) return { code, state: 'not-on-disk', at: strip(rightButGone), want }
 	return { code, state: 'other-version', at: strip(places[0] as Place & { onDisk: boolean }), want }
 }
 

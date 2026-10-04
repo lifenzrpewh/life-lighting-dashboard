@@ -73,6 +73,8 @@ import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
 import { lookbookItems, lookbookServices } from './lookbook.js'
 import type { LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js'
 import { createPopouts, type Popouts } from './popout.js'
+import { createMediaFetch } from './media-fetch.js'
+import { fetchRequestFrom, type FetchStates } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
@@ -412,6 +414,21 @@ app.whenReady().then(() => {
 	ipcMain.handle('lookbook:items', (e, id: unknown): Promise<LookbookRead<LookbookItem[]>> | LookbookRead<LookbookItem[]> =>
 		fromOurs(e) ? lookbookItems(id) : { ok: false, detail: 'not from this app', at: Date.now() },
 	)
+	// Fetching media the check found wrong (./media-fetch.ts): operator mode
+	// only, from the kiosk or a pop-out. The page names a code, a file name
+	// and a clip; main finds the file and builds every path.
+	const mediaFetch = createMediaFetch({
+		folders: () => ({ graphics: store.current().graphicsFolder, local: store.current().localMediaFolder }),
+		open: (clipId, file) => arena?.open(clipId, file) ?? Promise.resolve({ ok: false, detail: 'no Arena is set up' }),
+	})
+	ipcMain.handle('media:fetch', (e, raw: unknown): { ok: true } | { ok: false; detail: string } => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Operator mode only.' }
+		const req = fetchRequestFrom(raw)
+		if (req === null) return { ok: false, detail: 'not a fetch' }
+		return mediaFetch.ask(req)
+	})
+	ipcMain.handle('media:fetch-state', (e): FetchStates => (fromOurs(e) ? mediaFetch.states() : {}))
 	serveThumbnails(() => {
 		const s = store.current()
 		return s.arenaHost === null ? null : { host: s.arenaHost, port: s.arenaPort }

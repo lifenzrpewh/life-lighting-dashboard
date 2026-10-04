@@ -3,7 +3,10 @@
 // fire a column, clear a layer, drag a layer's fader; everyone may).
 //
 // THE RULES THIS FILE ENFORCES:
-// - Four things and no others. Every request is built here from a template
+// - Four things from the page and no others, and one from main: loading a
+//   file the media fetch copied (`openWire`, ../shared/media-fetch.ts), never
+//   into a clip that is playing.
+// - From the page, four things and no others. Every request is built here from a template
 //   with an id in it; nothing from the page becomes a path. Arena's API has
 //   neighbours that destroy the show: `/clips/by-id/<id>/clear` empties a
 //   clip slot ("removing all tracks and settings"), `/layers/by-id/<id>/clearclips`
@@ -34,8 +37,9 @@ import type { Decoded } from './ontime.js'
 
 /** What to do on the wire for one command. */
 export type ArenaWire =
-	/** POSTs to Arena's REST API, in order, each `body` sent as JSON. */
-	| { kind: 'rest'; calls: { path: string; body: boolean | null }[] }
+	/** POSTs to Arena's REST API, in order, each `body` sent as JSON, or as
+	 *  text when it is `{ text }`. */
+	| { kind: 'rest'; calls: { path: string; body: boolean | null | { text: string } }[] }
 	/** One message on the websocket main already holds. */
 	| { kind: 'socket'; message: string }
 
@@ -85,6 +89,19 @@ export function checkCommand(raw: unknown, tree: ArenaTree): Decoded<{ command: 
 		default:
 			return { ok: false, detail: `not one of the four things the Clips view may do: ${JSON.stringify(raw['kind'])}` }
 	}
+}
+
+/** Load a file into a clip: main's alone, for the media fetch. The clip must
+ *  still be in the composition and not playing, because a load into a playing
+ *  clip changes the output there and then. ✅ Arena 7.28, 2026-10-05: 204, and
+ *  the clip read back with the file. */
+export function openWire(tree: ArenaTree, clipId: number, fileUrl: string): Decoded<ArenaWire> {
+	if (!isId(clipId)) return { ok: false, detail: 'not a clip' }
+	if (!fileUrl.startsWith('file:///')) return { ok: false, detail: 'not a file on this computer' }
+	const slot = tree.layers.flatMap((l) => l.slots).find((s) => s.id === clipId)
+	if (slot === undefined) return { ok: false, detail: 'that clip is no longer in the composition' }
+	if (slot.state === 'playing') return { ok: false, detail: 'that clip is playing; nothing is loaded into a clip on output' }
+	return { ok: true, value: { kind: 'rest', calls: [{ path: `/composition/clips/by-id/${clipId}/open`, body: { text: fileUrl } }] } }
 }
 
 /** A tap, as Arena wants it: one POST with no body, its short click. */
