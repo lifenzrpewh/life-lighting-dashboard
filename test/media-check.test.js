@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { decodeItems, decodeServices, decodeWeeks } from '../dist/src/bridge/lookbook.js'
 import { planOf } from '../dist/src/shared/cue-pane.js'
-import { checkMedia, fileStem, lookbookStem, mediaCodeOf, nzDate, offeredServices, sameKey, sameMarkFrom, sameMarksFrom } from '../dist/src/shared/media-check.js'
+import { checkMedia, sameFile, fileStem, lookbookStem, mediaCodeOf, nzDate, offeredServices, sameKey, sameMarkFrom, sameMarksFrom } from '../dist/src/shared/media-check.js'
 
 // Two items as the lookbook sent them for Central AM, 2026-10-04.
 const ITEMS = [
@@ -175,8 +175,27 @@ test('a name that may differ, marked the same by hand, holds for that pair of na
 	// A new file in Arena, or a new upload in the lookbook, asks again.
 	assert.equal(cb('C:\\Media\\CB095-Sunday-RelationshipSeries-v4.png', marked).state, 'other-version')
 	assert.equal(cb(arena, new Set([sameKey('CB095', arena, 'CB095-Sunday-RelationshipSeries-v6')])).state, 'other-version')
-	// A marked file missing from this computer is not marked away.
-	assert.equal(cb(arena, marked, true).state, 'other-version')
+	// A marked file missing from this computer is not marked away: it is missing.
+	assert.equal(cb(arena, marked, true).state, 'not-on-disk')
+})
+
+test('with sizes, a file is the lookbook\'s by its size, whatever its name; without, by its name', () => {
+	const items = decodeItems([ITEMS[0]]).value
+	const lookbook = items[0].files.CB095
+	const renamed = 'D:\\Media\\CB095 background for Sunday.png'
+	const cb = (file, sizes) => checkMedia(items, status([['Holding BG', [slot('bg', file)]]]), new Set(), sizes).items[0].codes.find((c) => c.code === 'CB095')
+	// The same bytes under any name is the same file (the owner: the name is the comms team's).
+	assert.equal(cb(renamed, { arena: { [renamed]: 6569185 }, lookbook: { [lookbook]: 6569185 } }).state, 'ok')
+	// Another size is another file, even under the lookbook's own name.
+	const named = 'D:\\Media\\CB095-Sunday-RelationshipSeries-v5.jpg'
+	const other = cb(named, { arena: { [named]: 6710140 }, lookbook: { [lookbook]: 6569185 } })
+	assert.equal(other.state, 'other-version')
+	assert.equal(other.by, 'size')
+	assert.equal(other.wantPath, lookbook)
+	// No sizes yet: the name decides, and says it is only a name.
+	assert.equal(cb(named, undefined).state, 'ok')
+	assert.equal(cb(renamed, undefined).by, 'name')
+	assert.equal(sameFile(renamed, lookbook, 'CB095-Sunday-RelationshipSeries-v5', { arena: { [renamed]: 5 }, lookbook: {} }), false)
 })
 
 test('marks from storage and from the page are checked', () => {

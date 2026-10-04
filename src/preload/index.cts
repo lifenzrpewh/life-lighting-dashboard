@@ -15,7 +15,7 @@ import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 
 import type { TimerSources } from '../shared/timer.js' with { 'resolution-mode': 'import' }
 import type { ArenaCommand, ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js' with { 'resolution-mode': 'import' }
 import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js' with { 'resolution-mode': 'import' }
-import type { LookbookItem, LookbookRead, LookbookService, SameMark } from '../shared/media-check.js' with { 'resolution-mode': 'import' }
+import type { FileSizes, LookbookItem, LookbookRead, LookbookService, SameMark } from '../shared/media-check.js' with { 'resolution-mode': 'import' }
 import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
@@ -24,7 +24,7 @@ import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'imp
 import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
 import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
-import type { FetchRequest, FetchStates } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
+import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
 
 /** The page's frame callback, while it shows the video feed. */
 let onVideoFrame: ((frame: VideoFrame) => void) | null = null
@@ -89,6 +89,12 @@ const api = {
 	 *  and the media check says when Arena has it. */
 	fetchMedia: (request: FetchRequest): Promise<{ ok: true } | { ok: false; detail: string }> => ipcRenderer.invoke('media:fetch', request),
 	mediaFetches: (): Promise<FetchStates> => ipcRenderer.invoke('media:fetch-state'),
+	/** Where each request's file would come from (the drive, or the lookbook),
+	 *  for the confirmation to say and ask about before anything is sent. */
+	mediaSources: (requests: FetchRequest[]): Promise<Record<string, MediaSource>> => ipcRenderer.invoke('media:sources', requests),
+	/** File sizes, to tell a file by its size rather than its name: Arena's
+	 *  (only files the composition names) and the lookbook's library files. */
+	mediaSizes: (files: { arena: string[]; lookbook: string[] }): Promise<FileSizes> => ipcRenderer.invoke('media:sizes', files),
 	/** The media check's "same" marks, as keys (`sameKey`), and making or
 	 *  undoing one: operator mode only. */
 	/** Windows' folder picker, starting at `start`: the folder picked, or null

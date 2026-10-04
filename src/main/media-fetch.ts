@@ -1,22 +1,35 @@
 // Fetching media, main's half (../shared/media-fetch.ts has the rules): find
-// the file in the graphics folder, copy it into the local folder, load it into
-// Arena's clip. One at a time, in the order asked, each step in the log.
+// the code's file, copy it into the local folder, load it into Arena's clips.
+// One at a time, in the order asked, each step in the log.
+//
+// Where the file comes from (the owner, 2026-10-05): the graphics drive, found
+// by its code and matched to the lookbook's file by size (the lookbook's files
+// are the drive's, byte for byte). When the drive has none of that size (not
+// there, or an older version), the lookbook's own file is downloaded, but only
+// when the operator said yes to that at the confirmation (`allowLookbook`);
+// `sources` is what the confirmation asks before it says anything.
 
 import path from 'node:path'
 
-import { copyInto, findMedia } from '../bridge/media-files.js'
+import { copyInto, downloadInto, findByCode, pickBySize, type Found } from '../bridge/media-files.js'
 import type { ArenaCommandResult } from '../shared/arena.js'
-import { megabytes, type FetchRequest, type FetchState, type FetchStates } from '../shared/media-fetch.js'
+import { megabytes, type FetchRequest, type FetchState, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
 
 export type MediaFetch = {
 	/** Queue a fetch. Refused, with why, when one for that code is under way. */
 	ask(request: FetchRequest): { ok: true } | { ok: false; detail: string }
 	states(): FetchStates
+	/** Where each request's file would come from, before anything is sent. */
+	sources(requests: FetchRequest[]): Promise<Record<string, MediaSource>>
 }
+
+type Resolved = { from: 'drive'; found: Found } | { from: 'lookbook'; why: string; size: number; url: string; name: string } | { from: 'none'; detail: string }
 
 export function createMediaFetch(opts: {
 	folders: () => { graphics: string | null; local: string | null }
 	open: (clipId: number, file: string) => Promise<ArenaCommandResult>
+	lookbookSize: (libraryPath: string) => Promise<number | null>
+	lookbookUrl: (libraryPath: string) => string | null
 }): MediaFetch {
 	const states: FetchStates = {}
 	const queue: FetchRequest[] = []
@@ -30,36 +43,64 @@ export function createMediaFetch(opts: {
 		return s === 'finding' || s === 'copying' || s === 'loading' || queue.some((q) => q.code === code)
 	}
 
-	const run = async (req: FetchRequest) => {
-		const { graphics, local } = opts.folders()
-		if (graphics === null || local === null) {
-			return set(req.code, { state: 'failed', detail: 'set the graphics folder and the local folder on the Arena row in Connections' })
+	/** The drive's file of the lookbook's size, else the lookbook's own. */
+	const resolve = async (req: FetchRequest): Promise<Resolved> => {
+		const { graphics } = opts.folders()
+		const size = req.lookbookPath === null ? null : await opts.lookbookSize(req.lookbookPath)
+		const lookbook = (why: string): Resolved => {
+			const url = req.lookbookPath === null ? null : opts.lookbookUrl(req.lookbookPath)
+			if (url === null || size === null || req.lookbookPath === null) return { from: 'none', detail: `${why}, and the lookbook did not give its file` }
+			const ext = path.extname(req.lookbookPath)
+			return { from: 'lookbook', why, size, url, name: `${req.want}${ext}` }
 		}
-		set(req.code, { state: 'finding' })
-		const find = await findMedia(graphics, req.want)
-		if (!find.ok) return set(req.code, { state: 'failed', detail: find.detail })
-		const [newest] = find.found
-		if (newest === undefined) {
-			console.log(`[media] ${req.code}: "${req.want}" is not in ${graphics} (${find.looked} entries looked at)`)
-			return set(req.code, { state: 'failed', detail: `no file named ${req.want} in the graphics folder` })
+		if (graphics === null) return lookbook('no graphics folder is set')
+		const find = await findByCode(graphics, req.code)
+		if (!find.ok) return lookbook(find.detail)
+		if (size === null) {
+			// Nothing to match by size: only a file of the lookbook's own name.
+			const named = find.found.find((f) => path.basename(f.path, path.extname(f.path)).toLowerCase() === req.want.toLowerCase())
+			return named !== undefined ? { from: 'drive', found: named } : { from: 'none', detail: `the lookbook did not say its file's size, and the drive has no ${req.want}` }
 		}
-		if (find.found.length > 1) console.log(`[media] ${req.code}: ${find.found.length} files named "${req.want}"; taking the newest, ${newest.path}`)
+		const picked = pickBySize(find.found, size)
+		if (picked.pick !== null) return { from: 'drive', found: picked.pick }
+		return lookbook(picked.why === 'not-there' ? `${req.code} is not on the drive` : `the drive's ${req.code} is another version`)
+	}
 
-		console.log(`[media] ${req.code}: found ${newest.path} (${megabytes(newest.size)} MB); into ${local}`)
+	const run = async (req: FetchRequest) => {
+		const { local } = opts.folders()
+		if (local === null) return set(req.code, { state: 'failed', detail: 'set the local folder on the Arena row in Connections' })
+		set(req.code, { state: 'finding' })
+		const r = await resolve(req)
+		if (r.from === 'none') {
+			console.log(`[media] ${req.code}: ${r.detail}`)
+			return set(req.code, { state: 'failed', detail: r.detail })
+		}
+		if (r.from === 'lookbook' && !req.allowLookbook) {
+			console.log(`[media] ${req.code}: ${r.why}; not downloaded from the lookbook (not asked to)`)
+			return set(req.code, { state: 'failed', detail: `${r.why}; not downloaded from the lookbook` })
+		}
 		let lastShown = 0
-		const copy = await copyInto(newest.path, local, (done, total) => {
+		const progress = (done: number, total: number) => {
 			// Every 1 % or so is plenty for a bar, and keeps this cheap.
 			if (done - lastShown < total / 100 && done !== total) return
 			lastShown = done
 			set(req.code, { state: 'copying', done, total })
-		})
+		}
+		let copy
+		if (r.from === 'drive') {
+			console.log(`[media] ${req.code}: found ${r.found.path} on the drive (${megabytes(r.found.size)} MB); into ${local}`)
+			copy = await copyInto(r.found.path, local, progress)
+		} else {
+			console.log(`[media] ${req.code}: ${r.why}; downloading ${r.url} from the lookbook (${megabytes(r.size)} MB) into ${local} as ${r.name}`)
+			copy = await downloadInto(r.url, local, r.name, r.size, progress)
+		}
 		if (!copy.ok) {
 			console.log(`[media] ${req.code}: ${copy.detail}`)
 			return set(req.code, { state: 'failed', detail: copy.detail })
 		}
-		console.log(`[media] ${req.code}: ${copy.copied ? 'copied' : 'already in the local folder'}: ${copy.path}`)
+		console.log(`[media] ${req.code}: ${copy.copied ? (r.from === 'drive' ? 'copied' : 'downloaded') : 'already in the local folder'}: ${copy.path}`)
 		const file = path.basename(copy.path)
-		if (req.clipIds.length === 0) return set(req.code, { state: 'copied', file })
+		if (req.clipIds.length === 0) return set(req.code, { state: 'copied', file, from: r.from })
 
 		// One clip at a time, each checked as it is sent (never a playing one).
 		const failed: string[] = []
@@ -77,7 +118,7 @@ export function createMediaFetch(opts: {
 			const of = req.clipIds.length === 1 ? '' : ` (${loaded} of ${req.clipIds.length} clips)`
 			return set(req.code, { state: 'failed', detail: `copied, but not loaded into Arena${of}: ${failed[0]}` })
 		}
-		set(req.code, { state: 'sent', file, clips: loaded })
+		set(req.code, { state: 'sent', file, clips: loaded, from: r.from })
 	}
 
 	const next = async () => {
@@ -105,5 +146,13 @@ export function createMediaFetch(opts: {
 			return { ok: true }
 		},
 		states: () => ({ ...states }),
+		async sources(requests) {
+			const out: Record<string, MediaSource> = {}
+			for (const req of requests.slice(0, 50)) {
+				const r = await resolve(req)
+				out[req.code] = r.from === 'drive' ? { from: 'drive', file: r.found.path } : r.from === 'lookbook' ? { from: 'lookbook', why: r.why } : r
+			}
+			return out
+		},
 	}
 }

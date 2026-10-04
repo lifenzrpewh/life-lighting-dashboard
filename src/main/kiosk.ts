@@ -50,6 +50,7 @@
 
 import { app, BrowserWindow, Menu, dialog, ipcMain, powerSaveBlocker, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -70,13 +71,13 @@ import { startArena, type ArenaHandle } from './arena.js'
 import type { ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js'
 import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js'
 import { registerThumbnailScheme, serveLookbookThumbnails, serveThumbnails } from './arena-thumbnails.js'
-import { lookbookItems, lookbookServiceForPlan, lookbookServices } from './lookbook.js'
-import type { LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js'
+import { lookbookFileSize, lookbookFileUrl, lookbookItems, lookbookServiceForPlan, lookbookServices } from './lookbook.js'
+import type { FileSizes, LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js'
 import { createPopouts, type Popouts } from './popout.js'
 import { createMediaFetch } from './media-fetch.js'
 import { createMediaSame } from './media-same.js'
 import { sameMarkFrom } from '../shared/media-check.js'
-import { fetchRequestFrom, isFolderPath, type FetchStates } from '../shared/media-fetch.js'
+import { fetchRequestFrom, isFolderPath, type FetchRequest, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
@@ -425,6 +426,38 @@ app.whenReady().then(() => {
 	const mediaFetch = createMediaFetch({
 		folders: () => ({ graphics: store.current().graphicsFolder, local: store.current().localMediaFolder }),
 		open: (clipId, file) => arena?.open(clipId, file) ?? Promise.resolve({ ok: false, detail: 'no Arena is set up' }),
+		lookbookSize: lookbookFileSize,
+		lookbookUrl: lookbookFileUrl,
+	})
+	// Where each file would come from, for the confirmation: the drive, or the
+	// lookbook (which the operator is then asked about).
+	ipcMain.handle('media:sources', async (e, raw: unknown): Promise<Record<string, MediaSource>> => {
+		if (!fromOurs(e) || !Array.isArray(raw)) return {}
+		const reqs = raw.map(fetchRequestFrom).filter((r): r is FetchRequest => r !== null)
+		return mediaFetch.sources(reqs)
+	})
+	// File sizes for the media check (../shared/media-check.ts, `sameFile`):
+	// only files the open composition names, and the lookbook's library files.
+	ipcMain.handle('media:sizes', async (e, raw: unknown): Promise<FileSizes> => {
+		const out: FileSizes = { arena: {}, lookbook: {} }
+		if (!fromOurs(e) || typeof raw !== 'object' || raw === null) return out
+		const { arena: wantArena, lookbook: wantLookbook } = raw as Record<string, unknown>
+		const known = new Set((arena?.status()?.lastOk?.value.layers ?? []).flatMap((l) => l.slots.map((s) => s.file).filter((f): f is string => f !== null)))
+		for (const file of Array.isArray(wantArena) ? wantArena.slice(0, 300) : []) {
+			if (typeof file !== 'string' || !known.has(file)) continue
+			try {
+				out.arena[file] = (await fs.promises.stat(file)).size
+			} catch {
+				// Not on this computer: no size, and the check says the file is missing.
+			}
+		}
+		const lookbook = (Array.isArray(wantLookbook) ? wantLookbook.slice(0, 300) : []).filter((p): p is string => typeof p === 'string')
+		const sizes = await Promise.all(lookbook.map((p) => lookbookFileSize(p)))
+		lookbook.forEach((p, i) => {
+			const size = sizes[i]
+			if (size !== null && size !== undefined) out.lookbook[p] = size
+		})
+		return out
 	})
 	ipcMain.handle('media:fetch', (e, raw: unknown): { ok: true } | { ok: false; detail: string } => {
 		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }

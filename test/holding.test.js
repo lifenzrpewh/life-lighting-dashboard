@@ -200,8 +200,11 @@ test('an update goes into every clip with the old file, not the confirmed or the
 	const s = composition()
 	const bg = s.layers[1]
 	const want = 'CB095-Sunday-RelationshipSeries-v5'
-	assert.equal(clipsToUpdate('CB095', want, s, new Set()).length, 7)
-	assert.deepEqual(clipsToUpdate('CB095', want, s, new Set([sameKey('CB095', bg.slots[0].file, want)])), [])
+	assert.equal(clipsToUpdate('CB095', want, F.CB095, s, new Set()).length, 7)
+	assert.deepEqual(clipsToUpdate('CB095', want, F.CB095, s, new Set([sameKey('CB095', bg.slots[0].file, want)])), [])
+	// With sizes: the same bytes need nothing, whatever they are called.
+	const arena = Object.fromEntries(bg.slots.filter((x) => x.file !== null).map((x) => [x.file, 42]))
+	assert.deepEqual(clipsToUpdate('CB095', want, F.CB095, s, new Set(), { arena, lookbook: { [F.CB095]: 42 } }), [])
 })
 
 test('Update all: one step per code, its old clips and its missing columns together', () => {
@@ -212,6 +215,9 @@ test('Update all: one step per code, its old clips and its missing columns toget
 	// CB095 is confirmed, so only the columns missing it: BIBLES and WTG.
 	assert.equal(by.CB095.request.clipIds.length, 2)
 	assert.match(by.CF588.what, /HOLD FG · POST \(column 2\)/)
+	// Each step names the lookbook's file, and never downloads unless asked at the confirmation.
+	assert.equal(by.CF588.request.lookbookPath, F.CF588)
+	assert.ok(steps.every((x) => x.request.allowLookbook === false))
 	assert.equal(by.CF445, undefined)
 	assert.ok(unplaced.some((u) => u.code === 'CB105'))
 	assert.equal(new Set(steps.map((x) => x.request.code)).size, steps.length)

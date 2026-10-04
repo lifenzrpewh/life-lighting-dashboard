@@ -167,16 +167,32 @@ export function ReadLine({ m, now }: { m: MediaCheckState; now: number }) {
  *  it does: nothing is sent until Load (the owner, 2026-10-05). */
 export function Confirm({ m }: { m: MediaCheckState }) {
 	if (m.asking === null) return null
-	const { title, steps, unplaced } = m.asking
+	const { title, steps, unplaced, sources } = m.asking
+	const fromLookbook = sources === null ? 0 : steps.filter((s) => sources[s.request.code]?.from === 'lookbook').length
+	const fromDrive = sources === null ? 0 : steps.filter((s) => sources[s.request.code]?.from === 'drive').length
 	return (
 		<div className="my-2 rounded-lg bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
 			<p className="mb-2 font-medium">{title}</p>
 			<ul className="mb-2 flex flex-col gap-1 text-xs">
-				{steps.map((s) => (
-					<li key={s.request.code} className="truncate">
-						{s.what}
-					</li>
-				))}
+				{steps.map((s) => {
+					const src = sources?.[s.request.code]
+					return (
+						<li key={s.request.code} className="flex min-w-0 flex-col">
+							<span className="truncate">{s.what}</span>
+							<span className={`truncate ${src?.from === 'drive' ? 'text-booth-dim' : 'text-warn'}`}>
+								{src === undefined
+									? sources === null
+										? 'Looking on the drive…'
+										: 'Not checked'
+									: src.from === 'drive'
+										? `From the drive: ${fileName(src.file)}`
+										: src.from === 'lookbook'
+											? `Only in the lookbook: ${src.why}`
+											: `Left out: ${src.detail}`}
+							</span>
+						</li>
+					)
+				})}
 				{unplaced
 					.filter((u) => u.kind !== 'unnamed')
 					.map((u) => (
@@ -189,10 +205,25 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 				)}
 			</ul>
 			<p className="mb-2 text-xs text-booth-dim">
-				Copied from the graphics folder into the local folder, then loaded into Arena. Never into a playing clip; nothing is overwritten. Operator mode.
+				Copied into the local folder, then loaded into Arena. Never into a playing clip; nothing is overwritten. Operator mode.
 			</p>
-			<div className="flex gap-2">
-				<SmallButton onClick={m.confirm}>Load</SmallButton>
+			{fromLookbook > 0 && (
+				<p className="mb-2 text-xs text-warn">
+					{fromLookbook === 1 ? '1 file is' : `${fromLookbook} files are`} not on the graphics drive as the lookbook has {fromLookbook === 1 ? 'it' : 'them'}. Download
+					from the lookbook instead?
+				</p>
+			)}
+			<div className="flex flex-wrap gap-2">
+				{sources === null ? (
+					<span className="flex h-10 items-center text-xs text-booth-dim">Looking on the drive…</span>
+				) : fromLookbook > 0 ? (
+					<>
+						<SmallButton onClick={() => m.confirm(true)}>Load, downloading {fromLookbook} from the lookbook</SmallButton>
+						{fromDrive > 0 && <SmallButton onClick={() => m.confirm(false)}>Load only what's on the drive</SmallButton>}
+					</>
+				) : (
+					fromDrive > 0 && <SmallButton onClick={() => m.confirm(false)}>Load</SmallButton>
+				)}
 				<SmallButton onClick={m.cancel}>Cancel</SmallButton>
 			</div>
 		</div>
@@ -201,7 +232,7 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 
 /** Placing one code of one item in its column, said. */
 export function placeStep(p: Placement): UpdateStep {
-	return { request: { code: p.code, want: p.want, clipIds: [p.clipId] }, what: `${p.code} (${p.label ?? p.title}): ${p.want} into ${placementWords(p)}` }
+	return { request: { code: p.code, want: p.want, clipIds: [p.clipId], lookbookPath: p.lookbookPath, allowLookbook: false }, what: `${p.code} (${p.label ?? p.title}): ${p.want} into ${placementWords(p)}` }
 }
 
 /** Loading a newer file into clips, said: where, or how many. */
@@ -296,8 +327,11 @@ function CodeRow({
 			detail = `${where(check.at)} · ${check.at.file}`
 			break
 		case 'other-version':
-			state = <span className="text-warn">may differ</span>
-			detail = `${where(check.at)} has ${fileName(check.at.file)}; the lookbook has ${check.want}`
+			state = <span className="text-warn">{check.by === 'size' ? 'different file' : 'may differ'}</span>
+			detail =
+				check.by === 'size'
+					? `${where(check.at)} has ${fileName(check.at.file)}, not the lookbook's ${check.want} (another size)`
+					: `${where(check.at)} has ${fileName(check.at.file)}; the lookbook has ${check.want}`
 			break
 		case 'no-lookbook-file':
 			state = <span className="text-booth-dim">? the lookbook has no file{check.at !== null && ` · in ${where(check.at)}`}</span>
@@ -307,9 +341,18 @@ function CodeRow({
 	// code in its item's column; Copy here only copies, when there is no place.
 	const update: FetchRequest | null =
 		check.state === 'other-version' || check.state === 'not-on-disk'
-			? { code: check.code, want: check.want, clipIds: clipsToUpdate(check.code, check.want, status, m.same) }
+			? {
+					code: check.code,
+					want: check.want,
+					clipIds: clipsToUpdate(check.code, check.want, check.wantPath, status, m.same, m.sizes),
+					lookbookPath: check.wantPath,
+					allowLookbook: false,
+				}
 			: null
-	const copyOnly = check.state === 'not-loaded' && placement === null ? { code: check.code, want: check.want, clipIds: [] } : null
+	const copyOnly: FetchRequest | null =
+		check.state === 'not-loaded' && placement === null
+			? { code: check.code, want: check.want, clipIds: [], lookbookPath: check.wantPath, allowLookbook: false }
+			: null
 	const mark: SameMark | null =
 		check.state === 'other-version' || check.state === 'same-by-hand'
 			? { code: check.code, file: check.at.file, want: check.want, same: check.state === 'other-version' }
@@ -369,11 +412,16 @@ export function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | un
 			return (
 				<span className="max-w-72 truncate text-xs text-booth-dim">
 					sent {fetch.file}
+					{fetch.from === 'lookbook' ? ' (from the lookbook)' : ''}
 					{fetch.clips > 1 ? ` to ${fetch.clips} clips` : ''}; checking…
 				</span>
 			)
 		case 'copied':
-			return <span className="max-w-72 truncate text-xs text-booth-dim">copied {fetch.file} here; put it in Arena by hand</span>
+			return (
+				<span className="max-w-72 truncate text-xs text-booth-dim">
+					{fetch.from === 'lookbook' ? 'downloaded' : 'copied'} {fetch.file} here; put it in Arena by hand
+				</span>
+			)
 		case 'failed':
 			return (
 				<span className="max-w-72 truncate text-xs text-warn" title={fetch.detail}>

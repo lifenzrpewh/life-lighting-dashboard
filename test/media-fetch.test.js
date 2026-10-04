@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { copyInto, fileUrlOf, findMedia } from '../dist/src/bridge/media-files.js'
+import { copyInto, downloadInto, fileUrlOf, findByCode, findMedia, pickBySize } from '../dist/src/bridge/media-files.js'
+import http from 'node:http'
 import { fetchRequestFrom, isFolderPath, isPlainName } from '../dist/src/shared/media-fetch.js'
 import { openWire } from '../dist/src/bridge/arena-control.js'
 import { applyPatch, DEFAULT_SETTINGS } from '../dist/src/shared/settings.js'
@@ -69,8 +70,15 @@ test('Arena is given a file:/// address, spaces encoded', () => {
 })
 
 test('a request from the page is a code, a plain name and clips, and nothing else', () => {
-	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'CF588-Walk In V2', clipIds: [12, 13, 12] }), { code: 'CF588', want: 'CF588-Walk In V2', clipIds: [12, 13] })
-	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'x', clipIds: [] }).clipIds, [])
+	const lib = '/storage/library/C/CF588-Sunday-ReloSeries-WalkInV2_1789857226772.png'
+	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'CF588-Walk In V2', clipIds: [12, 13, 12], lookbookPath: lib, allowLookbook: true }), {
+		code: 'CF588',
+		want: 'CF588-Walk In V2',
+		clipIds: [12, 13],
+		lookbookPath: lib,
+		allowLookbook: true,
+	})
+	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'x', clipIds: [], lookbookPath: null, allowLookbook: false }).clipIds, [])
 	for (const bad of [
 		null,
 		{ code: 'cf588', want: 'x', clipIds: [1] },
@@ -80,6 +88,11 @@ test('a request from the page is a code, a plain name and clips, and nothing els
 		{ code: 'CF588', want: 'x', clipIds: 12 },
 		{ code: 'CF588', want: 'x', clipIds: Array.from({ length: 101 }, (_, i) => i + 1) },
 		{ code: 'CF588', want: 'x' },
+		// The lookbook file must be a library file, and the code's.
+		{ code: 'CF588', want: 'x', clipIds: [], lookbookPath: '/storage/library/C/CF589-x_1.png', allowLookbook: false },
+		{ code: 'CF588', want: 'x', clipIds: [], lookbookPath: 'https://elsewhere/CF588.png', allowLookbook: false },
+		{ code: 'CF588', want: 'x', clipIds: [], lookbookPath: '/storage/library/C/../CF588.png', allowLookbook: false },
+		{ code: 'CF588', want: 'x', clipIds: [], lookbookPath: null },
 	]) {
 		assert.equal(fetchRequestFrom(bad), null, JSON.stringify(bad))
 	}
@@ -108,4 +121,58 @@ test('a file goes only into a clip still there and not playing, by open, never c
 	assert.match(openWire(tree, 99, url).detail, /no longer/)
 	assert.equal(openWire(tree, 10, 'http://evil/x').ok, false)
 	assert.doesNotMatch(ok.value.calls[0].path, /clear/)
+})
+
+test('on the drive, a code is found anywhere in a name; the one of the lookbook\'s size wins, a copy last', async () => {
+	const root = temp()
+	fs.mkdirSync(path.join(root, '1. Central'), { recursive: true })
+	const put = (name, bytes) => fs.writeFileSync(path.join(root, '1. Central', name), 'x'.repeat(bytes))
+	put('CF449-Sunday-Bibles.png', 10)
+	put('CF449-Sunday-Bibles - Copy.png', 10)
+	put('Bibles CF449 old.png', 7)
+	put('CF4491-other.png', 10)
+	put('CB095-Sunday-RelationshipSeries-v4.jpg', 20)
+	const found = await findByCode(root, 'CF449')
+	assert.ok(found.ok)
+	assert.equal(found.found.length, 3)
+	const pick = pickBySize(found.found, 10)
+	assert.equal(path.basename(pick.pick.path), 'CF449-Sunday-Bibles.png')
+	// The drive has the code, but not the lookbook's version.
+	assert.deepEqual(pickBySize((await findByCode(root, 'CB095')).found, 19), { pick: null, why: 'other-version' })
+	assert.deepEqual(pickBySize((await findByCode(root, 'CF464')).found, 10), { pick: null, why: 'not-there' })
+	assert.equal((await findByCode(root, 'C.*')).ok, false)
+})
+
+test('a lookbook download is whole or not at all, and never overwrites', async () => {
+	const body = Buffer.from('lookbook bytes')
+	const server = http.createServer((req, res) => {
+		if (req.url === '/short') {
+			res.writeHead(200, { 'content-length': String(body.length) })
+			res.end(body.subarray(0, 4))
+			return
+		}
+		res.writeHead(req.url === '/ok' ? 200 : 404)
+		res.end(req.url === '/ok' ? body : '')
+	})
+	await new Promise((r) => server.listen(0, '127.0.0.1', r))
+	const base = `http://127.0.0.1:${server.address().port}`
+	try {
+		const to = temp()
+		const seen = []
+		const first = await downloadInto(`${base}/ok`, to, 'CF464-Sunday-EXP-NextStepsLounge.png', body.length, (d, t) => seen.push([d, t]))
+		assert.equal(first.ok, true)
+		assert.equal(first.copied, true)
+		assert.equal(fs.readFileSync(first.path, 'utf8'), 'lookbook bytes')
+		assert.deepEqual(seen.at(-1), [body.length, body.length])
+		// Again: the same file is there, so it is used.
+		assert.deepEqual(await downloadInto(`${base}/ok`, to, 'CF464-Sunday-EXP-NextStepsLounge.png', body.length, () => {}), { ok: true, path: first.path, copied: false })
+		// Another size under that name is left alone.
+		assert.match((await downloadInto(`${base}/ok`, to, 'CF464-Sunday-EXP-NextStepsLounge.png', 99, () => {})).detail, /nothing was overwritten/)
+		// A 404 or a short answer leaves nothing behind.
+		assert.match((await downloadInto(`${base}/gone`, to, 'a.png', 5, () => {})).detail, /answered 404/)
+		assert.equal((await downloadInto(`${base}/short`, to, 'b.png', body.length, () => {})).ok, false)
+		assert.deepEqual(fs.readdirSync(to).sort(), ['CF464-Sunday-EXP-NextStepsLounge.png'])
+	} finally {
+		server.close()
+	}
 })

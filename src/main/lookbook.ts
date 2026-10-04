@@ -17,6 +17,7 @@ import {
 	type LookbookRead,
 	type LookbookService,
 } from '../shared/media-check.js'
+import { LIBRARY_FILE } from '../shared/media-fetch.js'
 import { getJson } from './http-poll.js'
 
 const fail = <T>(detail: string): LookbookRead<T> => {
@@ -98,4 +99,30 @@ export async function lookbookItems(serviceId: unknown): Promise<LookbookRead<Lo
 	if (!items.ok) return fail(items.detail)
 	console.log(`[lookbook] read ${items.value.length} items`)
 	return { ok: true, value: items.value, at: Date.now() }
+}
+
+/** A library file's size, by asking the lookbook for its head: what a drive's
+ *  file must match to be the lookbook's (../shared/media-check.ts, `sameFile`).
+ *  Kept, since a library file's name carries its upload time: a new upload is a
+ *  new path. Null when the lookbook did not say. */
+const sizeKept = new Map<string, number>()
+
+export async function lookbookFileSize(libraryPath: string): Promise<number | null> {
+	if (!LIBRARY_FILE.test(libraryPath)) return null
+	const kept = sizeKept.get(libraryPath)
+	if (kept !== undefined) return kept
+	try {
+		const r = await fetch(LOOKBOOK_URL + libraryPath, { method: 'HEAD', signal: AbortSignal.timeout(LOOKBOOK_TIMEOUT_MS) })
+		const size = Number(r.headers.get('content-length'))
+		if (!r.ok || !Number.isSafeInteger(size) || size <= 0) return null
+		sizeKept.set(libraryPath, size)
+		return size
+	} catch {
+		return null
+	}
+}
+
+/** Where a library file is downloaded from: the lookbook, and nowhere else. */
+export function lookbookFileUrl(libraryPath: string): string | null {
+	return LIBRARY_FILE.test(libraryPath) ? LOOKBOOK_URL + libraryPath : null
 }

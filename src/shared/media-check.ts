@@ -157,14 +157,16 @@ export type Place = {
 export type CodeCheck =
 	/** Loaded, on this computer, and the lookbook's version. */
 	| { code: string; state: 'ok'; at: Place }
-	/** Nowhere in Arena. `want` is the lookbook's name, for the media fetch. */
-	| { code: string; state: 'not-loaded'; want: string }
+	/** Nowhere in Arena. `want` is the lookbook's name and `wantPath` its file
+	 *  in the lookbook's library, for the media fetch. */
+	| { code: string; state: 'not-loaded'; want: string; wantPath: string }
 	/** Loaded, but Arena cannot find the file on this computer. */
-	| { code: string; state: 'not-on-disk'; at: Place; want: string }
-	/** Loaded, but not the lookbook's name: `want` is the lookbook's name. */
-	| { code: string; state: 'other-version'; at: Place; want: string }
-	/** Not the lookbook's name, but an operator has said it is the same file. */
-	| { code: string; state: 'same-by-hand'; at: Place; want: string }
+	| { code: string; state: 'not-on-disk'; at: Place; want: string; wantPath: string }
+	/** Loaded, but not the lookbook's file: told by size when both sizes are
+	 *  known (`by: 'size'`, a different file), else by name (`'name'`, may differ). */
+	| { code: string; state: 'other-version'; at: Place; want: string; wantPath: string; by: 'size' | 'name' }
+	/** Not the lookbook's file, but an operator has said it is the same. */
+	| { code: string; state: 'same-by-hand'; at: Place; want: string; wantPath: string }
 	/** The lookbook has no file for it, so its version cannot be checked. Where
 	 *  Arena has it, if anywhere. */
 	| { code: string; state: 'no-lookbook-file'; at: Place | null }
@@ -225,24 +227,52 @@ export function sameMarkFrom(raw: unknown): SameMark | null {
 
 /** One code against what Arena holds. Several clips may carry it; the best
  *  answer wins, so a right copy anywhere is enough. */
-function checkCode(code: string, want: string | null, places: (Place & { onDisk: boolean })[], marks: ReadonlySet<string>): CodeCheck {
+function checkCode(
+	code: string,
+	want: { stem: string; path: string } | null,
+	places: (Place & { onDisk: boolean })[],
+	marks: ReadonlySet<string>,
+	sizes: FileSizes | undefined,
+): CodeCheck {
 	const strip = ({ onDisk: _, ...p }: Place & { onDisk: boolean }): Place => p
-	if (places.length === 0) return want === null ? { code, state: 'no-lookbook-file', at: null } : { code, state: 'not-loaded', want }
+	if (places.length === 0) return want === null ? { code, state: 'no-lookbook-file', at: null } : { code, state: 'not-loaded', want: want.stem, wantPath: want.path }
 	if (want === null) return { code, state: 'no-lookbook-file', at: strip(places[0] as Place & { onDisk: boolean }) }
-	const same = (p: Place) => fileStem(p.file).toLowerCase() === want.toLowerCase()
-	const right = places.find((p) => same(p) && p.onDisk)
+	const w = { want: want.stem, wantPath: want.path }
+	const right = places.find((p) => p.onDisk && sameFile(p.file, want.path, want.stem, sizes))
 	if (right !== undefined) return { code, state: 'ok', at: strip(right) }
-	const rightButGone = places.find(same)
-	if (rightButGone !== undefined) return { code, state: 'not-on-disk', at: strip(rightButGone), want }
-	const marked = places.find((p) => p.onDisk && marks.has(sameKey(code, p.file, want)))
-	if (marked !== undefined) return { code, state: 'same-by-hand', at: strip(marked), want }
-	return { code, state: 'other-version', at: strip(places[0] as Place & { onDisk: boolean }), want }
+	// A missing file has no size to compare: its name says whether it was the right one.
+	const rightButGone = places.find((p) => !p.onDisk && fileStem(p.file).toLowerCase() === want.stem.toLowerCase())
+	if (rightButGone !== undefined) return { code, state: 'not-on-disk', at: strip(rightButGone), ...w }
+	const marked = places.find((p) => p.onDisk && marks.has(sameKey(code, p.file, want.stem)))
+	if (marked !== undefined) return { code, state: 'same-by-hand', at: strip(marked), ...w }
+	const first = places[0] as Place & { onDisk: boolean }
+	if (!first.onDisk) return { code, state: 'not-on-disk', at: strip(first), ...w }
+	const by = sizes?.arena[first.file] !== undefined && sizes.lookbook[want.path] !== undefined ? 'size' : 'name'
+	return { code, state: 'other-version', at: strip(first), ...w, by }
+}
+
+/** File sizes, by path: Arena's files on this computer and the lookbook's
+ *  library files, as main read them (src/main/media-sizes.ts). */
+export type FileSizes = { arena: Record<string, number>; lookbook: Record<string, number> }
+
+/** Whether Arena's file is the lookbook's. ✅ 2026-10-05: the lookbook's
+ *  files are byte for byte the graphics drive's (CF588, CF445, CF449, CF546,
+ *  CF593 and CA635 the same size to the byte), so equal sizes are the same
+ *  file whatever it is called, and the name says nothing but the code (the
+ *  owner: the rest of a name is for the comms team). Without both sizes, the
+ *  names are compared, as before sizes were read. */
+export function sameFile(arenaFile: string, lookbookPath: string, stem: string, sizes: FileSizes | undefined): boolean {
+	const a = sizes?.arena[arenaFile]
+	const l = sizes?.lookbook[lookbookPath]
+	if (a !== undefined && l !== undefined) return a === l
+	return fileStem(arenaFile).toLowerCase() === stem.toLowerCase()
 }
 
 /** The run sheet's items against Arena. Only the types Arena holds are
  *  checked; an item with none of them is left out. `same` holds the keys
- *  (`sameKey`) an operator has marked the same. */
-export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: ReadonlySet<string> = new Set()): MediaCheck {
+ *  (`sameKey`) an operator has marked the same; `sizes`, when read, tell a
+ *  file by its size rather than its name (`sameFile`). */
+export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: ReadonlySet<string> = new Set(), sizes?: FileSizes): MediaCheck {
 	const loaded = loadedCodes(status)
 	const counts: MediaCheck['counts'] = { ok: 0, 'not-loaded': 0, 'not-on-disk': 0, 'other-version': 0, 'same-by-hand': 0, 'no-lookbook-file': 0 }
 	const seen = new Set<string>()
@@ -253,7 +283,7 @@ export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: Rea
 			const parsed = mediaCodeOf(raw)
 			if (parsed === null || !ARENA_TYPES.includes(parsed.type)) continue
 			const file = item.files[parsed.code]
-			const result = checkCode(parsed.code, file === undefined ? null : lookbookStem(file), loaded.get(parsed.code) ?? [], same)
+			const result = checkCode(parsed.code, file === undefined ? null : { stem: lookbookStem(file), path: file }, loaded.get(parsed.code) ?? [], same, sizes)
 			codes.push(result)
 			if (!seen.has(parsed.code)) {
 				seen.add(parsed.code)

@@ -648,8 +648,33 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
   check's ask to repeat the load test was stopped by this box's safety check. (The ZZ999
   test clip left in PRE & POST, column 9 went with that composition: the Central one
   loaded on 2026-10-05 has nothing there.)
-- Not built: fetching straight from the lookbook when the graphics folder lacks a file
-  (the lookbook holds the same files).
+- **By code and size, with the lookbook as the backup** (the owner, 2026-10-05: "the rest of
+  the name is more for the comms team"; download from the lookbook "as a backup if it's not
+  on the drive", with a safeguard). ✅ Measured that day: **the lookbook's files are the
+  drive's, byte for byte** (CF588, CF445, CF449, CF546, CF593 and CA635 the same size to the
+  byte on `G:\Sunday Media\1. Central` and in the lookbook). So:
+  - **The check tells a file by its size.** Main reads the size of Arena's files (only ones
+    the composition names) and of the lookbook's (a HEAD, kept: a library path carries its
+    upload time); same size is ✓ whatever the name, another size is **different file**. Only
+    while sizes are unread does a name decide (**may differ**). A missing file is **file
+    missing**, whatever its name.
+  - **The drive is searched by code**: a file whose name carries the code (`CF449` in `CF449
+    Bibles - Copy.png`), of the lookbook's size, a plain name before a `- Copy`, newest first.
+  - **Else the lookbook's own file is downloaded** into the local folder, named as the lookbook
+    names it without the upload stamp, whole or not at all (`.partial`, renamed at the right
+    size), never over another file, only from the lookbook's library.
+  - **The safeguard: the confirmation asks.** Before anything is sent, main says where each
+    file would come from ("From the drive: …", "Only in the lookbook: CF464 is not on the
+    drive", "…: the drive's CB095 is another version"); when any are lookbook-only it asks:
+    **Load, downloading N from the lookbook** or **Load only what's on the drive**. A request
+    never downloads unless that yes came with it (`allowLookbook`, checked in main). The log
+    says which, and a fetch's words say "(from the lookbook)".
+  - ✅ Dry run against the drive, the lookbook and the live composition for Central AM and PM
+    4 Oct: CF594 now found on the drive (`…Prayer&Fasting-Oct.png` where the lookbook says
+    `…Prayer-Fasting-Oct-1`, the same size; it failed by name that morning); CF464 not on the
+    drive, so the lookbook, asked; CB095's drive copy another version (`-v4` against `-v5`),
+    so the lookbook, asked; the check said CB095 "different file" by size. 287 tests.
+    ⚠️ A download through the button not yet watched.
 - **Browse** (the owner's ask, 2026-10-05): beside each folder on the Arena row, Windows' own
   folder picker over the window that asked; the pick fills the field, Save keeps it. Operator
   mode. ⚠️ Not opened from a session (it would raise a dialog on the owner's screen).

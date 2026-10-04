@@ -36,16 +36,34 @@ export type FetchRequest = {
 	/** The clips to load it into: every clip with the old file, or the one
 	 *  slot a new code is placed in. None copies only. */
 	clipIds: number[]
+	/** The lookbook's file for it (`/storage/library/C/…`): what the drive's
+	 *  file must match in size, and what is downloaded when the drive has none. */
+	lookbookPath: string | null
+	/** Download from the lookbook when the drive has no matching file. Only
+	 *  when the operator said so at the confirmation (the owner, 2026-10-05). */
+	allowLookbook: boolean
 }
+
+/** Where a code's file will come from, said at the confirmation before
+ *  anything is sent. */
+export type MediaSource =
+	| { from: 'drive'; file: string }
+	/** Not on the drive, or the drive's is another version: only with the
+	 *  operator's yes. */
+	| { from: 'lookbook'; why: string }
+	| { from: 'none'; detail: string }
+
+/** A lookbook library file, any media type: `/storage/library/C/CF588-…_1789857226772.png`. */
+export const LIBRARY_FILE = /^\/storage\/library\/[A-Za-z]\/[^/\\]{1,200}\.[A-Za-z0-9]{2,5}$/
 
 export type FetchState =
 	| { state: 'finding' }
 	| { state: 'copying'; done: number; total: number }
 	| { state: 'loading'; file: string; done: number; of: number }
 	/** Arena took the load; the media check confirms the clip has it. */
-	| { state: 'sent'; file: string; clips: number }
+	| { state: 'sent'; file: string; clips: number; from: 'drive' | 'lookbook' }
 	/** Copied, not loaded: nothing in Arena to load it into. */
-	| { state: 'copied'; file: string }
+	| { state: 'copied'; file: string; from: 'drive' | 'lookbook' }
 	| { state: 'failed'; detail: string }
 
 /** Each code's latest fetch, by code, stamped. */
@@ -60,12 +78,14 @@ export function isPlainName(name: string): boolean {
 /** A request off the IPC boundary, or null. */
 export function fetchRequestFrom(raw: unknown): FetchRequest | null {
 	if (typeof raw !== 'object' || raw === null) return null
-	const { code, want, clipIds } = raw as Record<string, unknown>
+	const { code, want, clipIds, lookbookPath, allowLookbook } = raw as Record<string, unknown>
 	if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return null
 	if (typeof want !== 'string' || !isPlainName(want)) return null
 	if (!Array.isArray(clipIds) || clipIds.length > 100) return null
 	if (!clipIds.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)) return null
-	return { code, want, clipIds: [...new Set(clipIds as number[])] }
+	if (lookbookPath !== null && !(typeof lookbookPath === 'string' && LIBRARY_FILE.test(lookbookPath) && libraryCodeIs(lookbookPath, code))) return null
+	if (typeof allowLookbook !== 'boolean') return null
+	return { code, want, clipIds: [...new Set(clipIds as number[])], lookbookPath, allowLookbook }
 }
 
 /** A folder setting: a whole path on this computer or the network, `D:\Media`,
@@ -78,4 +98,11 @@ export function isFolderPath(text: string): boolean {
 /** Megabytes, for the progress: `312 of 1,204 MB`. */
 export function megabytes(bytes: number): string {
 	return Math.round(bytes / 1_000_000).toLocaleString('en-NZ')
+}
+
+/** Whether a library file is the one for `code`: its name carries the code. */
+export function libraryCodeIs(libraryPath: string, code: string): boolean {
+	const name = libraryPath.split('/').at(-1) ?? ''
+	if (!/^[A-Z]{2}\d{3}$/.test(code)) return false
+	return new RegExp(`(?<![A-Za-z0-9])${code}(?![0-9])`, 'i').test(name)
 }

@@ -12,18 +12,19 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ArenaStatus } from '../shared/arena.js'
-import { planPlacements, updatePlan, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { codesOn, planPlacements, slotCode, updatePlan, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	nzDate,
 	offeredServices,
+	type FileSizes,
 	type LookbookItem,
 	type LookbookRead,
 	type LookbookService,
 	type MediaCheck,
 	type SameMark,
 } from '../shared/media-check.js'
-import type { FetchRequest, FetchStates } from '../shared/media-fetch.js'
+import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js'
 
 export type Load<T> = { kind: 'idle' } | { kind: 'reading' } | { kind: 'read'; read: LookbookRead<T> }
 
@@ -177,11 +178,29 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	}
 
 	const runSheet = service !== null && itemsFor === service.id && items.kind === 'read' && items.read.ok ? items.read.value : null
-	const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same)
+	// File sizes, so a file is told by its size, not its name (../shared/media-check.ts,
+	// `sameFile`): asked when the run sheet or the clips carrying its codes change.
+	const [sizes, setSizes] = useState<FileSizes | undefined>(undefined)
+	const today = runSheet === null ? null : codesOn(runSheet)
+	const arenaFiles =
+		today === null
+			? []
+			: [...new Set(status.layers.flatMap((l) => l.slots.filter((x) => x.file !== null && today.has(slotCode(x) ?? '')).map((x) => x.file as string)))].sort()
+	const libraryFiles = runSheet === null ? [] : [...new Set(runSheet.flatMap((i) => Object.values(i.files)))].sort()
+	const sizeKey = JSON.stringify([arenaFiles, libraryFiles])
+	useEffect(() => {
+		if (runSheet === null || life === undefined) return
+		let alive = true
+		void life.mediaSizes({ arena: arenaFiles, lookbook: libraryFiles }).then((s) => alive && setSizes(s))
+		return () => {
+			alive = false
+		}
+	}, [sizeKey])
+	const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same, sizes)
 	// Each item's codes into its column, by Arena's column names (../shared/holding.ts).
 	const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
 		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status)
-	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same)
+	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes)
 	// To look at: an old or missing file, a code not where its item belongs, or
 	// one with no place (a code the lookbook has no file for is said apart).
 	const trouble =
@@ -190,11 +209,30 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	// Nothing is copied or loaded into Arena without a confirmation first (the
 	// owner, 2026-10-05): a Fetch, a Place and Update all each say what they
 	// will do, and only Load sends it. Main runs the steps one at a time.
-	const [asking, setAsking] = useState<{ title: string; steps: UpdateStep[]; unplaced: Unplaced[] } | null>(null)
-	const ask = (title: string, steps: UpdateStep[], unplaced: Unplaced[] = []) => setAsking({ title, steps, unplaced })
-	const confirm = () => {
-		if (asking === null) return
-		for (const step of asking.steps) fetchCode(step.request)
+	// Before it says anything, main says where each file would come from: a
+	// file that is not on the drive, or only in another version there, would be
+	// downloaded from the lookbook, and the operator is asked about that apart.
+	const [asking, setAsking] = useState<{
+		id: number
+		title: string
+		steps: UpdateStep[]
+		unplaced: Unplaced[]
+		sources: Record<string, MediaSource> | null
+	} | null>(null)
+	const askId = useRef(0)
+	const ask = (title: string, steps: UpdateStep[], unplaced: Unplaced[] = []) => {
+		const id = ++askId.current
+		setAsking({ id, title, steps, unplaced, sources: null })
+		void life?.mediaSources(steps.map((s) => s.request)).then((sources) => setAsking((a) => (a?.id === id ? { ...a, sources } : a)))
+	}
+	/** Load: what the drive has, and what only the lookbook has when
+	 *  `downloadFromLookbook`. A file with nowhere to come from is left out. */
+	const confirm = (downloadFromLookbook: boolean) => {
+		if (asking === null || asking.sources === null) return
+		for (const step of asking.steps) {
+			const from = asking.sources[step.request.code]?.from
+			if (from === 'drive' || (from === 'lookbook' && downloadFromLookbook)) fetchCode({ ...step.request, allowLookbook: from === 'lookbook' })
+		}
 		setAsking(null)
 	}
 	const askUpdateAll = () => ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced)
@@ -220,6 +258,7 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		unplaced,
 		plannedUpdate,
 		same,
+		sizes,
 		// Actions, and how they are going.
 		fetches,
 		refused,

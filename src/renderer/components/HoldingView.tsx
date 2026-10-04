@@ -42,7 +42,7 @@ export function HoldingView({ status, now }: { status: Channel<ArenaStatus> | nu
 }
 
 /** What is being placed by hand: one code of one item, into a slot of its layer. */
-type Choosing = { item: number; title: string; label: string | null; code: string; want: string }
+type Choosing = { item: number; title: string; label: string | null; code: string; want: string; lookbookPath: string }
 type Picked = { kind: 'clip'; id: number } | { kind: 'choose'; what: Choosing } | null
 
 const TYPE_LAYER: Record<string, RegExp> = { B: /^hold\s*bg$/i, F: /^hold\s*fg$/i, A: /^pre\s*(?:&|and)?\s*post$/i }
@@ -64,7 +64,7 @@ function Holding({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | 
 	const freeFor = (what: Choosing, layer: ArenaLayer, slot: ArenaSlot, column: number) => {
 		const type = mediaCodeOf(what.code)?.type ?? ''
 		if (TYPE_LAYER[type]?.test(layer.name.trim()) !== true) return false
-		const mark = slotMark(slot, items, today, m.same)
+		const mark = slotMark(slot, items, today, m.same, m.sizes)
 		return slot.state !== 'playing' && !reserved(layer, column, status) && (mark === 'empty' || mark === 'not-today')
 	}
 
@@ -139,7 +139,7 @@ function Holding({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | 
 									{/^playback$/i.test(layer.name.trim()) && <span className="block text-xs text-booth-dim">rarely used</span>}
 								</th>
 								{layer.slots.map((slot, i) => {
-									const mark = slotMark(slot, items, today, m.same)
+									const mark = slotMark(slot, items, today, m.same, m.sizes)
 									const target = choosing !== null && freeFor(choosing, layer, slot, i + 1)
 									const columnName = columnNamesOf(layer, status)[i] ?? ''
 									return (
@@ -203,7 +203,8 @@ function PlaceRow({
 	const file = m.runSheet?.[one.item]?.files[one.code] ?? null
 	const thumb = file === null ? null : lookbookThumbUrl(file)
 	const fetch = m.fetches[one.code]
-	const what: Choosing | null = one.want === null ? null : { item: one.item, title: one.title, label: one.label, code: one.code, want: one.want }
+	const what: Choosing | null =
+		one.want === null || file === null ? null : { item: one.item, title: one.title, label: one.label, code: one.code, want: one.want, lookbookPath: file }
 	const active = choosing !== null && choosing.item === one.item && choosing.code === one.code
 	return (
 		<div className={`flex min-w-0 items-center gap-3 rounded-lg p-2 ${active ? 'bg-booth-raise nacre-ring' : 'bg-booth-panel ring-1 ring-booth-edge ring-inset'}`}>
@@ -256,7 +257,7 @@ function Tile({
 			? 'ring-2 ring-booth-ink'
 			: slot.state === 'playing'
 				? 'ring-2 ring-state-live'
-				: mark === 'may-differ' || mark === 'missing'
+				: mark === 'may-differ' || mark === 'different' || mark === 'missing'
 					? 'ring-2 ring-warn'
 					: 'ring-1 ring-booth-edge'
 	const faded = dim || (!target && (mark === 'not-today' || mark === 'no-code'))
@@ -284,8 +285,8 @@ function Tile({
 				{mark === 'today' && ' ✓'}
 				{mark === 'confirmed' && ' ✓ by hand'}
 			</span>
-			{(mark === 'may-differ' || mark === 'missing') && (
-				<span className="absolute top-1 left-1 rounded bg-black/75 px-1 text-[11px] font-medium text-warn">{mark === 'missing' ? 'File missing' : 'May differ'}</span>
+			{(mark === 'may-differ' || mark === 'different' || mark === 'missing') && (
+				<span className="absolute top-1 left-1 rounded bg-black/75 px-1 text-[11px] font-medium text-warn">{mark === 'missing' ? 'File missing' : mark === 'different' ? 'Different file' : 'May differ'}</span>
 			)}
 		</button>
 	)
@@ -302,7 +303,7 @@ function Inspect({ m, status, clipId, onClose }: { m: MediaCheckState; status: A
 	if (found === null) return null
 	const { slot } = found
 	const items = m.runSheet ?? []
-	const mark = slotMark(slot, items, codesOn(items), m.same)
+	const mark = slotMark(slot, items, codesOn(items), m.same, m.sizes)
 	const code = slotCode(slot)
 	const file = code === null ? null : (items.map((i) => i.files[code]).find((f) => f !== undefined) ?? null)
 	const want = file === null ? null : lookbookStem(file)
@@ -311,6 +312,7 @@ function Inspect({ m, status, clipId, onClose }: { m: MediaCheckState; status: A
 	const words: Record<SlotMark, string> = {
 		empty: 'Empty',
 		today: 'On this run sheet',
+		different: 'On this run sheet, but not the lookbook’s file (another size)',
 		'may-differ': 'On this run sheet, under another name than the lookbook’s',
 		confirmed: 'On this run sheet; confirmed the same by hand',
 		missing: 'On this run sheet, but Arena cannot find its file on this computer',
@@ -326,7 +328,7 @@ function Inspect({ m, status, clipId, onClose }: { m: MediaCheckState; status: A
 				</span>
 				<SmallButton onClick={onClose}>Close</SmallButton>
 			</div>
-			<p className={mark === 'may-differ' || mark === 'missing' ? 'text-warn' : 'text-booth-dim'}>
+			<p className={mark === 'may-differ' || mark === 'different' || mark === 'missing' ? 'text-warn' : 'text-booth-dim'}>
 				{m.check === null ? 'Not checked against a run sheet' : words[mark]}
 				{slot.state === 'playing' && ' · playing now'}
 			</p>
@@ -342,16 +344,25 @@ function Inspect({ m, status, clipId, onClose }: { m: MediaCheckState; status: A
 					</figure>
 				)}
 			</div>
-			{code !== null && want !== null && slot.file !== null && (mark === 'may-differ' || mark === 'confirmed' || mark === 'missing') && (
+			{code !== null && want !== null && file !== null && slot.file !== null && (mark === 'may-differ' || mark === 'different' || mark === 'confirmed' || mark === 'missing') && (
 				<div className="flex items-center gap-2">
 					<FetchWords fetch={fetch} refused={m.refused[code]} />
 					{!under(fetch) && mark !== 'missing' && (
-						<SmallButton onClick={() => m.markSame({ code, file: slot.file as string, want, same: mark === 'may-differ' })}>
-							{mark === 'may-differ' ? 'Same' : 'Undo'}
+						<SmallButton onClick={() => m.markSame({ code, file: slot.file as string, want, same: mark !== 'confirmed' })}>
+							{mark === 'confirmed' ? 'Undo' : 'Same'}
 						</SmallButton>
 					)}
 					{!under(fetch) && mark !== 'confirmed' && (
-						<SmallButton onClick={() => m.ask('Update', [updateStep({ code, want, clipIds: clipsToUpdate(code, want, status, m.same) }, status)])}>
+						<SmallButton
+							onClick={() =>
+								m.ask('Update', [
+									updateStep(
+										{ code, want, clipIds: clipsToUpdate(code, want, file, status, m.same, m.sizes), lookbookPath: file, allowLookbook: false },
+										status,
+									),
+								])
+							}
+						>
 							Update
 						</SmallButton>
 					)}

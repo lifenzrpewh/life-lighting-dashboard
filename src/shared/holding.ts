@@ -35,7 +35,7 @@
 // - Nothing found is said, not filled in with a guess.
 
 import type { ArenaLayer, ArenaSlot, ArenaStatus } from './arena.js'
-import { ARENA_TYPES, fileStem, lookbookStem, mediaCodeOf, sameKey, type LookbookItem } from './media-check.js'
+import { ARENA_TYPES, fileStem, lookbookStem, mediaCodeOf, sameFile, sameKey, type FileSizes, type LookbookItem } from './media-check.js'
 import type { FetchRequest } from './media-fetch.js'
 
 /** Each type's layer, by name. */
@@ -106,7 +106,9 @@ export type SlotMark =
 	| 'empty'
 	/** On the run sheet, the lookbook's file (or the lookbook has none to compare). */
 	| 'today'
-	/** On the run sheet, under another name than the lookbook's. */
+	/** On the run sheet, not the lookbook's file: another size. */
+	| 'different'
+	/** On the run sheet, another name than the lookbook's, and no sizes to tell. */
 	| 'may-differ'
 	/** Another name, but an operator has confirmed it is the same file. */
 	| 'confirmed'
@@ -117,7 +119,13 @@ export type SlotMark =
 	/** No code in its name: not the lookbook's media. Left alone. */
 	| 'no-code'
 
-export function slotMark(slot: ArenaSlot, items: LookbookItem[], today: ReadonlySet<string>, marks: ReadonlySet<string>): SlotMark {
+export function slotMark(
+	slot: ArenaSlot,
+	items: LookbookItem[],
+	today: ReadonlySet<string>,
+	marks: ReadonlySet<string>,
+	sizes?: FileSizes,
+): SlotMark {
 	if (slot.state === 'empty') return 'empty'
 	const code = slotCode(slot)
 	if (code === null) return 'no-code'
@@ -126,8 +134,9 @@ export function slotMark(slot: ArenaSlot, items: LookbookItem[], today: Readonly
 	const file = items.map((i) => i.files[code]).find((f) => f !== undefined)
 	if (file === undefined || slot.file === null) return 'today'
 	const want = lookbookStem(file)
-	if (fileStem(slot.file).toLowerCase() === want.toLowerCase()) return 'today'
-	return marks.has(sameKey(code, slot.file, want)) ? 'confirmed' : 'may-differ'
+	if (sameFile(slot.file, file, want, sizes)) return 'today'
+	if (marks.has(sameKey(code, slot.file, want))) return 'confirmed'
+	return sizes?.arena[slot.file] !== undefined && sizes.lookbook[file] !== undefined ? 'different' : 'may-differ'
 }
 
 /** The words of a media name that say what it is: no code, no "Sunday", no
@@ -172,6 +181,8 @@ export type Placement = {
 	code: string
 	/** The lookbook's file name, without folder or extension. */
 	want: string
+	/** Its file in the lookbook's library. */
+	lookbookPath: string
 	layer: string
 	/** Counted from 1. */
 	column: number
@@ -211,13 +222,13 @@ function namedColumn(item: LookbookItem, names: string[]): number | null {
 }
 
 /** The Arena codes an item calls for, each with the lookbook's file name. */
-function arenaCodes(item: LookbookItem): { code: string; type: string; want: string | null }[] {
-	const out: { code: string; type: string; want: string | null }[] = []
+function arenaCodes(item: LookbookItem): { code: string; type: string; want: string | null; path: string | null }[] {
+	const out: { code: string; type: string; want: string | null; path: string | null }[] = []
 	for (const raw of item.codes) {
 		const c = mediaCodeOf(raw)
 		if (c === null || !ARENA_TYPES.includes(c.type) || out.some((o) => o.code === c.code)) continue
 		const file = item.files[c.code]
-		out.push({ code: c.code, type: c.type, want: file === undefined ? null : lookbookStem(file) })
+		out.push({ code: c.code, type: c.type, want: file === undefined ? null : lookbookStem(file), path: file ?? null })
 	}
 	return out
 }
@@ -329,6 +340,7 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 				...base,
 				code: c.code,
 				want: c.want,
+				lookbookPath: c.path ?? '',
 				layer: layer.name,
 				column: where.column + 1,
 				columnName: columnNamesOf(layer, status)[where.column] || (names[where.column] ?? ''),
@@ -344,7 +356,14 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 /** Every clip carrying `code` that is not the lookbook's `want`, or whose file
  *  is missing: an update loads the new file into all of them, not only the
  *  first (CB095 sits in 18 columns of HOLD BG). Confirmed-same clips are left. */
-export function clipsToUpdate(code: string, want: string, status: ArenaStatus, marks: ReadonlySet<string>): number[] {
+export function clipsToUpdate(
+	code: string,
+	want: string,
+	wantPath: string,
+	status: ArenaStatus,
+	marks: ReadonlySet<string>,
+	sizes?: FileSizes,
+): number[] {
 	const out: number[] = []
 	for (const layer of status.layers) {
 		for (const slot of layer.slots) {
@@ -354,7 +373,7 @@ export function clipsToUpdate(code: string, want: string, status: ArenaStatus, m
 				continue
 			}
 			if (slot.file === null) continue
-			if (fileStem(slot.file).toLowerCase() === want.toLowerCase()) continue
+			if (sameFile(slot.file, wantPath, want, sizes)) continue
 			if (marks.has(sameKey(code, slot.file, want))) continue
 			out.push(slot.id)
 		}
@@ -378,25 +397,26 @@ export function updatePlan(
 	items: LookbookItem[],
 	status: ArenaStatus,
 	marks: ReadonlySet<string>,
+	sizes?: FileSizes,
 ): { steps: UpdateStep[]; unplaced: Unplaced[] } {
 	const { placements, unplaced } = planPlacements(items, status)
-	const byCode = new Map<string, { want: string; update: number[]; place: Placement[] }>()
+	const byCode = new Map<string, { want: string; path: string | null; update: number[]; place: Placement[] }>()
 	for (const item of items) {
 		for (const c of arenaCodes(item)) {
 			if (c.want === null || byCode.has(c.code)) continue
-			byCode.set(c.code, { want: c.want, update: clipsToUpdate(c.code, c.want, status, marks), place: [] })
+			byCode.set(c.code, { want: c.want, path: c.path, update: clipsToUpdate(c.code, c.want, c.path ?? '', status, marks, sizes), place: [] })
 		}
 	}
 	for (const p of placements) byCode.get(p.code)?.place.push(p)
 	const steps: UpdateStep[] = []
-	for (const [code, { want, update, place }] of byCode) {
+	for (const [code, { want, path, update, place }] of byCode) {
 		const clipIds = [...new Set([...update, ...place.map((p) => p.clipId)])]
 		if (clipIds.length === 0) continue
 		const parts = [
 			...(update.length === 0 ? [] : [update.length === 1 ? 'its clip with the old file' : `its ${update.length} clips with the old file`]),
 			...place.map(placementWords),
 		]
-		steps.push({ request: { code, want, clipIds }, what: `${code}: ${want} into ${parts.join('; ')}` })
+		steps.push({ request: { code, want, clipIds, lookbookPath: path, allowLookbook: false }, what: `${code}: ${want} into ${parts.join('; ')}` })
 	}
 	return { steps, unplaced }
 }
