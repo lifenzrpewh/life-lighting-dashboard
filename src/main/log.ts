@@ -37,6 +37,15 @@ export function startLog(dir: string): LogFile {
 	)
 
 	process.on('uncaughtExceptionMonitor', (e, origin) => log?.write('error', `[main] ${origin}: ${e.stack ?? e.message}`))
+	// Under the installed app's watchdog (./supervisor.ts), an exception in
+	// main ends the process and the watchdog brings it back. Left alone,
+	// Electron puts an error box on the booth screen and waits for a click.
+	if (process.env['PAUA_SUPERVISED'] === '1') {
+		process.on('uncaughtException', () => {
+			log?.close()
+			app.exit(1)
+		})
+	}
 	process.on('unhandledRejection', (reason) =>
 		console.error('[main] unhandled rejection:', reason instanceof Error ? (reason.stack ?? reason.message) : reason),
 	)

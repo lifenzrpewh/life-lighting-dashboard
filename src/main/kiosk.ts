@@ -45,7 +45,7 @@
 // its place only from the window it is in, so the kiosk and a pop-out never
 // fight over where the MA goes.
 
-import { app, BrowserWindow, Menu, ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain, powerSaveBlocker, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -493,6 +493,13 @@ app.whenReady().then(() => {
 	})
 
 	createWindow()
+
+	// The screen never sleeps, dims or goes to its screensaver while the app
+	// runs: a booth screen that locks itself mid-service is a screen nobody can
+	// use. ⚠️ A managed machine's own idle lock (machine policy, not the
+	// screensaver) may still win; not yet watched on the booth box.
+	powerSaveBlocker.start('prevent-display-sleep')
+	console.log('[kiosk] keeping the display awake')
 
 	app.on('activate', () => {
 		if (BrowserWindow.getAllWindows().length === 0) createWindow()

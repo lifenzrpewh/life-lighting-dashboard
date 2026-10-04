@@ -31,7 +31,7 @@ if errorlevel 1 (
 
 rem `npm test` and `npm run build` clear dist, so the app build can be missing
 rem from a checkout someone has worked in.
-if exist "dist\src\main\kiosk.js" if exist "dist\renderer\index.html" goto run
+if exist "dist\src\main\entry.js" if exist "dist\renderer\index.html" goto run
 echo No app build here. Building it, which takes a minute...
 call npm run build:app > "%DATA%\build.log" 2>&1
 if errorlevel 1 (

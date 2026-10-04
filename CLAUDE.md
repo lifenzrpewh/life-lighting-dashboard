@@ -320,6 +320,30 @@ and use MA's on-screen Shift. Driving the kiosk: start it with
 `electron . --remote-debugging-port=9223` and send CDP input; a held press can be cancelled
 by a real mouse moving over the window, so check the log said "sent".
 
+### Improvements, in order (the owner's picks, 2026-10-04)
+
+Field-test build 0.1.0 is out (`docs/FIELD_TEST.md`, `.github/workflows/release.yml`;
+a tag `v<version>` builds both and drafts a release, logs on `release-build-log`).
+1. ✅ The screen kept awake, and the installed app's watchdog (`src/main/entry.ts`,
+   `supervisor.ts`): watched on the Windows box, 2026-10-04: a killed app back in 5 s,
+   a normal close stays shut, a second launch leaves one app. ⚠️ A managed machine's
+   own idle lock is unwatched.
+2. **Connections can be turned off**: off leaves the dot, the slot pickers and its info
+   (countdown chip, LIVE/showfile). The **Video feed** becomes a connection of its own,
+   separate from Arena.
+3. **Duplicates**: any view in both slots. The MA can be picked twice, but only one
+   shows; the other slot says "Only one MA window at a time" with Move it here. Check
+   first that two Cue Manager pages do not double-sync its offline queue.
+4. **Pop-outs** can be sent back (not always on top), with Show on the slot to find them.
+5. A **pāua shell icon**; windowed mode (for Mac testers); "mark this moment" in the log.
+6. Start at login; self-update once hosting is decided.
+7. **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
+   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
+   view** ("?" in each slot). Then, interested: a big countdown view, connection history
+   (an hour's strip per row), a read-only phone view on the booth network.
+Parked: the pre-service check. Declined: stage messages (not this desk's role), clips
+for this service (another role fires clips from a Stream Deck), panic to black, dim mode.
+
 ### TODO, in order
 
 0. **The media check at the booth** (`docs/VISUALS_DASHBOARD.md` § Answered (owner,
