@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { decodeItems, decodeServices, decodeWeeks } from '../dist/src/bridge/lookbook.js'
-import { checkMedia, fileStem, lookbookStem, mediaCodeOf, nzDate, offeredServices } from '../dist/src/shared/media-check.js'
+import { checkMedia, fileStem, lookbookStem, mediaCodeOf, nzDate, offeredServices, sameKey, sameMarkFrom, sameMarksFrom } from '../dist/src/shared/media-check.js'
 
 // Two items as the lookbook sent them for Central AM, 2026-10-04.
 const ITEMS = [
@@ -129,7 +129,7 @@ test('every state: loaded, not in Arena, missing on disk, another version; T is 
 	assert.equal(byCode.CF445.state, 'not-on-disk')
 	assert.equal(byCode.CT108, undefined)
 	// CB095 is on both items but counted once.
-	assert.deepEqual(check.counts, { ok: 1, 'not-loaded': 1, 'not-on-disk': 1, 'other-version': 1, 'no-lookbook-file': 0 })
+	assert.deepEqual(check.counts, { ok: 1, 'not-loaded': 1, 'not-on-disk': 1, 'other-version': 1, 'same-by-hand': 0, 'no-lookbook-file': 0 })
 })
 
 test('a right copy anywhere wins over a wrong one; the name is matched without case', () => {
@@ -150,6 +150,36 @@ test('a format change alone is the same version (owner, 2026-10-05)', () => {
 	const items = decodeItems([ITEMS[0]]).value
 	const check = checkMedia(items, status([['Holding BG', [slot('bg', 'D:\\CB095-Sunday-RelationshipSeries-v5.png')]]]))
 	assert.equal(check.items[0].codes.find((c) => c.code === 'CB095').state, 'ok')
+})
+
+test('a name that may differ, marked the same by hand, holds for that pair of names only', () => {
+	const items = decodeItems([ITEMS[0]]).value
+	const arena = 'C:\\Media\\AM\\CB095-Sunday-RelationshipSeries.png'
+	const want = 'CB095-Sunday-RelationshipSeries-v5'
+	const cb = (file, same, missing = false) =>
+		checkMedia(items, status([['Holding BG', [slot('bg', file, missing)]]]), same).items[0].codes.find((c) => c.code === 'CB095')
+	assert.equal(cb(arena, new Set()).state, 'other-version')
+	// Kept without folder, extension or case.
+	const marked = new Set([sameKey('cb095', 'D:\\elsewhere\\cb095-sunday-relationshipseries.PNG', want)])
+	const r = cb(arena, marked)
+	assert.equal(r.state, 'same-by-hand')
+	assert.equal(r.want, want)
+	assert.equal(r.at.layer, 'Holding BG')
+	assert.equal(checkMedia(items, status([['Holding BG', [slot('bg', arena)]]]), marked).counts['same-by-hand'], 1)
+	// A new file in Arena, or a new upload in the lookbook, asks again.
+	assert.equal(cb('C:\\Media\\CB095-Sunday-RelationshipSeries-v4.png', marked).state, 'other-version')
+	assert.equal(cb(arena, new Set([sameKey('CB095', arena, 'CB095-Sunday-RelationshipSeries-v6')])).state, 'other-version')
+	// A marked file missing from this computer is not marked away.
+	assert.equal(cb(arena, marked, true).state, 'other-version')
+})
+
+test('marks from storage and from the page are checked', () => {
+	assert.deepEqual(sameMarksFrom(['CB095|a|b', 'nope', 3, 'CB095|a|b|c']), ['CB095|a|b'])
+	assert.deepEqual(sameMarksFrom({}), [])
+	assert.deepEqual(sameMarkFrom({ code: 'CB095', file: 'x.png', want: 'y', same: true }), { code: 'CB095', file: 'x.png', want: 'y', same: true })
+	assert.equal(sameMarkFrom({ code: 'CB095', file: 'a|b', want: 'y', same: true }), null)
+	assert.equal(sameMarkFrom({ code: 'CB0951', file: 'x', want: 'y', same: true }), null)
+	assert.equal(sameMarkFrom({ code: 'CB095', file: 'x', want: 'y' }), null)
 })
 
 test('a code the lookbook has no file for is never ok', () => {

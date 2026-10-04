@@ -1,7 +1,8 @@
 // The media check, inside the Arena view (the owner's choice, 2026-10-04): pick
 // a service from the lookbook, and every B, F and A code its run sheet calls for
-// is marked loaded, not in Arena, file missing, another version, or not
-// checkable. The rules are ../../shared/media-check.ts; the reads are main's
+// is marked loaded, not in Arena, file missing, may differ, or not
+// checkable. A name that may differ can be marked the same by hand (operator
+// mode; main keeps the marks). The rules are ../../shared/media-check.ts; the reads are main's
 // (src/main/lookbook.ts), asked only when someone opens or re-checks.
 //
 // It re-compares on every Arena update, so loading the right clip clears its
@@ -22,6 +23,7 @@ import {
 	type LookbookItem,
 	type LookbookRead,
 	type LookbookService,
+	type SameMark,
 } from '../../shared/media-check.js'
 import { megabytes, type FetchRequest, type FetchStates } from '../../shared/media-fetch.js'
 import { chipLabel, formatAge } from './vocabulary.js'
@@ -72,6 +74,19 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 			clearInterval(id)
 		}
 	}, [open])
+	// The "same" marks, read as the check opens and after each change.
+	const [same, setSame] = useState<ReadonlySet<string>>(new Set())
+	const readSame = () => void window.life?.sameMarks().then((m) => setSame(new Set(m)))
+	useEffect(() => {
+		if (open) readSame()
+	}, [open])
+	const markSame = (mark: SameMark) => {
+		setRefused(({ [mark.code]: _, ...rest }) => rest)
+		void window.life?.markSame(mark).then((r) => {
+			if (!r.ok) setRefused((x) => ({ ...x, [mark.code]: r.detail }))
+			readSame()
+		})
+	}
 	const fetchCode = (req: FetchRequest) => {
 		setRefused(({ [req.code]: _, ...rest }) => rest)
 		void window.life?.fetchMedia(req).then((r) => {
@@ -114,7 +129,7 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 		readItems(id)
 	}
 
-	const check = items.kind === 'read' && items.read.ok ? checkMedia(items.read.value, status) : null
+	const check = items.kind === 'read' && items.read.ok ? checkMedia(items.read.value, status, same) : null
 	const trouble = check === null ? 0 : check.counts['not-loaded'] + check.counts['not-on-disk'] + check.counts['other-version']
 	const unsettled = check?.counts['no-lookbook-file'] ?? 0
 	const total = check === null ? 0 : Object.values(check.counts).reduce((a, b) => a + b, 0)
@@ -127,6 +142,7 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 	else if (total === 0) summary = <span className="text-booth-dim">No Arena media on this run sheet</span>
 	else if (trouble > 0) summary = <span className="text-warn">{trouble === 1 ? '1 to look at' : `${trouble} to look at`}</span>
 	else if (unsettled > 0) summary = <span className="text-booth-dim">{unsettled === 1 ? '1 the lookbook has no file for' : `${unsettled} the lookbook has no file for`}</span>
+	else if (check.counts['same-by-hand'] > 0) summary = <span>All {total} loaded, {check.counts['same-by-hand']} marked the same by hand</span>
 	else summary = <span>All {total} loaded</span>
 
 	return (
@@ -150,6 +166,7 @@ export function MediaCheck({ status, now }: { status: ArenaStatus; now: number }
 							fetches={fetches}
 							refused={refused}
 							onFetch={fetchCode}
+							onMarkSame={markSame}
 						/>
 					)}
 				</div>
@@ -211,6 +228,7 @@ function Result({
 	fetches,
 	refused,
 	onFetch,
+	onMarkSame,
 }: {
 	load: Load<LookbookItem[]>
 	check: ReturnType<typeof checkMedia> | null
@@ -219,6 +237,7 @@ function Result({
 	fetches: FetchStates
 	refused: Record<string, string>
 	onFetch: (req: FetchRequest) => void
+	onMarkSame: (mark: SameMark) => void
 }) {
 	if (load.kind !== 'read') return <p className="py-2 text-sm text-booth-dim">Reading the run sheet…</p>
 	const read = load.read
@@ -238,7 +257,7 @@ function Result({
 					</div>
 					<ul className="mt-1 flex flex-col gap-1">
 						{item.codes.map((c, j) => (
-							<CodeRow key={j} check={c} fetch={fetches[c.code]} refused={refused[c.code]} onFetch={onFetch} />
+							<CodeRow key={j} check={c} fetch={fetches[c.code]} refused={refused[c.code]} onFetch={onFetch} onMarkSame={onMarkSame} />
 						))}
 					</ul>
 				</div>
@@ -254,11 +273,13 @@ function CodeRow({
 	fetch,
 	refused,
 	onFetch,
+	onMarkSame,
 }: {
 	check: CodeCheck
 	fetch: FetchStates[string] | undefined
 	refused: string | undefined
 	onFetch: (req: FetchRequest) => void
+	onMarkSame: (mark: SameMark) => void
 }) {
 	const type = TYPE_NAMES[mediaCodeOf(check.code)?.type ?? ''] ?? ''
 	const where = (at: { layer: string; column: number }) => `${at.layer} · column ${at.column}`
@@ -276,8 +297,12 @@ function CodeRow({
 			detail = `${where(check.at)} · ${check.at.file}`
 			break
 		case 'other-version':
-			state = <span className="text-warn">another version</span>
+			state = <span className="text-warn">may differ</span>
 			detail = `${where(check.at)} has ${fileName(check.at.file)}; the lookbook has ${check.want}`
+			break
+		case 'same-by-hand':
+			state = <span className="text-booth-dim">✓ {where(check.at)} · marked the same by hand</span>
+			detail = `${fileName(check.at.file)}; the lookbook has ${check.want}`
 			break
 		case 'no-lookbook-file':
 			state = <span className="text-booth-dim">? the lookbook has no file{check.at !== null && ` · in ${where(check.at)}`}</span>
@@ -291,16 +316,22 @@ function CodeRow({
 			: check.state === 'not-loaded'
 				? { code: check.code, want: check.want, clipId: null }
 				: null
+	// Marking: "Same" where a name may differ, "Undo" where it was marked.
+	const mark: SameMark | null =
+		check.state === 'other-version' || check.state === 'same-by-hand'
+			? { code: check.code, file: check.at.file, want: check.want, same: check.state === 'other-version' }
+			: null
 	return (
 		<li className="flex min-w-0 flex-col text-sm">
 			<span className="flex min-w-0 items-center gap-2">
 				<span className="w-14 shrink-0 font-mono text-xs">{check.code}</span>
 				<span className="w-20 shrink-0 text-xs text-booth-dim">{type}</span>
 				<span className="min-w-0 truncate">{state}</span>
-				{request !== null && (
+				{(request !== null || mark !== null) && (
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						<FetchWords fetch={fetch} refused={refused} />
-						{!under(fetch) && (
+						{mark !== null && !under(fetch) && <SmallButton onClick={() => onMarkSame(mark)}>{mark.same ? 'Same' : 'Undo'}</SmallButton>}
+						{request !== null && !under(fetch) && (
 							<SmallButton onClick={() => onFetch(request)}>{request.clipId === null ? 'Copy here' : 'Fetch'}</SmallButton>
 						)}
 					</span>

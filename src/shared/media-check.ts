@@ -21,6 +21,12 @@
 //
 // THE RULE THIS FILE ENFORCES: a code the check could not settle is never "ok".
 // A lookbook read that failed, or a code the lookbook has no file for, says so.
+//
+// A name that differs is only a guess at a different file (the owner,
+// 2026-10-05: CB095 was the same picture, uploaded to the lookbook as `-v5`),
+// so it reads "may differ", and an operator may mark it the same by hand. The
+// mark holds for that pair of names only: a new file on either side, and the
+// check asks again. It is shown as marked by hand, never as a plain ✓.
 
 import type { ArenaStatus } from './arena.js'
 
@@ -121,8 +127,10 @@ export type CodeCheck =
 	| { code: string; state: 'not-loaded'; want: string }
 	/** Loaded, but Arena cannot find the file on this computer. */
 	| { code: string; state: 'not-on-disk'; at: Place; want: string }
-	/** Loaded, but not the lookbook's version: `want` is the lookbook's name. */
+	/** Loaded, but not the lookbook's name: `want` is the lookbook's name. */
 	| { code: string; state: 'other-version'; at: Place; want: string }
+	/** Not the lookbook's name, but an operator has said it is the same file. */
+	| { code: string; state: 'same-by-hand'; at: Place; want: string }
 	/** The lookbook has no file for it, so its version cannot be checked. Where
 	 *  Arena has it, if anywhere. */
 	| { code: string; state: 'no-lookbook-file'; at: Place | null }
@@ -153,9 +161,35 @@ function loadedCodes(status: ArenaStatus): Map<string, (Place & { onDisk: boolea
 	return found
 }
 
+/** What an operator's "same" mark is kept under: the code, Arena's file name
+ *  and the lookbook's, without folder, extension or case. */
+export function sameKey(code: string, arenaFile: string, want: string): string {
+	return `${code.toUpperCase()}|${fileStem(arenaFile).toLowerCase()}|${want.toLowerCase()}`
+}
+
+/** The most marks kept; the oldest go first. */
+export const SAME_MARKS_MAX = 500
+
+/** Marks as read back from storage: anything not a key is dropped. */
+export function sameMarksFrom(raw: unknown): string[] {
+	if (!Array.isArray(raw)) return []
+	return raw.filter((k): k is string => typeof k === 'string' && k.length <= 600 && /^[A-Z]{2}\d{3}\|[^|]+\|[^|]+$/.test(k)).slice(-SAME_MARKS_MAX)
+}
+
+export type SameMark = { code: string; file: string; want: string; same: boolean }
+
+/** A mark as the page sent it, or null. Main builds the key from it, with `sameKey`. */
+export function sameMarkFrom(raw: unknown): SameMark | null {
+	if (typeof raw !== 'object' || raw === null) return null
+	const { code, file, want, same } = raw as Record<string, unknown>
+	const short = (s: unknown): s is string => typeof s === 'string' && s.length > 0 && s.length <= 260 && !s.includes('|')
+	if (typeof code !== 'string' || !/^[A-Za-z]{2}\d{3}$/.test(code) || !short(file) || !short(want) || typeof same !== 'boolean') return null
+	return { code, file, want, same }
+}
+
 /** One code against what Arena holds. Several clips may carry it; the best
  *  answer wins, so a right copy anywhere is enough. */
-function checkCode(code: string, want: string | null, places: (Place & { onDisk: boolean })[]): CodeCheck {
+function checkCode(code: string, want: string | null, places: (Place & { onDisk: boolean })[], marks: ReadonlySet<string>): CodeCheck {
 	const strip = ({ onDisk: _, ...p }: Place & { onDisk: boolean }): Place => p
 	if (places.length === 0) return want === null ? { code, state: 'no-lookbook-file', at: null } : { code, state: 'not-loaded', want }
 	if (want === null) return { code, state: 'no-lookbook-file', at: strip(places[0] as Place & { onDisk: boolean }) }
@@ -164,14 +198,17 @@ function checkCode(code: string, want: string | null, places: (Place & { onDisk:
 	if (right !== undefined) return { code, state: 'ok', at: strip(right) }
 	const rightButGone = places.find(same)
 	if (rightButGone !== undefined) return { code, state: 'not-on-disk', at: strip(rightButGone), want }
+	const marked = places.find((p) => p.onDisk && marks.has(sameKey(code, p.file, want)))
+	if (marked !== undefined) return { code, state: 'same-by-hand', at: strip(marked), want }
 	return { code, state: 'other-version', at: strip(places[0] as Place & { onDisk: boolean }), want }
 }
 
 /** The run sheet's items against Arena. Only the types Arena holds are
- *  checked; an item with none of them is left out. */
-export function checkMedia(items: LookbookItem[], status: ArenaStatus): MediaCheck {
+ *  checked; an item with none of them is left out. `same` holds the keys
+ *  (`sameKey`) an operator has marked the same. */
+export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: ReadonlySet<string> = new Set()): MediaCheck {
 	const loaded = loadedCodes(status)
-	const counts: MediaCheck['counts'] = { ok: 0, 'not-loaded': 0, 'not-on-disk': 0, 'other-version': 0, 'no-lookbook-file': 0 }
+	const counts: MediaCheck['counts'] = { ok: 0, 'not-loaded': 0, 'not-on-disk': 0, 'other-version': 0, 'same-by-hand': 0, 'no-lookbook-file': 0 }
 	const seen = new Set<string>()
 	const out: ItemCheck[] = []
 	for (const item of items) {
@@ -180,7 +217,7 @@ export function checkMedia(items: LookbookItem[], status: ArenaStatus): MediaChe
 			const parsed = mediaCodeOf(raw)
 			if (parsed === null || !ARENA_TYPES.includes(parsed.type)) continue
 			const file = item.files[parsed.code]
-			const result = checkCode(parsed.code, file === undefined ? null : lookbookStem(file), loaded.get(parsed.code) ?? [])
+			const result = checkCode(parsed.code, file === undefined ? null : lookbookStem(file), loaded.get(parsed.code) ?? [], same)
 			codes.push(result)
 			if (!seen.has(parsed.code)) {
 				seen.add(parsed.code)

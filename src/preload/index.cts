@@ -15,7 +15,7 @@ import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 
 import type { TimerSources } from '../shared/timer.js' with { 'resolution-mode': 'import' }
 import type { ArenaCommand, ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js' with { 'resolution-mode': 'import' }
 import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js' with { 'resolution-mode': 'import' }
-import type { LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js' with { 'resolution-mode': 'import' }
+import type { LookbookItem, LookbookRead, LookbookService, SameMark } from '../shared/media-check.js' with { 'resolution-mode': 'import' }
 import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
@@ -86,6 +86,11 @@ const api = {
 	 *  and the media check says when Arena has it. */
 	fetchMedia: (request: FetchRequest): Promise<{ ok: true } | { ok: false; detail: string }> => ipcRenderer.invoke('media:fetch', request),
 	mediaFetches: (): Promise<FetchStates> => ipcRenderer.invoke('media:fetch-state'),
+	/** The media check's "same" marks, as keys (`sameKey`), and making or
+	 *  undoing one: operator mode only. */
+	sameMarks: (): Promise<string[]> => ipcRenderer.invoke('media:same'),
+	markSame: (mark: SameMark): Promise<{ ok: true } | { ok: false; detail: string }> =>
+		ipcRenderer.invoke('media:mark-same', mark),
 	/** The showfile's write half, operator mode only (main refuses otherwise).
 	 *  Sent is not done: the new name comes back in `showfile`. */
 	listShows: (): Promise<ShowList> => ipcRenderer.invoke('showfile:shows'),

@@ -74,6 +74,8 @@ import { lookbookItems, lookbookServices } from './lookbook.js'
 import type { LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js'
 import { createPopouts, type Popouts } from './popout.js'
 import { createMediaFetch } from './media-fetch.js'
+import { createMediaSame } from './media-same.js'
+import { sameMarkFrom } from '../shared/media-check.js'
 import { fetchRequestFrom, type FetchStates } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
@@ -429,6 +431,16 @@ app.whenReady().then(() => {
 		return mediaFetch.ask(req)
 	})
 	ipcMain.handle('media:fetch-state', (e): FetchStates => (fromOurs(e) ? mediaFetch.states() : {}))
+	// "It is the same file", for a name that may differ (./media-same.ts):
+	// everyone sees the marks, operator mode makes and undoes them.
+	const mediaSame = createMediaSame(app.getPath('userData'))
+	ipcMain.handle('media:same', (e): string[] => (fromOurs(e) ? mediaSame.marks() : []))
+	ipcMain.handle('media:mark-same', (e, raw: unknown): { ok: true } | { ok: false; detail: string } => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Operator mode only.' }
+		const m = sameMarkFrom(raw)
+		return m === null ? { ok: false, detail: 'not a mark' } : mediaSame.mark(m)
+	})
 	serveThumbnails(() => {
 		const s = store.current()
 		return s.arenaHost === null ? null : { host: s.arenaHost, port: s.arenaPort }

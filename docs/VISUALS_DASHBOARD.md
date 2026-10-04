@@ -500,6 +500,16 @@ over the composition and the live lookbook for 4 October's Central AM and PM:
   to the lookbook; the rule compares names without the extension, so the PNG / JPG
   difference plays no part. **A format change alone passes** (the owner, 2026-10-05; the
   rule already did, now a test says so).
+- **"May differ", and Same by hand** (the owner's ask, 2026-10-05, built the same day): a
+  name that differs reads **may differ**, not "another version", since a name is only a
+  guess at the file. Beside it, **Same** (operator mode) marks it the same file: it then
+  reads "✓ … marked the same by hand", never a plain ✓, with **Undo**; the summary counts
+  them. A mark holds for that pair of names only (code, Arena's file name and the
+  lookbook's, without folder, extension or case), so a new file on either side asks again;
+  a marked file missing from this computer still says so. Main keeps the marks in
+  `media-same.json` in the data folder and logs each. ✅ In the kiosk over CDP: refused in
+  volunteer mode, kept and logged in operator mode, undone. ⚠️ The row itself not yet seen
+  on screen: on a Monday the lookbook offers no service until next week's are in.
 - **Not loaded**: AM wants CF464 (`EXP-NextStepsLounge`) where Arena has CF447
   (`NextStepsLounge`, PLAYBACK 6); PM wants CF465 (`EXP-NextStepsUpstairs`) where Arena has
   CF446, and CF594 (`AllCampus-Prayer-Fasting-Oct-1`) where Arena has CF593. Arena also
