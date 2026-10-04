@@ -376,3 +376,78 @@ export function savedLayoutsFrom(stored: unknown): SavedLayout[] {
 	}
 	return out
 }
+
+// ─── Seams: resizing for everyone ──────────────────────────────────────────
+//
+// The edge two windows share drags for everyone, volunteers too (the owner,
+// 2026-10-05: "the original ability we had to just adjust the windows", the
+// divider's). Only the shared edge moves: windows on one side grow as those on
+// the other shrink, so nothing is added, removed or moved, and the windows
+// still fill what they filled. Arranging stays in Edit layout.
+
+/** A shared edge: the line `at` (a column for 'x', a row for 'y'), the windows
+ *  ending on it (`before`) and starting on it (`after`), and the stretch of it
+ *  they share, in cells along the other axis. */
+export type Seam = { axis: 'x' | 'y'; at: number; from: number; to: number; before: string[]; after: string[] }
+
+/** Every seam in the layout. Windows meeting on the same line and touching
+ *  each other along it move together, so one drag never tears a window off
+ *  its neighbour. */
+export function seams(layout: Layout): Seam[] {
+	const out: Seam[] = []
+	for (const axis of ['x', 'y'] as const) {
+		const lo = (w: Box) => (axis === 'x' ? w.x : w.y)
+		const size = (w: Box) => (axis === 'x' ? w.w : w.h)
+		const crossLo = (w: Box) => (axis === 'x' ? w.y : w.x)
+		const crossHi = (w: Box) => (axis === 'x' ? w.y + w.h : w.x + w.w)
+		const limit = axis === 'x' ? COLS : ROWS
+		for (let at = 1; at < limit; at++) {
+			const before = layout.windows.filter((w) => lo(w) + size(w) === at)
+			const after = layout.windows.filter((w) => lo(w) === at)
+			const pairs = before.flatMap((a) =>
+				after.filter((b) => Math.max(crossLo(a), crossLo(b)) < Math.min(crossHi(a), crossHi(b))).map((b) => [a, b] as const),
+			)
+			// Pairs sharing a window are one seam.
+			const groups: Array<{ before: Set<GridWindow>; after: Set<GridWindow>; pairs: Array<readonly [GridWindow, GridWindow]> }> = []
+			for (const pair of pairs) {
+				const joined = groups.filter((g) => g.before.has(pair[0]) || g.after.has(pair[1]))
+				const group = { before: new Set([pair[0]]), after: new Set([pair[1]]), pairs: [pair] }
+				for (const g of joined) {
+					g.before.forEach((w) => group.before.add(w))
+					g.after.forEach((w) => group.after.add(w))
+					group.pairs.push(...g.pairs)
+					groups.splice(groups.indexOf(g), 1)
+				}
+				groups.push(group)
+			}
+			for (const g of groups) {
+				out.push({
+					axis,
+					at,
+					from: Math.min(...g.pairs.map(([a, b]) => Math.max(crossLo(a), crossLo(b)))),
+					to: Math.max(...g.pairs.map(([a, b]) => Math.min(crossHi(a), crossHi(b)))),
+					before: [...g.before].map((w) => w.id),
+					after: [...g.after].map((w) => w.id),
+				})
+			}
+		}
+	}
+	return out
+}
+
+/** Move a seam to the line `to`. Unchanged when that would make a window
+ *  smaller than MIN_W × MIN_H or run it into another one. */
+export function moveSeam(layout: Layout, seam: Seam, to: number): Layout {
+	if (to === seam.at) return layout
+	const x = seam.axis === 'x'
+	const next: Layout = {
+		...layout,
+		windows: layout.windows.map((w) => {
+			if (seam.before.includes(w.id)) return x ? { ...w, w: to - w.x } : { ...w, h: to - w.y }
+			if (seam.after.includes(w.id)) return x ? { ...w, x: to, w: w.x + w.w - to } : { ...w, y: to, h: w.y + w.h - to }
+			return w
+		}),
+	}
+	const moved = next.windows.filter((w) => seam.before.includes(w.id) || seam.after.includes(w.id))
+	return moved.every((w) => fits(next, w, w.id)) ? next : layout
+}

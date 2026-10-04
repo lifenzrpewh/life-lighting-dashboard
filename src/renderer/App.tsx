@@ -340,6 +340,23 @@ export function App() {
 			setEditing(true)
 		})
 	}
+	// A shared edge being dragged (./components/Grid.tsx): pictures for its
+	// length too, as the divider had, because a page reflowing on every step
+	// trails the finger. A page with no picture stays live.
+	const [frozen, setFrozen] = useState(false)
+	const startSeam = () => {
+		const id = ++editTurn.current
+		void window.life?.snapshotPanes().then((s) => {
+			if (editTurn.current !== id) return
+			setStills(s)
+			setFrozen(true)
+		})
+	}
+	const endSeam = () => {
+		const id = ++editTurn.current
+		setFrozen(false)
+		setTimeout(() => editTurn.current === id && setStills(null), 300)
+	}
 	useEffect(() => {
 		if (editing) return
 		const id = ++editTurn.current
@@ -355,7 +372,7 @@ export function App() {
 			.filter((e) => e.on)
 			.map((e) => ({ view: embedView(e.id), send: (rect: PaneRect | null) => window.life?.placeEmbed(e.id, rect) })),
 	]
-	const pageHidden = (view: ViewId) => popped.has(view) || editing
+	const pageHidden = (view: ViewId) => popped.has(view) || editing || (frozen && stills?.[view] != null)
 	// Unmounting closes the MA connection. It happens when the renderer goes
 	// away, which main also covers, since a crashed renderer cannot say goodbye.
 	useEffect(
@@ -545,15 +562,16 @@ export function App() {
 				</Centered>
 			)
 		}
-		if (editing && isNative(view)) {
+		if (isNative(view) && (editing || frozen)) {
 			const still = stills?.[view] ?? null
-			return still !== null ? (
-				<Still src={still} side="left" />
-			) : (
-				<Centered>
-					<Say head={label(view)} body="Shown again when the layout is done." />
-				</Centered>
-			)
+			if (still !== null) return <Still src={still} side="left" />
+			if (editing) {
+				return (
+					<Centered>
+						<Say head={label(view)} body="Shown again when the layout is done." />
+					</Centered>
+				)
+			}
 		}
 		const embedId = embedIdOf(view)
 		if (embedId !== null) {
@@ -759,6 +777,9 @@ export function App() {
 						onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
 						onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
 						onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
+						onResize={(l) => update(() => l)}
+						onSeamStart={startSeam}
+						onSeamEnd={endSeam}
 					/>
 				)}
 			</main>

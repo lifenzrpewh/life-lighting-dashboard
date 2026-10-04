@@ -10,12 +10,36 @@
 // picture of itself, so the grid can be drawn over. Drag a window's body to
 // move it, its edges or corners to resize it; it snaps to cells, and a place
 // over another window is shown in red and not taken. + adds a tab, × takes one
-// away, and the strip's × removes the window. Out of editing, only tapping a
-// tab does anything to the layout.
+// away, and the strip's × removes the window.
+//
+// OUT OF EDITING, for everyone: tap a tab, and drag the edge two windows share
+// (a grip in the gap between them, the one place a page cannot cover) to give
+// one more room and the other less, as the old divider did. Pages stand in as
+// pictures while it is dragged.
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 
-import { COLS, MIN_H, MIN_W, ROWS, fits, shownTab, type Box, type GridWindow, type Layout, type Tab, type ViewId } from '../../shared/layout.js'
+import {
+	COLS,
+	MIN_H,
+	MIN_W,
+	ROWS,
+	fits,
+	moveSeam,
+	seams,
+	shownTab,
+	type Box,
+	type GridWindow,
+	type Layout,
+	type Seam,
+	type Tab,
+	type ViewId,
+} from '../../shared/layout.js'
+
+/** The grid's padding and the gap between windows, in px: the gap is where a
+ *  shared edge is grabbed, so it is a finger's width, as the divider was. */
+const PAD = 4
+const GAP = 12
 
 const label = 'text-[10px] font-semibold tracking-widest uppercase'
 
@@ -65,6 +89,11 @@ export type GridProps = {
 	onRemoveTab: (windowId: string, tabId: string) => void
 	onRemoveWindow: (windowId: string) => void
 	onPlace: (windowId: string, box: Box) => void
+	/** A shared edge was let go here: the whole layout, both sides resized. */
+	onResize: (layout: Layout) => void
+	/** A shared edge is being dragged: pages stand in as pictures until it ends. */
+	onSeamStart: () => void
+	onSeamEnd: () => void
 }
 
 export function Grid(p: GridProps) {
@@ -74,6 +103,36 @@ export function Grid(p: GridProps) {
 	const latest = useRef(drag)
 	latest.current = drag
 	const [adding, setAdding] = useState<string | null>(null)
+
+	// A shared edge being dragged, and the layout it would make.
+	const seamStart = useRef<{ seam: Seam; at: number } | null>(null)
+	const [seamDrag, setSeamDrag] = useState<Layout | null>(null)
+	const seamLatest = useRef(seamDrag)
+	seamLatest.current = seamDrag
+	const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+	useEffect(() => {
+		const grid = gridRef.current
+		if (grid === null) return
+		// Measured now as well: a window not being painted (behind another) gets
+		// no observer callback, and the grips would wait for one.
+		const measure = () => setSize({ width: grid.clientWidth, height: grid.clientHeight })
+		measure()
+		const ro = new ResizeObserver(measure)
+		ro.observe(grid)
+		return () => ro.disconnect()
+	}, [])
+	const shown = seamDrag ?? p.layout
+	/** A seam drag over: keep where it got to, or not. Once only. */
+	const endSeam = (keep: boolean) => {
+		if (seamStart.current === null) return
+		const next = seamLatest.current
+		seamStart.current = null
+		setSeamDrag(null)
+		if (keep && next !== null && next !== p.layout) p.onResize(next)
+		p.onSeamEnd()
+	}
+	const cellW = size === null ? 0 : (size.width - 2 * PAD - GAP * (COLS - 1)) / COLS
+	const cellH = size === null ? 0 : (size.height - 2 * PAD - GAP * (ROWS - 1)) / ROWS
 
 	/** Pointer handlers for a handle that moves `edges` of `win`. A press keeps
 	 *  every move until it lifts (pointer capture), so a drag that runs off the
@@ -113,8 +172,13 @@ export function Grid(p: GridProps) {
 	return (
 		<div
 			ref={gridRef}
-			className="grid min-h-0 flex-1 gap-1 bg-booth-bg p-1"
-			style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))` }}
+			className="relative grid min-h-0 flex-1 bg-booth-bg"
+			style={{
+				padding: PAD,
+				gap: GAP,
+				gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
+				gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
+			}}
 		>
 			{/* The cells, while editing: where a window can go. */}
 			{p.editing &&
@@ -126,7 +190,7 @@ export function Grid(p: GridProps) {
 						style={area({ x: i % COLS, y: Math.floor(i / COLS), w: 1, h: 1 })}
 					/>
 				))}
-			{p.layout.windows.map((win) => {
+			{shown.windows.map((win) => {
 				const tab = shownTab(win, p.visible)
 				const tabs = win.tabs.filter((t) => p.visible(t.view))
 				const moving = drag?.id === win.id ? drag : null
@@ -232,9 +296,66 @@ export function Grid(p: GridProps) {
 					</section>
 				)
 			})}
+			{!p.editing &&
+				size !== null &&
+				seams(p.layout).map((seam) => {
+					const upright = seam.axis === 'x'
+					// Kept while dragged, so the grip keeps its press: `at` moves.
+					const key = seamKey(seam)
+					const dragging = seamStart.current !== null && seamKey(seamStart.current.seam) === key
+					// The dragged grip follows the windows it moves.
+					const first = shown.windows.find((w) => w.id === seam.before[0])
+					const at = dragging && first !== undefined ? (upright ? first.x + first.w : first.y + first.h) : seam.at
+					const line = PAD + at * ((upright ? cellW : cellH) + GAP) - GAP
+					const from = PAD + seam.from * ((upright ? cellH : cellW) + GAP)
+					const to = PAD + seam.to * ((upright ? cellH : cellW) + GAP) - GAP
+					return (
+						<div
+							key={key}
+							role="separator"
+							aria-orientation={upright ? 'vertical' : 'horizontal'}
+							aria-label="Drag to give one window more room and the other less"
+							onPointerDown={(e) => {
+								e.currentTarget.setPointerCapture(e.pointerId)
+								seamStart.current = { seam, at: upright ? e.clientX : e.clientY }
+								setSeamDrag(p.layout)
+								p.onSeamStart()
+							}}
+							onPointerMove={(e) => {
+								const s = seamStart.current
+								if (s === null) return
+								const step = (s.seam.axis === 'x' ? cellW : cellH) + GAP
+								const by = Math.round(((s.seam.axis === 'x' ? e.clientX : e.clientY) - s.at) / step)
+								const next = moveSeam(p.layout, s.seam, s.seam.at + by)
+								if (next !== seamLatest.current) setSeamDrag(next)
+							}}
+							onPointerUp={() => endSeam(true)}
+							onPointerCancel={() => endSeam(false)}
+							// The press taken away (another pointer, the window losing
+							// focus): ends where it got to, and never leaves the pages as
+							// pictures waiting for a lift that will not come.
+							onLostPointerCapture={() => endSeam(true)}
+							onContextMenu={(e) => e.preventDefault()}
+							style={
+								upright
+									? { left: line, top: from, width: GAP, height: to - from }
+									: { top: line, left: from, height: GAP, width: to - from }
+							}
+							className={`group absolute z-20 flex touch-none items-center justify-center ${upright ? 'cursor-col-resize' : 'cursor-row-resize'}`}
+						>
+							<span
+								className={`rounded-full ${upright ? 'h-12 w-1.5' : 'h-1.5 w-12'} ${
+									dragging ? 'bg-booth-ink' : 'bg-booth-edge group-hover:bg-booth-dim'
+								}`}
+							/>
+						</div>
+					)
+				})}
 		</div>
 	)
 }
+
+const seamKey = (seam: Seam) => `${seam.axis}:${seam.before.join(',')}|${seam.after.join(',')}`
 
 /** Bands along each edge and squares at each corner, big enough for a finger. */
 function EdgeHandles({ win, handle }: { win: GridWindow; handle: (win: GridWindow, edges: Edges) => object }) {

@@ -15,12 +15,14 @@ import {
 	layoutFrom,
 	layoutNameError,
 	makeHome,
+	moveSeam,
 	placeWindow,
 	removeTab,
 	removeWindow,
 	sameArrangement,
 	saveLayout,
 	savedLayoutsFrom,
+	seams,
 	selectTab,
 	shownTab,
 	viewsShown,
@@ -163,4 +165,44 @@ test('saved layouts off storage: a broken one is dropped, the rest kept', () => 
 	const broken = { name: 'Broken', layout: { windows: [{ id: 'w1', x: 0, y: 0, w: 99, h: 8, tabs: [], active: null }] } }
 	assert.deepEqual(savedLayoutsFrom(JSON.stringify([good, broken, { name: '', layout: DEFAULT_LAYOUT }, good])), [good])
 	for (const bad of [null, 'x', '{}']) assert.deepEqual(savedLayoutsFrom(bad), [])
+})
+
+test('the seam between the default windows drags both, and stops at the smallest', () => {
+	const [seam] = seams(DEFAULT_LAYOUT)
+	assert.deepEqual(seam, { axis: 'x', at: 4, from: 0, to: 8, before: ['w1'], after: ['w2'] })
+	const wider = moveSeam(DEFAULT_LAYOUT, seam, 6)
+	assert.deepEqual(wider.windows.map((w) => [w.x, w.w]), [
+		[0, 6],
+		[6, 6],
+	])
+	assert.equal(moveSeam(DEFAULT_LAYOUT, seam, 1), DEFAULT_LAYOUT) // run order under 2 wide
+	assert.equal(moveSeam(DEFAULT_LAYOUT, seam, 11), DEFAULT_LAYOUT) // MA under 2 wide
+})
+
+test('windows on one line move together; a stacked pair has a seam of its own', () => {
+	let l = placeWindow(DEFAULT_LAYOUT, 'w2', { x: 4, y: 0, w: 8, h: 5 })
+	l = addWindow(l, 'arena', { window: 'w3', tab: 't3' }) // 4,5 8×3, under the MA
+	const all = seams(l)
+	const upright = all.find((s) => s.axis === 'x')
+	assert.deepEqual([upright.before, upright.after.sort()], [['w1'], ['w2', 'w3']])
+	const level = all.find((s) => s.axis === 'y')
+	assert.deepEqual([level.at, level.from, level.to, level.before, level.after], [5, 4, 12, ['w2'], ['w3']])
+	const moved = moveSeam(l, upright, 3)
+	assert.deepEqual(moved.windows.map((w) => [w.x, w.w]), [
+		[0, 3],
+		[3, 9],
+		[3, 9],
+	])
+	assert.deepEqual(moveSeam(l, level, 6).windows.map((w) => [w.y, w.h]), [
+		[0, 8],
+		[0, 6],
+		[6, 2],
+	])
+	assert.equal(moveSeam(l, level, 7), l) // Arena under 2 high
+})
+
+test('a seam never runs a window into one that is not on it', () => {
+	// Run order 0–3, a gap at column 3, MA 4–12: no seam at 3 or 4.
+	const gap = placeWindow(DEFAULT_LAYOUT, 'w1', { x: 0, y: 0, w: 3, h: 8 })
+	assert.deepEqual(seams(gap), [])
 })
