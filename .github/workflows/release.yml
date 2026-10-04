@@ -9,7 +9,9 @@
 # THE MAC BUILD IS UNSIGNED, ad-hoc only (`identity: "-"` in package.json):
 # no Apple Developer ID yet, so macOS asks before the first open. The way past
 # it is docs/FIELD_TEST.md. Hardened runtime is off because, with an ad-hoc
-# signature, library validation would refuse the video addon.
+# signature, library validation would refuse the video addon. The addon's
+# Syphon.framework is left as upstream signed it (`signIgnore`): codesign
+# refuses to re-sign it, "bundle format is ambiguous" (first run, 2026-10-04).
 #
 # WHY THE REPORT JOB: nothing on the booth-class Windows box holds a token, so
 # a run's own logs cannot be read from there. The same answer as

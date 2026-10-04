@@ -4,3 +4,7 @@
 # and the built addon is a binary.
 native/texture-bridge/*.patch -text
 vendor/texture-bridge/*.node binary
+# Embedded byte for byte in LifeBridge.xml (test/plugin-xml.test.js): a
+# checkout that turned its line endings to CRLF would fail that test, as
+# GitHub's Windows runner did 2026-10-04.
+console-plugin/*.lua -text
