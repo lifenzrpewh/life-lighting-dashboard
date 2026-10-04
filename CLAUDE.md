@@ -307,7 +307,12 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-05, morning).** The overnight list is done and **v0.2.0**
+**Where things stand (2026-10-05, after 1 am).** Since v0.2.0, on main and not in that
+build: **anyone drags the edge two windows share** (the owner's ask: the divider's "just adjust
+the windows", for volunteers), and **Fetch** in the media check, which copies the lookbook's
+file from a graphics folder to a local folder and loads it into Arena's clip (✅ Arena 7.28
+takes a file into a clip over REST, by hand; the button's own load not yet watched;
+`docs/VISUALS_DASHBOARD.md` § Fetching media). Before that, overnight: the list is done and **v0.2.0**
 is tagged and **both builds passed** (run 37199608805: `Paua-Setup-0.2.0.exe`, `Paua-0.2.0-arm64.dmg`,
 257 tests green on the Windows runner); the release waits as a draft for the
 owner to publish (`docs/FIELD_TEST.md` has what to check). New in it: **embeds** (any web
@@ -332,11 +337,16 @@ gets every reply. The web remote ignores pasted text and drops shifted keys; typ
 and use MA's on-screen Shift. Driving the kiosk: start it with
 `electron . --remote-debugging-port=9223` and send CDP input; a held press can be cancelled
 by a real mouse moving over the window, so check the log said "sent".
-Left from the overnight run (2026-10-05): the kiosk's layout is three windows (Run order;
-MA; Arena and a second MA tab), with two saved layouts, "Three windows" and "Two windows",
-both test arrangements to delete or keep. No embed is set up (the test one was removed). A
-dev kiosk is left running with \`--remote-debugging-port=9223\`. \`npm test\` clears \`dist/\`,
-so a dev kiosk reloaded after it loses its preload: \`npm run build:app\` and restart.
+Left on 2026-10-05: the kiosk shows two windows (Run order, MA); two test saved layouts,
+"Three windows" (its run order sits a column in from the left: an empty strip, to fix or
+delete) and "Two windows". No embed is set up. The Arena row's graphics and local folders are
+empty (test folders were set and cleared). **In Arena, the test clip "ZZ999 Paua test" is
+still in PRE & POST, column 9**: clear it by hand. The second Arena load test (a file
+replacing that one, then clearing the slot) was stopped by this box's safety check, so writes
+to Arena from a session need the owner's go-ahead. A dev kiosk is left running with
+`--remote-debugging-port=9223`. `npm test` clears `dist/`, so a dev kiosk reloaded after it
+loses its preload: `npm run build:app` and restart. For edit scripts, a bash heredoc holding
+backticks or backslashes breaks: write the script with the Write tool, then run it.
 
 ### Improvements, in order: "work on what is listed in the md"
 
@@ -360,10 +370,9 @@ edge, a corner), a Google Sheet as an embed and its sign-in, and whether 2 × 2 
 sensible smallest window.
 
 Later, not tonight:
-- **Fetch missing media**: built 2026-10-05 (§ status, `docs/VISUALS_DASHBOARD.md` §
-  Fetching media). Next: watch a Fetch load into a clip on this box (and clear the
-  **ZZ999 Paua test** clip left in PRE & POST, column 9), then the real NAS path at a booth.
-  Open: where a code not in Arena belongs.
+- **Fetch missing media**: built 2026-10-05; its next step is the top of the TODO below.
+  Open: where a code not in Arena belongs, and fetching from the lookbook when the graphics
+  folder lacks a file.
 - Start at login; self-update once hosting is decided.
 - **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
@@ -375,6 +384,12 @@ Later, not tonight:
 
 ### TODO, in order
 
+0. **Watch a Fetch load into Arena** (`docs/VISUALS_DASHBOARD.md` § Fetching media), with the
+   owner's go-ahead: test folders on the Arena row, a code's file replacing a clip's (do its
+   settings stay?), then clear the ZZ999 test clip. Then the real NAS path at a booth.
+0. **By finger on the booth screen:** Edit layout, the shared-edge drag, a Google Sheet as an
+   embed and its sign-in; and the owner's word on the choices in `docs/VISUALS_DASHBOARD.md`
+   § Windows, embeds and layouts. Publish the v0.2.0 draft when happy.
 0. **The media check at the booth** (`docs/VISUALS_DASHBOARD.md` § Answered (owner,
    2026-10-04): the media check): against the show's composition, the ✓ and "another
    version" marks, and that a PNG still carries its file path. Open: the real slot names
