@@ -321,8 +321,8 @@ a 39 s test video; the VFX layer group runs at 1.795× speed. The show's media d
 0. **The video feed from Arena** (`docs/VISUALS_DASHBOARD.md` § The video feed): Arena's
    Spout output shows in the Video view. LIFE's own build of the addon
    (`native/texture-bridge/`, built by GitHub Actions) converts 16-bit (High Detail) on
-   the GPU: ✅ from a 16-bit stand-in and ✅ from Arena at 16 bpc (2026-10-04). Left: watch
-   Arena's own output for dropped frames with the view on; the multiview layout itself, in Arena.
+   the GPU: ✅ from a 16-bit stand-in and ✅ from Arena at 16 bpc, and ✅ Arena held its
+   50 fps with the view on (2026-10-04). Left: the multiview layout itself, in Arena.
 0. **Showfile Save As and Load: ✅ on onPC, 2026-10-04** (status table above). Left:
    does a Load ever freeze again (once, after a cancelled confirm dialog). This box's onPC: interface loopback, show "Dashboard Testing" and
    the `Show 2026-10-04 …` test saves, OSC row 1 on 8003 receiving, row 3 replying to

@@ -343,8 +343,12 @@ composition's `framerate` (0-1000) is the **target**, not a measurement: subscri
 8 s it pushed once, 50, and every GET reads 50. With Spout's frame counting off too, the
 output rate with the Video view on is read in Arena's own window or not at all.
 
-**Still to do:** watch Arena's own output for dropped frames with the Video view on; lay
-out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
+✅ **Arena keeps its rate with the view on, 2026-10-04** (same box, 16 bpc, owner reading
+Arena's own display): 50 fps, its target, with the Video view off, and still 50 with it on
+and pulling 1920×1080 at 26 fps. Arena and the kiosk share this machine's GPU, so this is
+the case the booth will have.
+
+**Still to do:** lay out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
 
 ## The risk to measure first
