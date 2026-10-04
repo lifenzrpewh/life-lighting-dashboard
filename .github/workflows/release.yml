@@ -1,0 +1,147 @@
+# Builds Pāua for field testing: the Windows installer and the Mac app
+# (Apple Silicon only, the owner's call 2026-10-04), from one commit.
+#
+# Run it from the Actions tab (Run workflow), or push a tag `v<version>`.
+# The files are the run's artifacts, downloaded from its page; a tag also
+# makes a DRAFT GitHub Release holding them, published by hand when the time
+# comes (GitHub as the place testers download from is the end goal).
+#
+# THE MAC BUILD IS UNSIGNED, ad-hoc only (`identity: "-"` in package.json):
+# no Apple Developer ID yet, so macOS asks before the first open. The way past
+# it is docs/FIELD_TEST.md. Hardened runtime is off because, with an ad-hoc
+# signature, library validation would refuse the video addon.
+#
+# WHY THE REPORT JOB: nothing on the booth-class Windows box holds a token, so
+# a run's own logs cannot be read from there. The same answer as
+# texture-bridge.yml: each run pushes its build logs, the files' sizes and
+# SHA-256s to the `release-build-log` branch, which plain git can fetch.
+#
+# Tests run on the Windows job only, without the Lua harness (no Lua on the
+# runner; `npm test` locally covers it) and without the MA library (its
+# tests skip and say so).
+
+name: release (Windows + Mac)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck and test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force logs | Out-Null
+          npm run typecheck 2>&1 | Tee-Object -FilePath logs/windows-test.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          npm run build 2>&1 | Tee-Object -Append -FilePath logs/windows-test.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node --test "test/*.test.js" 2>&1 | Tee-Object -Append -FilePath logs/windows-test.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          npm run dist:win 2>&1 | Tee-Object -FilePath logs/windows-build.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-ChildItem release/*.exe | ForEach-Object {
+            "$($_.Name)  $($_.Length) bytes  sha256 $((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())"
+          } | Set-Content -Encoding utf8 logs/windows-files.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paua-windows
+          path: release/*.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-windows
+          path: logs/
+
+  mac:
+    runs-on: macos-latest # Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the app
+        env:
+          # Never pick up a certificate the runner happens to hold.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          mkdir -p logs
+          set -o pipefail
+          npm run dist:mac 2>&1 | tee logs/mac-build.log
+          for f in release/*.dmg; do
+            echo "$(basename "$f")  $(stat -f %z "$f") bytes  sha256 $(shasum -a 256 "$f" | cut -d' ' -f1)"
+          done > logs/mac-files.txt
+          # What the addon resolved to, and the signature, for the record.
+          ls release/mac-arm64/Paua.app/Contents/Resources/app.asar.unpacked/node_modules/@napolab/ >> logs/mac-files.txt || true
+          codesign -dv release/mac-arm64/Paua.app >> logs/mac-files.txt 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paua-mac-arm64
+          path: release/*.dmg
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-mac
+          path: logs/
+
+  release:
+    needs: [windows, mac]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Paua-*
+          path: files
+          merge-multiple: true
+      - name: Draft a release holding both
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" files/* --repo "${{ github.repository }}" \
+            --draft --title "Pāua ${{ github.ref_name }}" --notes "Field-test build. How to install and what to check: docs/FIELD_TEST.md."
+
+  report:
+    needs: [windows, mac]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: logs-*
+          path: build-log
+          merge-multiple: true
+      - name: Push the logs to release-build-log
+        run: |
+          {
+            echo "run      ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "from     ${{ github.sha }} (${{ github.ref_name }})"
+            echo "windows  ${{ needs.windows.result }}"
+            echo "mac      ${{ needs.mac.result }}"
+          } > build-log/RUN.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B release-build-log
+          git add -f build-log
+          git commit -m "release build: windows ${{ needs.windows.result }}, mac ${{ needs.mac.result }} (${{ github.sha }})"
+          git push --force origin release-build-log

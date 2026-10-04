@@ -22,6 +22,7 @@ import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js
 import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'import' }
 import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'import' }
 import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
+import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
 
 /** The page's frame callback, while it shows the video feed. */
 let onVideoFrame: ((frame: VideoFrame) => void) | null = null
@@ -134,6 +135,11 @@ const api = {
 	},
 	/** Show this sender rather than the first. */
 	chooseVideo: (name: string): void => ipcRenderer.send('video:choose', name),
+
+	/** Which build this is, and where its log is. */
+	about: (): Promise<About> => ipcRenderer.invoke('app:about'),
+	/** Operator mode only: open the log's folder. */
+	showLog: (): void => ipcRenderer.send('app:show-log'),
 
 	/** Settings, as the renderer may see them: passwords only as set / not set. */
 	settings: (): Promise<SettingsView> => ipcRenderer.invoke('settings:get'),

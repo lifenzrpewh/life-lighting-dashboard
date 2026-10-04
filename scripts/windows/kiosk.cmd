@@ -9,7 +9,9 @@ rem A crash restarts after 5 s. Quitting on purpose (Alt+F4) exits 0 and stays
 rem quit, so the screen can always be got out of the way.
 rem
 rem The log is %APPDATA%\paua\kiosk.log, and the run before
-rem it is kiosk.prev.log beside it.
+rem it is kiosk.prev.log beside it. The app also keeps its own, paua.log, with
+rem times on every line (src/bridge/log-file.ts); this one adds what only the
+rem console sees, such as a native crash.
 
 setlocal
 cd /d "%~dp0..\.."

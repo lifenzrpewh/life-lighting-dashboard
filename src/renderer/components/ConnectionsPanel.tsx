@@ -13,6 +13,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 
+import type { About } from '../../shared/about.js'
 import type { ConnectionId, ConnectionStatus, Tone } from '../../shared/connections.js'
 import type { DeskState } from '../../shared/desk.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
@@ -67,6 +68,16 @@ export function ConnectionsPanel({
 
 	return (
 		<Frame onClose={onClose}>
+			{rows.every((row) => row.tone === 'off') && (
+				// A fresh install: every row off, which reads as a broken screen
+				// unless something says it is only empty.
+				<p className="rounded-md border border-booth-edge bg-booth-panel px-4 py-3 text-base">
+					Nothing is set up yet.{' '}
+					{operator
+						? 'Tap a row to give it an address; start with the Console.'
+						: 'Hold the mode chip for operator mode, then tap a row to give it an address.'}
+				</p>
+			)}
 			<ul className="flex flex-col divide-y divide-booth-edge rounded-md border border-booth-edge">
 				{rows.map((row) => (
 					<li key={row.id}>
@@ -106,7 +117,31 @@ export function ConnectionsPanel({
 					</li>
 				))}
 			</ul>
+			<AboutLine operator={operator} />
 		</Frame>
+	)
+}
+
+/** Which build this is and where it logs: what a field tester's report needs. */
+function AboutLine({ operator }: { operator: boolean }) {
+	const [about, setAbout] = useState<About | null>(null)
+	useEffect(() => void window.life?.about().then((a) => setAbout(a ?? null)), [])
+	if (about === null) return null
+	return (
+		<div className="flex items-center gap-4 text-sm text-booth-dim">
+			<span className="min-w-0">
+				Pāua {about.version} · Log <span className="break-all">{about.logPath}</span>
+			</span>
+			{operator && (
+				<button
+					type="button"
+					onClick={() => window.life?.showLog()}
+					className="h-10 shrink-0 rounded border border-booth-edge px-4 text-booth-ink active:scale-[0.98]"
+				>
+					Show the log
+				</button>
+			)}
+		</div>
 	)
 }
 

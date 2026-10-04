@@ -74,13 +74,18 @@ import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { VIEWS, type ViewId } from '../shared/layout.js'
 import { settleDataDir } from '../bridge/data-dir.js'
+import { logPage, startLog } from './log.js'
+import type { About } from '../shared/about.js'
 
 // Pāua's data folder, %APPDATA%paua, moved in whole from the name before the
 // rename on the first run after it (../bridge/data-dir.ts). Before anything
-// else: the single-instance lock, settings and every session live in it.
+// else: the single-instance lock, settings, every session and the log live in it.
+let logPath = ''
 {
 	const { dir, move } = settleDataDir(app.getPath('appData'))
 	app.setPath('userData', dir)
+	// The app's own log (./log.ts), before anything has something to say.
+	logPath = startLog(dir).path
 	if (move.kind === 'moved') console.log(`[kiosk] moved ${move.entries} entries of the old profile into ${dir}`)
 	if (move.kind === 'kept-old') console.log(`[kiosk] could not move the old profile (${move.detail}); still using ${dir}`)
 }
@@ -143,6 +148,7 @@ function createWindow(): void {
 	})
 
 	window.once('ready-to-show', () => window?.show())
+	logPage(window.webContents, 'page')
 
 	if (settings !== null) maPane = createMaPane(window, settings)
 	cuePane = createCuePane(window)
@@ -463,6 +469,15 @@ app.whenReady().then(() => {
 		if (!fromKiosk(e) || mode !== 'operator') return false
 		await cuePane?.reset()
 		return true
+	})
+
+	// Which build this is and where its log is, for a tester's report.
+	ipcMain.handle('app:about', (e): About | undefined =>
+		fromOurs(e) ? { version: app.getVersion(), platform: process.platform, logPath } : undefined,
+	)
+	// Operator mode only: it opens a file window over the kiosk.
+	ipcMain.on('app:show-log', (e) => {
+		if (fromKiosk(e) && mode === 'operator' && logPath !== '') shell.showItemInFolder(logPath)
 	})
 
 	ipcMain.handle('settings:get', (e) => (fromKiosk(e) ? settings?.view() : undefined))

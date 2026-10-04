@@ -2,7 +2,7 @@
 	"name": "paua",
 	"productName": "Paua",
 	"description": "Pāua: the booth dashboard for lighting and visuals at LIFE.",
-	"version": "0.0.2",
+	"version": "0.1.0",
 	"private": true,
 	"type": "module",
 	"engines": {
@@ -13,6 +13,7 @@
 		"build:app": "npm run build && tsc -p tsconfig.main.json && vite build",
 		"build:plugin": "node scripts/build-plugin-xml.mjs",
 		"dist:win": "npm run build:app && electron-builder --win --x64 --publish never",
+		"dist:mac": "npm run build:app && electron-builder --mac --arm64 --publish never",
 		"dev": "node scripts/dev.mjs",
 		"scan": "npm run build && node spikes/scan-exports.mjs",
 		"start": "npm run build:app && electron .",
@@ -76,6 +77,23 @@
 			"artifactName": "Paua-Setup-${version}.${ext}",
 			"shortcutName": "Pāua",
 			"uninstallDisplayName": "Pāua"
+		},
+		"mac": {
+			"target": [
+				{
+					"target": "dmg",
+					"arch": [
+						"arm64"
+					]
+				}
+			],
+			"category": "public.app-category.utilities",
+			"identity": "-",
+			"hardenedRuntime": false,
+			"artifactName": "Paua-${version}-arm64.${ext}"
+		},
+		"dmg": {
+			"title": "Paua ${version}"
 		}
 	}
 }
