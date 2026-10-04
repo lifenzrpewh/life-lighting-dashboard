@@ -425,7 +425,7 @@ app.whenReady().then(() => {
 	// and a clip; main finds the file and builds every path.
 	const mediaFetch = createMediaFetch({
 		folders: () => ({ graphics: store.current().graphicsFolder, local: store.current().localMediaFolder }),
-		open: (clipId, file) => arena?.open(clipId, file) ?? Promise.resolve({ ok: false, detail: 'no Arena is set up' }),
+		open: (clipId, file, live) => arena?.open(clipId, file, live) ?? Promise.resolve({ ok: false, detail: 'no Arena is set up' }),
 		lookbookSize: lookbookFileSize,
 		lookbookUrl: lookbookFileUrl,
 	})

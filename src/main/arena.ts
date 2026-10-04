@@ -51,8 +51,9 @@ export type ArenaHandle = {
 	 *  here, then sent (../bridge/arena-control.ts). */
 	command(raw: unknown): Promise<ArenaCommandResult>
 	/** The media fetch: load `file`, which main copied, into a clip that is
-	 *  not playing (../bridge/arena-control.ts `openWire`). */
-	open(clipId: number, file: string): Promise<ArenaCommandResult>
+	 *  not playing, or one the operator agreed to replace on screen (`live`,
+	 *  ../bridge/arena-control.ts `openWire`). */
+	open(clipId: number, file: string, live: boolean): Promise<ArenaCommandResult>
 	stop(): void
 }
 
@@ -77,7 +78,7 @@ export function startArena(s: Settings): ArenaHandle {
 		source: () => link.channel(),
 		status: () => live.status(),
 		command: (raw) => live.command(raw),
-		open: (clipId, file) => live.open(clipId, file),
+		open: (clipId, file, onScreen) => live.open(clipId, file, onScreen),
 		stop() {
 			link.stop()
 			live.stop()
@@ -92,7 +93,7 @@ function watchArena(
 	status(): Channel<ArenaStatus>
 	answered(): void
 	command(raw: unknown): Promise<ArenaCommandResult>
-	open(clipId: number, file: string): Promise<ArenaCommandResult>
+	open(clipId: number, file: string, live: boolean): Promise<ArenaCommandResult>
 	stop(): void
 } {
 	let channel = unread<ArenaTree>()
@@ -244,14 +245,15 @@ function watchArena(
 			if (command.kind !== 'fader') console.log(`[arena] ${describe(command, latest.value)}`)
 			return send(wire)
 		},
-		async open(clipId, file) {
+		async open(clipId, file, onScreen) {
 			const latest = channel.latest
 			if (!open || latest === null || !latest.ok) return { ok: false, detail: 'Arena is not answering, so nothing was loaded' }
-			const wire = openWire(latest.value, clipId, fileUrlOf(file))
+			const wire = openWire(latest.value, clipId, fileUrlOf(file), onScreen)
 			if (!wire.ok) return { ok: false, detail: wire.detail }
 			const layer = latest.value.layers.find((l) => l.slots.some((s) => s.id === clipId))
 			const column = (layer?.slots.findIndex((s) => s.id === clipId) ?? -1) + 1
-			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}`)
+			const playing = layer?.slots[column - 1]?.state === 'playing'
+			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}${playing ? ', ON SCREEN (the operator said yes)' : ''}`)
 			return send(wire.value)
 		},
 		answered() {

@@ -71,14 +71,18 @@ test('Arena is given a file:/// address, spaces encoded', () => {
 
 test('a request from the page is a code, a plain name and clips, and nothing else', () => {
 	const lib = '/storage/library/C/CF588-Sunday-ReloSeries-WalkInV2_1789857226772.png'
-	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'CF588-Walk In V2', clipIds: [12, 13, 12], lookbookPath: lib, allowLookbook: true }), {
+	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'CF588-Walk In V2', clipIds: [12, 13, 12], lookbookPath: lib, allowLookbook: true, allowLive: [13] }), {
 		code: 'CF588',
 		want: 'CF588-Walk In V2',
 		clipIds: [12, 13],
 		lookbookPath: lib,
 		allowLookbook: true,
+		allowLive: [13],
 	})
-	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'x', clipIds: [], lookbookPath: null, allowLookbook: false }).clipIds, [])
+	assert.deepEqual(fetchRequestFrom({ code: 'CF588', want: 'x', clipIds: [], lookbookPath: null, allowLookbook: false, allowLive: [] }).clipIds, [])
+	// A live yes only for a clip the request names.
+	assert.equal(fetchRequestFrom({ code: 'CF588', want: 'x', clipIds: [12], lookbookPath: null, allowLookbook: false, allowLive: [14] }), null)
+	assert.equal(fetchRequestFrom({ code: 'CF588', want: 'x', clipIds: [12], lookbookPath: null, allowLookbook: false }), null)
 	for (const bad of [
 		null,
 		{ code: 'cf588', want: 'x', clipIds: [1] },
@@ -118,6 +122,8 @@ test('a file goes only into a clip still there and not playing, by open, never c
 	assert.deepEqual(ok.value, { kind: 'rest', calls: [{ path: '/composition/clips/by-id/10/open', body: { text: url } }] })
 	assert.equal(openWire(tree, 12, url).ok, true) // an empty slot takes a file too
 	assert.match(openWire(tree, 11, url).detail, /playing/)
+	// Only with the operator's yes to that clip on screen.
+	assert.equal(openWire(tree, 11, url, true).ok, true)
 	assert.match(openWire(tree, 99, url).detail, /no longer/)
 	assert.equal(openWire(tree, 10, 'http://evil/x').ok, false)
 	assert.doesNotMatch(ok.value.calls[0].path, /clear/)

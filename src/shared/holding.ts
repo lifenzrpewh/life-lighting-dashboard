@@ -15,8 +15,12 @@
 //   anything else (COUNTDOWN, …)         never placed into
 //
 // A label with no column of its own goes to a PROMO column if it is an
-// announcement or promo; otherwise it is said ("no column named …"), and a
-// campus names a column after the label to give it one. Columns still named
+// announcement or promo; otherwise it is a ONE-OFF (the owner, 2026-10-05:
+// "things it doesn't know, you can decide where they go for that service"):
+// the operator chooses a slot on its layer, and once its code sits anywhere on
+// that layer it counts as placed. Arena is the record, so the choice lasts as
+// long as this service's deck and the next service asks again. A label that
+// comes back every week is the sign to name a column after it. Columns still named
 // Arena's default (`Column #`) mean nothing is placed, and the view says
 // which names to use. Nothing is guessed from what a column happens to hold.
 //
@@ -30,8 +34,10 @@
 //
 // THE RULES THIS FILE ENFORCES:
 // - A placement is a suggestion with its reason; the operator confirms it.
-// - Never a playing clip, never two PROMO items into one column, never a
-//   column whose name says it is for something else.
+// - Never two PROMO items into one column, never a column whose name says it
+//   is for something else. A placement into a clip on screen is allowed but
+//   marked `live`: the confirmation asks about it apart (the owner,
+//   2026-10-05).
 // - Nothing found is said, not filled in with a guess.
 
 import type { ArenaLayer, ArenaSlot, ArenaStatus } from './arena.js'
@@ -190,8 +196,10 @@ export type Placement = {
 	clipId: number
 	/** What is there now and would be replaced, or null for an empty slot. */
 	replaces: { code: string | null; name: string } | null
-	/** Its own column by name, or which PROMO column and why. */
-	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty'
+	/** Its own column by name, or which PROMO column and why; `chosen` by hand. */
+	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen'
+	/** The slot is playing: loading changes what is on screen. */
+	live: boolean
 }
 
 /** A code that has no place, and why: said, never guessed. */
@@ -201,7 +209,7 @@ export type Unplaced = {
 	label: string | null
 	code: string
 	want: string | null
-	kind: 'unnamed' | 'no-column' | 'no-promo' | 'no-layer' | 'playing' | 'no-file'
+	kind: 'unnamed' | 'no-column' | 'no-promo' | 'no-layer' | 'no-file'
 	detail: string
 }
 
@@ -318,6 +326,9 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 		const base = { item: i, title: item.title, label: item.label }
 		for (const c of arenaCodes(item)) {
 			if ('none' in where) {
+				// A one-off already on its layer was placed by hand: done.
+				const oneOff = where.none === 'no-column' || where.none === 'no-promo'
+				if (oneOff && layerOf(c.type)?.slots.some((s) => slotCode(s) === c.code) === true) continue
 				unplaced.push({ ...base, code: c.code, want: c.want, kind: where.none, detail: where.detail })
 				continue
 			}
@@ -332,10 +343,6 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 				continue
 			}
 			if (slotCode(slot) === c.code) continue
-			if (slot.state === 'playing') {
-				unplaced.push({ ...base, code: c.code, want: c.want, kind: 'playing', detail: `${layer.name} · ${names[where.column] || `column ${where.column + 1}`} is playing` })
-				continue
-			}
 			placements.push({
 				...base,
 				code: c.code,
@@ -347,6 +354,7 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 				clipId: slot.id,
 				replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
 				why: where.why,
+				live: slot.state === 'playing',
 			})
 		}
 	}
@@ -381,10 +389,10 @@ export function clipsToUpdate(
 	return out
 }
 
-/** Where a placement goes, said: `HOLD FG · POST (column 2), replacing …`. */
+/** Where a placement goes, said: `HOLD FG · POST (column 2), replacing CF445`. */
 export function placementWords(p: Placement): string {
 	const column = unnamed(p.columnName) ? `column ${p.column}` : `${p.columnName} (column ${p.column})`
-	return `${p.layer} · ${column}${p.replaces === null ? '' : `, replacing ${p.replaces.name}`}`
+	return `${p.layer} · ${column}${p.replaces === null ? '' : `, replacing ${p.replaces.code ?? p.replaces.name}`}`
 }
 
 /** One line of a confirmation, to show before it runs. */
@@ -416,7 +424,7 @@ export function updatePlan(
 			...(update.length === 0 ? [] : [update.length === 1 ? 'its clip with the old file' : `its ${update.length} clips with the old file`]),
 			...place.map(placementWords),
 		]
-		steps.push({ request: { code, want, clipIds, lookbookPath: path, allowLookbook: false }, what: `${code}: ${want} into ${parts.join('; ')}` })
+		steps.push({ request: { code, want, clipIds, lookbookPath: path, allowLookbook: false, allowLive: [] }, what: `${code} into ${parts.join('; ')}` })
 	}
 	return { steps, unplaced }
 }

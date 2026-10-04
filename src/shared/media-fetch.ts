@@ -22,8 +22,12 @@
 //   there.
 // - Nothing is overwritten: a file of the same name already in the local
 //   folder is used if it is the same size, and otherwise left alone and said.
-// - Never into a clip that is playing: checked against the composition at the
-//   moment of sending (../bridge/arena-control.ts).
+// - Never into a clip that is playing, unless the operator said yes to
+//   replacing that very clip on screen at the confirmation (`allowLive`, the
+//   owner, 2026-10-05: "happy to have it override the live clip, with an extra
+//   warning"): checked against the composition at the moment of sending
+//   (../bridge/arena-control.ts). A clip that went live after the yes is
+//   still refused.
 // - The page names a code, the file name the lookbook gave and a clip id, and
 //   nothing else. Main finds the file and builds every path itself.
 // - Sent is not done: the media check's own reading of Arena says when the
@@ -42,6 +46,9 @@ export type FetchRequest = {
 	/** Download from the lookbook when the drive has no matching file. Only
 	 *  when the operator said so at the confirmation (the owner, 2026-10-05). */
 	allowLookbook: boolean
+	/** The clips, of `clipIds`, the operator agreed to replace while they are
+	 *  on screen. Any other playing clip is refused at sending. */
+	allowLive: number[]
 }
 
 /** Where a code's file will come from, said at the confirmation before
@@ -78,14 +85,15 @@ export function isPlainName(name: string): boolean {
 /** A request off the IPC boundary, or null. */
 export function fetchRequestFrom(raw: unknown): FetchRequest | null {
 	if (typeof raw !== 'object' || raw === null) return null
-	const { code, want, clipIds, lookbookPath, allowLookbook } = raw as Record<string, unknown>
+	const { code, want, clipIds, lookbookPath, allowLookbook, allowLive } = raw as Record<string, unknown>
 	if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return null
 	if (typeof want !== 'string' || !isPlainName(want)) return null
 	if (!Array.isArray(clipIds) || clipIds.length > 100) return null
 	if (!clipIds.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)) return null
 	if (lookbookPath !== null && !(typeof lookbookPath === 'string' && LIBRARY_FILE.test(lookbookPath) && libraryCodeIs(lookbookPath, code))) return null
 	if (typeof allowLookbook !== 'boolean') return null
-	return { code, want, clipIds: [...new Set(clipIds as number[])], lookbookPath, allowLookbook }
+	if (!Array.isArray(allowLive) || !allowLive.every((id) => (clipIds as unknown[]).includes(id))) return null
+	return { code, want, clipIds: [...new Set(clipIds as number[])], lookbookPath, allowLookbook, allowLive: [...new Set(allowLive as number[])] }
 }
 
 /** A folder setting: a whole path on this computer or the network, `D:\Media`,

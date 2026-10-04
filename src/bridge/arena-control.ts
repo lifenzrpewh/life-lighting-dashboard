@@ -92,15 +92,16 @@ export function checkCommand(raw: unknown, tree: ArenaTree): Decoded<{ command: 
 }
 
 /** Load a file into a clip: main's alone, for the media fetch. The clip must
- *  still be in the composition and not playing, because a load into a playing
- *  clip changes the output there and then. ✅ Arena 7.28, 2026-10-05: 204, and
- *  the clip read back with the file. */
-export function openWire(tree: ArenaTree, clipId: number, fileUrl: string): Decoded<ArenaWire> {
+ *  still be in the composition, and not playing unless `live` (the operator
+ *  said yes to replacing it on screen), because a load into a playing clip
+ *  changes the output there and then. ✅ Arena 7.28, 2026-10-05: 204, and the
+ *  clip read back with the file. */
+export function openWire(tree: ArenaTree, clipId: number, fileUrl: string, live = false): Decoded<ArenaWire> {
 	if (!isId(clipId)) return { ok: false, detail: 'not a clip' }
 	if (!fileUrl.startsWith('file:///')) return { ok: false, detail: 'not a file on this computer' }
 	const slot = tree.layers.flatMap((l) => l.slots).find((s) => s.id === clipId)
 	if (slot === undefined) return { ok: false, detail: 'that clip is no longer in the composition' }
-	if (slot.state === 'playing') return { ok: false, detail: 'that clip is playing; nothing is loaded into a clip on output' }
+	if (slot.state === 'playing' && !live) return { ok: false, detail: 'that clip is playing; nothing is loaded into a clip on output' }
 	return { ok: true, value: { kind: 'rest', calls: [{ path: `/composition/clips/by-id/${clipId}/open`, body: { text: fileUrl } }] } }
 }
 

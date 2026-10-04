@@ -27,7 +27,7 @@ type Resolved = { from: 'drive'; found: Found } | { from: 'lookbook'; why: strin
 
 export function createMediaFetch(opts: {
 	folders: () => { graphics: string | null; local: string | null }
-	open: (clipId: number, file: string) => Promise<ArenaCommandResult>
+	open: (clipId: number, file: string, live: boolean) => Promise<ArenaCommandResult>
 	lookbookSize: (libraryPath: string) => Promise<number | null>
 	lookbookUrl: (libraryPath: string) => string | null
 }): MediaFetch {
@@ -102,11 +102,12 @@ export function createMediaFetch(opts: {
 		const file = path.basename(copy.path)
 		if (req.clipIds.length === 0) return set(req.code, { state: 'copied', file, from: r.from })
 
-		// One clip at a time, each checked as it is sent (never a playing one).
+		// One clip at a time, each checked as it is sent (never a playing one
+		// the operator did not agree to replace on screen).
 		const failed: string[] = []
 		for (const [i, clipId] of req.clipIds.entries()) {
 			set(req.code, { state: 'loading', file, done: i, of: req.clipIds.length })
-			const opened = await opts.open(clipId, copy.path)
+			const opened = await opts.open(clipId, copy.path, req.allowLive.includes(clipId))
 			if (!opened.ok) {
 				console.log(`[media] ${req.code}: not loaded into clip ${clipId}: ${opened.detail}`)
 				failed.push(opened.detail)

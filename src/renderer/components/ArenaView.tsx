@@ -34,6 +34,7 @@ import {
 } from '../../shared/arena.js'
 import { matchReading, readingOf, type Channel } from '../../shared/reading.js'
 import { Centered, Say } from './MaPane.js'
+import { Holding } from './HoldingView.js'
 import { MediaCheck } from './MediaCheck.js'
 import { chipLabel, formatAge, staleContent, unknownWhy } from './vocabulary.js'
 
@@ -99,6 +100,9 @@ function sectionsOf(status: ArenaStatus): Section[] {
 
 function Board({ status, ageMs, failure, now }: { status: ArenaStatus; ageMs: number | null; failure: string | null; now: number }) {
 	const stale = ageMs !== null
+	// The Media line opens the Holding view here, in the Arena view's place.
+	const [holding, setHolding] = useState(false)
+	if (holding) return <Holding status={status} ageMs={ageMs} now={now} onBack={() => setHolding(false)} />
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
 			<div className="flex h-12 shrink-0 items-center gap-3 border-b border-booth-edge px-4 text-sm">
@@ -120,7 +124,7 @@ function Board({ status, ageMs, failure, now }: { status: ArenaStatus; ageMs: nu
 			</div>
 			<MissingMediaNotice status={status} />
 			<div className={`shrink-0 ${stale ? staleContent : ''}`}>
-				<MediaCheck status={status} now={now} />
+				<MediaCheck status={status} now={now} onOpen={() => setHolding(true)} />
 			</div>
 			<div className={`min-h-0 flex-1 overflow-y-auto ${stale ? staleContent : ''}`}>
 				{sectionsOf(status).map((section, i) => (

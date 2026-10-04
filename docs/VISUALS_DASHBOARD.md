@@ -742,6 +742,41 @@ in both the Media row and here (taken without an answer: the owner can trim one)
   ⚠️ Not yet: Choose, Inspect and the confirmation driven (the owner was at the kiosk), a
   Load into Arena (needs the owner's go-ahead), and anything by finger.
 
+- **Edge cases and the clutter** (the owner, 2026-10-05: "a few edge cases decently often…
+  any good catch-all", and "feels very wall of texty"). Seen in the morning's log and on screen:
+  Update all skipping CB095 three times because its clip was on screen; CB105 "Preach BG" loaded
+  into a slot but still listed "no column named Preach BG"; CF588 named `WalkInV2` against the
+  lookbook's `WalkInV2-Demo`. The owner's answers, built the same day:
+  - **A clip on screen may be replaced**, "with an extra warning": a placement or update into a
+    playing clip is no longer refused in the rules; the confirmation asks apart, a red tick "Replace
+    N on screen now (… in HOLD BG · column 1): the audience sees it change", off until ticked, and
+    Load turns red, "Load, replacing N on screen". The yes names the clips (`allowLive`, clip ids);
+    main still refuses a clip that went on screen after it. ⚠️ Not yet watched: what the audience
+    sees when Arena opens a file into a playing clip.
+  - **One-offs, per service** (the owner's idea over a remembered label: "things it doesn't KNOW
+    you can decide where they go for that service, F in foregrounds and B in backgrounds"): an item
+    with no named column waits in the **No column** tray; tap it, then a lit slot on its layer.
+    Once its code is anywhere on its layer it counts as placed, so Arena is the record and the next
+    service's deck asks again. A label that comes back every week is the sign to name a column.
+  - **The lookbook question is a tick too**, off until ticked, beside the live one; Load says how
+    many it will send.
+  - **Less text, more picture** (direction mocked in chat, the owner happy): a right clip shows only
+    its code; amber ring and dot for may differ or another file, a file-missing icon, faded for not
+    this service, green for on screen, one legend under the grid. What belongs in a column and is
+    not there stands in it as a **dashed tile with the lookbook's picture, "+ place"** (To place's
+    list is gone). The header is one line: service (tap for following / pick by hand and when the
+    run sheet was read), what to look at, fetches as small chips (tap one for its detail), Update
+    all, a refresh icon. A clip opened: Arena's picture beside the lookbook's, "Use the lookbook's"
+    and "Arena's is right" (was Update and Same).
+  - **The Media row is one line** that opens the Holding view in the Arena view's place, with ←
+    Arena (the per-code list is gone; Copy here went with it). "To look at" counts codes as the
+    Holding view marks them, so it matches the amber tiles.
+  - ✅ In the kiosk over CDP, 2026-10-05: Central PM 20 Sep (CB105 no longer listed; CF588 and
+    CB095 amber) and 4 Oct (CF465 and CF594 as dashed tiles in NSL and PROMO 1); a ghost's Place and
+    Update all opened their confirmations and sent nothing until Load (checked by trapping the
+    send); the Media line opened Holding and came back. ⚠️ The live tick not seen (nothing was on
+    screen); nothing by finger.
+
 ## Open questions
 
 - **Briefs:** where should a brief's link live? The candidates were the item in the

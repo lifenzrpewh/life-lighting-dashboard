@@ -174,8 +174,15 @@ test("the names are read from the layer group's columns, the composition's only 
 	assert.equal(reserved(s.layers[3], 3, s), true)
 })
 
+/** The fixture without CB105 on HOLD BG, so Preach BG is a one-off not yet placed. */
+const withoutPreach = () => {
+	const s = composition()
+	s.layers[1].slots[2] = empty()
+	return s
+}
+
 test('what has no place is said, never guessed', () => {
-	const { unplaced } = planPlacements(ITEMS, composition())
+	const { unplaced } = planPlacements(ITEMS, withoutPreach())
 	const preach = unplaced.find((u) => u.code === 'CB105')
 	assert.equal(preach.kind, 'no-column')
 	assert.match(preach.detail, /no column named Preach BG/)
@@ -192,8 +199,25 @@ test('what has no place is said, never guessed', () => {
 	const playing = composition()
 	const fg = playing.layers[3]
 	fg.slots[1] = { ...fg.slots[1], state: 'playing', name: 'x', file: 'C:\\x.png' }
-	const p = planPlacements(ITEMS, playing).unplaced.find((u) => u.code === 'CF588')
-	assert.equal(p.kind, 'playing')
+	// On screen is not refused here: the placement is marked live, and the
+	// confirmation asks about it apart (the owner, 2026-10-05).
+	const p = planPlacements(ITEMS, playing).placements.find((x) => x.code === 'CF588' && x.column === 2)
+	assert.equal(p.live, true)
+	assert.equal(at(planPlacements(ITEMS, composition()).placements, 'Walk Out', 'CF588').live, false)
+})
+
+test('a one-off is placed by hand: once its code is on its layer, anywhere, it is done', () => {
+	// The fixture has an older CB105 in HOLD BG column 3: placed (Update's to freshen).
+	assert.equal(planPlacements(ITEMS, composition()).unplaced.some((u) => u.code === 'CB105'), false)
+	const s = withoutPreach()
+	assert.ok(planPlacements(ITEMS, s).unplaced.some((u) => u.code === 'CB105'))
+	const bg = s.layers[1]
+	bg.slots[11] = clip('CB105-Sunday-ReloSeries-PreachV2.jpg')
+	assert.equal(planPlacements(ITEMS, s).unplaced.some((u) => u.code === 'CB105'), false)
+	// On another layer it is not placed.
+	bg.slots[11] = empty()
+	s.layers[3].slots[11] = clip('CB105-Sunday-ReloSeries-PreachV2.jpg')
+	assert.ok(planPlacements(ITEMS, s).unplaced.some((u) => u.code === 'CB105'))
 })
 
 test('an update goes into every clip with the old file, not the confirmed or the right ones', () => {
@@ -210,6 +234,7 @@ test('an update goes into every clip with the old file, not the confirmed or the
 test('Update all: one step per code, its old clips and its missing columns together', () => {
 	const s = composition()
 	const marks = new Set([sameKey('CB095', s.layers[1].slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])
+	s.layers[1].slots[2] = empty()
 	const { steps, unplaced } = updatePlan(ITEMS, s, marks)
 	const by = Object.fromEntries(steps.map((x) => [x.request.code, x]))
 	// CB095 is confirmed, so only the columns missing it: BIBLES and WTG.

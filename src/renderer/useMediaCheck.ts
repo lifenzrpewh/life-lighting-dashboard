@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ArenaStatus } from '../shared/arena.js'
-import { codesOn, planPlacements, slotCode, updatePlan, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { codesOn, planPlacements, slotCode, slotMark, updatePlan, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	nzDate,
@@ -201,10 +201,22 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
 		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status)
 	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes)
-	// To look at: an old or missing file, a code not where its item belongs, or
-	// one with no place (a code the lookbook has no file for is said apart).
-	const trouble =
-		check === null ? 0 : check.counts['not-on-disk'] + check.counts['other-version'] + placements.length + unplaced.filter((u) => u.kind !== 'no-file').length
+	// To look at, by code, as the Holding view marks them: a code with any clip
+	// whose file may differ, differs or is missing (one of CB095's eighteen is
+	// enough), one not where its item belongs, or one with no place (a code the
+	// lookbook has no file for is said apart).
+	const look = new Set<string>()
+	if (runSheet !== null && today !== null) {
+		for (const layer of status.layers) {
+			for (const slot of layer.slots) {
+				const mark = slotMark(slot, runSheet, today, same, sizes)
+				if (mark === 'may-differ' || mark === 'different' || mark === 'missing') look.add(slotCode(slot) ?? '')
+			}
+		}
+		for (const p of placements) look.add(p.code)
+		for (const u of unplaced) if (u.kind !== 'no-file') look.add(u.code)
+	}
+	const trouble = check === null ? 0 : look.size
 
 	// Nothing is copied or loaded into Arena without a confirmation first (the
 	// owner, 2026-10-05): a Fetch, a Place and Update all each say what they
@@ -225,14 +237,33 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		setAsking({ id, title, steps, unplaced, sources: null })
 		void life?.mediaSources(steps.map((s) => s.request)).then((sources) => setAsking((a) => (a?.id === id ? { ...a, sources } : a)))
 	}
-	/** Load: what the drive has, and what only the lookbook has when
-	 *  `downloadFromLookbook`. A file with nowhere to come from is left out. */
-	const confirm = (downloadFromLookbook: boolean) => {
-		if (asking === null || asking.sources === null) return
+	/** The clips of a step that are on screen now, by where they are. */
+	const onScreen = (step: UpdateStep): { id: number; where: string }[] =>
+		status.layers.flatMap((layer) =>
+			layer.slots.flatMap((slot, i) =>
+				slot.state === 'playing' && step.request.clipIds.includes(slot.id) ? [{ id: slot.id, where: `${layer.name} · column ${i + 1}` }] : [],
+			),
+		)
+	/** Which steps Load would send, as it would send them: a file only in the
+	 *  lookbook only when `lookbook`, a clip on screen only when `live` (the
+	 *  owner, 2026-10-05: "happy to have it override the live clip, with an
+	 *  extra warning"). A step left with no clip to load is not sent; a file
+	 *  with nowhere to come from is left out. */
+	const toSend = (answers: { lookbook: boolean; live: boolean }): FetchRequest[] => {
+		if (asking === null || asking.sources === null) return []
+		const out: FetchRequest[] = []
 		for (const step of asking.steps) {
 			const from = asking.sources[step.request.code]?.from
-			if (from === 'drive' || (from === 'lookbook' && downloadFromLookbook)) fetchCode({ ...step.request, allowLookbook: from === 'lookbook' })
+			if (!(from === 'drive' || (from === 'lookbook' && answers.lookbook))) continue
+			const live = onScreen(step).map((c) => c.id)
+			const clipIds = answers.live ? step.request.clipIds : step.request.clipIds.filter((id) => !live.includes(id))
+			if (step.request.clipIds.length > 0 && clipIds.length === 0) continue
+			out.push({ ...step.request, clipIds, allowLookbook: from === 'lookbook', allowLive: answers.live ? live : [] })
 		}
+		return out
+	}
+	const confirm = (answers: { lookbook: boolean; live: boolean }) => {
+		for (const req of toSend(answers)) fetchCode(req)
 		setAsking(null)
 	}
 	const askUpdateAll = () => ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced)
@@ -265,6 +296,8 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		markSame,
 		asking,
 		ask,
+		onScreen,
+		toSend,
 		confirm,
 		cancel: () => setAsking(null),
 		askUpdateAll,
