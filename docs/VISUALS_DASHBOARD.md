@@ -324,6 +324,12 @@ exactly `v`.
   went back to the picked one when it returned. That is the rule as written in
   `src/main/video-feed.ts`; whether a booth would rather see "gone" is a question.
 
+✅ **From Arena at 16 bpc, 2026-10-04** (High Detail on, set and watched by the owner): the
+Video view showed Arena's Spout output, 1920×1080 at 27 fps, no failure, through LIFE's
+build. The stock addon refuses a 16-bit texture outright, so a picture at all is the
+conversion working. The sender's own format is not logged, so that it arrived 16-bit rests
+on Arena's setting.
+
 **Why the new-frame check always says yes** (it said so 1250 times in 3 s from Arena):
 Spout's frame counting is a per-user setting, `HKCUSoftwareLeading EdgeSpout`
 `Framecount`, off unless set (SpoutSettings sets it), and this box has no such key. With
