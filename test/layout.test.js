@@ -20,6 +20,7 @@ import {
 	moveSeam,
 	placeWindow,
 	removeTab,
+	moveTab,
 	removeWindow,
 	sameArrangement,
 	saveLayout,
@@ -279,4 +280,23 @@ test('a seam never runs a window into one that is not on it', () => {
 		[600, 600],
 		[600, 600],
 	])
+})
+
+test('a tab is dragged within its window or to another, keeping its id, shown where it lands', () => {
+	let l = addTab(DEFAULT_LAYOUT, 'w2', 'arena', 't3')
+	l = addTab(l, 'w2', 'clips', 't4')
+	const ids = (w) => l.windows.find((x) => x.id === w).tabs.map((t) => t.id)
+	const before = ids('w2')
+	l = moveTab(l, 'w2', 't4', 'w2', before[0])
+	assert.deepEqual(ids('w2'), ['t4', ...before.filter((t) => t !== 't4')])
+	l = moveTab(l, 'w2', 't4', 'w1', null)
+	assert.equal(ids('w1').at(-1), 't4')
+	assert.equal(l.windows.find((w) => w.id === 'w1').active, 't4')
+	assert.ok(!ids('w2').includes('t4'))
+	assert.notEqual(l.windows.find((w) => w.id === 'w2').active, 't4')
+	// Nowhere real: nothing changes.
+	assert.equal(moveTab(l, 'w2', 'nope', 'w1', null), l)
+	assert.equal(moveTab(l, 'w1', 't4', 'w9', null), l)
+	assert.equal(moveTab(l, 'w1', 't4', 'w1', 't4'), l)
+	assert.equal(moveTab(l, 'w1', 't4', 'w1', null), l)
 })

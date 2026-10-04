@@ -43,6 +43,7 @@ import {
 	makeHome,
 	placeWindow,
 	removeTab,
+	moveTab,
 	removeWindow,
 	sameArrangement,
 	selectTab,
@@ -86,6 +87,9 @@ function failureOf<T>(channel: Channel<T>): string | null {
 	return latest !== null && !latest.ok && latest.reason === 'error' ? latest.detail : null
 }
 
+/** Where this computer remembers the top bar folded. */
+const BAR_KEY = 'paua.barCollapsed'
+
 export function App() {
 	const [now, setNow] = useState(() => Date.now())
 	// 'real' is dev's way to watch main's own link, against onPC or a stand-in,
@@ -93,6 +97,24 @@ export function App() {
 	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
 	// Arranging the windows: operator mode only (../shared/layout.ts).
 	const [editing, setEditing] = useState(false)
+	// The top bar folded to a strip: a convenience of this computer's, so a
+	// machine that keeps nothing shows the bar.
+	const [barCollapsed, setBarCollapsed] = useState(() => {
+		try {
+			return localStorage.getItem(BAR_KEY) === '1'
+		} catch {
+			return false
+		}
+	})
+	const collapseBar = (on: boolean) => {
+		setBarCollapsed(on)
+		try {
+			if (on) localStorage.setItem(BAR_KEY, '1')
+			else localStorage.removeItem(BAR_KEY)
+		} catch {
+			// Kept for this run only.
+		}
+	}
 	const [connectionsOpen, setConnectionsOpen] = useState(false)
 	// The showfile sheet (Save As, Load) takes the right slot's place as
 	// Connections does; one at a time. The campus is read as it opens, for the
@@ -668,6 +690,8 @@ export function App() {
 				showfile={showfile}
 				showfileFailure={failureOf(sources.showfile)}
 				timers={timers}
+				collapsed={barCollapsed}
+				onCollapse={collapseBar}
 			/>
 
 			{/* Above the windows, never over them: a native view cannot be overlaid.
@@ -689,7 +713,7 @@ export function App() {
 					<span className={`min-w-0 truncate text-sm ${noRoom ? 'text-state-stale' : 'text-booth-dim'}`}>
 						{noRoom
 							? 'No room for another window. Make one smaller first.'
-							: 'Drag a window to move it, or an edge or corner to resize. + adds a tab, × takes one away.'}
+							: 'Drag a window to move it, an edge or corner to resize, a tab to reorder it or move it to another window. + adds a tab, × takes one away.'}
 					</span>
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						<Button
@@ -766,6 +790,7 @@ export function App() {
 						onSelect={(w, t) => update((l) => selectTab(l, w, t))}
 						onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
 						onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
+						onMoveTab={(from, t, to, before) => update((l) => moveTab(l, from, t, to, before))}
 						onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
 						onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
 						fresh={fresh}

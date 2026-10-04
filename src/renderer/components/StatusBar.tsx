@@ -14,9 +14,15 @@
 // is on; time in the true centre, biggest on the bar; the controls on the
 // right. Operator mode lays the nacre line along the bar's foot, so the mode
 // is visible from across the booth without being the loudest thing on it.
+//
+// Slimmer since the afternoon of 2026-10-05 (the owner: "seems to take A LOT
+// of screen space"): 60 px, the countdown one line, and a chevron that
+// collapses the bar to a 36 px strip of the same readings (link, show,
+// countdown, clock, the connections' dot, the mode), remembered on this
+// computer. The strip's controls are only the chevron back.
 
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, Flag, PanelsTopLeft, Pencil } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Flag, PanelsTopLeft, Pencil } from 'lucide-react'
 
 import type { LinkState, Reading, UnknownReason } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
@@ -26,7 +32,7 @@ import type { Showfile } from '../../shared/showfile.js'
 import type { TimerSources } from '../../shared/timer.js'
 import { ModeChip } from './ModeChip.js'
 import { TimerChip } from './TimerChip.js'
-import { Button, Dot } from './ui.js'
+import { Button, Dot, IconButton } from './ui.js'
 import { chip, formatAge, staleContent, stateClass, unknownWhy } from './vocabulary.js'
 
 /** A round trip in milliseconds, which is what `roundTripMs` holds. Tenths
@@ -89,7 +95,7 @@ function ConsoleCard({
 			onClick={onOpen}
 			aria-label="The console and its show: Save As and Load"
 			aria-expanded={open}
-			className={`${chip} ${frame} h-14 max-w-[36rem] gap-3.5 pr-3 pl-4 text-left transition-colors hover:bg-booth-hover ${open ? 'bg-booth-hover' : ''}`}
+			className={`${chip} ${frame} h-12 max-w-[36rem] gap-3.5 pr-3 pl-4 text-left transition-colors hover:bg-booth-hover ${open ? 'bg-booth-hover' : ''}`}
 		>
 			<Dot tone={live ? 'live' : 'down'} />
 			<span className="flex min-w-0 flex-col leading-tight">
@@ -133,10 +139,10 @@ function Clock({ now }: { now: number }) {
 	return (
 		<span className="flex shrink-0 flex-col leading-none">
 			<span className="flex items-baseline gap-1.5">
-				<span className="text-[30px] font-medium tracking-tight tabular-nums">{time}</span>
+				<span className="text-[24px] font-medium tracking-tight tabular-nums">{time}</span>
 				{period !== null && <span className="text-sm font-medium text-booth-dim">{period}</span>}
 			</span>
-			<span className="mt-1 text-xs text-booth-dim">{date}</span>
+			<span className="mt-0.5 text-xs text-booth-dim">{date}</span>
 		</span>
 	)
 }
@@ -162,6 +168,8 @@ export function StatusBar({
 	showfile,
 	showfileFailure,
 	timers,
+	collapsed,
+	onCollapse,
 }: {
 	link: LinkState
 	/** False when the console is turned off in Connections: no link, no show. */
@@ -194,11 +202,15 @@ export function StatusBar({
 	showfileFailure: string | null
 	/** OnTime and ProPresenter, as main last heard them. */
 	timers: TimerSources | null
+	/** The bar folded to a strip. */
+	collapsed: boolean
+	onCollapse: (collapsed: boolean) => void
 }) {
 	const operator = mode === 'operator'
 	const open = 'bg-booth-hover ring-1 ring-inset ring-booth-dim/40'
+	if (collapsed) return <Strip {...{ link, consoleOn, now, operator, connections, showfile, timers }} onExpand={() => onCollapse(false)} />
 	return (
-		<header className="relative grid h-[76px] shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-6 border-b border-booth-edge bg-booth-panel px-4">
+		<header className="relative grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-6 border-b border-booth-edge bg-booth-panel px-4">
 			{/* The console: is it there, and which show it is on. */}
 			<div className="flex min-w-0 items-center">
 				{consoleOn && (
@@ -239,8 +251,73 @@ export function StatusBar({
 				<MarkButton onMark={onMark} />
 				{/* Boots into volunteer, always, and never remembers otherwise. */}
 				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
+				<IconButton icon={ChevronUp} label="Fold the bar away" onClick={() => onCollapse(true)} />
 			</div>
 
+			{operator && <span aria-hidden className="nacre-line absolute inset-x-0 -bottom-px h-0.5" />}
+		</header>
+	)
+}
+
+/** The bar folded: the same readings in one 36 px line, and the way back. */
+function Strip({
+	link,
+	consoleOn,
+	now,
+	operator,
+	connections,
+	showfile,
+	timers,
+	onExpand,
+}: {
+	link: LinkState
+	consoleOn: boolean
+	now: number
+	operator: boolean
+	connections: Tone
+	showfile: Reading<Showfile>
+	timers: TimerSources | null
+	onExpand: () => void
+}) {
+	const live = link.state === 'live'
+	const show = matchReading<Showfile, { name: string | null; stale: boolean; onBase: boolean }>(showfile, {
+		live: (s) => ({ name: s.name, stale: false, onBase: s.onBase }),
+		stale: (s) => ({ name: s.name, stale: true, onBase: s.onBase }),
+		unknown: () => ({ name: null, stale: false, onBase: false }),
+	})
+	const time = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+	return (
+		<header className="relative flex h-9 shrink-0 items-center gap-4 border-b border-booth-edge bg-booth-panel pl-4 text-sm">
+			{consoleOn && (
+				<span className="flex min-w-0 items-center gap-2">
+					<Dot tone={live ? 'live' : 'down'} size="sm" />
+					<span className={live ? 'text-state-live' : 'text-state-unreachable'}>{live ? 'Live' : 'Not answering'}</span>
+					{show.name !== null && (
+						<span className={`truncate font-mono text-xs ${show.onBase ? 'text-warn' : ''} ${show.stale ? staleContent : ''}`}>
+							{show.name}
+							{show.onBase && ' · on base show'}
+						</span>
+					)}
+				</span>
+			)}
+			<span className="ml-auto flex shrink-0 items-center gap-4">
+				<TimerChip sources={timers} compact />
+				<span className="font-medium tabular-nums">{time}</span>
+				<span className="flex items-center gap-1.5 text-xs text-booth-dim">
+					<Dot tone={connections} size="sm" />
+					Connections
+				</span>
+				<span className={`text-xs ${operator ? 'text-booth-ink' : 'text-booth-dim'}`}>{operator ? 'Operator' : 'Volunteer'}</span>
+			</span>
+			<button
+				type="button"
+				onClick={onExpand}
+				aria-label="Show the bar"
+				title="Show the bar"
+				className="grid h-full w-14 shrink-0 place-items-center text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
+			>
+				<ChevronDown size={18} aria-hidden />
+			</button>
 			{operator && <span aria-hidden className="nacre-line absolute inset-x-0 -bottom-px h-0.5" />}
 		</header>
 	)

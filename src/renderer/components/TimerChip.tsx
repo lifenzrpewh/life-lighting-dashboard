@@ -5,7 +5,7 @@
 // READ-ONLY, like the rest of the status bar: it starts, stops and sends
 // nothing to either program.
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 import { matchReading } from '../../shared/reading.js'
 import {
@@ -34,7 +34,18 @@ function useNow(): number {
 	return now
 }
 
-export function TimerChip({ sources }: { sources: TimerSources | null }) {
+/** The collapsed bar's chip: one line, no frame's padding, the number small. */
+const Compact = createContext(false)
+
+export function TimerChip({ sources, compact = false }: { sources: TimerSources | null; compact?: boolean }) {
+	return (
+		<Compact.Provider value={compact}>
+			<Chosen sources={sources} />
+		</Compact.Provider>
+	)
+}
+
+function Chosen({ sources }: { sources: TimerSources | null }) {
 	const now = useNow()
 	if (sources === null) return null
 	const view = chooseTimer(sources, now)
@@ -118,7 +129,7 @@ function ProPresenter({
 		shown.kind === 'missing' ? `No timer “${shown.name}” in ProPresenter` : value.message === null ? 'No timer running' : null
 	return (
 		<Frame source="ProPresenter" ageMs={ageMs} note={ontime} caption={caption ?? 'Stage message'}>
-			{value.message !== null && <span className="max-w-[24rem] truncate text-lg">{value.message}</span>}
+			{value.message !== null && <span className="max-w-[24rem] truncate text-base">{value.message}</span>}
 		</Frame>
 	)
 }
@@ -127,7 +138,8 @@ function ProPresenter({
  *  program (the owner's call, 2026-10-02), with its caption, so it reads
  *  across the booth. Zero itself is not yet over. */
 function Big({ ms }: { ms: number | null }) {
-	return <span className="text-[30px] leading-none font-medium tracking-tight tabular-nums">{ms === null ? '–:––' : formatCountdown(ms)}</span>
+	const compact = useContext(Compact)
+	return <span className={`${compact ? 'text-base' : 'text-[26px]'} leading-none font-medium tracking-tight tabular-nums`}>{ms === null ? '–:––' : formatCountdown(ms)}</span>
 }
 
 /** A countdown is a reading, not a control: no surface while live, so it can
@@ -153,15 +165,18 @@ function Frame({
 	note?: OnTimeAside
 	children: ReactNode
 }) {
+	const compact = useContext(Compact)
 	const stale = ageMs !== null
 	const frame = unknown ? stateClass.unknown : stale ? stateClass.stale : stateClass.live
 	// Nothing to count: one line, quieter, so an idle or silent program does
 	// not take the room a running countdown would.
 	const quiet = children === null || children === undefined || children === false
 	return (
-		<span className={`flex min-w-0 items-center gap-3 rounded-lg border px-3 ${quiet ? 'h-11' : 'py-1.5'} ${frame} ${over ? 'text-overtime' : ''}`}>
-			<span className={`flex min-w-0 flex-col items-end gap-1 ${stale ? staleContent : ''}`}>
-				<span className={`flex max-w-[22rem] items-center gap-1.5 truncate ${quiet ? 'text-sm' : 'text-xs'} ${over ? '' : 'text-booth-dim'}`}>
+		// Caption and number side by side (2026-10-05, the owner: the bar "seems
+		// to take A LOT of screen space"), so the chip is one line high.
+		<span className={`flex min-w-0 items-center gap-3 rounded-lg border ${compact ? 'h-7 px-2' : 'h-11 px-3'} ${frame} ${over ? 'text-overtime' : ''}`}>
+			<span className={`flex min-w-0 items-center gap-3 ${stale ? staleContent : ''}`}>
+				<span className={`flex max-w-[22rem] items-center gap-1.5 truncate ${quiet && !compact ? 'text-sm' : 'text-xs'} ${over ? '' : 'text-booth-dim'}`}>
 					<span className="font-medium">{source}</span>
 					<span>·</span>
 					<span className="truncate">{caption}</span>

@@ -302,6 +302,27 @@ export function removeTab(layout: Layout, windowId: string, tabId: string): Layo
 	})
 }
 
+/** Drag a tab (Edit layout, the owner's ask, 2026-10-05: reorganise without
+ *  removing and adding): to before `beforeTabId` in `toWindow`, or its end
+ *  when null, in the same window or another. It keeps its id, so a page whose
+ *  home it is goes with it, and it is shown where it lands. The window it
+ *  left shows its neighbour. */
+export function moveTab(layout: Layout, fromWindow: string, tabId: string, toWindow: string, beforeTabId: string | null): Layout {
+	const from = layout.windows.find((w) => w.id === fromWindow)
+	const tab = from?.tabs.find((t) => t.id === tabId)
+	const to = layout.windows.find((w) => w.id === toWindow)
+	if (from === undefined || tab === undefined || to === undefined || beforeTabId === tabId) return layout
+	if (beforeTabId !== null && !to.tabs.some((t) => t.id === beforeTabId)) return layout
+	const taken = fromWindow === toWindow ? layout : removeTab(layout, fromWindow, tabId)
+	const next = replace(taken, toWindow, (w) => {
+		const rest = w.tabs.filter((t) => t.id !== tabId)
+		const at = beforeTabId === null ? rest.length : rest.findIndex((t) => t.id === beforeTabId)
+		return { ...w, tabs: [...rest.slice(0, at), tab, ...rest.slice(at)], active: tabId }
+	})
+	const same = (a: Layout, b: Layout) => JSON.stringify(a.windows) === JSON.stringify(b.windows)
+	return same(next, layout) ? layout : next
+}
+
 export function selectTab(layout: Layout, windowId: string, tabId: string): Layout {
 	const win = layout.windows.find((w) => w.id === windowId)
 	if (win === undefined || win.active === tabId || !win.tabs.some((t) => t.id === tabId)) return layout

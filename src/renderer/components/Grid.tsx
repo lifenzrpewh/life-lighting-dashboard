@@ -12,7 +12,10 @@
 // edge near the screen's edge or another window's snaps onto it, a resized
 // edge stops flush against a window in its way, and a move onto another window
 // is shown in red and not taken. + adds a tab, × takes one away, and the
-// strip's × removes the window.
+// strip's × removes the window. A tab is dragged along its strip to reorder
+// it, or onto another window to move it there (the owner, 2026-10-05: "don't
+// have to delete them to allow them to be reorganised"); a nacre bar shows
+// where it will land.
 //
 // OUT OF EDITING, for everyone: tap a tab, and drag the edge two windows share
 // (a grip in the gap between them, the one place a page cannot cover) to give
@@ -82,6 +85,8 @@ export type GridProps = {
 	onSelect: (windowId: string, tabId: string) => void
 	onAddTab: (windowId: string, view: ViewId) => void
 	onRemoveTab: (windowId: string, tabId: string) => void
+	/** A tab dragged: to before `beforeTabId` in `toWindow`, or its end. */
+	onMoveTab: (fromWindow: string, tabId: string, toWindow: string, beforeTabId: string | null) => void
 	onRemoveWindow: (windowId: string) => void
 	onPlace: (windowId: string, box: Box) => void
 	/** A window just added: its "Add a view" menu opens at once, since an
@@ -101,6 +106,59 @@ export function Grid(p: GridProps) {
 	const latest = useRef(drag)
 	latest.current = drag
 	const [adding, setAdding] = useState<string | null>(null)
+
+	// A tab being dragged (editing only): where it came from, where the pointer
+	// is, and where it would land. A press that never moves is a tap.
+	const tabStart = useRef<{ win: string; tab: string; px: number; py: number; moved: boolean } | null>(null)
+	const [tabDrag, setTabDrag] = useState<{ win: string; tab: string; label: string; x: number; y: number; to: { win: string; before: string | null } | null } | null>(
+		null,
+	)
+	const tabLatest = useRef(tabDrag)
+	tabLatest.current = tabDrag
+	/** Where a tab let go at (x, y) lands: before the tab under it (after it,
+	 *  past its middle), or the end of the window under it. */
+	const landing = (x: number, y: number): { win: string; before: string | null } | null => {
+		const el = document.elementFromPoint(x, y)
+		const overTab = el?.closest<HTMLElement>('[data-tab]')
+		if (overTab != null) {
+			const win = overTab.dataset['win'] as string
+			const r = overTab.getBoundingClientRect()
+			if (x < r.left + r.width / 2) return { win, before: overTab.dataset['tab'] as string }
+			const next = overTab.nextElementSibling?.closest<HTMLElement>('[data-tab]')
+			return { win, before: next?.dataset['tab'] ?? null }
+		}
+		const overWin = el?.closest<HTMLElement>('[data-win]')
+		return overWin == null ? null : { win: overWin.dataset['win'] as string, before: null }
+	}
+	const tabHandle = (win: GridWindow, t: Tab) =>
+		!p.editing
+			? {}
+			: {
+					onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+						e.currentTarget.setPointerCapture(e.pointerId)
+						tabStart.current = { win: win.id, tab: t.id, px: e.clientX, py: e.clientY, moved: false }
+					},
+					onPointerMove: (e: ReactPointerEvent<HTMLElement>) => {
+						const s = tabStart.current
+						if (s === null) return
+						if (!s.moved && Math.hypot(e.clientX - s.px, e.clientY - s.py) < 8) return
+						s.moved = true
+						setTabDrag({ win: s.win, tab: s.tab, label: p.labelOf(t.view), x: e.clientX, y: e.clientY, to: landing(e.clientX, e.clientY) })
+					},
+					onPointerUp: () => {
+						const d = tabLatest.current
+						if (d !== null && d.to !== null) p.onMoveTab(d.win, d.tab, d.to.win, d.to.before)
+						setTabDrag(null)
+						// The click that follows a drag is not a tap; the next one is.
+						setTimeout(() => (tabStart.current = null), 0)
+					},
+					onPointerCancel: () => {
+						tabStart.current = null
+						setTabDrag(null)
+					},
+				}
+	/** A tap on a tab selects it; the end of a drag does not. */
+	const dragged = () => tabStart.current?.moved === true
 	useEffect(() => {
 		if (p.fresh != null) setAdding(p.fresh)
 	}, [p.fresh])
@@ -163,8 +221,11 @@ export function Grid(p: GridProps) {
 				const tabs = win.tabs.filter((t) => p.visible(t.view))
 				const moving = drag?.id === win.id ? drag : null
 				const box = moving?.box ?? win
+				const target = tabDrag?.to?.win === win.id && tabDrag.win !== win.id
 				const ring =
-					moving !== null
+					target
+						? 'ring-2 ring-nacre-blue'
+						: moving !== null
 						? moving.ok
 							? 'ring-2 ring-nacre-blue'
 							: 'ring-2 ring-state-unreachable'
@@ -174,6 +235,7 @@ export function Grid(p: GridProps) {
 				return (
 					<section
 						key={win.id}
+						data-win={win.id}
 						style={place(box)}
 						className={`absolute z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-booth-panel ${ring}`}
 					>
@@ -183,13 +245,23 @@ export function Grid(p: GridProps) {
 									const on = t.id === tab?.id
 									const TabIcon = viewIcon(t.view)
 									return (
-										<span key={t.id} className="relative flex shrink-0 items-center">
+										<span
+											key={t.id}
+											data-win={win.id}
+											data-tab={t.id}
+											className={`relative flex shrink-0 items-center ${tabDrag?.tab === t.id ? 'opacity-40' : ''}`}
+										>
+											{tabDrag?.to?.win === win.id && tabDrag.to.before === t.id && (
+												<span aria-hidden className="nacre-line absolute inset-y-2 -left-0.5 w-1 rounded-full" />
+											)}
 											<button
 												type="button"
 												role="tab"
 												aria-selected={on}
-												onClick={() => p.onSelect(win.id, t.id)}
-												className={`flex h-full shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${
+												onClick={() => !dragged() && p.onSelect(win.id, t.id)}
+												{...tabHandle(win, t)}
+												title={p.editing ? 'Drag to move this tab' : undefined}
+												className={`flex h-full shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${p.editing ? 'cursor-grab touch-none' : ''} ${
 													on ? 'text-booth-ink' : 'text-booth-dim hover:text-booth-ink'
 												}`}
 											>
@@ -211,6 +283,9 @@ export function Grid(p: GridProps) {
 										</span>
 									)
 								})}
+								{tabDrag?.to?.win === win.id && tabDrag.to.before === null && (
+									<span aria-hidden className="nacre-line my-2 w-1 shrink-0 rounded-full" />
+								)}
 								{tabs.length === 0 && !p.editing && <span className="flex items-center px-3.5 text-sm text-booth-dim">Empty</span>}
 							</div>
 							{p.editing && (
@@ -283,6 +358,15 @@ export function Grid(p: GridProps) {
 					</section>
 				)
 			})}
+			{tabDrag !== null && (
+				<span
+					aria-hidden
+					style={{ left: tabDrag.x + 12, top: tabDrag.y + 12 }}
+					className="pointer-events-none fixed z-50 rounded-lg bg-booth-raise px-3.5 py-2 text-sm font-medium shadow-2xl ring-1 ring-nacre-blue"
+				>
+					{tabDrag.label}
+				</span>
+			)}
 			{!p.editing &&
 				seams(p.layout).map((seam) => {
 					const upright = seam.axis === 'x'

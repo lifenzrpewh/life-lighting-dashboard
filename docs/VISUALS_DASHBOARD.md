@@ -554,7 +554,12 @@ CDP, not yet by a finger.
   twice. A second live copy of an embed would need a second page in the same session;
   not built.
 - **Adding and removing tabs is arranging**, so it is in Edit layout (operator mode).
-  Switching tabs and **Move it here** are everyone's.
+  Switching tabs and **Move it here** are everyone's. **Since 2026-10-05 a tab is dragged**
+  in Edit layout (the owner: "don't have to delete them to allow them to be reorganised"):
+  along its strip to reorder, onto another window to move it there; a nacre bar shows where
+  it lands, the window it goes to is ringed, and it keeps its id, so a page whose home it is
+  goes with it (`moveTab`). ✅ Over CDP: Clips dragged in front of Holding, Arena dragged
+  into the run order's window.
 - **While editing, every page is a picture** for the whole edit, not only while
   dragging: the handles are drawn over the windows, and nothing can be drawn over a
   live page. The pictures are taken as Edit layout is tapped.
@@ -611,6 +616,11 @@ tokens and their reasons are in `src/renderer/theme.css`; the shared pieces in
 - **Showfile's Save As and Load are two cards a screen apart**, which is how "Load never
   shares a neighbourhood with Save As" is kept now (it was a gap down the page).
 - **Add window opens its view menu** at once.
+- **The bar is slimmer and folds away** (the owner, 2026-10-05: "seems to take A LOT of
+  screen space"): 60 px instead of 76, the countdown's caption beside its number rather than
+  above it, the clock smaller; the chevron at the right folds it to a 36 px strip of the same
+  readings (link, show, countdown, clock, the connections' dot, the mode), whose only control is
+  the chevron back. Remembered on this computer (`paua.barCollapsed`). ✅ Over CDP, both ways.
 - **Status words are sentence case on screen** ("Live", not "LIVE"); the shared code
   still says them in capitals (`sentence()` in `vocabulary.tsx`).
 
