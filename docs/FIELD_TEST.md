@@ -51,7 +51,7 @@ The path and the version are at the foot of Connections; in operator mode,
 
 ## Reporting something
 
-When something happens, tap **MARK** in the status bar (the flag, on the `ui-overhaul` build): it writes a numbered
+When something happens, tap **MARK** in the status bar (the flag, from the build after 0.2.0): it writes a numbered
 mark in the log at that moment, with what was on screen, and shows the number.
 Write the number down with what you saw.
 
@@ -85,7 +85,7 @@ Tick what you saw; anything odd is worth a line.
 **Windows and layouts** (0.2.0)
 - [ ] Edit layout (operator mode, status bar): move a window, resize it by an edge, add one, add and remove tabs
 - [ ] A second MA tab says "Only one MA window at a time"; Move it here brings the MA over without logging in again
-- [ ] Save the layout under a name (LAYOUT in the status bar; Layouts on the `ui-overhaul` build), change it, then switch back as a volunteer
+- [ ] Save the layout under a name (LAYOUT in the status bar; Layouts after 0.2.0), change it, then switch back as a volunteer
 - [ ] Pop a tab out, Send behind, then Show from its tab; Bring back
 
 **Embeds** (0.2.0)
