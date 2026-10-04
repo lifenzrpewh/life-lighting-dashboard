@@ -136,6 +136,18 @@ function missingFileOf(clip: Record<string, unknown>): string | null {
 	return null
 }
 
+/** The clip's file, there or not, or null. ✅ 2026-10-03: `video.fileinfo.path`
+ *  on a video clip; a generator has no `fileinfo`. A still is a video clip to
+ *  Arena (⚠️ assumed, not yet seen with a PNG). */
+function fileOf(clip: Record<string, unknown>): string | null {
+	for (const part of ['video', 'audio']) {
+		const p = clip[part]
+		const info = isObject(p) ? p['fileinfo'] : undefined
+		if (isObject(info) && typeof info['path'] === 'string' && info['path'] !== '') return info['path']
+	}
+	return null
+}
+
 /** Every cell of a layer, and the clip it is playing, or null. The first
  *  connected clip if Arena ever says more than one (during a transition,
  *  perhaps: not yet seen). */
@@ -155,7 +167,8 @@ function clipsOf(clips: unknown[], layer: string): Decoded<{ playing: TreeClip |
 		const named: Decoded<string> = state === 'Empty' ? { ok: true, value: '' } : text(clip['name'], what)
 		if (!named.ok) return named
 		const missingFile = state === 'Empty' ? null : missingFileOf(clip)
-		slots.push({ id: clip['id'], name: named.value, state: slotState(state), thumbnail: state === 'Empty' ? null : thumbnailOf(clip), missingFile })
+		const file = state === 'Empty' ? null : fileOf(clip)
+		slots.push({ id: clip['id'], name: named.value, state: slotState(state), thumbnail: state === 'Empty' ? null : thumbnailOf(clip), file, missingFile })
 		if (!PLAYING.includes(state) || playing !== null) continue
 		const transport = transportOf(clip, `${layer}'s ${named.value}`)
 		if (!transport.ok) return transport

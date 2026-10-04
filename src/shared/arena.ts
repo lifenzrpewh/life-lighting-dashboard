@@ -109,6 +109,9 @@ export type ArenaSlot = {
 	name: string
 	state: SlotState
 	thumbnail: { clipId: number; version: string } | null
+	/** The clip's file as Arena names it, there or not, or null: a generator
+	 *  has none. The media check reads the code and version from it. */
+	file: string | null
 	/** The file Arena cannot find on this machine, or null: a generator has no
 	 *  file, and a file that is there is not missing. */
 	missingFile: string | null

@@ -33,11 +33,12 @@ import {
 } from '../../shared/arena.js'
 import { matchReading, readingOf, type Channel } from '../../shared/reading.js'
 import { Say } from './MaPane.js'
+import { MediaCheck } from './MediaCheck.js'
 import { Centered } from './Slot.js'
 import { chipLabel, formatAge, staleContent, unknownWhy } from './vocabulary.js'
 
 export function ArenaView({ status, now }: { status: Channel<ArenaStatus> | null | undefined; now: number }) {
-	return <ArenaReading status={status} now={now} render={(s, ageMs, failure) => <Board status={s} ageMs={ageMs} failure={failure} />} />
+	return <ArenaReading status={status} now={now} render={(s, ageMs, failure) => <Board status={s} ageMs={ageMs} failure={failure} now={now} />} />
 }
 
 /** Arena's status in its four states, for any view drawn from it: not heard,
@@ -95,7 +96,7 @@ function sectionsOf(status: ArenaStatus): Section[] {
 	return sections
 }
 
-function Board({ status, ageMs, failure }: { status: ArenaStatus; ageMs: number | null; failure: string | null }) {
+function Board({ status, ageMs, failure, now }: { status: ArenaStatus; ageMs: number | null; failure: string | null; now: number }) {
 	const stale = ageMs !== null
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
@@ -117,6 +118,9 @@ function Board({ status, ageMs, failure }: { status: ArenaStatus; ageMs: number 
 				</span>
 			</div>
 			<MissingMediaNotice status={status} />
+			<div className={`shrink-0 ${stale ? staleContent : ''}`}>
+				<MediaCheck status={status} now={now} />
+			</div>
 			<div className={`min-h-0 flex-1 overflow-y-auto ${stale ? staleContent : ''}`}>
 				{sectionsOf(status).map((section, i) => (
 					<section key={i}>

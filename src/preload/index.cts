@@ -15,6 +15,7 @@ import type { Showfile } from '../shared/showfile.js' with { 'resolution-mode': 
 import type { TimerSources } from '../shared/timer.js' with { 'resolution-mode': 'import' }
 import type { ArenaCommand, ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js' with { 'resolution-mode': 'import' }
 import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js' with { 'resolution-mode': 'import' }
+import type { LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js' with { 'resolution-mode': 'import' }
 import type { CuePaneReport } from '../shared/cue-pane.js' with { 'resolution-mode': 'import' }
 import type { MaPaneReport, Mode, PaneRect } from '../shared/ma-pane.js' with { 'resolution-mode': 'import' }
 import type { Checked, SettingsPatch, SettingsView } from '../shared/settings.js' with { 'resolution-mode': 'import' }
@@ -72,6 +73,10 @@ const api = {
 	/** Fire a clip or column, clear a layer, or move its fader. Sent is not
 	 *  done: what plays comes back in `arenaStatus`. */
 	arenaCommand: (command: ArenaCommand): Promise<ArenaCommandResult> => ipcRenderer.invoke('arena:command', command),
+	/** The media check's reads from the lookbook app, asked on demand: the
+	 *  services from today to a week ahead, then one service's run sheet. */
+	lookbookServices: (): Promise<LookbookRead<LookbookService[]>> => ipcRenderer.invoke('lookbook:services'),
+	lookbookItems: (serviceId: string): Promise<LookbookRead<LookbookItem[]>> => ipcRenderer.invoke('lookbook:items', serviceId),
 	/** The showfile's write half, operator mode only (main refuses otherwise).
 	 *  Sent is not done: the new name comes back in `showfile`. */
 	listShows: (): Promise<ShowList> => ipcRenderer.invoke('showfile:shows'),

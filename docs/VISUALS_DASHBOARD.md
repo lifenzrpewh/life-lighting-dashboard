@@ -417,7 +417,30 @@ on macOS (where on-top over a full-screen space is set but unseen).
 ## Answered (owner, 2026-10-04): the media check
 
 Started as "announcements against Arena's designated columns"; the answers widened it.
-**Nothing is built yet.** It takes in the parked foregrounds idea, `docs/LOOKBOOK_CHECK.md`.
+It takes in the parked foregrounds idea, `docs/LOOKBOOK_CHECK.md`.
+
+**Built the same day, inside the Arena view** (`src/renderer/components/MediaCheck.tsx`;
+rules `src/shared/media-check.ts`; reads `src/bridge/lookbook.ts`, `src/main/lookbook.ts`).
+A **Media** row under the missing-file notice: pick one of the lookbook's services from
+today to a week ahead (the booth's campus first, the last pick remembered per machine),
+and each B, F and A code on its run sheet reads ✓ with where it is, **not in Arena**,
+**file missing on this computer**, **another version** (Arena's file against the
+lookbook's), or **? the lookbook has no file**. Lower thirds (T) are not looked for
+(they are not in Arena), nor countdowns (D, not asked). It re-compares on every Arena
+update; the lookbook is asked only on a pick or **Check again**. The code is found
+anywhere in Arena's file name (the clip's name when Arena names no file), and a version
+matches when the file's name is the lookbook's without its upload stamp, case aside.
+✅ In the kiosk on this box, 2026-10-04: today's seven services listed from the live
+lookbook, Central AM's run sheet read, its 9 codes all "not in Arena" (right: this box's
+Arena has none of the show's media), and a real clip's file path read from Arena.
+⚠️ Not yet against the booth's Arena with the media loaded, so ✓ and "another version"
+are seen only in the tests; and a PNG still is assumed to carry `video.fileinfo` as a
+video clip does.
+
+**The lookbook** (✅ read 2026-10-04, no sign-in): `GET /api/weeks` (one per campus
+service, ~300), `/api/weeks/<id>/services` (the campus), `/api/services/<id>/items` (each
+item's `codes`, its files by role, `missingCodes`). Type letters seen: B background,
+F foreground, A A-screen, T lower third. Files are `/storage/library/C/<CODE>-<name>_<ms>.<ext>`.
 
 - **The link is LIFE's media code**, which PCO's item names were missing: `CB102` is
   Central Background 102, `CF455` a Central foreground, `CD…` a countdown track. The
@@ -425,10 +448,9 @@ Started as "announcements against Arena's designated columns"; the answers widen
 - **The run sheet lists codes in PCO's `Media No.` column** (an item-note category),
   placed ad hoc against whichever item, not on announcement items of their own. It is
   usually the source of truth, but a service sometimes deviates.
-  ⚠️ The shared backend does **not** sync PCO's item notes today (it keeps an item's
-  `html_details` and its own `note_values`), so reading `Media No.` means adding item
-  notes to `pco-sync`, append-only. The owner thinks **the lookbook app** shows this
-  better; where it lives and what it reads is still to find out.
+  The shared backend does not sync PCO's item notes (it keeps an item's `html_details`
+  and its own `note_values`), and need not: the lookbook app already reads `Media No.`
+  (below).
 - **Every coded item, one check** (the owner's pick): backgrounds, foregrounds,
   countdowns and announcements together.
 - **Announcements are transparent PNGs, not videos**, usually `F`-coded, rarely `B`.
@@ -444,9 +466,12 @@ Started as "announcements against Arena's designated columns"; the answers widen
 - **The network drive** is a few stacked folders; the owner needs to look before
   describing it.
 
-**Still to find out before code:** a real `Media No.` value and a real file name (is it
-always letter, letter, digits?); where the lookbook app lives and whether it already
-reads `Media No.`; the drive's path and layout; the real composition's column names.
+**Answered after:** `Media No.` reads like `CB095/CF588/CA635 (Walk In)`, and the
+lookbook (lookbooks-lifenz.replit.app) already parses it, so the backend needs no new
+sync. The booth's Arena files carry the NAS names (`LC-NAS-01 › Graphics › Sunday Media ›
+1. Central`, a Synology). The lookbook is the truth for the current version. **Still
+open:** the real composition's slot names (only needed if the check should say a code
+is in the wrong slot), and whether countdowns (D) belong in it.
 
 ## Open questions
 

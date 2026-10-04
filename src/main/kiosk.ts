@@ -67,6 +67,8 @@ import { startArena, type ArenaHandle } from './arena.js'
 import type { ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js'
 import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js'
 import { registerThumbnailScheme, serveThumbnails } from './arena-thumbnails.js'
+import { lookbookItems, lookbookServices } from './lookbook.js'
+import type { LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js'
 import { createPopouts, type Popouts } from './popout.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
@@ -358,6 +360,13 @@ app.whenReady().then(() => {
 	// is checked in main against the composition, never taken from the page.
 	ipcMain.handle('arena:command', (e, raw: unknown): Promise<ArenaCommandResult> | ArenaCommandResult =>
 		fromOurs(e) ? (arena?.command(raw) ?? { ok: false, detail: 'no Arena is set up' }) : { ok: false, detail: 'not from this app' },
+	)
+	// The media check's reads (./lookbook.ts): asked on demand, never polled.
+	ipcMain.handle('lookbook:services', (e): Promise<LookbookRead<LookbookService[]>> | LookbookRead<LookbookService[]> =>
+		fromOurs(e) ? lookbookServices() : { ok: false, detail: 'not from this app', at: Date.now() },
+	)
+	ipcMain.handle('lookbook:items', (e, id: unknown): Promise<LookbookRead<LookbookItem[]>> | LookbookRead<LookbookItem[]> =>
+		fromOurs(e) ? lookbookItems(id) : { ok: false, detail: 'not from this app', at: Date.now() },
 	)
 	serveThumbnails(() => {
 		const s = store.current()

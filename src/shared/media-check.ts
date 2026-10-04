@@ -1,0 +1,206 @@
+// The media check (docs/VISUALS_DASHBOARD.md § the media check): is every coded
+// piece of media the run sheet calls for loaded in Arena, on this computer, and
+// the version the lookbook has?
+//
+// WHY THIS EXISTS: the run sheet names media by LIFE's code (`CF588` is Central
+// foreground 588) in PCO's `Media No.` column, and the comms team keeps
+// replacing files. A clip that is missing, or last week's version, is found by
+// the congregation unless it is found before. The lookbook app
+// (lookbooks-lifenz.replit.app) already reads `Media No.` into codes and points
+// each code at its current file, so the list comes from there, and this file
+// only compares it with what Arena holds.
+//
+// The owner's answers, 2026-10-04:
+// - The lookbook is the truth for which version is current (it tracks uploads,
+//   and the booth's Arena loads the same files, named as the NAS names them).
+// - Arena holds B (backgrounds), F (foregrounds) and A (A-screens). Lower
+//   thirds (T) live elsewhere, so they are not looked for in Arena.
+// - "Up to date" is three things: loaded at all, the file on this computer, and
+//   the lookbook's version.
+// - The booth picks the service from a list.
+//
+// THE RULE THIS FILE ENFORCES: a code the check could not settle is never "ok".
+// A lookbook read that failed, or a code the lookbook has no file for, says so.
+
+import type { ArenaStatus } from './arena.js'
+
+/** Where the lookbook answers. Public reads, no sign-in (seen 2026-10-04). */
+export const LOOKBOOK_URL = 'https://lookbooks-lifenz.replit.app'
+
+/** A lookbook request that has not answered in this long has failed. */
+export const LOOKBOOK_TIMEOUT_MS = 8_000
+
+/** How far ahead the service list reaches: this week's services, for a check
+ *  during the week as well as on the day. */
+export const LOOKBOOK_DAYS_AHEAD = 7
+
+/** The code types Arena holds (the owner, 2026-10-04). */
+export const ARENA_TYPES: readonly string[] = ['B', 'F', 'A']
+
+/** What each type letter is, for the screen. */
+export const TYPE_NAMES: Record<string, string> = {
+	B: 'background',
+	F: 'foreground',
+	A: 'A-screen',
+	T: 'lower third',
+	D: 'countdown',
+}
+
+/** A campus letter, a type letter, three digits: `CB095`, `CF588`. Found
+ *  anywhere in a name (the owner: "somewhere in the name"), but not inside a
+ *  longer run of letters or digits. */
+const CODE = /(?<![A-Za-z0-9])([A-Za-z])([A-Za-z])(\d{3})(?!\d)/
+
+export type MediaCode = { code: string; campus: string; type: string }
+
+/** The first code in a name, upper-cased, or null. */
+export function mediaCodeOf(name: string): MediaCode | null {
+	const m = CODE.exec(name)
+	if (m === null) return null
+	const [, campus, type, digits] = m as unknown as [string, string, string, string]
+	const code = `${campus}${type}${digits}`.toUpperCase()
+	return { code, campus: campus.toUpperCase(), type: type.toUpperCase() }
+}
+
+/** A file's name without its folder or extension, whichever separator the
+ *  path uses: Arena's are Windows paths, the lookbook's are URL paths. */
+export function fileStem(path: string): string {
+	const base = path.split(/[\\/]/).at(-1) ?? path
+	const dot = base.lastIndexOf('.')
+	return dot > 0 ? base.slice(0, dot) : base
+}
+
+/** The name a lookbook file had on the NAS: the lookbook appends its upload
+ *  time, `CF588-Sunday-ReloSeries-WalkInV2_1789857226772.png` (seen
+ *  2026-10-04), and the booth's copy carries the NAS name. */
+export function lookbookStem(path: string): string {
+	return fileStem(path).replace(/_\d{10,}$/, '')
+}
+
+/** One of today's services, as the lookbook lists it. */
+export type LookbookService = {
+	id: string
+	name: string
+	/** `2026-10-04`. */
+	date: string
+	/** `09:00`, or null when the lookbook gives none. */
+	time: string | null
+	/** `central`, as the lookbook keys campuses. */
+	campus: string
+}
+
+/** One run-sheet item, as the lookbook resolves it. */
+export type LookbookItem = {
+	title: string
+	/** What the `Media No.` note calls it, `Walk In`, or null. */
+	label: string | null
+	/** Every code on the item, in the note's order. */
+	codes: string[]
+	/** The lookbook's current file for each code it found one for, by code. */
+	files: Record<string, string>
+	/** Codes the lookbook could not find a file for. */
+	missingCodes: string[]
+}
+
+export type LookbookRead<T> = { ok: true; value: T; at: number } | { ok: false; detail: string; at: number }
+
+/** Where a code was found in Arena. */
+export type Place = { layer: string; column: number; file: string }
+
+/** What became of one code. */
+export type CodeCheck =
+	/** Loaded, on this computer, and the lookbook's version. */
+	| { code: string; state: 'ok'; at: Place }
+	/** Nowhere in Arena. */
+	| { code: string; state: 'not-loaded' }
+	/** Loaded, but Arena cannot find the file on this computer. */
+	| { code: string; state: 'not-on-disk'; at: Place }
+	/** Loaded, but not the lookbook's version: `want` is the lookbook's name. */
+	| { code: string; state: 'other-version'; at: Place; want: string }
+	/** The lookbook has no file for it, so its version cannot be checked. Where
+	 *  Arena has it, if anywhere. */
+	| { code: string; state: 'no-lookbook-file'; at: Place | null }
+
+export type ItemCheck = { title: string; label: string | null; codes: CodeCheck[] }
+
+export type MediaCheck = {
+	items: ItemCheck[]
+	/** How many distinct codes are in each state. */
+	counts: Record<CodeCheck['state'], number>
+}
+
+/** Every clip in Arena that carries a code, by code: its file where Arena
+ *  names one, else its clip name. Top layer first, as Arena's panel reads. */
+function loadedCodes(status: ArenaStatus): Map<string, (Place & { onDisk: boolean })[]> {
+	const found = new Map<string, (Place & { onDisk: boolean })[]>()
+	for (const layer of [...status.layers].reverse()) {
+		layer.slots.forEach((slot, i) => {
+			if (slot.state === 'empty') return
+			const file = slot.file ?? slot.missingFile ?? slot.name
+			const code = mediaCodeOf(fileStem(file)) ?? mediaCodeOf(slot.name)
+			if (code === null) return
+			const places = found.get(code.code) ?? []
+			places.push({ layer: layer.name, column: i + 1, file, onDisk: slot.missingFile === null })
+			found.set(code.code, places)
+		})
+	}
+	return found
+}
+
+/** One code against what Arena holds. Several clips may carry it; the best
+ *  answer wins, so a right copy anywhere is enough. */
+function checkCode(code: string, want: string | null, places: (Place & { onDisk: boolean })[]): CodeCheck {
+	const strip = ({ onDisk: _, ...p }: Place & { onDisk: boolean }): Place => p
+	if (places.length === 0) return want === null ? { code, state: 'no-lookbook-file', at: null } : { code, state: 'not-loaded' }
+	if (want === null) return { code, state: 'no-lookbook-file', at: strip(places[0] as Place & { onDisk: boolean }) }
+	const same = (p: Place) => fileStem(p.file).toLowerCase() === want.toLowerCase()
+	const right = places.find((p) => same(p) && p.onDisk)
+	if (right !== undefined) return { code, state: 'ok', at: strip(right) }
+	const rightButGone = places.find(same)
+	if (rightButGone !== undefined) return { code, state: 'not-on-disk', at: strip(rightButGone) }
+	return { code, state: 'other-version', at: strip(places[0] as Place & { onDisk: boolean }), want }
+}
+
+/** The run sheet's items against Arena. Only the types Arena holds are
+ *  checked; an item with none of them is left out. */
+export function checkMedia(items: LookbookItem[], status: ArenaStatus): MediaCheck {
+	const loaded = loadedCodes(status)
+	const counts: MediaCheck['counts'] = { ok: 0, 'not-loaded': 0, 'not-on-disk': 0, 'other-version': 0, 'no-lookbook-file': 0 }
+	const seen = new Set<string>()
+	const out: ItemCheck[] = []
+	for (const item of items) {
+		const codes: CodeCheck[] = []
+		for (const raw of item.codes) {
+			const parsed = mediaCodeOf(raw)
+			if (parsed === null || !ARENA_TYPES.includes(parsed.type)) continue
+			const file = item.files[parsed.code]
+			const result = checkCode(parsed.code, file === undefined ? null : lookbookStem(file), loaded.get(parsed.code) ?? [])
+			codes.push(result)
+			if (!seen.has(parsed.code)) {
+				seen.add(parsed.code)
+				counts[result.state] += 1
+			}
+		}
+		if (codes.length > 0) out.push({ title: item.title, label: item.label, codes })
+	}
+	return { items: out, counts }
+}
+
+/** The services worth offering: from today, for `days` days, this campus's
+ *  first when the booth's campus is set and matches, soonest first. */
+export function offeredServices(services: LookbookService[], today: string, campus: string | null): LookbookService[] {
+	const key = (campus ?? '').trim().toLowerCase()
+	const ours = (s: LookbookService) => key !== '' && (s.campus.toLowerCase() === key || s.name.toLowerCase().startsWith(key))
+	return services
+		.filter((s) => s.date >= today)
+		.sort((a, b) => Number(ours(b)) - Number(ours(a)) || a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.name.localeCompare(b.name))
+}
+
+/** The New Zealand date, `2026-10-04`, plus `days`: the lookbook's dates are
+ *  New Zealand days. */
+export function nzDate(at: Date, days = 0): string {
+	const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
+	if (days === 0) return parts
+	const [y, m, d] = parts.split('-').map(Number) as [number, number, number]
+	return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
