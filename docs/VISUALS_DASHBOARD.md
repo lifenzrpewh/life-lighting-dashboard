@@ -531,7 +531,12 @@ over the composition and the live lookbook for 4 October's Central AM and PM:
   its position. The owner, 2026-10-05: columns 3 and 4 are used, less often: **3 is the
   Countdown**, **4 the Video / Broadcast Background** (a vignetted black behind videos, so
   they sit nicely; at the other campuses only for now, not Central). In this composition
-  only HOLD BG has clips there (CB105, CB095).
+  only HOLD BG has clips there (CB105, CB095). **A-screens** (the owner, 2026-10-05) live in
+  the first layer, PRE & POST: column 1 is Pre, column 2 Post (CA635 Walk In and CA636
+  Walk Out in this composition). The run sheet's labels say which: `Walk In`, `Walk Out`.
+- **The run sheet's labels are steady week to week** (Central AM, 20 Sep to 4 Oct): Walk In,
+  WTL, NSL, WTG, Bibles, Walk Out recur with the same codes; one-off announcements come and
+  go (Help & Hope Week, Update Details, Alpha, Prayer & Fasting).
 
 ## Windows, embeds and layouts (owner, 2026-10-04; built 2026-10-05)
 
