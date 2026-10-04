@@ -91,6 +91,9 @@ const api = {
 	mediaFetches: (): Promise<FetchStates> => ipcRenderer.invoke('media:fetch-state'),
 	/** The media check's "same" marks, as keys (`sameKey`), and making or
 	 *  undoing one: operator mode only. */
+	/** Windows' folder picker, starting at `start`: the folder picked, or null
+ *  when cancelled. Operator mode only (main answers null otherwise). */
+	chooseFolder: (start: string | null): Promise<string | null> => ipcRenderer.invoke('folder:choose', start),
 	sameMarks: (): Promise<string[]> => ipcRenderer.invoke('media:same'),
 	markSame: (mark: SameMark): Promise<{ ok: true } | { ok: false; detail: string }> =>
 		ipcRenderer.invoke('media:mark-same', mark),

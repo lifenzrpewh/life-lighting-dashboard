@@ -23,7 +23,7 @@ import type { ConnectionId, ConnectionStatus, RowId, Tone } from '../../shared/c
 import { EMBEDS_MAX, embedIdOf, embedNameError, embedUrlOf, newEmbedId, type Embed } from '../../shared/embeds.js'
 import type { DeskState } from '../../shared/desk.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
-import { Monitor, Plus, Save, Trash2 } from 'lucide-react'
+import { FolderOpen, Monitor, Plus, Save, Trash2 } from 'lucide-react'
 
 import { CueManagerSettings } from './CueManagerSettings.js'
 import { Field, Input, Select, User, portOf, useProPresenterNames } from './form.js'
@@ -676,15 +676,31 @@ function ArenaEditor({ view, save }: { view: SettingsView; save: Save }) {
 					</p>
 					<div className="grid grid-cols-2 gap-4">
 						<Field label="Graphics folder" error={err('graphicsFolder')} hint="The NAS or drive the media comes from.">
-							<Input value={graphics} onChange={setGraphics} placeholder="\\LC-NAS-01\Graphics\Sunday Media" mono />
+							<FolderInput value={graphics} onChange={setGraphics} placeholder="\\LC-NAS-01\Graphics\Sunday Media" />
 						</Field>
 						<Field label="Local folder" error={err('localMediaFolder')} hint="On this computer, for Arena to play from.">
-							<Input value={local} onChange={setLocal} placeholder="D:\VFX Media" mono />
+							<FolderInput value={local} onChange={setLocal} placeholder="D:\VFX Media" />
 						</Field>
 					</div>
 				</>
 			)}
 		</Editor>
+	)
+}
+
+/** A folder, typed or picked with Windows' own folder picker (the owner's
+ *  ask, 2026-10-05). Picking only fills the field; Save keeps it. */
+function FolderInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+	const browse = () => void window.life?.chooseFolder(value.trim() === '' ? null : value).then((f) => f !== null && onChange(f))
+	return (
+		<span className="flex min-w-0 gap-2">
+			<span className="min-w-0 flex-1">
+				<Input value={value} onChange={onChange} placeholder={placeholder} mono />
+			</span>
+			<Button icon={FolderOpen} onClick={browse}>
+				Browse
+			</Button>
+		</span>
 	)
 }
 

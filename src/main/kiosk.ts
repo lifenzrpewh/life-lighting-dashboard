@@ -48,7 +48,7 @@
 // its place only from the window it is in, so the kiosk and a pop-out never
 // fight over where the MA goes.
 
-import { app, BrowserWindow, Menu, ipcMain, powerSaveBlocker, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, Menu, dialog, ipcMain, powerSaveBlocker, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -76,7 +76,7 @@ import { createPopouts, type Popouts } from './popout.js'
 import { createMediaFetch } from './media-fetch.js'
 import { createMediaSame } from './media-same.js'
 import { sameMarkFrom } from '../shared/media-check.js'
-import { fetchRequestFrom, type FetchStates } from '../shared/media-fetch.js'
+import { fetchRequestFrom, isFolderPath, type FetchStates } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
@@ -434,6 +434,19 @@ app.whenReady().then(() => {
 		return mediaFetch.ask(req)
 	})
 	ipcMain.handle('media:fetch-state', (e): FetchStates => (fromOurs(e) ? mediaFetch.states() : {}))
+	// Browse for a folder (the Arena row's two folders): Windows' own picker,
+	// over the window that asked. Only the path comes back; Save keeps it.
+	ipcMain.handle('folder:choose', async (e, start: unknown): Promise<string | null> => {
+		if (operatorOnly(e) !== null) return null
+		const owner = BrowserWindow.fromWebContents(e.sender)
+		const opts = {
+			title: 'Choose a folder',
+			properties: ['openDirectory' as const, 'dontAddToRecent' as const],
+			...(typeof start === 'string' && isFolderPath(start) ? { defaultPath: start } : {}),
+		}
+		const r = owner === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(owner, opts)
+		return r.canceled ? null : (r.filePaths[0] ?? null)
+	})
 	// "It is the same file", for a name that may differ (./media-same.ts):
 	// everyone sees the marks, operator mode makes and undoes them.
 	const mediaSame = createMediaSame(app.getPath('userData'))
