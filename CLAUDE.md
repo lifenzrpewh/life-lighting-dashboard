@@ -67,7 +67,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/main/pane-snapshot.ts` · `src/renderer/components/Still.tsx` | **Pages as pictures**: each page stands in as a picture of itself while the layout is edited, since nothing can be drawn over a live page (first for the divider, 2026-10-03, owner: "feels good"; for Edit layout, 2026-10-05, taken before the pages are hidden). |
 | ⚠️ `src/main/popout.ts` · `src/shared/popout.ts` · `src/renderer/PopOut.tsx` | **Pop out**: any tab's view (embeds too) into a window of its own, on top of the kiosk; every tab of that view says so and offers **Show** (forward, on top) and **Bring back**; the pop-out's **Send behind** lets the kiosk over it (2026-10-05: sent behind, Show focused it, Bring back closed it home, over CDP; the stacking itself not watched by eye); closing the window brings the view home, as does a kiosk reload. The MA and run order move page and all. Seen working in the kiosk on the Windows box, 2026-10-03, driven over the debugging port; not yet by a finger or on a second display. `docs/VISUALS_DASHBOARD.md` § Pop a view out. |
 | ✅ `src/renderer/components/ClipsView.tsx` · `src/bridge/arena-control.ts` | **Clips**, the trigger screen (2026-10-04): Arena's grid in a slot or popped out; tap a clip, fire a column, Clear a layer, drag a fader; everyone may. The only writer to Arena: four templated requests, ids checked against the composition, never `/clips/…/clear` or `/clearclips` (tested). A tap is one bodiless POST: `true`/`false` only selected the clip. Fired by clicks in the kiosk on the Windows box. Above it and the Arena view, clips whose file is missing (⚠️ not yet seen with a real one). `docs/VISUALS_DASHBOARD.md` § The pieces. |
-| ⚠️ `src/shared/media-check.ts` · `src/bridge/lookbook.ts` · `src/main/lookbook.ts` · `src/renderer/components/MediaCheck.tsx` | **The media check** (2026-10-04), a Media row in the Arena view: pick a service from the lookbook app (lookbooks-lifenz.replit.app, which already parses PCO's `Media No.` into codes like `CF588`), and each B, F and A code reads ✓, not in Arena, file missing, another version, or the lookbook has no file. The lookbook is the truth for the version. Read live in the kiosk on the Windows box; ⚠️ not yet against an Arena holding the show's media. `docs/VISUALS_DASHBOARD.md` § the media check. |
+| ✅ `src/shared/media-check.ts` · `src/bridge/lookbook.ts` · `src/main/lookbook.ts` · `src/renderer/components/MediaCheck.tsx` | **The media check** (2026-10-04), a Media row in the Arena view: pick a service from the lookbook app (lookbooks-lifenz.replit.app, which already parses PCO's `Media No.` into codes like `CF588`), and each B, F and A code reads ✓, not in Arena, file missing, another version, or the lookbook has no file. The lookbook is the truth for the version. ✅ **Against the owner's up-to-date Central composition, 2026-10-05**, on the Windows box: ✓ on seven codes, three not loaded, and "another version" on CB095, which is the same picture under another name and format (PNG in Arena, the lookbook's `-v5` JPG). Stills carry their file path. ⚠️ Not yet at a booth or from the NAS. `docs/VISUALS_DASHBOARD.md` § the media check. |
 | ⚠️ `src/main/video-feed.ts` · `src/renderer/components/VideoView.tsx` | **The video feed**: a Spout/Syphon sender (Arena's multiview, to be) as a **Video** view, GPU to GPU through `@napolab/texture-bridge` and Electron's `sharedTexture`, the pages still sandboxed. Seen live from a stand-in sender (`spikes/spout-test-sender.cjs`) and from **Arena 7.28's Spout output** on the Windows box, 2026-10-03, in a slot and popped out; capped at 30 fps. A touch-sized source picker, and **Fit** to give the space the picture's shape. 16-bit (Arena's High Detail) goes through **LIFE's build of the addon** (`native/texture-bridge/`, built by GitHub Actions), converted to 8-bit on the GPU: ✅ exact against a 16-bit stand-in (`spikes/spout-16bit-sender.cs`), 2026-10-03, and ✅ **from Arena at 16 bpc**, 2026-10-04 (owner-set and owner-watched; the kiosk read 1920×1080 at 27 fps, no failure; the stock addon refuses 16-bit, and the sender's own format is not logged). `docs/VISUALS_DASHBOARD.md` § The video feed. |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
@@ -369,8 +369,9 @@ refused by a Read permission rule; inlining the images as data URIs worked.
 Earlier on 2026-10-05: the kiosk showed two windows (Run order, MA); two test saved layouts,
 "Three windows" (its run order sits a column in from the left: an empty strip, to fix or
 delete) and "Two windows". No embed is set up. The Arena row's graphics and local folders are
-empty (test folders were set and cleared). **In Arena, the test clip "ZZ999 Paua test" is
-still in PRE & POST, column 9**: clear it by hand. The second Arena load test (a file
+empty (test folders were set and cleared). Arena now holds the owner's up-to-date Central
+composition (deck AM, files in a local OneDrive `MediaAM` folder); the ZZ999 test clip went
+with the old one. The second Arena load test (a file
 replacing that one, then clearing the slot) was stopped by this box's safety check, so writes
 to Arena from a session need the owner's go-ahead. A dev kiosk is left running with
 `--remote-debugging-port=9223`. `npm test` clears `dist/`, so a dev kiosk reloaded after it
@@ -416,17 +417,20 @@ Later, not tonight:
 
 0. **Watch a Fetch load into Arena** (`docs/VISUALS_DASHBOARD.md` § Fetching media), with the
    owner's go-ahead: test folders on the Arena row, a code's file replacing a clip's (do its
-   settings stay?), then clear the ZZ999 test clip. Then the real NAS path at a booth.
+   settings stay?). Arena now holds the owner's Central composition: test on a scratch
+   column, never its clips. Then the real NAS path at a booth.
 0. **v0.2.1 on GitHub** (the owner's): check the Actions run went green, publish the draft,
    delete the v0.2.0 draft. If the run failed, read its log (`release-build-log` branch).
 0. **By finger on the booth screen:** the new look (`docs/FIELD_TEST.md` § The new look),
    Layouts › Edit this layout, the shared-edge drag and its snap, a Google Sheet as an embed
    and its sign-in; and the owner's word on the choices in `docs/VISUALS_DASHBOARD.md`
    § Windows, embeds and layouts and § The look.
-0. **The media check at the booth** (`docs/VISUALS_DASHBOARD.md` § Answered (owner,
-   2026-10-04): the media check): against the show's composition, the ✓ and "another
-   version" marks, and that a PNG still carries its file path. Open: the real slot names
-   (only if it should say a code is in the wrong slot), and whether countdowns (D) belong.
+0. **The media check** (`docs/VISUALS_DASHBOARD.md` § Answered (owner, 2026-10-04): the
+   media check): ✅ ✓, "another version" and stills' paths seen against the owner's Central
+   composition, 2026-10-05. For the owner: CB095's PNG against the lookbook's `-v5` JPG
+   (same picture; which should the booth play), and whether a format change alone should
+   count as another version. Columns carry no names (slots are positions: 3 Countdown,
+   4 Video/Broadcast Background, other campuses). Open: whether countdowns (D) belong.
 0. **Arena:** see a real missing file in the Clips view and the notice; the multiview
    layout, in Arena (the owner's). The brief slot waits on where a brief's link lives; no
    countdown chip (dropped). QLab is parked (`docs/QLAB.md`).

@@ -484,8 +484,29 @@ F foreground, A A-screen, T lower third. Files are `/storage/library/C/<CODE>-<n
 lookbook (lookbooks-lifenz.replit.app) already parses it, so the backend needs no new
 sync. The booth's Arena files carry the NAS names (`LC-NAS-01 › Graphics › Sunday Media ›
 1. Central`, a Synology). The lookbook is the truth for the current version. **Still
-open:** the real composition's slot names (only needed if the check should say a code
-is in the wrong slot), and whether countdowns (D) belong in it.
+open:** whether countdowns (D) belong in it.
+
+**Against an up-to-date Central composition, 2026-10-05** (the owner's, loaded in Arena on
+this box; files in a local `Media\AM` folder, not the NAS; deck AM). The shipped check, run
+over the composition and the live lookbook for 4 October's Central AM and PM:
+
+- ✅ **✓ seen for real**: CF588, CA635, CF445, CF546, CF593, CF449, CA636, each with its layer
+  and column. ✅ **A PNG or JPG still carries `video.fileinfo`** with its path, as a video
+  clip does (all of this composition's clips are stills). No file missing.
+- ✅ **"Another version" seen for real, and it is a naming difference only**: CB095 in Arena
+  is `CB095-Sunday-RelationshipSeries.png` (16 MB, 17 Sep), the lookbook's is
+  `…-RelationshipSeries-v5.jpg` (6.6 MB, uploaded the same evening). Same picture, same
+  5800 × 2037 by eye. The rule compares names, so it is right by its own terms; whether
+  the booth's file should be the lookbook's `-v5` is the owner's call.
+- **Not loaded**: AM wants CF464 (`EXP-NextStepsLounge`) where Arena has CF447
+  (`NextStepsLounge`, PLAYBACK 6); PM wants CF465 (`EXP-NextStepsUpstairs`) where Arena has
+  CF446, and CF594 (`AllCampus-Prayer-Fasting-Oct-1`) where Arena has CF593. Arena also
+  holds CB105 (`ReloSeries-Preach`, HOLD BG 3), on neither run sheet.
+- **Slots have no names in Arena**: every column is Arena's default `Column #`, so a slot is
+  its position. The owner, 2026-10-05: columns 3 and 4 are used, less often: **3 is the
+  Countdown**, **4 the Video / Broadcast Background** (a vignetted black behind videos, so
+  they sit nicely; at the other campuses only for now, not Central). In this composition
+  only HOLD BG has clips there (CB105, CB095).
 
 ## Windows, embeds and layouts (owner, 2026-10-04; built 2026-10-05)
 
@@ -580,7 +601,8 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
   if several; Synology's `@eaDir` and recycle bins skipped) under the graphics folder, copied
   with progress (`.partial` then renamed), loaded into the clip that has the old one, and
   confirmed by the check's own next reading. **Not in Arena**: copied only ("Copy here"), since
-  which clip it belongs in is still open (§ Answered, the media check: the real slot names).
+  which clip it belongs in is still open (columns are unnamed, by position: § Answered, the
+  media check).
 - **Guards**: never into a playing clip (checked at sending), nothing overwritten (a same-size
   file of that name is reused, a different one left alone and said), the page sends a code, a
   file name and a clip id and main builds every path, operator mode only.
@@ -590,9 +612,9 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
 - ⚠️ **Not yet watched**: a load through the Fetch button (the live load above was by hand);
   a second file into a clip that already has one (whether its settings stay); what Arena says
   for a path that is not there; copying from the real NAS (speed, the share's path). The
-  check's ask to repeat the load test was stopped by this box's safety check, so the test
-  clip **ZZ999 Paua test is still in PRE & POST, column 9** of the open composition: clear it
-  by hand.
+  check's ask to repeat the load test was stopped by this box's safety check. (The ZZ999
+  test clip left in PRE & POST, column 9 went with that composition: the Central one
+  loaded on 2026-10-05 has nothing there.)
 - Not built: fetching straight from the lookbook when the graphics folder lacks a file
   (the lookbook holds the same files), and placing a not-loaded code into a slot.
 
