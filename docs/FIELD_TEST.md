@@ -51,7 +51,7 @@ The path and the version are at the foot of Connections; in operator mode,
 
 ## Reporting something
 
-When something happens, tap **MARK** in the status bar (the flag, from the build after 0.2.0): it writes a numbered
+When something happens, tap the **flag** in the top bar (MARK in 0.2.0): it writes a numbered
 mark in the log at that moment, with what was on screen, and shows the number.
 Write the number down with what you saw.
 
@@ -69,12 +69,12 @@ Tick what you saw; anything odd is worth a line.
 - [ ] The touch keyboard comes up when you tap into a Cue Manager note (booth touchscreen)
 
 **The console** (a real desk, not onPC)
-- [ ] The status bar reads LIVE, and the showfile chip names the loaded show
+- [ ] The console card (top left) reads Live, and names the loaded show
 - [ ] The MA view logs in and stays in; volunteer and operator users each see their own
 - [ ] Turn the console's Web Remote off and on: the MA view comes back by itself
 - [ ] Restart the console: the MA view and LIVE both come back by themselves
-- [ ] Save As from the showfile chip's ▸: the new name comes back on the chip
-- [ ] Load from the same sheet, with "save first" ticked: the show loads, the chip follows
+- [ ] Save As from the console card: the new name comes back on the card
+- [ ] Load from the same sheet, with "save first" ticked: the show loads, the card follows
 
 **Arena** (with the show's own media)
 - [ ] The media check (Arena view › Media): pick this week's service; every code reads ✓, or says why not
@@ -82,10 +82,15 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Clips fire from the Clips view; faders move
 - [ ] The Video view shows Arena's output and keeps up
 
-**Windows and layouts** (0.2.0)
-- [ ] Edit layout (operator mode, status bar): move a window, resize it by an edge, add one, add and remove tabs
-- [ ] A second MA tab says "Only one MA window at a time"; Move it here brings the MA over without logging in again
-- [ ] Save the layout under a name (LAYOUT in the status bar; Layouts after 0.2.0), change it, then switch back as a volunteer
+**The new look** (0.2.1)
+- [ ] Hold Volunteer (top right) for 3 s: it turns to Operator with a coloured line under the bar; one tap goes back
+- [ ] Anything that reads too dim, too small or too close together from where a volunteer stands
+- [ ] Drag the edge between two windows by finger: it follows smoothly and snaps to the other windows' edges
+
+**Windows and layouts** (0.2.0, rearranged in 0.2.1)
+- [ ] Layouts › Edit this layout (operator mode): move a window, resize it by an edge or corner, add one (its view menu opens), add and remove tabs
+- [ ] A second MA tab says the MA is showing in another window; Move it here brings it over without logging in again
+- [ ] Save the layout under a name (Layouts, top right), change it, then switch back to it as a volunteer by its picture
 - [ ] Pop a tab out, Send behind, then Show from its tab; Bring back
 
 **Embeds** (0.2.0)

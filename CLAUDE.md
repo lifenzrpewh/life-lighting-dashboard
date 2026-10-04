@@ -314,8 +314,10 @@ and **the owner chose A**, with the neutrals moved halfway back towards the orig
 and had it merged that morning. What changed is in the status row below
 (`src/renderer/components/ui.tsx`); nothing about what the app does or guards changed. The
 skin is `theme.css` plus `ui.tsx`; the structure (three-zone bar, one Layouts button,
-list-and-detail Connections, sheets, drawn edit handles) is separate from it. Not yet in a
-release build, and not yet tried by a finger on the booth screen.
+list-and-detail Connections, sheets, drawn edit handles) is separate from it. **Tagged
+v0.2.1** the same morning for the field-test builds (the release drafts itself on GitHub
+for the owner to publish; `docs/FIELD_TEST.md` § The new look). Not yet tried by a finger
+on the booth screen.
 
 **Where things stood before it (2026-10-05, after 1 am).** Since v0.2.0, on main and not in that
 build: **anyone drags the edge two windows share** (the owner's ask: the divider's "just adjust
