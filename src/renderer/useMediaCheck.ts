@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ArenaStatus } from '../shared/arena.js'
-import { suggestHomes, updatePlan, type HomeFor, type UpdateStep } from '../shared/holding.js'
+import { planPlacements, updatePlan, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	nzDate,
@@ -178,22 +178,26 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 
 	const runSheet = service !== null && itemsFor === service.id && items.kind === 'read' && items.read.ok ? items.read.value : null
 	const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same)
-	const homes: HomeFor[] = runSheet === null || check === null ? [] : suggestHomes(runSheet, check, status)
-	const plannedUpdate: { steps: UpdateStep[]; homeless: HomeFor[] } =
-		runSheet === null || check === null ? { steps: [], homeless: [] } : updatePlan(runSheet, check, status, same)
-	const trouble = check === null ? 0 : check.counts['not-loaded'] + check.counts['not-on-disk'] + check.counts['other-version']
+	// Each item's codes into its column, by Arena's column names (../shared/holding.ts).
+	const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
+		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status)
+	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same)
+	// To look at: an old or missing file, a code not where its item belongs, or
+	// one with no place (a code the lookbook has no file for is said apart).
+	const trouble =
+		check === null ? 0 : check.counts['not-on-disk'] + check.counts['other-version'] + placements.length + unplaced.filter((u) => u.kind !== 'no-file').length
 
 	// Nothing is copied or loaded into Arena without a confirmation first (the
 	// owner, 2026-10-05): a Fetch, a Place and Update all each say what they
 	// will do, and only Load sends it. Main runs the steps one at a time.
-	const [asking, setAsking] = useState<{ title: string; steps: UpdateStep[]; homeless: HomeFor[] } | null>(null)
-	const ask = (title: string, steps: UpdateStep[], homeless: HomeFor[] = []) => setAsking({ title, steps, homeless })
+	const [asking, setAsking] = useState<{ title: string; steps: UpdateStep[]; unplaced: Unplaced[] } | null>(null)
+	const ask = (title: string, steps: UpdateStep[], unplaced: Unplaced[] = []) => setAsking({ title, steps, unplaced })
 	const confirm = () => {
 		if (asking === null) return
 		for (const step of asking.steps) fetchCode(step.request)
 		setAsking(null)
 	}
-	const askUpdateAll = () => ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.homeless)
+	const askUpdateAll = () => ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced)
 
 	return {
 		// Which service, and how it was chosen.
@@ -212,7 +216,8 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		readItemsAgain: () => service !== null && readItems(service.id),
 		check,
 		trouble,
-		homes,
+		placements,
+		unplaced,
 		plannedUpdate,
 		same,
 		// Actions, and how they are going.

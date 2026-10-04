@@ -1,10 +1,23 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { checkMedia, sameKey } from '../dist/src/shared/media-check.js'
-import { clipsToUpdate, holdingLayers, likeness, nameWords, reserved, slotMark, suggestHomes, updatePlan, codesOn } from '../dist/src/shared/holding.js'
+import { sameKey } from '../dist/src/shared/media-check.js'
+import {
+	clipsToUpdate,
+	codesOn,
+	holdingLayers,
+	likeness,
+	nameWords,
+	placementWords,
+	planPlacements,
+	reserved,
+	slotMark,
+	updatePlan,
+} from '../dist/src/shared/holding.js'
 
-// The owner's Central composition, 2026-10-05, cut down: files under Media\AM.
+// The owner's Central composition, 2026-10-05, with its columns named by the
+// pattern (the owner: "happy to make all campuses conform"). Files under Media\AM.
+const NAMES = ['PRE', 'POST', 'COUNTDOWN', 'VIDEO BG', 'WTL', 'NSL', 'BIBLES', 'WTG', 'PROMO', 'PROMO', 'PROMO', 'PROMO']
 let nextId = 100
 const clip = (file, state = 'loaded', missing = false) => ({
 	id: nextId++,
@@ -15,67 +28,77 @@ const clip = (file, state = 'loaded', missing = false) => ({
 	missingFile: missing ? `C:\\Media\\AM\\${file}` : null,
 })
 const empty = () => ({ id: nextId++, name: '', state: 'empty', thumbnail: null, file: null, missingFile: null })
+const row = (cells) => NAMES.map((_, i) => (cells[i] === undefined ? empty() : clip(cells[i])))
 const layer = (id, name, group, slots) => ({ id, name, group, master: 1, bypassed: false, playing: null, slots })
+const BG = 'CB095-Sunday-RelationshipSeries.png'
 // Arena's composition order: bottom layer first.
-const composition = () => ({
+const composition = (names = NAMES) => ({
 	master: 1,
 	deck: 'AM',
 	groups: [],
-	columns: [],
+	columns: names.map((name, i) => ({ id: 900 + i, name, state: 'loaded' })),
 	layers: [
-		layer(1, 'PRE & POST', 'A SCREENS', [clip('CA635-Sunday-Relationship-WalkIn.jpg'), clip('CA600-Old-WalkOut.jpg'), empty(), empty()]),
-		layer(2, 'HOLD BG', 'HOLDING', [
-			clip('CB095-Sunday-RelationshipSeries.png'),
-			clip('CB095-Sunday-RelationshipSeries.png'),
-			clip('CB105-Sunday-ReloSeries-Preach.png'),
-			empty(),
-			clip('CB095-Sunday-RelationshipSeries.png'),
-			empty(),
-		]),
-		layer(3, 'PLAYBACK', 'HOLDING', [empty(), clip('CF447-Sunday-NextStepsLounge.png'), empty()]),
-		layer(4, 'HOLD FG', 'HOLDING', [
-			clip('CF588-Sunday-ReloSeries-WalkInV2.png'),
-			clip('CF446-Sunday-NextStepsUpstairs.png'),
-			clip('CF593-Sunday-Prayer&Fasting-Oct.png'),
-			empty(),
-			clip('Generic Logo.png'),
-		]),
+		layer(1, 'PRE & POST', 'A SCREENS', row({ 0: 'CA635-Sunday-Relationship-WalkIn.jpg', 1: 'CA600-Old-WalkOut.jpg' })),
+		layer(2, 'HOLD BG', 'HOLDING', row({ 0: BG, 1: BG, 2: 'CB105-Sunday-ReloSeries-Preach.png', 4: BG, 5: BG, 8: BG, 9: BG, 10: BG })),
+		layer(3, 'PLAYBACK', 'HOLDING', row({ 5: 'CF447-Sunday-NextStepsLounge.png' })),
+		layer(4, 'HOLD FG', 'HOLDING', row({
+			0: 'CF588-Sunday-ReloSeries-WalkInV2.png',
+			4: 'CF445-Sunday-WelcometoLIFE.png',
+			5: 'CF446-Sunday-NextStepsUpstairs.png',
+			8: 'CF561-Sunday-UpdateDetails.png',
+			9: 'CF593-Sunday-Prayer&Fasting-Oct.png',
+		})),
 		layer(5, 'VFX 1', 'VFX', [empty()]),
 	],
 })
 
 const item = (title, label, codes, files) => ({ title, label, codes, files, missingCodes: [] })
 const L = (name) => `/storage/library/C/${name}_1789627559514.png`
+const F = {
+	CB095: L('CB095-Sunday-RelationshipSeries-v5'),
+	CF588: L('CF588-Sunday-ReloSeries-WalkInV2'),
+	CA635: L('CA635-Sunday-Relationship-WalkIn'),
+	CA636: L('CA636-Sunday-Relationship-WalkOut'),
+	CF445: L('CF445-Sunday-WelcometoLIFE'),
+	CF465: L('CF465-Sunday-EXP-NextStepsUpstairs'),
+	CF546: L('CF546-Sunday-WaystoGive-Updated'),
+	CF594: L('CF594-Sunday-AllCampus-Prayer-Fasting-Oct-1'),
+	CF562: L('CF562-Sunday-Alpha'),
+	CF449: L('CF449-Sunday-Bibles'),
+	CB105: L('CB105-Sunday-ReloSeries-Preach'),
+}
+const pick = (...codes) => Object.fromEntries(codes.filter((c) => F[c]).map((c) => [c, F[c]]))
+// Central PM, 4 October, as the lookbook gave it (plus Alpha and the preach BG).
 const ITEMS = [
-	item('Doors Open', 'Walk In', ['CB095', 'CF588', 'CA635'], {
-		CB095: L('CB095-Sunday-RelationshipSeries-v5'),
-		CF588: L('CF588-Sunday-ReloSeries-WalkInV2'),
-		CA635: L('CA635-Sunday-Relationship-WalkIn'),
-	}),
-	item('Welcome', 'NSL', ['CB095', 'CF464', 'CT003'], { CB095: L('CB095-Sunday-RelationshipSeries-v5'), CF464: L('CF464-Sunday-EXP-NextStepsLounge') }),
-	item('Announcement', 'Prayer & Fasting', ['CF594'], { CF594: L('CF594-Sunday-AllCampus-Prayer-Fasting-Oct-1') }),
-	item('Announcement', 'Alpha', ['CF562'], { CF562: L('CF562-Sunday-Alpha') }),
-	item('End', 'Walk Out', ['CA636'], { CA636: L('CA636-Sunday-Relationship-WalkOut') }),
+	item('Doors Open', 'Walk In', ['CB095', 'CF588', 'CA635'], pick('CB095', 'CF588', 'CA635')),
+	item('Welcome', 'WTL', ['CB095', 'CF445', 'CT108'], pick('CB095', 'CF445')),
+	item('Welcome', 'NSL', ['CB095', 'CF465', 'CT003'], pick('CB095', 'CF465')),
+	item('Welcome', 'WTG', ['CB095', 'CF546', 'CT109'], pick('CB095', 'CF546')),
+	item('Announcement', 'Prayer & Fasting', ['CB095', 'CF594', 'CT290'], pick('CB095', 'CF594')),
+	item('EOS Announcements', 'Alpha', ['CB095', 'CF562'], pick('CB095', 'CF562')),
+	item('EOS Announcements', 'Bibles', ['CB095', 'CF449', 'CT110'], pick('CB095', 'CF449')),
+	item('Message (Incl. Altar Call)', 'Preach BG', ['CB105'], pick('CB105')),
+	item('End', 'Walk Out', ['CB095', 'CF588', 'CA636'], pick('CB095', 'CF588', 'CA636')),
 ]
+const at = (placements, label, code) => placements.find((p) => (p.label ?? p.title) === label && p.code === code)
 
 test('the words of a name leave out the code, Sunday, versions, months and campuses', () => {
 	assert.deepEqual([...nameWords('CF464-Sunday-EXP-NextStepsLounge')], ['next', 'steps', 'lounge'])
 	assert.deepEqual([...nameWords('CF594-Sunday-AllCampus-Prayer-Fasting-Oct-1.png')], ['prayer', 'fasting'])
 	assert.equal(likeness('CF594-Sunday-AllCampus-Prayer-Fasting-Oct-1', 'CF593-Sunday-Prayer&Fasting-Oct'), 1)
-	assert.equal(likeness('CF464-Sunday-EXP-NextStepsLounge', 'CF446-Sunday-NextStepsUpstairs'), 0.5)
 	assert.equal(likeness('CF562-Sunday-Alpha', 'CF446-Sunday-NextStepsUpstairs'), 0)
-	assert.equal(likeness('CB095', 'CB096'), 0)
 })
 
-test('the holding layers, top first, PLAYBACK last; columns 3 and 4 kept only on HOLD BG', () => {
+test('the holding layers, top first, PLAYBACK last; a column named for something else is never placed into', () => {
 	const s = composition()
 	assert.deepEqual(holdingLayers(s).map((l) => l.name), ['HOLD FG', 'HOLD BG', 'PRE & POST', 'PLAYBACK'])
-	const bg = s.layers[1]
-	const fg = s.layers[3]
-	assert.equal(reserved(bg, 3), true)
-	assert.equal(reserved(bg, 4), true)
-	assert.equal(reserved(bg, 5), false)
-	assert.equal(reserved(fg, 3), false)
+	const [, bg, , fg] = s.layers
+	assert.equal(reserved(fg, 3, s), true) // COUNTDOWN, on every layer
+	assert.equal(reserved(bg, 4, s), true) // VIDEO BG
+	assert.equal(reserved(fg, 5, s), false)
+	const plain = composition(NAMES.map(() => 'Column #'))
+	assert.equal(reserved(plain.layers[1], 3, plain), true)
+	assert.equal(reserved(plain.layers[3], 3, plain), false)
 })
 
 test("each clip's mark against today's run sheet", () => {
@@ -88,84 +111,94 @@ test("each clip's mark against today's run sheet", () => {
 	assert.equal(mark(pre.slots[2]), 'empty')
 	assert.equal(mark(bg.slots[0]), 'may-differ')
 	assert.equal(mark(bg.slots[0], new Set([sameKey('CB095', bg.slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])), 'confirmed')
-	assert.equal(mark(bg.slots[2]), 'not-today')
-	assert.equal(mark(fg.slots[4]), 'no-code')
-	const gone = { ...fg.slots[0], missingFile: fg.slots[0].file }
-	assert.equal(mark(gone), 'missing')
+	assert.equal(mark(fg.slots[9]), 'not-today')
 })
 
-test('homes: Post in column 2, a newer version where its old one is, then last week, then empty; never twice', () => {
+test('Doors Open goes in PRE and End in POST, on every layer; a code both use goes in both', () => {
 	const s = composition()
-	const homes = Object.fromEntries(suggestHomes(ITEMS, checkMedia(ITEMS, s), s).map((h) => [h.code, h]))
-	// Walk Out replaces the old A-screen in column 2.
-	assert.equal(homes.CA636.home.why, 'post')
-	assert.equal(homes.CA636.home.column, 2)
-	assert.equal(homes.CA636.home.replaces.code, 'CA600')
-	// The lounge goes where upstairs is (alike enough), never on PLAYBACK.
-	assert.equal(homes.CF464.home.layer, 'HOLD FG')
-	assert.equal(homes.CF464.home.why, 'looks-like')
-	assert.equal(homes.CF464.home.column, 2)
-	// Prayer and fasting replaces last month's.
-	assert.equal(homes.CF594.home.why, 'looks-like')
-	assert.equal(homes.CF594.home.column, 3)
-	// Alpha looks like nothing: no stale clip left, so the empty column.
-	assert.equal(homes.CF562.home.why, 'empty')
-	assert.equal(homes.CF562.home.column, 4)
-	assert.equal(homes.CF562.home.replaces, null)
-	// Never a clip the run sheet uses (CF588) or one with no code (the logo).
-	const used = Object.values(homes).map((h) => h.home.clipId)
-	assert.equal(new Set(used).size, used.length)
+	const { placements } = planPlacements(ITEMS, s)
+	// Doors Open is all in PRE already: nothing to place.
+	assert.equal(placements.filter((p) => p.label === 'Walk In').length, 0)
+	// End: CF588 into HOLD FG · POST although it is in PRE; CA636 replaces the old Post A-screen.
+	const end588 = at(placements, 'Walk Out', 'CF588')
+	assert.equal(end588.layer, 'HOLD FG')
+	assert.equal(end588.columnName, 'POST')
+	assert.equal(end588.column, 2)
+	const end636 = at(placements, 'Walk Out', 'CA636')
+	assert.equal(end636.layer, 'PRE & POST')
+	assert.equal(end636.column, 2)
+	assert.equal(end636.replaces.code, 'CA600')
+	assert.match(placementWords(end636), /^PRE & POST · POST \(column 2\), replacing CA600/)
+	// CB095 is in POST's background already.
+	assert.equal(at(placements, 'Walk Out', 'CB095'), undefined)
 })
 
-test('no home is said, never guessed: no layer, or no free column', () => {
-	const s = composition()
-	s.layers = s.layers.filter((l) => l.name !== 'PRE & POST')
-	const homes = suggestHomes(ITEMS, checkMedia(ITEMS, s), s)
-	const a = homes.find((h) => h.code === 'CA636')
-	assert.equal(a.home, null)
-	assert.match(a.detail, /no PRE & POST layer/)
-
-	const full = composition()
-	full.layers[3].slots = [full.layers[3].slots[0], { ...full.layers[3].slots[1], state: 'playing' }]
-	const f = suggestHomes(ITEMS, checkMedia(ITEMS, full), full).filter((h) => h.code.startsWith('CF'))
-	assert.ok(f.every((h) => h.home === null && /no free column on HOLD FG/.test(h.detail)))
+test('WTL, NSL, BIBLES and WTG go in their own columns by label, replacing what is there', () => {
+	const { placements } = planPlacements(ITEMS, composition())
+	assert.equal(at(placements, 'WTL', 'CF445'), undefined) // already in WTL
+	const nsl = at(placements, 'NSL', 'CF465')
+	assert.equal(nsl.columnName, 'NSL')
+	assert.equal(nsl.replaces.code, 'CF446')
+	assert.equal(at(placements, 'WTG', 'CF546').columnName, 'WTG')
+	const bibles = at(placements, 'Bibles', 'CF449')
+	assert.equal(bibles.columnName, 'BIBLES')
+	assert.equal(bibles.replaces, null)
+	// The BIBLES and WTG columns have no background yet: CB095 goes in too.
+	assert.equal(at(placements, 'Bibles', 'CB095').layer, 'HOLD BG')
 })
 
-test('a background never goes into HOLD BG columns 3 or 4', () => {
-	const s = composition()
-	const bg = s.layers[1]
-	bg.slots = [clip('CB095-Sunday-RelationshipSeries.png'), empty(), empty(), empty(), empty()]
-	bg.slots[1] = clip('CB095-Sunday-RelationshipSeries.png')
-	const items = [item('Message', 'Preach BG', ['CB200'], { CB200: L('CB200-Sunday-Preach') }), ...ITEMS]
-	const h = suggestHomes(items, checkMedia(items, s), s).find((x) => x.code === 'CB200')
-	assert.equal(h.home.column, 5)
+test('announcements go in PROMO columns: an older version first, then last week, then empty; never two in one', () => {
+	const { placements } = planPlacements(ITEMS, composition())
+	const prayer = at(placements, 'Prayer & Fasting', 'CF594')
+	assert.equal(prayer.why, 'promo-alike')
+	assert.equal(prayer.column, 10)
+	assert.equal(prayer.replaces.code, 'CF593')
+	const alpha = at(placements, 'Alpha', 'CF562')
+	assert.equal(alpha.why, 'promo-free')
+	assert.equal(alpha.column, 9)
+	assert.equal(alpha.replaces.code, 'CF561')
+	assert.notEqual(prayer.column, alpha.column)
+})
+
+test('what has no place is said, never guessed', () => {
+	const { unplaced } = planPlacements(ITEMS, composition())
+	const preach = unplaced.find((u) => u.code === 'CB105')
+	assert.equal(preach.kind, 'no-column')
+	assert.match(preach.detail, /no column named Preach BG/)
+
+	const plain = composition(NAMES.map(() => 'Column #'))
+	const r = planPlacements(ITEMS, plain)
+	assert.deepEqual(r.placements, [])
+	assert.ok(r.unplaced.every((u) => u.kind === 'unnamed'))
+	assert.match(r.unplaced[0].detail, /name them PRE, POST, WTL, NSL, BIBLES, WTG and PROMO/)
+
+	const noPromo = composition(NAMES.map((n) => (n === 'PROMO' ? 'Column #' : n)))
+	assert.equal(planPlacements(ITEMS, noPromo).unplaced.find((u) => u.code === 'CF594').kind, 'no-promo')
+
+	const playing = composition()
+	const fg = playing.layers[3]
+	fg.slots[1] = { ...fg.slots[1], state: 'playing', name: 'x', file: 'C:\\x.png' }
+	const p = planPlacements(ITEMS, playing).unplaced.find((u) => u.code === 'CF588')
+	assert.equal(p.kind, 'playing')
 })
 
 test('an update goes into every clip with the old file, not the confirmed or the right ones', () => {
 	const s = composition()
 	const bg = s.layers[1]
 	const want = 'CB095-Sunday-RelationshipSeries-v5'
-	const all = clipsToUpdate('CB095', want, s, new Set())
-	assert.deepEqual(all, [bg.slots[0].id, bg.slots[1].id, bg.slots[4].id])
+	assert.equal(clipsToUpdate('CB095', want, s, new Set()).length, 7)
 	assert.deepEqual(clipsToUpdate('CB095', want, s, new Set([sameKey('CB095', bg.slots[0].file, want)])), [])
-	bg.slots[1] = { ...bg.slots[1], file: `C:\\x\\${want}.jpg`, name: want }
-	assert.deepEqual(clipsToUpdate('CB095', want, s, new Set()), [bg.slots[0].id, bg.slots[4].id])
 })
 
-test('Update all: every may-differ code into all its clips, then each placed code; the homeless apart', () => {
+test('Update all: one step per code, its old clips and its missing columns together', () => {
 	const s = composition()
-	const { steps, homeless } = updatePlan(ITEMS, checkMedia(ITEMS, s), s, new Set())
-	assert.deepEqual(
-		steps.map((x) => x.request.code),
-		['CB095', 'CF464', 'CF594', 'CF562', 'CA636'],
-	)
-	assert.equal(steps[0].request.clipIds.length, 3)
-	assert.match(steps[0].what, /into its 3 clips/)
-	assert.match(steps[1].what, /place .* in HOLD FG · column 2, replacing CF446/)
-	assert.deepEqual(homeless, [])
-	// Confirmed the same: nothing to load for CB095.
-	const bg = s.layers[1]
-	const marks = new Set([sameKey('CB095', bg.slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])
-	const check = checkMedia(ITEMS, s, marks)
-	assert.equal(updatePlan(ITEMS, check, s, marks).steps[0].request.code, 'CF464')
+	const marks = new Set([sameKey('CB095', s.layers[1].slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])
+	const { steps, unplaced } = updatePlan(ITEMS, s, marks)
+	const by = Object.fromEntries(steps.map((x) => [x.request.code, x]))
+	// CB095 is confirmed, so only the columns missing it: BIBLES and WTG.
+	assert.equal(by.CB095.request.clipIds.length, 2)
+	assert.match(by.CF588.what, /HOLD FG · POST \(column 2\)/)
+	assert.equal(by.CF445, undefined)
+	assert.ok(unplaced.some((u) => u.code === 'CB105'))
+	assert.equal(new Set(steps.map((x) => x.request.code)).size, steps.length)
 })

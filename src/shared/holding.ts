@@ -1,48 +1,73 @@
 // The Holding view's rules (docs/VISUALS_DASHBOARD.md § The Holding view): what
-// each clip in the holding layers is to today's run sheet, where media that is
-// not in Arena should go, and what Update all would do.
+// each clip in the holding layers is to today's run sheet, which column each
+// run-sheet item belongs in, and what Update all would do.
 //
-// The owner, 2026-10-05:
-// - A-screens live in the first layer, PRE & POST: column 1 is Pre (Walk In),
-//   column 2 Post (Walk Out). Only campuses with IMAG screens have them.
-// - Backgrounds go on HOLD BG, foregrounds on HOLD FG. PLAYBACK is rarely used
-//   and nothing from the lookbook goes there.
-// - On HOLD BG, column 3 is the Countdown and column 4 the Video / Broadcast
-//   Background: never offered as a home. Other layers have no such columns.
-// - Each service has its own deck (AM, PM), so a clip whose code is not on
-//   this run sheet is free to be replaced.
+// A COLUMN IS ONE MOMENT OF THE SERVICE, ACROSS EVERY LAYER (the owner,
+// 2026-10-05, after a first version filled HOLD FG from column 1 and put
+// Welcome in Post): Doors Open's background, foreground and A-screen all sit
+// in the PRE column, End's in POST, and so on. Which column is which is read
+// from Arena's own column names, the pattern every campus follows:
+//
+//   PRE    Doors Open / Walk In          POST   End / Walk Out
+//   WTL, NSL, BIBLES, WTG                the item with that run-sheet label,
+//                                        always the same column
+//   PROMO  (as many as the campus has)   announcements and promos
+//   anything else (COUNTDOWN, …)         never placed into
+//
+// A label with no column of its own goes to a PROMO column if it is an
+// announcement or promo; otherwise it is said ("no column named …"), and a
+// campus names a column after the label to give it one. Columns still named
+// Arena's default (`Column #`) mean nothing is placed, and the view says
+// which names to use. Nothing is guessed from what a column happens to hold.
+//
+// Also the owner's: B on HOLD BG, F on HOLD FG, A on PRE & POST; nothing from
+// the lookbook on PLAYBACK; each service has its own deck, so a clip this run
+// sheet does not use may be replaced.
 //
 // THE RULES THIS FILE ENFORCES:
-// - A home is a suggestion with its reason, never a decision: the operator
-//   confirms it, or taps another slot.
-// - Never a playing clip, never a clip this run sheet still uses, never a
-//   reserved column, never two codes into one slot.
-// - Nothing found is said ("no place found"), not filled in with a guess.
+// - A placement is a suggestion with its reason; the operator confirms it.
+// - Never a playing clip, never two PROMO items into one column, never a
+//   column whose name says it is for something else.
+// - Nothing found is said, not filled in with a guess.
 
 import type { ArenaLayer, ArenaSlot, ArenaStatus } from './arena.js'
-import { fileStem, lookbookStem, mediaCodeOf, sameKey, type LookbookItem, type MediaCheck } from './media-check.js'
+import { ARENA_TYPES, fileStem, lookbookStem, mediaCodeOf, sameKey, type LookbookItem } from './media-check.js'
 import type { FetchRequest } from './media-fetch.js'
 
-/** Each type's home layer, by name. */
-const HOME_LAYER: Record<string, RegExp> = {
+/** Each type's layer, by name. */
+const TYPE_LAYER: Record<string, RegExp> = {
 	B: /^hold\s*bg$/i,
 	F: /^hold\s*fg$/i,
 	A: /^pre\s*(?:&|and)?\s*post$/i,
 }
+const TYPE_LAYER_NAME: Record<string, string> = { B: 'HOLD BG', F: 'HOLD FG', A: 'PRE & POST' }
+
+/** The names a campus gives its columns, for the screen. */
+export const COLUMN_NAMES = 'PRE, POST, WTL, NSL, BIBLES, WTG and PROMO'
+
+/** A name with only its letters and digits, upper case: `Promo 3` is PROMO3. */
+const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
+
+/** Arena's default column name (`Column #`, `Column 3`): not a name. */
+const unnamed = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
 
 /** The layers the Holding view shows, top first as Arena's panel reads:
  *  HOLDING's and PRE & POST, PLAYBACK last as it is rarely used. */
 export function holdingLayers(status: ArenaStatus): ArenaLayer[] {
 	const top = [...status.layers].reverse()
 	const holding = top.filter((l) => l.group !== null && /holding/i.test(l.group) && !/playback/i.test(l.name))
-	const pre = top.filter((l) => HOME_LAYER['A']?.test(l.name.trim()))
+	const pre = top.filter((l) => TYPE_LAYER['A']?.test(l.name.trim()))
 	const playback = top.filter((l) => /^playback$/i.test(l.name.trim()))
 	return [...holding.filter((l) => !pre.includes(l)), ...pre, ...playback.filter((l) => !holding.includes(l))]
 }
 
-/** A column never offered as a home (counted from 1). */
-export function reserved(layer: ArenaLayer, column: number): boolean {
-	return HOME_LAYER['B']?.test(layer.name.trim()) === true && (column === 3 || column === 4)
+/** A column a person cannot pick either: one named for something the
+ *  lookbook does not fill (COUNTDOWN, a video background), or, in a
+ *  composition whose columns are not named yet, HOLD BG's 3 and 4. */
+export function reserved(layer: ArenaLayer, column: number, status: ArenaStatus): boolean {
+	const name = status.columns[column - 1]?.name ?? ''
+	if (/count\s*down|video|broadcast/i.test(name)) return true
+	return unnamed(name) && TYPE_LAYER['B']?.test(layer.name.trim()) === true && (column === 3 || column === 4)
 }
 
 /** The code a clip carries: in its file's name, else its clip name. */
@@ -52,8 +77,8 @@ export function slotCode(slot: ArenaSlot): string | null {
 	return (file !== null ? mediaCodeOf(fileStem(file))?.code : undefined) ?? mediaCodeOf(slot.name)?.code ?? null
 }
 
-/** Every code on the run sheet, any type: a lower third's code is not a clip,
- *  but nothing named on the sheet is "not used today". */
+/** Every code on the run sheet, any type: nothing named on the sheet is
+ *  "not used today". */
 export function codesOn(items: LookbookItem[]): Set<string> {
 	const out = new Set<string>()
 	for (const item of items) for (const raw of item.codes) {
@@ -125,92 +150,183 @@ export function likeness(a: string, b: string): number {
 /** Names this alike are taken for the same piece, a newer version of it. */
 export const LIKENESS_MIN = 0.5
 
-/** A suggested home for a code that is not in Arena. */
-export type Home = {
-	clipId: number
+/** One code of one run-sheet item, going into its column on its layer. */
+export type Placement = {
+	/** The item's place in the run sheet. */
+	item: number
+	title: string
+	label: string | null
+	code: string
+	/** The lookbook's file name, without folder or extension. */
+	want: string
 	layer: string
 	/** Counted from 1. */
 	column: number
-	why: 'pre' | 'post' | 'looks-like' | 'not-used-today' | 'empty'
+	columnName: string
+	clipId: number
 	/** What is there now and would be replaced, or null for an empty slot. */
 	replaces: { code: string | null; name: string } | null
+	/** Its own column by name, or which PROMO column and why. */
+	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty'
 }
 
-export type HomeFor = { code: string; want: string; home: Home | null; detail: string | null }
+/** A code that has no place, and why: said, never guessed. */
+export type Unplaced = {
+	item: number
+	title: string
+	label: string | null
+	code: string
+	want: string | null
+	kind: 'unnamed' | 'no-column' | 'no-promo' | 'no-layer' | 'playing' | 'no-file'
+	detail: string
+}
 
-/** A home for every code the check found not in Arena, in run-sheet order,
- *  each in a slot of its own. */
-export function suggestHomes(items: LookbookItem[], check: MediaCheck, status: ArenaStatus): HomeFor[] {
-	const today = codesOn(items)
-	const taken = new Set<number>()
-	const out: HomeFor[] = []
-	const seen = new Set<string>()
-	for (const item of check.items) {
-		for (const c of item.codes) {
-			if (c.state !== 'not-loaded' || seen.has(c.code)) continue
-			seen.add(c.code)
-			const r = homeFor(c.code, c.want, item.label, status, today, taken)
-			if (r.home !== null) taken.add(r.home.clipId)
-			out.push({ code: c.code, want: c.want, ...r })
-		}
+const isPromo = (item: LookbookItem) => /announce|promo/i.test(`${item.title} ${item.label ?? ''}`)
+const isPre = (item: LookbookItem) => /walk\s*in|doors?\s*open|^pre$/i.test(item.label ?? '') || /doors?\s*open/i.test(item.title)
+const isPost = (item: LookbookItem) => /walk\s*out|^post$/i.test(item.label ?? '') || /^\s*end\b/i.test(item.title)
+
+/** The column (counted from 0) an item has by name, or null. */
+function namedColumn(item: LookbookItem, names: string[]): number | null {
+	const find = (want: string) => {
+		const i = names.findIndex((n) => norm(n) === want)
+		return i < 0 ? null : i
+	}
+	if (isPre(item)) return find('PRE')
+	if (isPost(item)) return find('POST')
+	if (item.label !== null && norm(item.label) !== '') return find(norm(item.label))
+	return null
+}
+
+/** The Arena codes an item calls for, each with the lookbook's file name. */
+function arenaCodes(item: LookbookItem): { code: string; type: string; want: string | null }[] {
+	const out: { code: string; type: string; want: string | null }[] = []
+	for (const raw of item.codes) {
+		const c = mediaCodeOf(raw)
+		if (c === null || !ARENA_TYPES.includes(c.type) || out.some((o) => o.code === c.code)) continue
+		const file = item.files[c.code]
+		out.push({ code: c.code, type: c.type, want: file === undefined ? null : lookbookStem(file) })
 	}
 	return out
 }
 
-function homeFor(
-	code: string,
-	want: string,
-	label: string | null,
-	status: ArenaStatus,
-	today: ReadonlySet<string>,
-	taken: ReadonlySet<number>,
-): { home: Home | null; detail: string | null } {
-	const type = mediaCodeOf(code)?.type ?? ''
-	const pattern = HOME_LAYER[type]
-	const layer = pattern === undefined ? undefined : status.layers.find((l) => pattern.test(l.name.trim()))
-	if (layer === undefined) {
-		const name = type === 'A' ? 'PRE & POST' : type === 'B' ? 'HOLD BG' : 'HOLD FG'
-		return { home: null, detail: `no ${name} layer in this composition` }
+/** Every run-sheet item's codes, into its column: what is missing from
+ *  where it belongs, and what has no place. A code already in its column (any
+ *  version: an old one is Update's, by `clipsToUpdate`) needs nothing. */
+export function planPlacements(items: LookbookItem[], status: ArenaStatus): { placements: Placement[]; unplaced: Unplaced[] } {
+	const names = status.columns.map((c) => c.name)
+	const anyNamed = names.some((n) => !unnamed(n))
+	const today = codesOn(items)
+	const layerOf = (type: string) => {
+		const p = TYPE_LAYER[type]
+		return p === undefined ? undefined : status.layers.find((l) => p.test(l.name.trim()))
 	}
-	const slots = layer.slots.map((slot, i) => ({ slot, column: i + 1, code: slotCode(slot) }))
-	const free = (s: (typeof slots)[number]) =>
-		!taken.has(s.slot.id) && s.slot.state !== 'playing' && !reserved(layer, s.column) && (s.code === null ? s.slot.state === 'empty' : !today.has(s.code))
-	const home = (s: (typeof slots)[number], why: Home['why']): Home => ({
-		clipId: s.slot.id,
-		layer: layer.name,
-		column: s.column,
-		why,
-		replaces: s.slot.state === 'empty' ? null : { code: s.code, name: s.slot.name },
-	})
+	const promoColumns = names.flatMap((n, i) => (norm(n).startsWith('PROMO') ? [i] : []))
 
-	// A-screens: Pre and Post have their columns.
-	if (type === 'A' && label !== null) {
-		const column = /walk\s*in|\bpre\b/i.test(label) ? 1 : /walk\s*out|\bpost\b/i.test(label) ? 2 : null
-		const s = column === null ? undefined : slots[column - 1]
-		if (s !== undefined) {
-			if (free(s)) return { home: home(s, column === 1 ? 'pre' : 'post'), detail: null }
-			return { home: null, detail: `${layer.name} · column ${column} is in use` }
+	// Which column each item goes in. PROMO items first find the column that
+	// already holds their piece, so no other item takes it.
+	const columnOf = new Map<number, { column: number; why: Placement['why'] } | { none: Unplaced['kind']; detail: string }>()
+	const takenPromo = new Set<number>()
+	const promoItems: number[] = []
+	for (const [i, item] of items.entries()) {
+		if (arenaCodes(item).length === 0) continue
+		if (!anyNamed) {
+			columnOf.set(i, { none: 'unnamed', detail: `Arena's columns aren't named yet: name them ${COLUMN_NAMES}` })
+			continue
+		}
+		const named = namedColumn(item, names)
+		if (named !== null) columnOf.set(i, { column: named, why: 'named' })
+		else if (isPromo(item)) promoItems.push(i)
+		else columnOf.set(i, { none: 'no-column', detail: `no column named ${item.label ?? item.title}` })
+	}
+	// The item's piece: its foreground, or its background when it has none.
+	const keyOf = (item: LookbookItem) => {
+		const codes = arenaCodes(item)
+		return codes.find((c) => c.type === 'F') ?? codes.find((c) => c.type === 'B') ?? codes[0]
+	}
+	const slotAt = (type: string, column: number) => layerOf(type)?.slots[column]
+	const choose = (pass: (key: NonNullable<ReturnType<typeof keyOf>>, column: number) => number | null, why: Placement['why']) => {
+		for (const i of promoItems) {
+			if (columnOf.has(i)) continue
+			const key = keyOf(items[i] as LookbookItem)
+			if (key === undefined) continue
+			let best: { column: number; score: number } | null = null
+			for (const column of promoColumns) {
+				if (takenPromo.has(column)) continue
+				const score = pass(key, column)
+				if (score !== null && (best === null || score > best.score)) best = { column, score }
+			}
+			if (best !== null) {
+				takenPromo.add(best.column)
+				columnOf.set(i, { column: best.column, why })
+			}
 		}
 	}
-	// A newer version of something already there.
-	let best: { s: (typeof slots)[number]; score: number } | null = null
-	for (const s of slots) {
-		if (s.code === null || !free(s)) continue
-		const score = likeness(want, s.slot.file ?? s.slot.name)
-		if (score >= LIKENESS_MIN && (best === null || score > best.score)) best = { s, score }
+	const free = (slot: ArenaSlot | undefined) => slot !== undefined && slot.state !== 'playing' && (slot.state === 'empty' || !today.has(slotCode(slot) ?? ''))
+	// Already there; then an older version of it; then last week's promo; then empty.
+	choose((key, column) => {
+		const s = slotAt(key.type, column)
+		return s !== undefined && slotCode(s) === key.code ? 1 : null
+	}, 'promo-alike')
+	choose((key, column) => {
+		const s = slotAt(key.type, column)
+		if (s === undefined || s.state === 'empty' || !free(s) || key.want === null) return null
+		const score = likeness(key.want, s.file ?? s.name)
+		return score >= LIKENESS_MIN ? score : null
+	}, 'promo-alike')
+	choose((key, column) => {
+		const s = slotAt(key.type, column)
+		return s !== undefined && s.state !== 'empty' && free(s) ? -column : null
+	}, 'promo-free')
+	choose((key, column) => (slotAt(key.type, column)?.state === 'empty' ? -column : null), 'promo-empty')
+	for (const i of promoItems) {
+		if (!columnOf.has(i)) columnOf.set(i, { none: 'no-promo', detail: promoColumns.length === 0 ? 'no PROMO columns in Arena' : 'every PROMO column is in use today' })
 	}
-	if (best !== null) return { home: home(best.s, 'looks-like'), detail: null }
-	// Last week's piece, then an empty column.
-	const stale = slots.find((s) => s.code !== null && free(s))
-	if (stale !== undefined) return { home: home(stale, 'not-used-today'), detail: null }
-	const empty = slots.find((s) => s.slot.state === 'empty' && free(s))
-	if (empty !== undefined) return { home: home(empty, 'empty'), detail: null }
-	return { home: null, detail: `no free column on ${layer.name}` }
+
+	const placements: Placement[] = []
+	const unplaced: Unplaced[] = []
+	for (const [i, item] of items.entries()) {
+		const where = columnOf.get(i)
+		if (where === undefined) continue
+		const base = { item: i, title: item.title, label: item.label }
+		for (const c of arenaCodes(item)) {
+			if ('none' in where) {
+				unplaced.push({ ...base, code: c.code, want: c.want, kind: where.none, detail: where.detail })
+				continue
+			}
+			if (c.want === null) {
+				unplaced.push({ ...base, code: c.code, want: null, kind: 'no-file', detail: 'the lookbook has no file' })
+				continue
+			}
+			const layer = layerOf(c.type)
+			const slot = layer?.slots[where.column]
+			if (layer === undefined || slot === undefined) {
+				unplaced.push({ ...base, code: c.code, want: c.want, kind: 'no-layer', detail: `no ${TYPE_LAYER_NAME[c.type] ?? 'such'} layer in this composition` })
+				continue
+			}
+			if (slotCode(slot) === c.code) continue
+			if (slot.state === 'playing') {
+				unplaced.push({ ...base, code: c.code, want: c.want, kind: 'playing', detail: `${layer.name} · ${names[where.column]} is playing` })
+				continue
+			}
+			placements.push({
+				...base,
+				code: c.code,
+				want: c.want,
+				layer: layer.name,
+				column: where.column + 1,
+				columnName: names[where.column] ?? '',
+				clipId: slot.id,
+				replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
+				why: where.why,
+			})
+		}
+	}
+	return { placements, unplaced }
 }
 
 /** Every clip carrying `code` that is not the lookbook's `want`, or whose file
- *  is missing: a fetch loads the new file into all of them, not only the first
- *  (CB095 sits in 18 columns of HOLD BG). Confirmed-same clips are left. */
+ *  is missing: an update loads the new file into all of them, not only the
+ *  first (CB095 sits in 18 columns of HOLD BG). Confirmed-same clips are left. */
 export function clipsToUpdate(code: string, want: string, status: ArenaStatus, marks: ReadonlySet<string>): number[] {
 	const out: number[] = []
 	for (const layer of status.layers) {
@@ -229,38 +345,41 @@ export function clipsToUpdate(code: string, want: string, status: ArenaStatus, m
 	return out
 }
 
-/** One line of Update all, to show before it runs. */
+/** Where a placement goes, said: `HOLD FG · POST (column 2), replacing …`. */
+export function placementWords(p: Placement): string {
+	const column = unnamed(p.columnName) ? `column ${p.column}` : `${p.columnName} (column ${p.column})`
+	return `${p.layer} · ${column}${p.replaces === null ? '' : `, replacing ${p.replaces.name}`}`
+}
+
+/** One line of a confirmation, to show before it runs. */
 export type UpdateStep = { request: FetchRequest; what: string }
 
-/** What Update all would do: every code that may differ or is missing loaded
- *  afresh into each of its clips, and every code not in Arena placed in its
- *  suggested home. Codes with no home are listed apart, not guessed. */
+/** What Update all would do, one step per code: its file into every clip
+ *  with an old or missing version, and into every column it is missing from.
+ *  What has no place is listed apart, never guessed. */
 export function updatePlan(
 	items: LookbookItem[],
-	check: MediaCheck,
 	status: ArenaStatus,
 	marks: ReadonlySet<string>,
-): { steps: UpdateStep[]; homeless: HomeFor[] } {
-	const steps: UpdateStep[] = []
-	const seen = new Set<string>()
-	for (const item of check.items) {
-		for (const c of item.codes) {
-			if (seen.has(c.code)) continue
-			if (c.state === 'other-version' || c.state === 'not-on-disk') {
-				seen.add(c.code)
-				const clipIds = clipsToUpdate(c.code, c.want, status, marks)
-				if (clipIds.length === 0) continue
-				const into = clipIds.length === 1 ? 'its clip' : `its ${clipIds.length} clips`
-				steps.push({ request: { code: c.code, want: c.want, clipIds }, what: `${c.code}: load ${c.want} into ${into}` })
-			}
+): { steps: UpdateStep[]; unplaced: Unplaced[] } {
+	const { placements, unplaced } = planPlacements(items, status)
+	const byCode = new Map<string, { want: string; update: number[]; place: Placement[] }>()
+	for (const item of items) {
+		for (const c of arenaCodes(item)) {
+			if (c.want === null || byCode.has(c.code)) continue
+			byCode.set(c.code, { want: c.want, update: clipsToUpdate(c.code, c.want, status, marks), place: [] })
 		}
 	}
-	const homes = suggestHomes(items, check, status)
-	for (const h of homes) {
-		if (h.home === null) continue
-		const where = `${h.home.layer} · column ${h.home.column}`
-		const replacing = h.home.replaces === null ? '' : `, replacing ${h.home.replaces.name}`
-		steps.push({ request: { code: h.code, want: h.want, clipIds: [h.home.clipId] }, what: `${h.code}: place ${h.want} in ${where}${replacing}` })
+	for (const p of placements) byCode.get(p.code)?.place.push(p)
+	const steps: UpdateStep[] = []
+	for (const [code, { want, update, place }] of byCode) {
+		const clipIds = [...new Set([...update, ...place.map((p) => p.clipId)])]
+		if (clipIds.length === 0) continue
+		const parts = [
+			...(update.length === 0 ? [] : [update.length === 1 ? 'its clip with the old file' : `its ${update.length} clips with the old file`]),
+			...place.map(placementWords),
+		]
+		steps.push({ request: { code, want, clipIds }, what: `${code}: ${want} into ${parts.join('; ')}` })
 	}
-	return { steps, homeless: homes.filter((h) => h.home === null) }
+	return { steps, unplaced }
 }

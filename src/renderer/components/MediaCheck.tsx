@@ -15,7 +15,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
-import { clipsToUpdate, type HomeFor, type UpdateStep } from '../../shared/holding.js'
+import { clipsToUpdate, placementWords, type Placement, type Unplaced, type UpdateStep } from '../../shared/holding.js'
 import { TYPE_NAMES, mediaCodeOf, type CodeCheck, type LookbookService, type SameMark } from '../../shared/media-check.js'
 import { megabytes, type FetchRequest, type FetchStates } from '../../shared/media-fetch.js'
 import { useMediaCheck, type Load, type MediaCheckState } from '../useMediaCheck.js'
@@ -167,7 +167,7 @@ export function ReadLine({ m, now }: { m: MediaCheckState; now: number }) {
  *  it does: nothing is sent until Load (the owner, 2026-10-05). */
 export function Confirm({ m }: { m: MediaCheckState }) {
 	if (m.asking === null) return null
-	const { title, steps, homeless } = m.asking
+	const { title, steps, unplaced } = m.asking
 	return (
 		<div className="my-2 rounded-lg bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
 			<p className="mb-2 font-medium">{title}</p>
@@ -177,11 +177,16 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 						{s.what}
 					</li>
 				))}
-				{homeless.map((h) => (
-					<li key={h.code} className="truncate text-booth-dim">
-						{h.code}: left out, {h.detail}
-					</li>
-				))}
+				{unplaced
+					.filter((u) => u.kind !== 'unnamed')
+					.map((u) => (
+						<li key={`${u.item}:${u.code}`} className="truncate text-booth-dim">
+							{u.code} ({u.label ?? u.title}): left out, {u.detail}
+						</li>
+					))}
+				{unplaced.some((u) => u.kind === 'unnamed') && (
+					<li className="text-booth-dim">Nothing placed: {unplaced.find((u) => u.kind === 'unnamed')?.detail}</li>
+				)}
 			</ul>
 			<p className="mb-2 text-xs text-booth-dim">
 				Copied from the graphics folder into the local folder, then loaded into Arena. Never into a playing clip; nothing is overwritten. Operator mode.
@@ -194,22 +199,23 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 	)
 }
 
-/** One step, said: what goes where. */
-export function stepFor(req: FetchRequest, status: ArenaStatus, home: NonNullable<HomeFor['home']> | null): UpdateStep {
-	if (home !== null) {
-		const replacing = home.replaces === null ? '' : `, replacing ${home.replaces.name}`
-		return { request: req, what: `${req.code}: place ${req.want} in ${home.layer} · column ${home.column}${replacing}` }
-	}
+/** Placing one code of one item in its column, said. */
+export function placeStep(p: Placement): UpdateStep {
+	return { request: { code: p.code, want: p.want, clipIds: [p.clipId] }, what: `${p.code} (${p.label ?? p.title}): ${p.want} into ${placementWords(p)}` }
+}
+
+/** Loading a newer file into clips, said: where, or how many. */
+export function updateStep(req: FetchRequest, status: ArenaStatus): UpdateStep {
 	if (req.clipIds.length === 0) return { request: req, what: `${req.code}: copy ${req.want} into the local folder only (no place in Arena)` }
 	const places = req.clipIds.map((id) => placeOf(id, status)).filter((p) => p !== null)
-	const where = places.length === 1 ? places[0] : `${req.clipIds.length} clips`
+	const where = places.length === 1 ? places[0] : `${req.clipIds.length} clips with the old file`
 	return { request: req, what: `${req.code}: load ${req.want} into ${where}` }
 }
 
 function placeOf(clipId: number, status: ArenaStatus): string | null {
 	for (const layer of status.layers) {
 		const i = layer.slots.findIndex((s) => s.id === clipId)
-		if (i >= 0) return `${layer.name} · column ${i + 1}`
+		if (i >= 0) return `${layer.name} · ${status.columns[i]?.name ?? 'column'} (column ${i + 1})`
 	}
 	return null
 }
@@ -219,15 +225,22 @@ function Result({ m, status, now }: { m: MediaCheckState; status: ArenaStatus; n
 		<div>
 			<ReadLine m={m} now={now} />
 			<Confirm m={m} />
-			{m.check?.items.map((item, i) => (
-				<div key={i} className="border-t border-booth-edge/60 py-2">
+			{m.check?.items.map((item) => (
+				<div key={item.index} className="border-t border-booth-edge/60 py-2">
 					<div className="truncate text-sm">
 						{item.title}
 						{item.label !== null && <span className="text-booth-dim"> · {item.label}</span>}
 					</div>
 					<ul className="mt-1 flex flex-col gap-1">
 						{item.codes.map((c, j) => (
-							<CodeRow key={j} check={c} m={m} status={status} home={m.homes.find((h) => h.code === c.code) ?? null} />
+							<CodeRow
+								key={j}
+								check={c}
+								m={m}
+								status={status}
+								placement={m.placements.find((p) => p.item === item.index && p.code === c.code) ?? null}
+								unplaced={m.unplaced.find((u) => u.item === item.index && u.code === c.code) ?? null}
+							/>
 						))}
 					</ul>
 				</div>
@@ -236,21 +249,47 @@ function Result({ m, status, now }: { m: MediaCheckState; status: ArenaStatus; n
 	)
 }
 
-/** One code: what it is, and what became of it. Amber only where someone must
- *  act; a code the check could not settle is said, never shown as loaded. */
-function CodeRow({ check, m, status, home }: { check: CodeCheck; m: MediaCheckState; status: ArenaStatus; home: HomeFor | null }) {
+/** One code of one item: what it is, what became of it, and whether it is in
+ *  its item's column. Amber only where someone must act; a code the check
+ *  could not settle is said, never shown as loaded. */
+function CodeRow({
+	check,
+	m,
+	status,
+	placement,
+	unplaced,
+}: {
+	check: CodeCheck
+	m: MediaCheckState
+	status: ArenaStatus
+	placement: Placement | null
+	unplaced: Unplaced | null
+}) {
 	const type = TYPE_NAMES[mediaCodeOf(check.code)?.type ?? ''] ?? ''
 	const where = (at: { layer: string; column: number }) => `${at.layer} · column ${at.column}`
 	const fetch = m.fetches[check.code]
+	const noPlace = unplaced !== null && unplaced.kind !== 'no-file' ? `No place: ${unplaced.detail}` : null
 	let state: React.ReactNode
 	let detail: string | null = null
 	switch (check.state) {
 		case 'ok':
-			state = <span className="text-booth-dim">✓ {where(check.at)}</span>
+		case 'same-by-hand':
+			if (placement !== null) {
+				state = <span className="text-warn">not in {placement.columnName || 'its column'}</span>
+				detail = `In ${where(check.at)}; goes in ${placementWords(placement)}`
+			} else {
+				state = (
+					<span className="text-booth-dim">
+						✓ {where(check.at)}
+						{check.state === 'same-by-hand' && ' · confirmed the same by hand'}
+					</span>
+				)
+				detail = noPlace ?? (check.state === 'same-by-hand' ? `${fileName(check.at.file)}; the lookbook has ${check.want}` : null)
+			}
 			break
 		case 'not-loaded':
 			state = <span className="text-warn">not in Arena</span>
-			detail = home === null ? null : home.home === null ? `No place found: ${home.detail}` : homeWords(home.home)
+			detail = placement !== null ? `Goes in ${placementWords(placement)}` : noPlace
 			break
 		case 'not-on-disk':
 			state = <span className="text-warn">file missing on this computer</span>
@@ -260,40 +299,38 @@ function CodeRow({ check, m, status, home }: { check: CodeCheck; m: MediaCheckSt
 			state = <span className="text-warn">may differ</span>
 			detail = `${where(check.at)} has ${fileName(check.at.file)}; the lookbook has ${check.want}`
 			break
-		case 'same-by-hand':
-			state = <span className="text-booth-dim">✓ {where(check.at)} · confirmed the same by hand</span>
-			detail = `${fileName(check.at.file)}; the lookbook has ${check.want}`
-			break
 		case 'no-lookbook-file':
 			state = <span className="text-booth-dim">? the lookbook has no file{check.at !== null && ` · in ${where(check.at)}`}</span>
 			break
 	}
-	// A fetch loads every clip with the old or missing file; a code not in
-	// Arena goes into its suggested home, or is only copied when none is found.
-	const request: { req: FetchRequest; label: string } | null =
+	// An update loads every clip with the old or missing file; Place puts the
+	// code in its item's column; Copy here only copies, when there is no place.
+	const update: FetchRequest | null =
 		check.state === 'other-version' || check.state === 'not-on-disk'
-			? { req: { code: check.code, want: check.want, clipIds: clipsToUpdate(check.code, check.want, status, m.same) }, label: 'Fetch' }
-			: check.state === 'not-loaded'
-				? home?.home != null
-					? { req: { code: check.code, want: check.want, clipIds: [home.home.clipId] }, label: 'Place' }
-					: { req: { code: check.code, want: check.want, clipIds: [] }, label: 'Copy here' }
-				: null
+			? { code: check.code, want: check.want, clipIds: clipsToUpdate(check.code, check.want, status, m.same) }
+			: null
+	const copyOnly = check.state === 'not-loaded' && placement === null ? { code: check.code, want: check.want, clipIds: [] } : null
 	const mark: SameMark | null =
 		check.state === 'other-version' || check.state === 'same-by-hand'
 			? { code: check.code, file: check.at.file, want: check.want, same: check.state === 'other-version' }
 			: null
+	const any = update !== null || copyOnly !== null || placement !== null || mark !== null
 	return (
 		<li className="flex min-w-0 flex-col text-sm">
 			<span className="flex min-w-0 items-center gap-2">
 				<span className="w-14 shrink-0 font-mono text-xs">{check.code}</span>
 				<span className="w-20 shrink-0 text-xs text-booth-dim">{type}</span>
 				<span className="min-w-0 truncate">{state}</span>
-				{(request !== null || mark !== null) && (
+				{any && (
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						<FetchWords fetch={fetch} refused={m.refused[check.code]} />
-						{mark !== null && !under(fetch) && <SmallButton onClick={() => m.markSame(mark)}>{mark.same ? 'Same' : 'Undo'}</SmallButton>}
-						{request !== null && !under(fetch) && (
-							<SmallButton onClick={() => m.ask(request.label, [stepFor(request.req, status, request.label === 'Place' ? (home?.home ?? null) : null)])}>{request.label}</SmallButton>
+						{!under(fetch) && (
+							<>
+								{mark !== null && <SmallButton onClick={() => m.markSame(mark)}>{mark.same ? 'Same' : 'Undo'}</SmallButton>}
+								{update !== null && <SmallButton onClick={() => m.ask('Fetch', [updateStep(update, status)])}>Fetch</SmallButton>}
+								{placement !== null && <SmallButton onClick={() => m.ask('Place', [placeStep(placement)])}>Place</SmallButton>}
+								{copyOnly !== null && <SmallButton onClick={() => m.ask('Copy here', [updateStep(copyOnly, status)])}>Copy here</SmallButton>}
+							</>
 						)}
 					</span>
 				)}
@@ -301,23 +338,6 @@ function CodeRow({ check, m, status, home }: { check: CodeCheck; m: MediaCheckSt
 			{detail !== null && <span className="truncate pl-[8.5rem] text-xs text-booth-dim">{detail}</span>}
 		</li>
 	)
-}
-
-/** A suggested home, with its reason, for a person to agree with. */
-export function homeWords(h: NonNullable<HomeFor['home']>): string {
-	const where = `${h.layer} · column ${h.column}`
-	switch (h.why) {
-		case 'pre':
-			return `Goes in ${where}, Pre${h.replaces === null ? '' : `, replacing ${h.replaces.name}`}`
-		case 'post':
-			return `Goes in ${where}, Post${h.replaces === null ? '' : `, replacing ${h.replaces.name}`}`
-		case 'looks-like':
-			return `Looks like a newer ${h.replaces?.name ?? 'version'}: ${where}`
-		case 'not-used-today':
-			return `${where}, replacing ${h.replaces?.name ?? 'a clip'} (not on this run sheet)`
-		case 'empty':
-			return `${where}, empty`
-	}
 }
 
 /** A fetch still going: no second tap until it ends. */

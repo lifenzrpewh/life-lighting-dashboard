@@ -169,7 +169,9 @@ export type CodeCheck =
 	 *  Arena has it, if anywhere. */
 	| { code: string; state: 'no-lookbook-file'; at: Place | null }
 
-export type ItemCheck = { title: string; label: string | null; codes: CodeCheck[] }
+/** `index` is the item's place in the run sheet, for the placements
+ *  (./holding.ts) that are per item. */
+export type ItemCheck = { index: number; title: string; label: string | null; codes: CodeCheck[] }
 
 export type MediaCheck = {
 	items: ItemCheck[]
@@ -245,7 +247,7 @@ export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: Rea
 	const counts: MediaCheck['counts'] = { ok: 0, 'not-loaded': 0, 'not-on-disk': 0, 'other-version': 0, 'same-by-hand': 0, 'no-lookbook-file': 0 }
 	const seen = new Set<string>()
 	const out: ItemCheck[] = []
-	for (const item of items) {
+	for (const [index, item] of items.entries()) {
 		const codes: CodeCheck[] = []
 		for (const raw of item.codes) {
 			const parsed = mediaCodeOf(raw)
@@ -258,7 +260,7 @@ export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: Rea
 				counts[result.state] += 1
 			}
 		}
-		if (codes.length > 0) out.push({ title: item.title, label: item.label, codes })
+		if (codes.length > 0) out.push({ index, title: item.title, label: item.label, codes })
 	}
 	return { items: out, counts }
 }

@@ -661,7 +661,7 @@ A view of its own (Holding, in the + menu), run off the Arena reading: the holdi
 holds something ("rarely used"), each a row of its clips' thumbnails, every clip marked against
 the run sheet the media check follows: ✓ on it, **may differ**, **file missing**, faded when
 not on this run sheet (free to replace) or carrying no code (left alone), green when playing
-as in Clips. HOLD BG's columns 3 and 4 say Countdown and Broadcast BG when empty. The rules
+as in Clips. The column headers carry Arena's column names. The rules
 are `src/shared/holding.ts`; the state is shared with the Media row (`src/renderer/useMediaCheck.ts`).
 
 The owner's answers (2026-10-05): **inspect only** (a tap never fires; Clips is for playing);
@@ -671,18 +671,38 @@ it"); HOLD BG's columns 3 and 4 kept, no other layer's; each service has its own
 clip not on this run sheet may be replaced. Keep the Fetch, Same, Place and Update all buttons
 in both the Media row and here (taken without an answer: the owner can trim one).
 
-- **Needs a home**: every code the run sheet calls for that is not in Arena, with the
-  lookbook's picture (main shrinks it to 480 px on a `lookbook:` scheme, only library stills)
-  and a suggested slot, in this order: an A-screen's Pre (Walk In) or Post (Walk Out) column;
-  a clip on the type's layer whose name is alike (words without code, Sunday, versions, months,
-  campuses; half or more shared) and not on this run sheet; a clip not on this run sheet;
-  an empty column. Never a playing clip, a clip the run sheet uses, a reserved column, or two
-  codes into one slot. **Place** takes it, **Choose** makes the next tap on a free slot the home
-  (only free slots light up). None found is said ("No place found: no free column on HOLD FG").
+- **A column is one moment of the service, across every layer** (the owner, 2026-10-05).
+  The first version (built that morning) treated each layer apart and filled HOLD FG from
+  column 1 in run-sheet order; the owner's Place all on the PM run sheet put CF588, CF445,
+  CF465, CF546 and CF449 in HOLD FG columns 1, 2, 3, 4 and 6: Welcome in Post, two in the
+  Countdown and Video columns (✅ the loads themselves, the first through the button, all
+  landed; nothing was overwritten, HOLD FG had been emptied). Rebuilt the same day on the
+  owner's pattern, which every campus will follow ("happy to make all campuses conform"):
+  **Arena's columns are named** `PRE` (Doors Open / Walk In), `POST` (End / Walk Out),
+  `WTL`, `NSL`, `BIBLES`, `WTG` (always the same columns), and `PROMO` (as many as the
+  campus has: Central 6) for every announcement and promo; any other name (`COUNTDOWN`, a
+  video background) is never placed into. Each run-sheet item's codes go into its column on
+  their layers (B on HOLD BG, F on HOLD FG, A on PRE & POST); a code two items use goes into
+  both (CF588 in PRE and POST). A label with no column of its own goes to a PROMO column if it
+  is an announcement or promo (its title or label says so): the one already holding it, then
+  an older version of it, then one not on this run sheet, then an empty one, never two in one;
+  otherwise it is said ("no column named Preach BG"), and a campus can name a column after the
+  label. Columns still named Arena's `Column #` mean nothing is placed, and the view says
+  which names to use. ✅ Dry run against the live composition and the real Central PM 4 Oct
+  run sheet, columns named on a copy: CF588 back into POST (replacing the misplaced CF445),
+  CF445 into WTL, CF465 into NSL (replacing the misplaced CF449), CF449 into BIBLES, CF546 into
+  WTG, CF594 into a PROMO column; unnamed, nothing placed. ⚠️ Arena's columns are not named
+  yet: the owner's, in Arena.
+- **To place** (was Needs a home): each code not where its item belongs, with the lookbook's
+  picture (main shrinks it to 480 px on a `lookbook:` scheme, only library stills) and its
+  column; **Place** puts it there, **Choose** makes the next tap on a free slot of its layer
+  the place instead (only free slots light up). What has no place is listed with why. The
+  Media row says the same per item: "not in POST" for End's CF588 while it sits in PRE.
 - **Tap a clip** to inspect it: what it is, Arena's picture beside the lookbook's for one that
   may differ, **Same** / **Undo** and **Update** (every clip with the old file).
-- **Update all** (here and in the Media row): every may-differ or missing code into all its
-  clips, then every code placed in its home; the homeless listed apart, never guessed.
+- **Update all** (here and in the Media row): one step per code, its file into every clip with
+  an old or missing version and into every column it is missing from; what has no place listed
+  apart, never guessed.
 - ✅ In the kiosk over CDP, 2026-10-05, against the owner's Central composition with the run
   order on Central PM 4 Oct and HOLD FG emptied in Arena: six PM foregrounds in Needs a home
   with their lookbook pictures and HOLD FG columns 1 to 6 suggested; HOLD BG's CB095 clips may
