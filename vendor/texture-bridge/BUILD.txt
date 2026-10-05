@@ -3,5 +3,5 @@ upstream 7f7d589809f0735ce9b1d9e7fa2e790773d401d6
 spout2   c2bcc12147711d12ace7d5f08e869d774d840f8a
 patch    sha256 687315dd184cf3bedeca2a749827cfb6a41fc72856a029870b27140580a3f004
 ring     sha256 b4ae2f65f1af35e1c4e2ef0224a685805c9596d81be3a944d29276d2c7c431d6
-built    https://github.com/lifenzrpewh/life-lighting-dashboard/actions/runs/37242740953
-from     cd379e0e63bbfe5e22a7cbba5ac291b0b87fe13b
+built    https://github.com/lifenzrpewh/life-lighting-dashboard/actions/runs/37253637938
+from     e981ecb5b66e2c338bbf7156dcf7fa6f98458bbd
