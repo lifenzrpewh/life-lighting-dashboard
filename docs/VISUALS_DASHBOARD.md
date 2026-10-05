@@ -389,7 +389,8 @@ stand-in until then was opaque. ✅ Reproduced with `spikes/video-lag/sender.cjs
 whose alpha fades): frame alpha 251 to 4, canvas held at 220. ✅ Fixed by drawing each frame on
 black (`VideoView.tsx`), as Arena's multiview shows it: canvas 215 to 1 in the spike, and in the
 kiosk 211, 188, … 25, 1, 23, … 212 at 100 ms steps. The ring build (tearing) and the stall lines
-stay; the stall was never the feed.
+stay; the stall was never the feed. ✅ The owner, watching Arena's own fades in the kiosk
+afterwards: "Seems good now."
 
 **Still to do:** lay out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).

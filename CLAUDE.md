@@ -68,7 +68,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ⚠️ `src/main/popout.ts` · `src/shared/popout.ts` · `src/renderer/PopOut.tsx` | **Pop out**: any tab's view (embeds too) into a window of its own, on top of the kiosk; every tab of that view says so and offers **Show** (forward, on top) and **Bring back**; the pop-out's **Send behind** lets the kiosk over it (2026-10-05: sent behind, Show focused it, Bring back closed it home, over CDP; the stacking itself not watched by eye); closing the window brings the view home, as does a kiosk reload. The MA and run order move page and all. Seen working in the kiosk on the Windows box, 2026-10-03, driven over the debugging port; not yet by a finger or on a second display. `docs/VISUALS_DASHBOARD.md` § Pop a view out. |
 | ✅ `src/renderer/components/ClipsView.tsx` · `src/bridge/arena-control.ts` | **Clips**, the trigger screen (2026-10-04): Arena's grid in a slot or popped out; tap a clip, fire a column, Clear a layer, drag a fader; everyone may. The only writer to Arena: four templated requests, ids checked against the composition, never `/clips/…/clear` or `/clearclips` (tested). A tap is one bodiless POST: `true`/`false` only selected the clip. Fired by clicks in the kiosk on the Windows box. Above it and the Arena view, clips whose file is missing (⚠️ not yet seen with a real one). `docs/VISUALS_DASHBOARD.md` § The pieces. |
 | ✅ `src/shared/media-check.ts` · `src/bridge/lookbook.ts` · `src/main/lookbook.ts` · `src/renderer/components/MediaCheck.tsx` | **The media check** (2026-10-04), a Media row in the Arena view: the service the run order has open (by its Planning Center plan, since 2026-10-05), or one picked from the lookbook app (lookbooks-lifenz.replit.app, which already parses PCO's `Media No.` into codes like `CF588`), and each B, F and A code reads ✓, not in Arena, file missing, another version, or the lookbook has no file. The lookbook is the truth for the version. ✅ **Against the owner's up-to-date Central composition, 2026-10-05**, on the Windows box: ✓ on seven codes, three not loaded, and "may differ" on CB095 (an operator can confirm it **Same** by hand since 2026-10-05; kept per computer, for that pair of names only): the same picture, but the lookbook's file is named `…-v5` and Arena's is not (the extension is ignored; a format change alone passes, the owner's rule, 2026-10-05). Stills carry their file path. ⚠️ Not yet at a booth or from the NAS. `docs/VISUALS_DASHBOARD.md` § the media check. |
-| ⚠️ `src/main/video-feed.ts` · `src/renderer/components/VideoView.tsx` | **The video feed**: a Spout/Syphon sender (Arena's multiview, to be) as a **Video** view, GPU to GPU through `@napolab/texture-bridge` and Electron's `sharedTexture`, the pages still sandboxed. Seen live from a stand-in sender (`spikes/spout-test-sender.cjs`) and from **Arena 7.28's Spout output** on the Windows box, 2026-10-03, in a slot and popped out; capped at 30 fps (60 since 2026-10-05 with the ring build: three staging textures and a GPU fence against tearing on fades; 47-48 fps read from Arena's 50). A touch-sized source picker, and **Fit** to give the space the picture's shape. 16-bit (Arena's High Detail) goes through **LIFE's build of the addon** (`native/texture-bridge/`, built by GitHub Actions), converted to 8-bit on the GPU: ✅ exact against a 16-bit stand-in (`spikes/spout-16bit-sender.cs`), 2026-10-03, and ✅ **from Arena at 16 bpc**, 2026-10-04 (owner-set and owner-watched; the kiosk read 1920×1080 at 27 fps, no failure; the stock addon refuses 16-bit, and the sender's own format is not logged). `docs/VISUALS_DASHBOARD.md` § The video feed. |
+| ⚠️ `src/main/video-feed.ts` · `src/renderer/components/VideoView.tsx` | **The video feed**: a Spout/Syphon sender (Arena's multiview, to be) as a **Video** view, GPU to GPU through `@napolab/texture-bridge` and Electron's `sharedTexture`, the pages still sandboxed. Seen live from a stand-in sender (`spikes/spout-test-sender.cjs`) and from **Arena 7.28's Spout output** on the Windows box, 2026-10-03, in a slot and popped out; capped at 30 fps (60 since 2026-10-05 with the ring build: three staging textures and a GPU fence against tearing on fades; 47-48 fps read from Arena's 50). A touch-sized source picker, and **Fit** to give the space the picture's shape. 16-bit (Arena's High Detail) goes through **LIFE's build of the addon** (`native/texture-bridge/`, built by GitHub Actions), converted to 8-bit on the GPU: ✅ exact against a 16-bit stand-in (`spikes/spout-16bit-sender.cs`), 2026-10-03, and ✅ **from Arena at 16 bpc**, 2026-10-04 (owner-set and owner-watched; the kiosk read 1920×1080 at 27 fps, no failure; the stock addon refuses 16-bit, and the sender's own format is not logged). ✅ **Fades no longer freeze** (2026-10-05, owner-watched on Arena: "seems good now"): Arena's picture carries alpha, so each frame is drawn on black; reproduced and measured with `spikes/video-lag/` (`--alpha`). `[video]` lines in the log say where a stall is, each 5 s with one. `docs/VISUALS_DASHBOARD.md` § The video feed. |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ⚠️ `src/shared/embeds.ts` · `src/main/embeds.ts` · `src/renderer/components/EmbedPane.tsx` | **Embeds** (2026-10-05): any web page, added by name and address in Connections (operator mode), is a view of its own with its own sign-in (a partition per embed), − / + zoom remembered per embed, Reload, Pop out, and a row saying loaded / loading / not loading that can be turned off. New windows open in the computer's browser; the user agent drops Electron's name, for Google. Removing one clears its session, and its folder at the next start. In the kiosk on the Windows box over CDP, 2026-10-05: added, placed over its slot, zoomed (saved, re-applied after a reload), popped out and back, off and on, renamed, removed. ⚠️ Not signed in to Google (its sign-in raised a Windows passkey dialog, cancelled); a new-window link not tried. |
@@ -311,7 +311,20 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-05, late afternoon).** **v0.2.2 is tagged and both builds passed**
+**Where things stand (2026-10-05, about 2 pm).** On main since v0.2.2, not in a build: the **video
+freeze on Arena's fades is fixed** (Arena's picture carries alpha and a fading layer goes
+transparent, so the view drew over the last frame; now each frame is drawn on black; the owner:
+"seems good now"); the **Lookbook view** (one look a row, the lookbook's composed picture, Load per
+look); **Clear old FGs** (a tick in Update all's confirmation and a header button; never pressed);
+the **Creative Guide** behind Guide on the top bar; the A-screen layer found as **A SCREEN BG** (the
+owner's rename) as well as PRE & POST; and `[video]` stall lines in the log. The choices taken
+without the owner's answer: the Lookbook as its own view beside Holding rather than merged, what
+"old" means for a foreground, the guide's address fixed rather than a setting
+(`docs/VISUALS_DASHBOARD.md` § The Lookbook view, § Clear old FGs, § The Creative Guide). NDI
+sources as views are only noted (§ NDI sources as views). Next: Clear old FGs pressed once with
+the owner, then a v0.2.3 build.
+
+**Earlier that afternoon (v0.2.2).** **v0.2.2 is tagged and both builds passed**
 (run 37244795777: `Paua-Setup-0.2.2.exe`, `Paua-0.2.2-arm64.dmg`, 289 tests green on the Windows
 runner); the release waits as a draft for the owner. New in it, all from the owner's asks that
 afternoon: the **Holding view as pictures** (only what needs a look is marked, a dashed "+ place"
@@ -387,12 +400,19 @@ gets every reply. The web remote ignores pasted text and drops shifted keys; typ
 and use MA's on-screen Shift. Driving the kiosk: start it with
 `electron . --remote-debugging-port=9223` and send CDP input; a held press can be cancelled
 by a real mouse moving over the window, so check the log said "sent".
-Left on the late afternoon of 2026-10-05: the kiosk runs e900e26's build with the **ring build
-of the addon** (`vendor/texture-bridge/`, BUILD.txt names it; a running kiosk locks the `.node`,
-so stop it before `git checkout origin/texture-bridge-build -- vendor/texture-bridge`), in
-volunteer mode, on the owner's own three windows (run order | MA | Arena, Clips, Holding, Video,
-MA), the Video view on `Arena - MULTIVIEW`. Its bar is expanded (`paua.barCollapsed` unset); the
-saved layouts list is empty (`paua.layouts` is `[]`: the two test layouts are gone). It was started detached (PowerShell `Start-Process` on
+Left at about 2 pm on 2026-10-05: the kiosk runs c1767d2's build (main from a restart at 13:47,
+the page reloaded after the video fix) with the **ring build of the addon** (`vendor/texture-bridge/`,
+BUILD.txt names it; a running kiosk locks the `.node`, so stop it before `git checkout
+origin/texture-bridge-build -- vendor/texture-bridge`), in volunteer mode, on the owner's own two
+windows: the run order, and Arena, Clips, Holding, Video, MA, a dead tab of the removed Creative
+Guide embed, the **Marvelous Item Brief** embed (a Google Sheet, the only embed) and Lookbook
+(showing). The Video view is on `Arena - MULTIVIEW`. Its bar is expanded (`paua.barCollapsed` unset);
+the saved layouts list is empty. **The console link has been unreachable since 13:21**: LifeBridge
+stopped answering in onPC (onPC still running; nothing of this session touched the link), so look
+at onPC before trusting the showfile chip. No test senders are left running; the 16-bit stand-in
+is built at `%TEMP%\spout-16bit-sender.exe` (build it from PowerShell: Git Bash mangles csc's `/`
+flags). `npm test` clears the app build, so `npm run build:app` before a spike that imports
+`dist/src/main`. It was started detached (PowerShell `Start-Process` on
 `node_modules\electron\dist\electron.exe . --remote-debugging-port=9223`), because a kiosk
 started as a session's background task is killed at that task's time limit. **The owner uses
 this kiosk too**: read the page (Connections open, operator mode) before sending CDP input.
@@ -413,8 +433,7 @@ may hold anything since. **CB095 is a test file** (the owner: ignore it; its dri
 CF464), local folder `D:\Holding` (the five files the Place all copied are there). No "same"
 confirmations are kept (`media-same.json` is empty). The lookbook has no service dated after
 4 Oct yet, so test against 4 Oct by pointing the Cue Manager at it.
-Also on this box: two test saved layouts, "Three windows" (its run order sits a column in from
-the left: an empty strip, to fix or delete) and "Two windows". No embed is set up. Writes to
+Writes to
 Arena from a session need the owner's go-ahead (this box's safety check stopped one); the
 owner did the loads through the button themselves. `npm test` clears `dist/`, so a dev kiosk
 reloaded after it loses its preload: `npm run build:app` and restart. For edit scripts, a bash
@@ -465,10 +484,15 @@ Later, not tonight:
 
 0. **v0.2.2 on GitHub** (the owner's): publish the draft (both builds passed, run
    37244795777), delete the older drafts. `docs/FIELD_TEST.md` § 0.2.2 is what testers check.
-0. **The Video view on Arena's fades, by the owner's eye** after the fix of 2026-10-05: Arena's
-   picture carries alpha, a fading layer goes transparent, and the view drew over the last frame,
-   so the fade held. Now drawn on black (`docs/VISUALS_DASHBOARD.md` § The video feed, found and
-   fixed). ✅ In the kiosk with a transparent-fade stand-in; ⚠️ not yet watched on Arena's own fade.
+0. **Clear old FGs, pressed once with the owner** (never pressed yet): what Arena 7.28 does with
+   `/clips/by-id/<id>/clear`, and that only the listed HOLD FG slots empty; then the owner's word on
+   what "old" means (`docs/VISUALS_DASHBOARD.md` § Clear old FGs). Also a Lookbook **Load**.
+0. **v0.2.3** once that is seen: tag it for the field-test builds (the video fix, Lookbook, Clear
+   old FGs, Guide, A SCREEN BG); `docs/FIELD_TEST.md` gets a § 0.2.3.
+0. **The owner's word** on the Lookbook as its own view (not merged with Holding) and the guide's
+   fixed address.
+0. **The console link**: unreachable since 13:21 on 2026-10-05 (LifeBridge silent in onPC); look
+   at onPC, re-import LifeBridge if it lost it.
 0. **A live replace, with the owner**: Update all with a clip on screen, the red tick, and what
    the audience sees as Arena opens a file into a playing clip. Also whether a file loaded over
    another keeps the clip's settings, and the real NAS path at a booth.
