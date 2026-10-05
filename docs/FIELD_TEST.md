@@ -82,7 +82,7 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Clips fire from the Clips view; faders move
 - [ ] The Video view shows Arena's output and keeps up
 
-**Capture inputs** (after 0.2.3, in the next build)
+**Capture inputs** (0.2.4)
 - [ ] Connections › Add a capture input (operator mode) lists this computer's cameras: a Blackmagic card's inputs (Desktop Video installed), an ATEM Mini on USB, OBS Virtual Camera, a webcam
 - [ ] A Blackmagic input shows its picture; say the card, the signal's format, and whether it still works while Arena uses the same card
 - [ ] OBS: Start Virtual Camera in OBS first; then the view shows OBS's output
