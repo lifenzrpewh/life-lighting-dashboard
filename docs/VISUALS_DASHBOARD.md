@@ -372,6 +372,17 @@ the page, in the last 5 s:` the longest wait between frames, without drawing, an
 draw (the page's, only while it is on screen). Next: the owner fades to black, taps MARK, and the
 lines around the mark name the half that stalls.
 
+Marks 1 (a BG fade) and 2 (an FG fade), 13:28: **no stall line by either**, so frames kept
+arriving and being drawn. The owner: Arena's own output and its built-in multiview stay clear.
+A 16-bit stand-in (Arena's High Detail format) came through the ring build's conversion with
+47.6 of 48 frames a second new pictures. A 3-minute watch of Arena's `MULTIVIEW` at 13:44
+read it two ways, the shipped GPU path and the addon's CPU copy (\`--cpu\`, which bypasses it):
+in each of the three changes Arena made (13:44:53, 13:45:53, 13:46:55) **both saw the picture
+change in the same seconds**. The CPU copy slows the receiver it shares (about 20 fps, the
+kiosk meanwhile 48), so its rates are not the kiosk's. Not yet tied to what the owner saw at
+those moments. Open: whether the MULTIVIEW screen's slices (Advanced Output) take layers in
+a way that does not follow a fade, which Arena's own preview of that screen would show.
+
 **Still to do:** lay out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
 
