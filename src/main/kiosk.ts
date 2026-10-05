@@ -466,6 +466,15 @@ app.whenReady().then(() => {
 		if (req === null) return { ok: false, detail: 'not a fetch' }
 		return mediaFetch.ask(req)
 	})
+	// Clear old FGs (../bridge/arena-control.ts, `emptyWire`): operator mode
+	// only. The page names a clip and the code it showed the operator; main
+	// checks both against the composition it holds and builds the path.
+	ipcMain.handle('media:empty', async (e, clipId: unknown, code: unknown): Promise<ArenaCommandResult> => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Operator mode only.' }
+		if (typeof clipId !== 'number' || typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return { ok: false, detail: 'not a clip to clear' }
+		return arena?.empty(clipId, code) ?? { ok: false, detail: 'no Arena is set up' }
+	})
 	ipcMain.handle('media:fetch-state', (e): FetchStates => (fromOurs(e) ? mediaFetch.states() : {}))
 	// Browse for a folder (the Arena row's two folders): Windows' own picker,
 	// over the window that asked. Only the path comes back; Save keeps it.

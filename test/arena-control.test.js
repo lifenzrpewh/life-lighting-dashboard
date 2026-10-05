@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-import { checkCommand } from '../dist/src/bridge/arena-control.js'
+import { checkCommand, emptyWire } from '../dist/src/bridge/arena-control.js'
 import { decodeComposition, statusOf } from '../dist/src/bridge/arena-live.js'
 import { missingMedia } from '../dist/src/shared/arena.js'
 
@@ -124,4 +124,20 @@ test('no command can reach the endpoints that empty a slot or a layer', () => {
 			assert.match(call.path, /^\/composition\/(clips|columns)\/by-id\/\d+\/connect$|^\/composition\/layers\/by-id\/\d+\/clear$/)
 		}
 	}
+})
+
+test('Clear old FGs empties only a HOLD FG clip still holding the code shown, never one on screen', () => {
+	const t = tree()
+	const fg = t.layers.find((l) => l.name === 'HOLD FG')
+	const at = (i, slot) => (fg.slots[i] = { ...fg.slots[i], ...slot })
+	at(0, { name: 'CF561-Sunday-UpdateDetails', state: 'loaded', file: 'C:\Media\CF561-Sunday-UpdateDetails.png', missingFile: null })
+	at(1, { name: 'CF593-Sunday-Prayer', state: 'playing', file: 'C:\Media\CF593-Sunday-Prayer.png', missingFile: null })
+	at(2, { name: '', state: 'empty', file: null, missingFile: null })
+	const id = fg.slots[0].id
+	assert.deepEqual(emptyWire(t, id, 'CF561').value, { kind: 'rest', calls: [{ path: `/composition/clips/by-id/${id}/clear`, body: null }] })
+	assert.match(emptyWire(t, id, 'CF999').detail, /no longer holds CF999/)
+	assert.match(emptyWire(t, fg.slots[1].id, 'CF593').detail, /on screen/)
+	assert.match(emptyWire(t, fg.slots[2].id, 'CF561').detail, /already empty/)
+	assert.match(emptyWire(t, vfx1(t).slots[0].id, 'CF561').detail, /only old foregrounds/)
+	assert.match(emptyWire(t, 999999, 'CF561').detail, /no longer in the composition/)
 })

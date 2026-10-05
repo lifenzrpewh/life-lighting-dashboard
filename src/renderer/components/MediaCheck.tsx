@@ -146,21 +146,29 @@ function ServicePicker({
 /** What a Place, an Update or Update all will copy and load into Arena, before
  *  it does: nothing is sent until Load (the owner, 2026-10-05). Two questions
  *  are asked apart, each off until ticked: a file only the lookbook has, and a
- *  clip on screen now. */
+ *  clip on screen now. A third, when there are any: old foregrounds this run
+ *  sheet does not use, to clear (the owner, 2026-10-05); on its own (Clear old
+ *  FGs) it is the whole question. */
 export function Confirm({ m }: { m: MediaCheckState }) {
 	const [lookbook, setLookbook] = useState(false)
 	const [live, setLive] = useState(false)
+	const [clear, setClear] = useState(false)
 	if (m.asking === null) return null
-	const { title, steps, unplaced, sources } = m.asking
+	const { title, steps, unplaced, sources, clears } = m.asking
+	// A confirmation that is only a clear asks nothing else.
+	const onlyClear = steps.length === 0 && clears.length > 0
+	const clearing = onlyClear || (clear && clears.length > 0)
 	const fromLookbook = sources === null ? 0 : steps.filter((s) => sources[s.request.code]?.from === 'lookbook').length
 	const onScreen = steps.flatMap((s) => m.onScreen(s).map((c) => ({ code: s.request.code, where: c.where })))
 	const sending = m.toSend({ lookbook, live })
-	const done = (answers: { lookbook: boolean; live: boolean } | null) => {
+	const done = (answers: { lookbook: boolean; live: boolean; clear: boolean } | null) => {
 		if (answers !== null) m.confirm(answers)
 		else m.cancel()
 		setLookbook(false)
 		setLive(false)
+		setClear(false)
 	}
+	const oldWords = clears.map((c) => `${c.code} in ${c.columnName}`).join(', ')
 	return (
 		<div className="my-2 flex flex-col gap-2 rounded-lg bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
 			<p className="font-medium">{title}</p>
@@ -197,6 +205,18 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 					Download {fromLookbook} from the lookbook: not on the graphics drive as the lookbook has {fromLookbook === 1 ? 'it' : 'them'}
 				</Tick>
 			)}
+			{onlyClear ? (
+				<p className="text-xs text-warn">
+					Empty {clears.length === 1 ? 'this slot' : `these ${clears.length} slots`} on {clears[0]?.layer}, not used by this service: {oldWords}. Each slot loses its file and
+					settings.
+				</p>
+			) : (
+				clears.length > 0 && (
+					<Tick on={clear} onChange={setClear} tone="warn">
+						Also clear {clears.length === 1 ? 'an old foreground' : `${clears.length} old foregrounds`} this service does not use ({oldWords})
+					</Tick>
+				)
+			)}
 			{onScreen.length > 0 && (
 				<Tick on={live} onChange={setLive} tone="live">
 					Replace {onScreen.length === 1 ? 'a clip' : `${onScreen.length} clips`} on screen now ({[...new Set(onScreen.map((c) => `${c.code} in ${c.where}`))].join(', ')}): the
@@ -204,13 +224,16 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 				</Tick>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
-				{sources === null ? (
+				{onlyClear ? (
+					<SmallButton onClick={() => done({ lookbook: false, live: false, clear: true })}>Clear {clears.length}</SmallButton>
+				) : sources === null ? (
 					<span className="flex h-10 items-center text-xs text-booth-dim">Looking on the drive…</span>
-				) : sending.length === 0 ? (
+				) : sending.length === 0 && !clearing ? (
 					<span className="flex h-10 items-center text-xs text-booth-dim">Nothing to load{fromLookbook + onScreen.length > 0 ? ' unless ticked' : ''}</span>
 				) : (
-					<SmallButton onClick={() => done({ lookbook, live })} tone={live && onScreen.length > 0 ? 'live' : 'plain'}>
-						{live && onScreen.length > 0 ? `Load, replacing ${onScreen.length} on screen` : `Load ${sending.length === 1 ? '1' : sending.length}`}
+					<SmallButton onClick={() => done({ lookbook, live, clear: clearing })} tone={live && onScreen.length > 0 ? 'live' : 'plain'}>
+						{live && onScreen.length > 0 ? `Load, replacing ${onScreen.length} on screen` : sending.length === 0 ? 'Clear only' : `Load ${sending.length === 1 ? '1' : sending.length}`}
+						{clearing && sending.length > 0 ? `, clear ${clears.length}` : ''}
 					</SmallButton>
 				)}
 				<SmallButton onClick={() => done(null)}>Cancel</SmallButton>

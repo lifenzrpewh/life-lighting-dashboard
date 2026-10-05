@@ -207,6 +207,9 @@ const api = {
 
 	/** Which build this is, and where its log is. */
 	about: (): Promise<About> => ipcRenderer.invoke('app:about'),
+	/** Clear an old foreground: empty clip `clipId`, which must still hold
+	 *  `code`. Operator mode only; main checks it is an old foreground. */
+	emptyClip: (clipId: number, code: string): Promise<ArenaCommandResult> => ipcRenderer.invoke('media:empty', clipId, code),
 	/** Write a tester's mark in the log, with a few words of what is on
 	 *  screen. Answers which mark this is, or null if refused. */
 	mark: (context: string): Promise<number | null> => ipcRenderer.invoke('app:mark', context),

@@ -450,6 +450,28 @@ function stepFor(code: string, want: string, path: string | null, update: number
 	return { request: { code, want, clipIds, lookbookPath: path, allowLookbook: false, allowLive: [] }, what: `${code} into ${parts.join('; ')}` }
 }
 
+/** A clip to empty: where it is, and the code it must still hold when main
+ *  empties it, so a slot that changed since the confirmation is left alone. */
+export type OldClip = { clipId: number; code: string; layer: string; column: number; columnName: string }
+
+/** Old foregrounds (the owner, 2026-10-05: "a clear old FGs button when
+ *  updating all", asked, not done unasked): clips on HOLD FG whose code this
+ *  run sheet does not use, so last week's announcements cannot be fired by
+ *  mistake. Not one on screen, not one in a column named for something else
+ *  (COUNTDOWN), not one without a code (not the lookbook's), and not one
+ *  `excluding` names (an update is about to load into it). */
+export function oldForegrounds(items: LookbookItem[], status: ArenaStatus, excluding: ReadonlySet<number> = new Set()): OldClip[] {
+	const layer = status.layers.find((l) => TYPE_LAYER['F']?.test(l.name.trim()))
+	if (layer === undefined || items.length === 0) return []
+	const today = codesOn(items)
+	const names = columnNamesOf(layer, status)
+	return layer.slots.flatMap((slot, i) => {
+		const code = slotCode(slot)
+		if (slot.state !== 'loaded' || code === null || today.has(code) || excluding.has(slot.id) || reserved(layer, i + 1, status)) return []
+		return [{ clipId: slot.id, code, layer: layer.name, column: i + 1, columnName: unnamed(names[i] ?? '') ? `column ${i + 1}` : (names[i] ?? '') }]
+	})
+}
+
 /** What one code of a run-sheet item is in Arena, for the Lookbook view:
  *  - `ready`: in its column, the lookbook's file, found on this computer
  *  - `place`: not yet in its column

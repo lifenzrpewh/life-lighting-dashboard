@@ -10,6 +10,7 @@ import {
 	lookSteps,
 	looksOf,
 	nameWords,
+	oldForegrounds,
 	placementWords,
 	planPlacements,
 	reserved,
@@ -306,4 +307,18 @@ test("loading one look: its codes into its column, a shared code's old files eve
 	const marks = new Set([sameKey('CB095', s.layers[1].slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])
 	assert.deepEqual(lookSteps(0, ITEMS, s, marks), [])
 	assert.deepEqual(lookSteps(99, ITEMS, s, marks), [])
+})
+
+test('old foregrounds: HOLD FG clips this run sheet does not use, never on screen, reserved or about to be loaded', () => {
+	const s = composition()
+	const fg = s.layers[3]
+	// CF446 (NSL), CF561 and CF593 (PROMO) are last week's; CF588 and CF445 are today's.
+	assert.deepEqual(
+		oldForegrounds(ITEMS, s).map((c) => [c.code, c.columnName]),
+		[['CF446', 'NSL'], ['CF561', 'PROMO'], ['CF593', 'PROMO']],
+	)
+	fg.slots[8] = { ...fg.slots[8], state: 'playing' }
+	fg.slots[2] = clip('CF100-Old-Countdown.png') // COUNTDOWN: reserved
+	assert.deepEqual(oldForegrounds(ITEMS, s, new Set([fg.slots[5].id])).map((c) => c.code), ['CF593'])
+	assert.deepEqual(oldForegrounds([], s), [])
 })

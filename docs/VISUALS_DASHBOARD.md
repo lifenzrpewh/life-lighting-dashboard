@@ -825,11 +825,13 @@ Lookbook is the service's (moments in order) and is for seeing. One screen doing
 clutter the owner dislikes. Both read `looksOf` and the same check, so they never disagree, and
 both load through the same confirmation.
 
-- One card per run-sheet item with media, two across a wide window: **the lookbook's own
+- One look a row, as wide as the view, snapping as it scrolls (the owner, the same afternoon:
+  "single announcement/look per that fills the screen", the A-screens and lower thirds were too
+  small): **the lookbook's own
   picture of the moment** (`previewPath`, background and foreground composed, 5800×2037, served
   1600 wide on `lookbook://large/…`; a preview is not kept, since the lookbook redraws it at the
-  same address), the A-screen or lower third beside its name (a lower third on grey), its column
-  name, its codes.
+  same address) across the top; under it the A-screen or lower third at about 40 % of the
+  width (a lower third on grey), beside its name, column and codes.
 - Quiet when right: a tick. **Amber ring and Load** when Arena lacks any of it; **green ring and
   On screen** when a clip of its own plays in its column. A code chip: plain (in Arena), dashed +
   (not in its column), amber (another file, or missing), struck (no file in the lookbook), faint
@@ -838,6 +840,22 @@ both load through the same confirmation.
   background) freshened wherever it is old. **Load all** is Holding's Update all.
 - ✅ In the kiosk over CDP, against the live composition and Central PM 4 Oct: seven cards with
   their pictures, six ticked, End amber with +CB095 for POST. Load not pressed. ⚠️ Nothing by finger.
+
+## Clear old FGs (owner's ask, 2026-10-05)
+
+"A clear old FGs button when updating all, and note when an old FG is in and ask if they
+want to be cleared." **Old** (taken, the owner's to change): a clip on HOLD FG whose code this
+run sheet does not use, not on screen, not in a column named for something else (COUNTDOWN),
+not without a code, and not one Update all is about to load into (`oldForegrounds`).
+
+- **Update all's confirmation** names them and asks, a tick off until ticked: "Also clear N old
+  foregrounds this service does not use (CF561 in PROMO 1, …)".
+- **Clear old FGs (N)** in Holding's and the Lookbook's header when there are any: a
+  confirmation that is only that question, and **Clear N**.
+- Main's guard (`emptyWire`, operator mode only): the clip must be on HOLD FG, still hold the code
+  the operator was shown, and not be on screen. This is Arena's `/clips/by-id/<id>/clear`, which
+  empties a slot of its file and settings; the Clips view still cannot reach it (tested).
+  ⚠️ Not yet pressed: what Arena 7.28 does with it is its API's word, not yet watched.
 
 ## The Creative Guide (owner's ask, 2026-10-05)
 

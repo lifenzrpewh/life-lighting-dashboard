@@ -15,7 +15,7 @@
 // status, so an Arena that stops answering takes its status STALE with it.
 
 import { decodeArenaProduct } from '../bridge/arena.js'
-import { checkCommand, openWire, type ArenaWire } from '../bridge/arena-control.js'
+import { checkCommand, emptyWire, openWire, type ArenaWire } from '../bridge/arena-control.js'
 import { fileUrlOf } from '../bridge/media-files.js'
 import {
 	applyParameter,
@@ -54,13 +54,15 @@ export type ArenaHandle = {
 	 *  not playing, or one the operator agreed to replace on screen (`live`,
 	 *  ../bridge/arena-control.ts `openWire`). */
 	open(clipId: number, file: string, live: boolean): Promise<ArenaCommandResult>
+	/** Empty an old foreground's slot (../bridge/arena-control.ts, `emptyWire`). */
+	empty(clipId: number, code: string): Promise<ArenaCommandResult>
 	stop(): void
 }
 
 export function startArena(s: Settings): ArenaHandle {
 	if (s.arenaHost === null) {
 		const none = async () => ({ ok: false, detail: 'no Arena is set up' }) as const
-		return { source: () => null, status: () => null, command: none, open: none, stop() {} }
+		return { source: () => null, status: () => null, command: none, open: none, empty: none, stop() {} }
 	}
 	const live = watchArena(`ws://${s.arenaHost}:${s.arenaPort}/api/v1`, `http://${s.arenaHost}:${s.arenaPort}/api/v1`)
 	const link = poll<ArenaProduct>({
@@ -79,6 +81,7 @@ export function startArena(s: Settings): ArenaHandle {
 		status: () => live.status(),
 		command: (raw) => live.command(raw),
 		open: (clipId, file, onScreen) => live.open(clipId, file, onScreen),
+		empty: (clipId, code) => live.empty(clipId, code),
 		stop() {
 			link.stop()
 			live.stop()
@@ -94,6 +97,7 @@ function watchArena(
 	answered(): void
 	command(raw: unknown): Promise<ArenaCommandResult>
 	open(clipId: number, file: string, live: boolean): Promise<ArenaCommandResult>
+	empty(clipId: number, code: string): Promise<ArenaCommandResult>
 	stop(): void
 } {
 	let channel = unread<ArenaTree>()
@@ -254,6 +258,16 @@ function watchArena(
 			const column = (layer?.slots.findIndex((s) => s.id === clipId) ?? -1) + 1
 			const playing = layer?.slots[column - 1]?.state === 'playing'
 			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}${playing ? ', ON SCREEN (the operator said yes)' : ''}`)
+			return send(wire.value)
+		},
+		async empty(clipId, code) {
+			const latest = channel.latest
+			if (!open || latest === null || !latest.ok) return { ok: false, detail: 'Arena is not answering, so nothing was cleared' }
+			const wire = emptyWire(latest.value, clipId, code)
+			if (!wire.ok) return { ok: false, detail: wire.detail }
+			const layer = latest.value.layers.find((l) => l.slots.some((s) => s.id === clipId))
+			const column = (layer?.slots.findIndex((s) => s.id === clipId) ?? -1) + 1
+			console.log(`[arena] clearing old foreground ${code} from ${layer?.name ?? 'a layer'}, column ${column}`)
 			return send(wire.value)
 		},
 		answered() {

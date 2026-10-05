@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ArenaStatus } from '../shared/arena.js'
-import { codesOn, planPlacements, slotCode, slotMark, updatePlan, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { codesOn, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	nzDate,
@@ -229,12 +229,14 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		title: string
 		steps: UpdateStep[]
 		unplaced: Unplaced[]
+		/** Old foregrounds to offer clearing, off until ticked (`oldForegrounds`). */
+		clears: OldClip[]
 		sources: Record<string, MediaSource> | null
 	} | null>(null)
 	const askId = useRef(0)
-	const ask = (title: string, steps: UpdateStep[], unplaced: Unplaced[] = []) => {
+	const ask = (title: string, steps: UpdateStep[], unplaced: Unplaced[] = [], clears: OldClip[] = []) => {
 		const id = ++askId.current
-		setAsking({ id, title, steps, unplaced, sources: null })
+		setAsking({ id, title, steps, unplaced, clears, sources: null })
 		void life?.mediaSources(steps.map((s) => s.request)).then((sources) => setAsking((a) => (a?.id === id ? { ...a, sources } : a)))
 	}
 	/** The clips of a step that are on screen now, by where they are. */
@@ -262,11 +264,25 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		}
 		return out
 	}
-	const confirm = (answers: { lookbook: boolean; live: boolean }) => {
+	const confirm = (answers: { lookbook: boolean; live: boolean; clear: boolean }) => {
 		for (const req of toSend(answers)) fetchCode(req)
+		if (answers.clear) {
+			for (const c of asking?.clears ?? []) {
+				clearRefusal(c.code)
+				void life?.emptyClip(c.clipId, c.code).then((r) => {
+					if (!r.ok) setRefused((x) => ({ ...x, [c.code]: r.detail }))
+				})
+			}
+		}
 		setAsking(null)
 	}
-	const askUpdateAll = () => ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced)
+	// Old foregrounds (../shared/holding.ts): never one Update all is about to load into.
+	const loading = new Set(plannedUpdate.steps.flatMap((s) => s.request.clipIds))
+	const oldFgs: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, loading)
+	const askUpdateAll = () =>
+		ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced, oldFgs)
+	const allOld: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status)
+	const askClearOld = () => ask(`Clear old foregrounds: ${allOld.length}`, [], [], allOld)
 
 	return {
 		// Which service, and how it was chosen.
@@ -301,5 +317,8 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		confirm,
 		cancel: () => setAsking(null),
 		askUpdateAll,
+		/** HOLD FG clips this run sheet does not use, and the confirmation to clear them. */
+		oldFgs: allOld,
+		askClearOld,
 	}
 }

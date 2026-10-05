@@ -128,6 +128,7 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					</span>
 					<Activity fetches={m.fetches} refused={m.refused} now={now} onTap={(code) => setFetchNote(fetchNote === code ? null : code)} />
 					<span className="ml-auto flex shrink-0 items-center gap-2">
+						{m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
 						{m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
 						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-lg bg-booth-raise hover:bg-booth-hover">
 							<RefreshCw size={16} aria-hidden />

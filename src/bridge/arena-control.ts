@@ -3,9 +3,10 @@
 // fire a column, clear a layer, drag a layer's fader; everyone may).
 //
 // THE RULES THIS FILE ENFORCES:
-// - Four things from the page and no others, and one from main: loading a
+// - Four things from the page and no others, and two from main: loading a
 //   file the media fetch copied (`openWire`, ../shared/media-fetch.ts), never
-//   into a clip that is playing.
+//   into a clip that is playing unless the operator said so; and emptying an
+//   old foreground the operator ticked (`emptyWire`), never anything else.
 // - From the page, four things and no others. Every request is built here from a template
 //   with an id in it; nothing from the page becomes a path. Arena's API has
 //   neighbours that destroy the show: `/clips/by-id/<id>/clear` empties a
@@ -32,6 +33,7 @@
 //   back to the subscriber, so the read-back comes free.
 
 import type { ArenaCommand } from '../shared/arena.js'
+import { slotCode, TYPE_LAYER } from '../shared/holding.js'
 import type { ArenaTree } from './arena-live.js'
 import type { Decoded } from './ontime.js'
 
@@ -103,6 +105,26 @@ export function openWire(tree: ArenaTree, clipId: number, fileUrl: string, live 
 	if (slot === undefined) return { ok: false, detail: 'that clip is no longer in the composition' }
 	if (slot.state === 'playing' && !live) return { ok: false, detail: 'that clip is playing; nothing is loaded into a clip on output' }
 	return { ok: true, value: { kind: 'rest', calls: [{ path: `/composition/clips/by-id/${clipId}/open`, body: { text: fileUrl } }] } }
+}
+
+/** Empty an old foreground's clip slot: main's alone, for Clear old FGs (the
+ *  owner, 2026-10-05; ../shared/holding.ts `oldForegrounds`), never the Clips
+ *  view's. This is the `/clips/by-id/<id>/clear` the header warns of, so it is
+ *  allowed only where the confirmation said: a clip on the foreground layer
+ *  (HOLD FG), still holding the code the operator was shown, and not on
+ *  screen. A slot that changed since is left alone. ⚠️ What Arena 7.28 does
+ *  with it is its API's word ("removing all tracks and settings"), not yet
+ *  watched here. */
+export function emptyWire(tree: ArenaTree, clipId: number, code: string): Decoded<ArenaWire> {
+	if (!isId(clipId)) return { ok: false, detail: 'not a clip' }
+	const layer = tree.layers.find((l) => l.slots.some((s) => s.id === clipId))
+	const slot = layer?.slots.find((s) => s.id === clipId)
+	if (layer === undefined || slot === undefined) return { ok: false, detail: 'that clip is no longer in the composition' }
+	if (TYPE_LAYER['F']?.test(layer.name.trim()) !== true) return { ok: false, detail: `only old foregrounds are cleared, and this clip is on ${layer.name}` }
+	if (slot.state === 'empty') return { ok: false, detail: 'that slot is already empty' }
+	if (slot.state === 'playing') return { ok: false, detail: 'that clip is on screen; nothing on screen is cleared' }
+	if (slotCode(slot) !== code) return { ok: false, detail: `that slot no longer holds ${code}` }
+	return { ok: true, value: { kind: 'rest', calls: [{ path: `/composition/clips/by-id/${clipId}/clear`, body: null }] } }
 }
 
 /** A tap, as Arena wants it: one POST with no body, its short click. */
