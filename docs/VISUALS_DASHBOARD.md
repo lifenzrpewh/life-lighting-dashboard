@@ -376,7 +376,7 @@ Marks 1 (a BG fade) and 2 (an FG fade), 13:28: **no stall line by either**, so f
 arriving and being drawn. The owner: Arena's own output and its built-in multiview stay clear.
 A 16-bit stand-in (Arena's High Detail format) came through the ring build's conversion with
 47.6 of 48 frames a second new pictures. A 3-minute watch of Arena's `MULTIVIEW` at 13:44
-read it two ways, the shipped GPU path and the addon's CPU copy (\`--cpu\`, which bypasses it):
+read it two ways, the shipped GPU path and the addon's CPU copy (`--cpu`, which bypasses it):
 in each of the three changes Arena made (13:44:53, 13:45:53, 13:46:55) **both saw the picture
 change in the same seconds**. The CPU copy slows the receiver it shares (about 20 fps, the
 kiosk meanwhile 48), so its rates are not the kiosk's.
@@ -884,6 +884,33 @@ as an embed in a window and taken it out. Fixed in `src/shared/guide.ts`, not a 
 guide for every campus. An embed of main's own (own session, links out to the browser, zoom
 remembered), never listed in Connections. ✅ In the kiosk: opened, Notion loaded in ~8 s and
 filled the sheet, closed. ⚠️ Not by finger; a pop-out of it not offered.
+
+## NDI sources as views (owner's ask, 2026-10-05; not started)
+
+The owner: add NDI sources as views, "similar to the embeds": a camera, ProPresenter's output,
+another machine's screen, each a view a window can hold or pop out. Noted for a fresh session;
+nothing below is tried (⚠️ all of it).
+
+- **The shape, by analogy:** added and named in Connections like an embed (operator mode), a
+  row there saying receiving / no source / not found, a view of its own per source, the Video
+  view's picture rules (on black, stalled after N s, a picture not a reading). Which sources
+  exist is read from the network (NDI's discovery), never typed in, as the Video view lists
+  Spout senders; a saved source missing is said, not swapped.
+- **Two ways in, plainest first:**
+  1. *NDI Tools' webcam input* (NDI Webcam Input / "NDI Virtual Input"): it makes an NDI source a
+     camera Windows sees, and the page takes it with `getUserMedia`, no native code. Costs: one
+     virtual camera per source (check how many it offers), a CPU decode, the camera permission
+     (the kiosk's session must allow `media` for that one page only), and a program installed on
+     each booth box (admin rights? the box has none).
+  2. *The NDI SDK in main*, as the video feed holds Spout: a native receiver (the old
+     `grandiose` addon is unmaintained; LIFE's own small addon built by GitHub Actions, as
+     texture-bridge is) handing frames to the page. NDI frames arrive on the CPU (UYVY/BGRA), so a
+     copy a frame at 1080p is the cost to measure first, on the GPU that plays the show. The
+     SDK's licence allows redistribution with its runtime and a notice; read it before shipping.
+- **Arena can send NDI itself**, so this could also replace Spout for a multiview on another
+  computer (Spout is this machine only).
+- **Lessons the Video view paid for:** test with the real source's format (Arena's alpha froze
+  fades, its 16 bpc was refused at first), and log where a stall happens before guessing.
 
 ## Open questions
 

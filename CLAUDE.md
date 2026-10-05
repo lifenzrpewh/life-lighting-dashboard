@@ -449,6 +449,9 @@ smallest window.
 Later, not tonight:
 - **Fetch missing media**: built 2026-10-05, with placement by column names and the lookbook
   as the backup; its next step is the top of the TODO below.
+- **NDI sources as views** (the owner, 2026-10-05), added like embeds: the plainest way in is NDI
+  Tools' webcam input and `getUserMedia`, else the NDI SDK in main. Not started;
+  `docs/VISUALS_DASHBOARD.md` § NDI sources as views.
 - Start at login; self-update once hosting is decided.
 - **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
