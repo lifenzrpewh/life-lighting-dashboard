@@ -886,32 +886,61 @@ guide for every campus. An embed of main's own (own session, links out to the br
 remembered), never listed in Connections. ✅ In the kiosk: opened, Notion loaded in ~8 s and
 filled the sheet, closed. ⚠️ Not by finger; a pop-out of it not offered.
 
-## NDI sources as views (owner's ask, 2026-10-05; not started)
+## NDI sources as views (owner's ask, 2026-10-05; built the same afternoon)
 
 The owner: add NDI sources as views, "similar to the embeds": a camera, ProPresenter's output,
-another machine's screen, each a view a window can hold or pop out. Noted for a fresh session;
-nothing below is tried (⚠️ all of it).
+another machine's screen, each a view a window can hold or pop out.
 
-- **The shape, by analogy:** added and named in Connections like an embed (operator mode), a
-  row there saying receiving / no source / not found, a view of its own per source, the Video
-  view's picture rules (on black, stalled after N s, a picture not a reading). Which sources
-  exist is read from the network (NDI's discovery), never typed in, as the Video view lists
-  Spout senders; a saved source missing is said, not swapped.
-- **Two ways in, plainest first:**
-  1. *NDI Tools' webcam input* (NDI Webcam Input / "NDI Virtual Input"): it makes an NDI source a
-     camera Windows sees, and the page takes it with `getUserMedia`, no native code. Costs: one
-     virtual camera per source (check how many it offers), a CPU decode, the camera permission
-     (the kiosk's session must allow `media` for that one page only), and a program installed on
-     each booth box (admin rights? the box has none).
-  2. *The NDI SDK in main*, as the video feed holds Spout: a native receiver (the old
-     `grandiose` addon is unmaintained; LIFE's own small addon built by GitHub Actions, as
-     texture-bridge is) handing frames to the page. NDI frames arrive on the CPU (UYVY/BGRA), so a
-     copy a frame at 1080p is the cost to measure first, on the GPU that plays the show. The
-     SDK's licence allows redistribution with its runtime and a notice; read it before shipping.
-- **Arena can send NDI itself**, so this could also replace Spout for a multiview on another
-  computer (Spout is this machine only).
-- **Lessons the Video view paid for:** test with the real source's format (Arena's alpha froze
-  fades, its 16 bpc was refused at first), and log where a stall happens before guessing.
+**The shape.** Connections › **Add an NDI source** (operator mode) lists what NDI finds on the
+network, and Add makes one a view (`ndi:<id>`) and a row, named by the part of NDI's name in
+brackets (`2413-RUAP (Arena - Composition)` is "Arena - Composition"), renamed and removed in its
+row, turned off like any connection. Never typed: a saved source missing is "not found", never
+swapped. The row: found (live, there to show), LIVE with size and rate while shown, no picture,
+not found (down), NDI not installed (down). The view follows the Video view's rules: drawn on
+black, dimmed with words after 2 s without a frame. Its strip says the source's size and fps.
+`src/shared/ndi.ts` holds the rules; `src/renderer/components/NdiView.tsx` draws.
+
+**The route: neither of the two noted, a third.** NDI's own runtime is called through **koffi**
+(MIT, prebuilt for every platform, pinned 3.3.2), so there is no addon to build and no NDI Tools
+to install: the runtime is already on a box with ProPresenter (`NDI 5 Runtime`, 5.6.0 here). It
+runs in a **utilityProcess** (`src/main/ndi-worker.ts`, started by `src/main/ndi.ts` the first
+time anything asks about NDI, restarted 5 s after a crash, left off after five in two minutes),
+and each page showing a source gets a **MessagePort of its own** to it, so frames never pass
+through main. Each frame is waited for on koffi's thread, copied out with the C runtime's
+`memcpy`, **thinned** to the size it is drawn at (`ndiStep`, the nearest whole step), and made a
+`VideoFrame` in the preload. At most two frames in flight per page; up to 60 fps.
+
+✅ **Seen on the Windows box, 2026-10-05**, in the kiosk over CDP:
+- Arena 7.28's NDI output of its composition, `2413-RUAP (Arena - Composition)`, 5800×2036 BGRA:
+  every frame NDI delivered, **42 fps** (of its 50), sent 1933×678 into a window drawing it
+  2016×708. Arena was playing nothing, so the picture was black; its pixels read 0.
+- `spikes/ndi-test-sender.cjs`, a stand-in of known colours: 50 fps at 1280×720; read off the
+  canvas within 1 of what was sent, (255,0,0) (1,127,1) (1,0,65) (201,200,200), and a white
+  patch at half alpha read 128 on black. Added through Connections, popped out, brought back,
+  removed.
+- **What it costs:** the kiosk page **~60% busy** at 42 fps of 1933×678 (28% at 21 fps); the
+  worker copies a frame in 5-7 ms. More than the Video view, which never leaves the GPU. Every
+  30 s shown, `[ndi] "<source>": N fps sent at W×H, copying X ms a frame; of N from NDI, N not
+  due, N while the page drew` in `paua.log` says where a slow picture is slow.
+
+**Paid for on the way:** `koffi.view` (a buffer over NDI's memory, fine in plain Node) **kills
+the process inside Electron**, whose V8 refuses an ArrayBuffer it did not allocate: hence
+`memcpy`. A poll every 5 ms held the view near 20 fps (Windows runs timers every ~15.6 ms), and a
+30 fps cap against a 43 fps source sent every other frame, 21: hence the wait on koffi's thread
+and the 60 cap.
+
+**Choices taken without the owner** (say if any is wrong): sources picked from the list only; a
+source's name defaults to NDI's bracketed part; the worker starts only once a source is added or
+the Add list is opened; 60 fps, at the page cost above; the highest bandwidth, thinned here,
+rather than NDI's own low-bandwidth proxy (640 wide, too soft for a big window); the trademark
+notice ("NDI® is a registered trademark of Vizrt NDI AB") under Add and each source's row, as
+NDI's licence asks.
+
+⚠️ Not yet: by finger; a camera or ProPresenter as the source; another machine's source over
+the network (decoding then costs the receiving CPU, which a local source does not); macOS (the
+runtime's paths there are the SDK's documented ones, untried); the installed build (koffi is
+unpacked from the archive, `asarUnpack`). **Arena can send NDI itself**, so this could also be
+a multiview on another computer (Spout is this machine only).
 
 ## Open questions
 

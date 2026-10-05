@@ -69,6 +69,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/renderer/components/ClipsView.tsx` · `src/bridge/arena-control.ts` | **Clips**, the trigger screen (2026-10-04): Arena's grid in a slot or popped out; tap a clip, fire a column, Clear a layer, drag a fader; everyone may. The only writer to Arena: four templated requests, ids checked against the composition, never `/clips/…/clear` or `/clearclips` (tested). A tap is one bodiless POST: `true`/`false` only selected the clip. Fired by clicks in the kiosk on the Windows box. Above it and the Arena view, clips whose file is missing (⚠️ not yet seen with a real one). `docs/VISUALS_DASHBOARD.md` § The pieces. |
 | ✅ `src/shared/media-check.ts` · `src/bridge/lookbook.ts` · `src/main/lookbook.ts` · `src/renderer/components/MediaCheck.tsx` | **The media check** (2026-10-04), a Media row in the Arena view: the service the run order has open (by its Planning Center plan, since 2026-10-05), or one picked from the lookbook app (lookbooks-lifenz.replit.app, which already parses PCO's `Media No.` into codes like `CF588`), and each B, F and A code reads ✓, not in Arena, file missing, another version, or the lookbook has no file. The lookbook is the truth for the version. ✅ **Against the owner's up-to-date Central composition, 2026-10-05**, on the Windows box: ✓ on seven codes, three not loaded, and "may differ" on CB095 (an operator can confirm it **Same** by hand since 2026-10-05; kept per computer, for that pair of names only): the same picture, but the lookbook's file is named `…-v5` and Arena's is not (the extension is ignored; a format change alone passes, the owner's rule, 2026-10-05). Stills carry their file path. ⚠️ Not yet at a booth or from the NAS. `docs/VISUALS_DASHBOARD.md` § the media check. |
 | ⚠️ `src/main/video-feed.ts` · `src/renderer/components/VideoView.tsx` | **The video feed**: a Spout/Syphon sender (Arena's multiview, to be) as a **Video** view, GPU to GPU through `@napolab/texture-bridge` and Electron's `sharedTexture`, the pages still sandboxed. Seen live from a stand-in sender (`spikes/spout-test-sender.cjs`) and from **Arena 7.28's Spout output** on the Windows box, 2026-10-03, in a slot and popped out; capped at 30 fps (60 since 2026-10-05 with the ring build: three staging textures and a GPU fence against tearing on fades; 47-48 fps read from Arena's 50). A touch-sized source picker, and **Fit** to give the space the picture's shape. 16-bit (Arena's High Detail) goes through **LIFE's build of the addon** (`native/texture-bridge/`, built by GitHub Actions), converted to 8-bit on the GPU: ✅ exact against a 16-bit stand-in (`spikes/spout-16bit-sender.cs`), 2026-10-03, and ✅ **from Arena at 16 bpc**, 2026-10-04 (owner-set and owner-watched; the kiosk read 1920×1080 at 27 fps, no failure; the stock addon refuses 16-bit, and the sender's own format is not logged). ✅ **Fades no longer freeze** (2026-10-05, owner-watched on Arena: "seems good now"): Arena's picture carries alpha, so each frame is drawn on black; reproduced and measured with `spikes/video-lag/` (`--alpha`). `[video]` lines in the log say where a stall is, each 5 s with one. `docs/VISUALS_DASHBOARD.md` § The video feed. |
+| ⚠️ `src/shared/ndi.ts` · `src/main/ndi.ts` · `src/main/ndi-worker.ts` · `src/renderer/components/NdiView.tsx` | **NDI sources as views** (2026-10-05, the owner's ask: "similar to the embeds"). Connections › Add an NDI source (operator) lists what NDI finds; each added is a view and a row. NDI's own runtime (ProPresenter's `NDI 5 Runtime`) through **koffi** (prebuilt FFI, no addon to build) in a **utilityProcess**; each page gets its own MessagePort, so frames skip main; copied with `memcpy` (❌ `koffi.view` kills the process in Electron), thinned to the size drawn. In the kiosk over CDP: Arena's composition NDI (5800×2036) at **42 fps** sent 1933×678; a stand-in (`spikes/ndi-test-sender.cjs`) at 50 fps, colours read back within 1. Costs the page ~60% at that rate. ⚠️ Not by finger, a camera, another machine, macOS, or the installed build. `docs/VISUALS_DASHBOARD.md` § NDI sources as views. |
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
 | ⚠️ `src/shared/embeds.ts` · `src/main/embeds.ts` · `src/renderer/components/EmbedPane.tsx` | **Embeds** (2026-10-05): any web page, added by name and address in Connections (operator mode), is a view of its own with its own sign-in (a partition per embed), − / + zoom remembered per embed, Reload, Pop out, and a row saying loaded / loading / not loading that can be turned off. New windows open in the computer's browser; the user agent drops Electron's name, for Google. Removing one clears its session, and its folder at the next start. In the kiosk on the Windows box over CDP, 2026-10-05: added, placed over its slot, zoomed (saved, re-applied after a reload), popped out and back, off and on, renamed, removed. ⚠️ Not signed in to Google (its sign-in raised a Windows passkey dialog, cancelled); a new-window link not tried. |
@@ -311,7 +312,15 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-05, about 2 pm).** On main since v0.2.2, not in a build: the **video
+**Where things stand (2026-10-05, about 3 pm).** **v0.2.3 is tagged** at the owner's ask, carrying
+everything below plus **NDI sources as views** (status row above; `docs/VISUALS_DASHBOARD.md`
+§ NDI sources as views has the route, the numbers and the choices taken without asking). The
+kiosk here runs it, with Arena's composition NDI added as a source and its tab in the owner's
+right-hand window (put there by a pop-out brought back during testing; remove it if unwanted).
+Clear old FGs is still never pressed, and went into 0.2.3 that way. The owner asked about
+**Blackmagic** inputs next (Later, below).
+
+**Earlier, about 2 pm.** On main since v0.2.2, not in a build: the **video
 freeze on Arena's fades is fixed** (Arena's picture carries alpha and a fading layer goes
 transparent, so the view drew over the last frame; now each frame is drawn on black; the owner:
 "seems good now"); the **Lookbook view** (one look a row, the lookbook's composed picture, Load per
@@ -320,9 +329,7 @@ the **Creative Guide** behind Guide on the top bar; the A-screen layer found as 
 owner's rename) as well as PRE & POST; and `[video]` stall lines in the log. The choices taken
 without the owner's answer: the Lookbook as its own view beside Holding rather than merged, what
 "old" means for a foreground, the guide's address fixed rather than a setting
-(`docs/VISUALS_DASHBOARD.md` § The Lookbook view, § Clear old FGs, § The Creative Guide). NDI
-sources as views are only noted (§ NDI sources as views). Next: Clear old FGs pressed once with
-the owner, then a v0.2.3 build.
+(`docs/VISUALS_DASHBOARD.md` § The Lookbook view, § Clear old FGs, § The Creative Guide).
 
 **Earlier that afternoon (v0.2.2).** **v0.2.2 is tagged and both builds passed**
 (run 37244795777: `Paua-Setup-0.2.2.exe`, `Paua-0.2.2-arm64.dmg`, 289 tests green on the Windows
@@ -468,9 +475,10 @@ smallest window.
 Later, not tonight:
 - **Fetch missing media**: built 2026-10-05, with placement by column names and the lookbook
   as the backup; its next step is the top of the TODO below.
-- **NDI sources as views** (the owner, 2026-10-05), added like embeds: the plainest way in is NDI
-  Tools' webcam input and `getUserMedia`, else the NDI SDK in main. Not started;
-  `docs/VISUALS_DASHBOARD.md` § NDI sources as views.
+- **NDI sources as views**: built 2026-10-05 and in v0.2.3; next, a camera or ProPresenter as
+  the source, and another machine's over the network. **Blackmagic capture** (the owner asked,
+  2026-10-05) is the likely next view: Desktop Video exposes a DeckLink or UltraStudio input
+  as a Windows camera, so `getUserMedia` in the page, no native code; not started.
 - Start at login; self-update once hosting is decided.
 - **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
@@ -482,13 +490,14 @@ Later, not tonight:
 
 ### TODO, in order
 
-0. **v0.2.2 on GitHub** (the owner's): publish the draft (both builds passed, run
-   37244795777), delete the older drafts. `docs/FIELD_TEST.md` § 0.2.2 is what testers check.
-0. **Clear old FGs, pressed once with the owner** (never pressed yet): what Arena 7.28 does with
-   `/clips/by-id/<id>/clear`, and that only the listed HOLD FG slots empty; then the owner's word on
-   what "old" means (`docs/VISUALS_DASHBOARD.md` § Clear old FGs). Also a Lookbook **Load**.
-0. **v0.2.3** once that is seen: tag it for the field-test builds (the video fix, Lookbook, Clear
-   old FGs, Guide, A SCREEN BG); `docs/FIELD_TEST.md` gets a § 0.2.3.
+0. **v0.2.3 on GitHub** (the owner's): watch its build on `release-build-log`, then publish the
+   draft and delete the older drafts. `docs/FIELD_TEST.md` § NDI sources (0.2.3) is new.
+0. **Clear old FGs, pressed once with the owner** (never pressed yet, though shipped in 0.2.3):
+   what Arena 7.28 does with `/clips/by-id/<id>/clear`, and that only the listed HOLD FG slots
+   empty; then the owner's word on what "old" means (`docs/VISUALS_DASHBOARD.md` § Clear old FGs).
+   Also a Lookbook **Load**.
+0. **NDI, the owner's word** on the choices in `docs/VISUALS_DASHBOARD.md` § NDI sources as views
+   (60 fps at ~60% of the page, sources from the list only), and a camera or ProPresenter tried.
 0. **The owner's word** on the Lookbook as its own view (not merged with Holding) and the guide's
    fixed address.
 0. **The console link**: unreachable since 13:21 on 2026-10-05 (LifeBridge silent in onPC); look

@@ -83,6 +83,8 @@ import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
 import { createEmbeds, type EmbedPane, type Embeds } from './embeds.js'
 import { embedIdOf, isEmbedId, type EmbedReport } from '../shared/embeds.js'
+import { createNdi, type Ndi } from './ndi.js'
+import { isNdiId, ndiIdOf, type NdiState } from '../shared/ndi.js'
 import { settleDataDir } from '../bridge/data-dir.js'
 import { logPage, startLog } from './log.js'
 import type { About } from '../shared/about.js'
@@ -133,6 +135,7 @@ let consoleLink: LinkHandle | null = null
 let timers: TimersHandle | null = null
 let arena: ArenaHandle | null = null
 let videoFeed: VideoFeed | null = null
+let ndi: Ndi | null = null
 const BOOTED_AT = Date.now()
 
 // Must precede ready: Electron fixes scheme privileges at startup.
@@ -180,7 +183,7 @@ function createWindow(): void {
 	popouts = createPopouts({
 		kiosk: window,
 		paneOf,
-		labelOf: (view) => viewLabel(view, settings?.current().embeds ?? []),
+		labelOf: (view) => viewLabel(view, settings?.current().embeds ?? [], settings?.current().ndiSources ?? []),
 		load: loadPage,
 		preload: PRELOAD,
 		icon: ICON,
@@ -195,6 +198,7 @@ function createWindow(): void {
 		// The page's own cleanup does not run on a reload, so it would stay
 		// listed as watching and the feed would keep sending to nobody.
 		if (window !== null) videoFeed?.watch(window.webContents, false)
+		if (window !== null) ndi?.forget(window.webContents)
 		mode = 'volunteer'
 		maPane?.release()
 	})
@@ -566,11 +570,29 @@ app.whenReady().then(() => {
 	})
 	store.onChange(() => {
 		embeds?.sync(store.current().embeds)
-		// A pop-out of an embed removed or turned off has nothing left to show.
+		// A pop-out of an embed or NDI source removed or turned off has nothing
+		// left to show.
+		const ndiOn = new Set(store.current().ndiSources.filter((s) => s.on).map((s) => s.id))
 		for (const view of popouts?.popped() ?? []) {
 			const id = embedIdOf(view)
 			if (id !== null && embeds?.pane(id) === undefined) popouts?.close(view)
+			const ndiId = ndiIdOf(view)
+			if (ndiId !== null && !ndiOn.has(ndiId)) popouts?.close(view)
 		}
+	})
+
+	// NDI sources (./ndi.ts): the worker holds NDI, and each page that shows a
+	// source is handed a port to it. Anyone may watch; adding is Connections'.
+	ndi = createNdi()
+	ndi.setSources(store.current().ndiSources)
+	store.onChange(() => ndi?.setSources(store.current().ndiSources))
+	const isToken = (v: unknown): v is string => typeof v === 'string' && /^[a-z0-9]{1,32}$/.test(v)
+	ipcMain.handle('ndi:state', (e): NdiState | null => (fromOurs(e) ? (ndi?.state() ?? null) : null))
+	ipcMain.on('ndi:watch', (e, id: unknown, token: unknown) => {
+		if (fromOurs(e) && isNdiId(id) && isToken(token)) ndi?.watch(e.sender, id, token)
+	})
+	ipcMain.on('ndi:unwatch', (e, token: unknown) => {
+		if (fromOurs(e) && isToken(token)) ndi?.unwatch(e.sender, token)
 	})
 
 	// Pictures of the pages in the kiosk, to stand in for them while the
@@ -719,4 +741,5 @@ app.on('will-quit', () => {
 	timers?.stop()
 	arena?.stop()
 	videoFeed?.stop()
+	ndi?.stop()
 })

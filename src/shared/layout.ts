@@ -28,12 +28,14 @@
 // answering keeps its tab, which says so in its own place.
 
 import { embedIdOf, type Embed, type EmbedView } from './embeds.js'
+import { ndiIdOf, type NdiSource, type NdiView } from './ndi.js'
 
 /** The views that come with Pāua. */
 export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video'
 
-/** A built-in view, or an embed someone added in Connections (./embeds.ts). */
-export type ViewId = BuiltInView | EmbedView
+/** A built-in view, or an embed or NDI source someone added in Connections
+ *  (./embeds.ts, ./ndi.ts). */
+export type ViewId = BuiltInView | EmbedView | NdiView
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
 export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video']
@@ -51,14 +53,17 @@ export const VIEW_LABEL: Record<BuiltInView, string> = {
 	video: 'Video',
 }
 
-/** A built-in view, or any embed's view by its shape. Whether that embed still
- *  exists is the caller's question: a layout outlives an embed removed. */
+/** A built-in view, or any embed's or NDI source's view by its shape. Whether
+ *  that one still exists is the caller's question: a layout outlives an embed
+ *  removed. */
 export function isViewId(v: unknown): v is ViewId {
-	return typeof v === 'string' && ((VIEWS as readonly string[]).includes(v) || embedIdOf(v) !== null)
+	return typeof v === 'string' && ((VIEWS as readonly string[]).includes(v) || embedIdOf(v) !== null || ndiIdOf(v) !== null)
 }
 
-/** What a view is called: its label, or an embed's own name. */
-export function viewLabel(view: ViewId, embeds: readonly Embed[]): string {
+/** What a view is called: its label, or an embed's or NDI source's own name. */
+export function viewLabel(view: ViewId, embeds: readonly Embed[], ndi: readonly NdiSource[] = []): string {
+	const ndiId = ndiIdOf(view)
+	if (ndiId !== null) return ndi.find((s) => s.id === ndiId)?.name ?? 'NDI'
 	const id = embedIdOf(view)
 	if (id === null) return VIEW_LABEL[view as BuiltInView]
 	return embeds.find((e) => e.id === id)?.name ?? 'Embed'

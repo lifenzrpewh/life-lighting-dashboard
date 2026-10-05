@@ -18,6 +18,7 @@ import type { BuiltInView, ViewId } from './layout.js'
 import type { MaPaneState } from './ma-pane.js'
 import type { Channel, LinkState } from './reading.js'
 import { readingOf } from './reading.js'
+import { NDI_STALLED_AFTER_MS, ndiIdOf, ndiView, type NdiSource, type NdiState, type NdiView } from './ndi.js'
 import { currentFrame, type VideoFeedState } from './video-feed.js'
 
 /** LIVE, STALE, down, or not set up. Down covers UNKNOWN and UNREACHABLE: in a
@@ -43,12 +44,33 @@ export const CONNECTION_OF_VIEW: Record<BuiltInView, ConnectionId> = {
 	video: 'video',
 }
 
-/** Whether a view may be on screen: its connection is on, or for an embed,
- *  the embed still exists and is on. */
-export function viewIsOn(view: ViewId, off: readonly ConnectionId[], embeds: readonly Embed[]): boolean {
+/** Whether a view may be on screen: its connection is on, or for an embed or
+ *  an NDI source, it still exists and is on. */
+export function viewIsOn(view: ViewId, off: readonly ConnectionId[], embeds: readonly Embed[], ndi: readonly NdiSource[] = []): boolean {
+	const ndiId = ndiIdOf(view)
+	if (ndiId !== null) return ndi.some((s) => s.id === ndiId && s.on)
 	const id = embedIdOf(view)
 	if (id !== null) return embeds.some((e) => e.id === id && e.on)
 	return !off.includes(CONNECTION_OF_VIEW[view as BuiltInView])
+}
+
+/** An NDI source's row. Found on the network and not on screen is live: it is
+ *  there to be shown. Added, on and not found is down: someone added it to
+ *  see it, as the video feed with no sender is. */
+export function ndiStatus(source: NdiSource, ndi: NdiState | null, now: number): ConnectionStatus {
+	const base = { id: ndiView(source.id), name: source.name }
+	if (!source.on) return { ...base, tone: 'off', status: 'turned off', detail: null }
+	if (ndi === null || ndi.runtime === null) return { ...base, tone: 'off', status: 'not heard yet', detail: null }
+	if (!ndi.runtime.ok) return { ...base, tone: 'down', status: 'NDI not installed', detail: ndi.runtime.detail }
+	const feed = ndi.feeds.find((f) => f.id === source.id)
+	const found = ndi.found.includes(source.source)
+	const frame = feed?.lastFrame ?? null
+	if (feed !== undefined && feed.watched && frame !== null && now - frame.at <= NDI_STALLED_AFTER_MS) {
+		return { ...base, tone: 'live', status: 'LIVE', detail: `${frame.full.width}×${frame.full.height}, ${feed.fps} fps` }
+	}
+	if (!found) return { ...base, tone: 'down', status: 'not found', detail: feed?.failure ?? null }
+	if (feed !== undefined && feed.watched) return { ...base, tone: 'stale', status: 'no picture', detail: feed.failure }
+	return { ...base, tone: 'live', status: 'found', detail: null }
 }
 
 /** An embed's row: whether its page loaded. Not opened yet is not down: an
@@ -75,8 +97,9 @@ export function turnedOff(id: RowId, name: string): ConnectionStatus {
 	return { id, name, tone: 'off', status: 'turned off', detail: null }
 }
 
-/** A connection's row: a built-in connection, or an embed's own row. */
-export type RowId = ConnectionId | EmbedView
+/** A connection's row: a built-in connection, or an embed's or NDI source's
+ *  own row. */
+export type RowId = ConnectionId | EmbedView | NdiView
 
 export type ConnectionStatus = {
 	id: RowId

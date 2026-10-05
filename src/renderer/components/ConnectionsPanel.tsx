@@ -21,9 +21,10 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { About } from '../../shared/about.js'
 import type { ConnectionId, ConnectionStatus, RowId, Tone } from '../../shared/connections.js'
 import { EMBEDS_MAX, embedIdOf, embedNameError, embedUrlOf, newEmbedId, type Embed } from '../../shared/embeds.js'
+import { NDI_SOURCES_MAX, ndiIdOf, ndiMachine, ndiNameError, ndiShortName, type NdiSource, type NdiState } from '../../shared/ndi.js'
 import type { DeskState } from '../../shared/desk.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
-import { FolderOpen, Monitor, Plus, Save, Trash2 } from 'lucide-react'
+import { Cast, FolderOpen, Monitor, Plus, Save, Trash2 } from 'lucide-react'
 
 import { CueManagerSettings } from './CueManagerSettings.js'
 import { Field, Input, Select, User, portOf, useProPresenterNames } from './form.js'
@@ -36,7 +37,7 @@ type Errors = Partial<Record<SettingsField, string>>
 type Save = (patch: SettingsPatch) => Promise<Errors | null>
 
 /** What the right side shows: a connection, or one of the two extras. */
-type Selected = RowId | 'add' | 'computer'
+type Selected = RowId | 'add' | 'add-ndi' | 'computer'
 
 export function ConnectionsPanel({
 	rows,
@@ -93,16 +94,26 @@ export function ConnectionsPanel({
 		const e = embedIdOf(id)
 		return e === null ? null : (view.embeds.find((x) => x.id === e) ?? null)
 	}
+	const ndiOf = (id: RowId) => {
+		const n = ndiIdOf(id)
+		return n === null ? null : (view.ndiSources.find((x) => x.id === n) ?? null)
+	}
 	const isOff = (id: RowId) => {
 		const embed = embedOf(id)
-		return embed !== null ? !embed.on : view.off.includes(id as ConnectionId)
+		const ndi = ndiOf(id)
+		return embed !== null ? !embed.on : ndi !== null ? !ndi.on : view.off.includes(id as ConnectionId)
 	}
 	const setOn = (id: RowId, on: boolean) => {
+		const ndi = ndiOf(id)
+		if (ndi !== null) return save({ ndiSources: view.ndiSources.map((n) => (n.id === ndi.id ? { ...n, on } : n)) })
 		const embed = embedOf(id)
 		if (embed !== null) return save({ embeds: view.embeds.map((e) => (e.id === embed.id ? { ...e, on } : e)) })
 		return save({ off: on ? view.off.filter((x) => x !== id) : [...view.off, id as ConnectionId] })
 	}
 	const addressOf = (id: RowId): string | null => {
+		const ndi = ndiOf(id)
+		// The machine it is on: NDI names are `MACHINE (Source)`.
+		if (ndi !== null) return ndiMachine(ndi.source)
 		const embed = embedOf(id)
 		if (embed !== null) return new URL(embed.url).host
 		return address[id as ConnectionId]
@@ -120,7 +131,7 @@ export function ConnectionsPanel({
 
 	const fallback = rows.find((r) => r.tone === 'down')?.id ?? rows[0]?.id ?? 'computer'
 	const selected: Selected =
-		picked === null || (picked !== 'add' && picked !== 'computer' && !rows.some((r) => r.id === picked)) ? fallback : picked
+		picked === null || (picked !== 'add' && picked !== 'add-ndi' && picked !== 'computer' && !rows.some((r) => r.id === picked)) ? fallback : picked
 	const row = rows.find((r) => r.id === selected) ?? null
 	const notOperator = 'Hold Volunteer (top right) for 3 seconds for operator mode to change these.'
 
@@ -158,6 +169,15 @@ export function ConnectionsPanel({
 							sub={<span className="text-booth-dim">A Google Sheet or any page, as a view</span>}
 						/>
 					)}
+					{operator && (
+						<ListRow
+							selected={selected === 'add-ndi'}
+							onClick={() => setPicked('add-ndi')}
+							lead={<Cast size={18} className="text-booth-dim" aria-hidden />}
+							title="Add an NDI source"
+							sub={<span className="text-booth-dim">A camera or another program's output, as a view</span>}
+						/>
+					)}
 					<ListRow
 						selected={selected === 'computer'}
 						onClick={() => setPicked('computer')}
@@ -171,6 +191,8 @@ export function ConnectionsPanel({
 					<div key={selected} className="flex max-w-4xl animate-rise flex-col gap-6 px-10 py-8 select-text">
 						{selected === 'add' ? (
 							<AddEmbed all={view.embeds} save={save} />
+						) : selected === 'add-ndi' ? (
+							<AddNdi all={view.ndiSources} save={save} />
 						) : selected === 'computer' ? (
 							<>
 								<DetailHead title="This computer" />
@@ -198,7 +220,15 @@ export function ConnectionsPanel({
 									</p>
 								)}
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
-								{embedOf(row.id) !== null ? (
+								{ndiOf(row.id) !== null ? (
+									operator ? (
+										<NdiEditor key={row.id} source={ndiOf(row.id)!} all={view.ndiSources} save={save} onRemoved={() => setPicked(null)} />
+									) : (
+										<p className="text-sm text-booth-dim">
+											<span className="font-mono text-booth-ink">{ndiOf(row.id)!.source}</span>. {notOperator}
+										</p>
+									)
+								) : embedOf(row.id) !== null ? (
 									operator ? (
 										<EmbedEditor
 											key={row.id}
@@ -402,6 +432,143 @@ function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 				</>
 			)}
 		</section>
+	)
+}
+
+/** What NDI finds on the network, asked while this is open. Asking starts NDI
+ *  (src/main/ndi.ts), which is why nothing asks before a source is added. */
+function useNdi(): NdiState | null {
+	const [ndi, setNdi] = useState<NdiState | null>(null)
+	useEffect(() => {
+		let alive = true
+		const poll = () => void window.life?.ndi().then((v) => alive && setNdi(v))
+		poll()
+		const id = setInterval(poll, 1_000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+	return ndi
+}
+
+/** NDI's trademark notice, which its licence asks for wherever NDI is used. */
+function NdiNotice() {
+	return <p className="text-xs text-booth-dim">NDI® is a registered trademark of Vizrt NDI AB. ndi.video</p>
+}
+
+/** Add an NDI source as a view of its own (../../shared/ndi.ts): picked from
+ *  what NDI finds on the network, never typed. */
+function AddNdi({ all, save }: { all: readonly NdiSource[]; save: Save }) {
+	const ndi = useNdi()
+	const [added, setAdded] = useState<string | null>(null)
+	const [error, setError] = useState<string | null>(null)
+	const full = all.length >= NDI_SOURCES_MAX
+	const add = async (source: string) => {
+		setAdded(null)
+		setError(null)
+		const name = ndiShortName(source)
+		const entry: NdiSource = { id: newEmbedId(Date.now(), Math.random()), name, source, on: true }
+		const result = await save({ ndiSources: [...all, entry] })
+		if (result !== null) return setError(result.ndiSources ?? result.form ?? 'Not added.')
+		setAdded(name)
+	}
+	const body = (() => {
+		if (ndi === null || ndi.runtime === null) return <p className="text-sm text-booth-dim">Looking for NDI sources…</p>
+		if (!ndi.runtime.ok) return <p className="text-sm text-state-unreachable">{ndi.runtime.detail}</p>
+		if (ndi.found.length === 0) {
+			return (
+				<p className="text-sm text-booth-dim">
+					No NDI sources on the network yet. Turn on NDI output in the program that sends it (in Arena, Output › Advanced
+					Output, a screen sent to NDI); it appears here within a few seconds.
+				</p>
+			)
+		}
+		return (
+			<ul className="flex flex-col gap-1.5">
+				{ndi.found.map((source) => {
+					const have = all.some((s) => s.source === source)
+					return (
+						<li key={source} className="flex min-h-14 items-center gap-4 rounded-xl bg-booth-raise px-4 py-2">
+							<Cast size={18} className="shrink-0 text-booth-dim" aria-hidden />
+							<span className="flex min-w-0 flex-1 flex-col leading-tight">
+								<span className="truncate text-base">{ndiShortName(source)}</span>
+								<span className="truncate font-mono text-xs text-booth-dim">{source}</span>
+							</span>
+							{have ? (
+								<span className="text-sm text-booth-dim">Added</span>
+							) : (
+								<Button icon={Plus} disabled={full} onClick={() => void add(source)}>
+									Add
+								</Button>
+							)}
+						</li>
+					)
+				})}
+			</ul>
+		)
+	})()
+	return (
+		<section className="flex flex-col gap-5">
+			<DetailHead title="Add an NDI source" />
+			<p className="max-w-prose text-sm text-booth-dim">
+				A camera, ProPresenter’s output, Arena’s or another computer’s screen: any NDI source on this network becomes a view
+				of its own.
+			</p>
+			{full && <p className="text-sm text-booth-dim">That is {NDI_SOURCES_MAX}, the most there can be. Remove one to add another.</p>}
+			{body}
+			{added !== null && <span className="text-sm text-state-live">Added {added}. Layouts › Edit this layout, then a window's +, puts it on screen.</span>}
+			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
+			<NdiNotice />
+		</section>
+	)
+}
+
+/** An NDI source's name, and Remove. */
+function NdiEditor({ source, all, save, onRemoved }: { source: NdiSource; all: readonly NdiSource[]; save: Save; onRemoved: () => void }) {
+	const [name, setName] = useState(source.name)
+	const [local, setLocal] = useState<string | undefined>(undefined)
+	const [removing, setRemoving] = useState(false)
+	useEffect(() => {
+		if (!removing) return
+		const id = setTimeout(() => setRemoving(false), 4_000)
+		return () => clearTimeout(id)
+	}, [removing])
+	return (
+		<>
+			<p className="text-sm text-booth-dim">
+				<span className="font-mono text-booth-ink">{source.source}</span>, as NDI names it.
+			</p>
+			<Editor
+				save={async (patch) => {
+					const e = ndiNameError(name.trim())
+					setLocal(e ?? undefined)
+					if (e !== null) return {}
+					return save(patch)
+				}}
+				patch={() => ({ ndiSources: all.map((s) => (s.id === source.id ? { ...s, name: name.trim() } : s)) })}
+			>
+				{(err) => (
+					<Field label="Name" error={local ?? err('ndiSources')} hint="What its tab says.">
+						<Input value={name} onChange={setName} placeholder={ndiShortName(source.source)} />
+					</Field>
+				)}
+			</Editor>
+			<div className="flex items-center gap-4 border-t border-booth-edge pt-5">
+				<Button
+					variant={removing ? 'danger' : 'quiet'}
+					icon={Trash2}
+					onClick={() => {
+						if (!removing) return setRemoving(true)
+						void save({ ndiSources: all.filter((s) => s.id !== source.id) }).then((e) => e === null && onRemoved())
+					}}
+				>
+					{removing ? 'Tap again to remove' : 'Remove this source'}
+				</Button>
+				<span className="text-sm text-booth-dim">Its tabs leave the screen. It can be added again from the list.</span>
+			</div>
+			<NdiNotice />
+		</>
 	)
 }
 

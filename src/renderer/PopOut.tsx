@@ -19,6 +19,8 @@ import type { MaPaneReport } from '../shared/ma-pane.js'
 import { VIEW_LABEL, type BuiltInView, type ViewId } from '../shared/layout.js'
 import { embedIdOf, type EmbedReport } from '../shared/embeds.js'
 import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
+import { ndiIdOf, type NdiState } from '../shared/ndi.js'
+import { NdiStrip, NdiView } from './components/NdiView.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { HoldingView } from './components/HoldingView.js'
@@ -66,7 +68,14 @@ export function PopOut({ view }: { view: ViewId }) {
 		embedId === null ? null : (api) => api.embeds().then((all) => all.find((r) => r.id === embedId)),
 		1000,
 	)
-	const label = embedId === null ? VIEW_LABEL[view as BuiltInView] : (embed?.name ?? 'Embed')
+	const ndiId = ndiIdOf(view)
+	const ndi = usePolled<NdiState | null>(ndiId === null ? null : (api) => api.ndi(), 500)
+	const label =
+		ndiId !== null
+			? (ndi?.feeds.find((f) => f.id === ndiId)?.name ?? 'NDI')
+			: embedId === null
+				? VIEW_LABEL[view as BuiltInView]
+				: (embed?.name ?? 'Embed')
 	const ViewIcon = viewIcon(view)
 	/** The MA, the run order and embeds are native pages main moves in here. */
 	const native = view === 'ma' || view === 'cue' || embedId !== null
@@ -115,6 +124,7 @@ export function PopOut({ view }: { view: ViewId }) {
 					<span aria-hidden className="nacre-line absolute inset-x-3 -bottom-px h-[3px] rounded-t-full" />
 				</h1>
 				<span className="ml-auto flex items-center gap-2">
+				{ndiId !== null && <NdiStrip id={ndiId} ndi={ndi} now={now} />}
 				{view === 'video' && <VideoStrip feed={video} space={videoSpace} onFit={fitVideo} />}
 				{embedId !== null && embed !== undefined && (
 					<ZoomControl name={label} zoom={embed.zoom} onZoom={(by) => window.life?.zoomEmbed(embedId, by)} />
@@ -131,7 +141,9 @@ export function PopOut({ view }: { view: ViewId }) {
 				</span>
 			</div>
 			<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-bg">
-				{view === 'arena' ? (
+				{ndiId !== null ? (
+					<NdiView id={ndiId} ndi={ndi} now={now} />
+				) : view === 'arena' ? (
 					<ArenaView status={arena} now={now} />
 				) : view === 'clips' ? (
 					<ClipsView status={arena} now={now} />

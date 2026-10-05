@@ -82,6 +82,14 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Clips fire from the Clips view; faders move
 - [ ] The Video view shows Arena's output and keeps up
 
+**NDI sources** (0.2.3)
+- [ ] Connections › Add an NDI source (operator mode) lists the booth's NDI sources (a camera, ProPresenter, Arena); Add one
+- [ ] Put it in a window (Edit layout, a window's +): the picture shows and keeps up; the strip says its size and frames a second
+- [ ] Turn the source off at its end: the view says it stopped, then that it is not on the network; back on, it returns by itself
+- [ ] A computer without NDI installed says so in words, not a blank view (NDI comes with ProPresenter, or ndi.video's NDI Tools)
+- [ ] Anything slow elsewhere on screen while an NDI view shows (it costs the kiosk's page more than the Video view)
+- [ ] Also in 0.2.3: the Video view through Arena's fades to black (fixed: no frozen picture), the Lookbook view, Guide on the top bar
+
 **Media, the bar, tabs and video** (0.2.2)
 - [ ] Holding view: a clip that's right shows only its code; amber marks one to look at; a dashed "+ place" tile sits where a run-sheet item belongs and isn't yet
 - [ ] A one-off with no column waits in the "No column" tray: tap it, then a lit slot; it stays placed for that service

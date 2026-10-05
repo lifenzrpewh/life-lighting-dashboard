@@ -24,6 +24,7 @@ import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'imp
 import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
 import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
+import type { NdiState } from '../shared/ndi.js' with { 'resolution-mode': 'import' }
 import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
 
 /** The page's frame callback, while it shows the video feed. */
@@ -81,6 +82,36 @@ try {
 } catch (e) {
 	console.error('[video] this page cannot receive shared textures:', e)
 }
+
+// NDI sources (src/main/ndi.ts): each view showing one gets a port of its own
+// to the worker that receives it, and frames arrive on it as BGRA pixels. A
+// VideoFrame is made of each here and handed to the page, which draws it at
+// once; then the worker is told, and only then sends the next.
+type NdiWatch = { draw: (frame: VideoFrame) => void; port: MessagePort | null; space: { width: number; height: number } | null }
+const ndiWatches = new Map<string, NdiWatch>()
+let ndiTokens = 0
+ipcRenderer.on('ndi:port', (e, msg: { token?: unknown }) => {
+	const port = e.ports[0]
+	const w = typeof msg?.token === 'string' ? ndiWatches.get(msg.token) : undefined
+	if (port === undefined) return
+	if (w === undefined) return port.close()
+	w.port?.close()
+	w.port = port
+	port.onmessage = (ev: MessageEvent) => {
+		const d = ev.data as { width: number; height: number; format: 'BGRA' | 'BGRX'; data: Uint8Array }
+		let frame: VideoFrame | null = null
+		try {
+			frame = new VideoFrame(d.data, { format: d.format, codedWidth: d.width, codedHeight: d.height, timestamp: 0 })
+			w.draw(frame)
+		} catch (err) {
+			console.error('[ndi] a frame could not be drawn:', err)
+		} finally {
+			frame?.close()
+			port.postMessage({ type: 'drawn' })
+		}
+	}
+	if (w.space !== null) port.postMessage({ type: 'space', space: w.space })
+})
 
 const api = {
 	/** The console link as main knows it: LIVE only while LifeBridge answers
@@ -204,6 +235,30 @@ const api = {
 	},
 	/** Show this sender rather than the first. */
 	chooseVideo: (name: string): void => ipcRenderer.send('video:choose', name),
+
+	/** What NDI finds on the network, and how each added source is received. */
+	ndi: (): Promise<NdiState | null> => ipcRenderer.invoke('ndi:state'),
+	/** Show NDI source `id`: frames go to `draw` until `stop`. Draw at once;
+	 *  the frame is closed when `draw` returns. `space` says, in device pixels,
+	 *  how big it is drawn, so the worker sends no more than that. */
+	watchNdi: (id: string, draw: (frame: VideoFrame) => void): { stop: () => void; space: (size: { width: number; height: number }) => void } => {
+		ndiTokens += 1
+		const token = `${Math.random().toString(36).slice(2, 10)}${ndiTokens.toString(36)}`
+		const w: NdiWatch = { draw, port: null, space: null }
+		ndiWatches.set(token, w)
+		ipcRenderer.send('ndi:watch', id, token)
+		return {
+			stop: () => {
+				ndiWatches.delete(token)
+				w.port?.close()
+				ipcRenderer.send('ndi:unwatch', token)
+			},
+			space: (size) => {
+				w.space = { width: Math.round(size.width), height: Math.round(size.height) }
+				w.port?.postMessage({ type: 'space', space: w.space })
+			},
+		}
+	},
 
 	/** Which build this is, and where its log is. */
 	about: (): Promise<About> => ipcRenderer.invoke('app:about'),

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeftRight, Check, PictureInPicture2, Plus, RotateCw, SquareStack, Unplug } from 'lucide-react'
 
 import { embedIdOf, embedView, type Embed, type EmbedReport } from '../shared/embeds.js'
+import { ndiIdOf, ndiView, type NdiSource, type NdiState } from '../shared/ndi.js'
+import { NdiStrip, NdiView } from './components/NdiView.js'
 
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
@@ -15,6 +17,7 @@ import {
 	consoleStatus,
 	cueStatus,
 	embedStatus,
+	ndiStatus,
 	viewIsOn,
 	polledStatus,
 	turnedOff,
@@ -142,6 +145,7 @@ export function App() {
 	// turned off in the same place.
 	const [off, setOff] = useState<ConnectionId[]>([])
 	const [embeds, setEmbeds] = useState<Embed[]>([])
+	const [ndiSources, setNdiSources] = useState<NdiSource[]>([])
 	// Nothing on screen is moved for a view that is off until the settings
 	// that say so have been read: before then, every embed looks removed.
 	const [settingsRead, setSettingsRead] = useState(false)
@@ -149,10 +153,11 @@ export function App() {
 		void window.life?.settings().then((s) => {
 			setOff(s.off)
 			setEmbeds(s.embeds)
+			setNdiSources(s.ndiSources)
 			setSettingsRead(true)
 		})
 	useEffect(readOff, [])
-	const label = (view: ViewId) => viewLabel(view, embeds)
+	const label = (view: ViewId) => viewLabel(view, embeds, ndiSources)
 	const { layout, update, saved, setSaved } = useLayout()
 	// The saved layouts (./components/LayoutsPanel.tsx), in the grid's place.
 	const [layoutsOpen, setLayoutsOpen] = useState(false)
@@ -281,6 +286,23 @@ export function App() {
 			clearInterval(id)
 		}
 	}, [])
+
+	// NDI (../shared/ndi.ts): what the network has and how each added source
+	// is received. Asked only once a source is added, since asking starts NDI.
+	const [ndi, setNdi] = useState<NdiState | null | undefined>(undefined)
+	const anyNdi = ndiSources.length > 0
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined || !anyNdi) return
+		let alive = true
+		const poll = () => void api.ndi().then((v) => alive && setNdi(v))
+		poll()
+		const id = setInterval(poll, 500)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [anyNdi])
 
 	// The space the picture has, for the strip's size readout. Fit is a
 	// pop-out's: a window on the grid snaps to cells, so it cannot take a
@@ -479,15 +501,17 @@ export function App() {
 	]
 		.map((row) => (off.includes(row.id as ConnectionId) ? turnedOff(row.id, row.name) : row))
 		.concat(embeds.map((e) => embedStatus(e, embedReport(e.id)?.pane ?? null)))
+		.concat(ndiSources.map((s) => ndiStatus(s, ndi ?? null, now)))
 	const consoleOn = !off.includes('console')
 
 	// A tab whose connection is off is not on screen (../shared/layout.ts),
 	// and comes back when it is on. Until settings are read, nothing is off:
 	// every embed would otherwise look removed for a moment.
-	const visible = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds)
+	const visible = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds, ndiSources)
 	const embedViews = embeds.filter((e) => e.on).map((e) => embedView(e.id))
+	const ndiViews = ndiSources.filter((s) => s.on).map((s) => ndiView(s.id))
 	/** What a window's + offers: every view that may be on screen. */
-	const offer = [...VIEWS, ...embedViews].filter(visible)
+	const offer = [...VIEWS, ...embedViews, ...ndiViews].filter(visible)
 	const maShown = viewsShown(layout, visible).includes('ma')
 
 	/** A view's own buttons, in its window's strip. Reload reconnects a picture
@@ -499,6 +523,15 @@ export function App() {
 			window.life === undefined ? null : (
 				<IconButton icon={PictureInPicture2} size="sm" label={`Pop ${label(view)} out into its own window`} onClick={() => popOut(view)} />
 			)
+		const ndiId = ndiIdOf(view)
+		if (ndiId !== null) {
+			return (
+				<>
+					<NdiStrip id={ndiId} ndi={ndi} now={now} />
+					{out}
+				</>
+			)
+		}
 		const embedId = embedIdOf(view)
 		if (embedId !== null) {
 			const r = embedReport(embedId)
@@ -586,6 +619,8 @@ export function App() {
 				)
 			}
 		}
+		const ndiId = ndiIdOf(view)
+		if (ndiId !== null) return <NdiView id={ndiId} ndi={ndi} now={now} />
 		const embedId = embedIdOf(view)
 		if (embedId !== null) {
 			return (
