@@ -379,9 +379,17 @@ A 16-bit stand-in (Arena's High Detail format) came through the ring build's con
 read it two ways, the shipped GPU path and the addon's CPU copy (\`--cpu\`, which bypasses it):
 in each of the three changes Arena made (13:44:53, 13:45:53, 13:46:55) **both saw the picture
 change in the same seconds**. The CPU copy slows the receiver it shares (about 20 fps, the
-kiosk meanwhile 48), so its rates are not the kiosk's. Not yet tied to what the owner saw at
-those moments. Open: whether the MULTIVIEW screen's slices (Advanced Output) take layers in
-a way that does not follow a fade, which Arena's own preview of that screen would show.
+kiosk meanwhile 48), so its rates are not the kiosk's.
+
+**Found and fixed, 2026-10-05, 14:00: Arena's picture carries alpha.** The owner's video: the
+fade starts in Pāua, then holds, a pink strip of the old picture left under the new one, while
+Arena's own multiview is clean. A layer fading out goes **transparent**, not black, and the Video
+view drew each frame over the last on its canvas, where a transparent pixel draws nothing. Every
+stand-in until then was opaque. ✅ Reproduced with `spikes/video-lag/sender.cjs --alpha` (a colour
+whose alpha fades): frame alpha 251 to 4, canvas held at 220. ✅ Fixed by drawing each frame on
+black (`VideoView.tsx`), as Arena's multiview shows it: canvas 215 to 1 in the spike, and in the
+kiosk 211, 188, … 25, 1, 23, … 212 at 100 ms steps. The ring build (tearing) and the stall lines
+stay; the stall was never the feed.
 
 **Still to do:** lay out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).

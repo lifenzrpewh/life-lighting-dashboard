@@ -61,7 +61,18 @@ export function VideoView({
 					ctx = null
 				}
 				ctx ??= c.getContext('2d', { alpha: false })
-				ctx?.drawImage(frame, 0, 0)
+				// On black, every frame: Arena's picture carries alpha, and a layer
+				// fading out goes transparent, not black. Drawn over the last frame,
+				// a transparent pixel draws nothing, so the old picture stayed: the
+				// fade started and then froze (the owner, 2026-10-05; reproduced by
+				// spikes/video-lag/sender.cjs --alpha: frame alpha 251 to 4, canvas
+				// held at 220; on black it followed, 215 to 1). Arena's own
+				// multiview shows it on black too.
+				if (ctx !== null) {
+					ctx.fillStyle = '#000'
+					ctx.fillRect(0, 0, c.width, c.height)
+					ctx.drawImage(frame, 0, 0)
+				}
 			}
 			// This side's copy of the frame; the preload closes its own.
 			frame.close()

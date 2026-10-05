@@ -71,7 +71,7 @@ app.whenReady().then(async () => {
 			all.push(s)
 			const st = feed.state()
 			console.log(
-				`${new Date().toTimeString().slice(0, 8)}  ${st.showing ?? '-'}  main ${st.fps} fps · page ${s.frames} frames, ${s.changed} changed · gap max ${s.gapMax} ms` +
+				`${new Date().toTimeString().slice(0, 8)}  ${st.showing ?? '-'}  main ${st.fps} fps · page ${s.frames} frames, ${s.changed} changed, alpha ${s.alpha}, canvas red ${s.shown} · gap max ${s.gapMax} ms` +
 					(s.lateMed === null ? '' : ` · late med ${s.lateMed} max ${s.lateMax} ms`) +
 					(st.failure ? ` · ${st.failure}` : '') +
 					(process.argv.includes('--cpu') ? ` · cpu ${cpu.reads} reads, ${cpu.changed} changed${cpu.failed ? ` (${cpu.failed})` : ''}` : ''),

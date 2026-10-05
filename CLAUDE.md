@@ -462,11 +462,10 @@ Later, not tonight:
 
 0. **v0.2.2 on GitHub** (the owner's): publish the draft (both builds passed, run
    37244795777), delete the older drafts. `docs/FIELD_TEST.md` § 0.2.2 is what testers check.
-0. **The Video view freezing on Arena's fades to black** (the owner, 2026-10-05, after the ring
-   build): not reproduced with a stand-in fading the whole picture (`spikes/video-lag/`: smooth
-   standalone and in the kiosk). The owner fades to black and taps MARK; the `[video] in the last
-   5 s:` and `[video] the page, …` lines by the mark say whether main, the sender (Arena) or the
-   page stalls (`docs/VISUALS_DASHBOARD.md` § The video feed, still freezing).
+0. **The Video view on Arena's fades, by the owner's eye** after the fix of 2026-10-05: Arena's
+   picture carries alpha, a fading layer goes transparent, and the view drew over the last frame,
+   so the fade held. Now drawn on black (`docs/VISUALS_DASHBOARD.md` § The video feed, found and
+   fixed). ✅ In the kiosk with a transparent-fade stand-in; ⚠️ not yet watched on Arena's own fade.
 0. **A live replace, with the owner**: Update all with a clip on screen, the red tick, and what
    the audience sees as Arena opens a file into a playing clip. Also whether a file loaded over
    another keeps the clip's settings, and the real NAS path at a booth.

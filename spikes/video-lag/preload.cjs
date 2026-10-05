@@ -11,7 +11,10 @@ let strip = null
 let tiny = null
 let prev = null
 let last = 0
-let sec = { frames: 0, changed: 0, gapMax: 0, late: [] }
+let sec = { frames: 0, changed: 0, gapMax: 0, late: [], alpha: [], shown: [] }
+// What the canvas shows at its centre, and the frame's own alpha there: a
+// canvas that holds while the frame goes transparent is the freeze.
+let dot = null
 
 sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }) => {
 	const frame = importedSharedTexture.getVideoFrame()
@@ -28,7 +31,16 @@ sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }) => {
 				ctx = null
 			}
 			ctx ??= c.getContext('2d', { alpha: false })
+			if (process.env.LIFE_FILL_BLACK === '1') {
+				ctx.fillStyle = '#000'
+				ctx.fillRect(0, 0, c.width, c.height)
+			}
 			ctx.drawImage(frame, 0, 0)
+			dot ??= new OffscreenCanvas(1, 1).getContext('2d', { willReadFrequently: true })
+			dot.clearRect(0, 0, 1, 1)
+			dot.drawImage(frame, frame.displayWidth / 2, frame.displayHeight / 2, 1, 1, 0, 0, 1, 1)
+			sec.alpha.push(dot.getImageData(0, 0, 1, 1).data[3])
+			sec.shown.push(ctx.getImageData(c.width / 2, c.height / 2, 1, 1).data[0])
 			// Five full-width lines across the height, at full resolution: a small
 			// move is not averaged away, and a fade anywhere crosses one.
 			const W = frame.displayWidth
@@ -65,6 +77,7 @@ sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }) => {
 
 setInterval(() => {
 	const l = sec.late.sort((a, b) => a - b)
-	console.log(JSON.stringify({ frames: sec.frames, changed: sec.changed, gapMax: sec.gapMax, lateMed: l.length ? l[l.length >> 1] : null, lateMax: l.length ? l[l.length - 1] : null }))
-	sec = { frames: 0, changed: 0, gapMax: 0, late: [] }
+	const range = (a) => (a.length ? `${Math.min(...a)}-${Math.max(...a)}` : '-')
+	console.log(JSON.stringify({ alpha: range(sec.alpha), shown: range(sec.shown), frames: sec.frames, changed: sec.changed, gapMax: sec.gapMax, lateMed: l.length ? l[l.length >> 1] : null, lateMax: l.length ? l[l.length - 1] : null }))
+	sec = { frames: 0, changed: 0, gapMax: 0, late: [], alpha: [], shown: [] }
 }, 1000)
