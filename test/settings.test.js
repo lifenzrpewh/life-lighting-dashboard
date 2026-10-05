@@ -69,6 +69,7 @@ test('a corrupt file costs only the bad values', () => {
 		off: [],
 		embeds: [],
 		ndiSources: [],
+		captureInputs: [],
 		windowed: false,
 		graphicsFolder: null,
 		localMediaFolder: null,

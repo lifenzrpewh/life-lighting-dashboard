@@ -25,6 +25,7 @@ import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution
 import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
 import type { NdiState } from '../shared/ndi.js' with { 'resolution-mode': 'import' }
+import type { CaptureInput } from '../shared/capture.js' with { 'resolution-mode': 'import' }
 import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
 
 /** The page's frame callback, while it shows the video feed. */
@@ -235,6 +236,10 @@ const api = {
 	},
 	/** Show this sender rather than the first. */
 	chooseVideo: (name: string): void => ipcRenderer.send('video:choose', name),
+
+	/** Capture input uid=4096(LIFE+Ruarangi.Pewhairangi) gid=4096 groups=4096 as settings have it, for a pop-out, which cannot read
+	 *  settings: null when removed. */
+	captureInput: (id: string): Promise<CaptureInput | null> => ipcRenderer.invoke('capture:input', id),
 
 	/** What NDI finds on the network, and how each added source is received. */
 	ndi: (): Promise<NdiState | null> => ipcRenderer.invoke('ndi:state'),

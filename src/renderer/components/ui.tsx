@@ -8,11 +8,12 @@
 // controls are 48.
 
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { BookImage, Cast, GalleryHorizontalEnd, Globe, Layers, LayoutGrid, ListChecks, MonitorPlay, SlidersHorizontal, X } from 'lucide-react'
+import { BookImage, Cast, Webcam, GalleryHorizontalEnd, Globe, Layers, LayoutGrid, ListChecks, MonitorPlay, SlidersHorizontal, X } from 'lucide-react'
 
 import type { Tone } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
 import { ndiIdOf } from '../../shared/ndi.js'
+import { captureIdOf } from '../../shared/capture.js'
 import type { ViewId } from '../../shared/layout.js'
 
 export type Icon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string; strokeWidth?: number | string }>
@@ -224,6 +225,7 @@ export function Dot({ tone, size = 'md' }: { tone: Tone; size?: 'sm' | 'md' }) {
 export function viewIcon(view: ViewId): Icon {
 	if (embedIdOf(view) !== null) return Globe
 	if (ndiIdOf(view) !== null) return Cast
+	if (captureIdOf(view) !== null) return Webcam
 	switch (view) {
 		case 'cue':
 			return ListChecks

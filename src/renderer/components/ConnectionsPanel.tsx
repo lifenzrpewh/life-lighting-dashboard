@@ -24,7 +24,9 @@ import { EMBEDS_MAX, embedIdOf, embedNameError, embedUrlOf, newEmbedId, type Emb
 import { NDI_SOURCES_MAX, ndiIdOf, ndiMachine, ndiNameError, ndiShortName, type NdiSource, type NdiState } from '../../shared/ndi.js'
 import type { DeskState } from '../../shared/desk.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
-import { Cast, FolderOpen, Monitor, Plus, Save, Trash2 } from 'lucide-react'
+import { Cast, FolderOpen, Monitor, Plus, Save, Trash2, Webcam } from 'lucide-react'
+import { CAPTURE_INPUTS_MAX, captureIdOf, captureNameError, captureShortName, type CaptureInput } from '../../shared/capture.js'
+import { useCameras } from '../capture.js'
 
 import { CueManagerSettings } from './CueManagerSettings.js'
 import { Field, Input, Select, User, portOf, useProPresenterNames } from './form.js'
@@ -37,7 +39,7 @@ type Errors = Partial<Record<SettingsField, string>>
 type Save = (patch: SettingsPatch) => Promise<Errors | null>
 
 /** What the right side shows: a connection, or one of the two extras. */
-type Selected = RowId | 'add' | 'add-ndi' | 'computer'
+type Selected = RowId | 'add' | 'add-ndi' | 'add-capture' | 'computer'
 
 export function ConnectionsPanel({
 	rows,
@@ -98,12 +100,20 @@ export function ConnectionsPanel({
 		const n = ndiIdOf(id)
 		return n === null ? null : (view.ndiSources.find((x) => x.id === n) ?? null)
 	}
+	const captureOf = (id: RowId) => {
+		const c = captureIdOf(id)
+		return c === null ? null : (view.captureInputs.find((x) => x.id === c) ?? null)
+	}
 	const isOff = (id: RowId) => {
 		const embed = embedOf(id)
 		const ndi = ndiOf(id)
+		const capture = captureOf(id)
+		if (capture !== null) return !capture.on
 		return embed !== null ? !embed.on : ndi !== null ? !ndi.on : view.off.includes(id as ConnectionId)
 	}
 	const setOn = (id: RowId, on: boolean) => {
+		const capture = captureOf(id)
+		if (capture !== null) return save({ captureInputs: view.captureInputs.map((c) => (c.id === capture.id ? { ...c, on } : c)) })
 		const ndi = ndiOf(id)
 		if (ndi !== null) return save({ ndiSources: view.ndiSources.map((n) => (n.id === ndi.id ? { ...n, on } : n)) })
 		const embed = embedOf(id)
@@ -131,7 +141,7 @@ export function ConnectionsPanel({
 
 	const fallback = rows.find((r) => r.tone === 'down')?.id ?? rows[0]?.id ?? 'computer'
 	const selected: Selected =
-		picked === null || (picked !== 'add' && picked !== 'add-ndi' && picked !== 'computer' && !rows.some((r) => r.id === picked)) ? fallback : picked
+		picked === null || (picked !== 'add' && picked !== 'add-ndi' && picked !== 'add-capture' && picked !== 'computer' && !rows.some((r) => r.id === picked)) ? fallback : picked
 	const row = rows.find((r) => r.id === selected) ?? null
 	const notOperator = 'Hold Volunteer (top right) for 3 seconds for operator mode to change these.'
 
@@ -178,6 +188,15 @@ export function ConnectionsPanel({
 							sub={<span className="text-booth-dim">A camera or another program's output, as a view</span>}
 						/>
 					)}
+					{operator && (
+						<ListRow
+							selected={selected === 'add-capture'}
+							onClick={() => setPicked('add-capture')}
+							lead={<Webcam size={18} className="text-booth-dim" aria-hidden />}
+							title="Add a capture input"
+							sub={<span className="text-booth-dim">A Blackmagic card, ATEM, OBS Virtual Camera or webcam</span>}
+						/>
+					)}
 					<ListRow
 						selected={selected === 'computer'}
 						onClick={() => setPicked('computer')}
@@ -193,6 +212,8 @@ export function ConnectionsPanel({
 							<AddEmbed all={view.embeds} save={save} />
 						) : selected === 'add-ndi' ? (
 							<AddNdi all={view.ndiSources} save={save} />
+						) : selected === 'add-capture' ? (
+							<AddCapture all={view.captureInputs} save={save} />
 						) : selected === 'computer' ? (
 							<>
 								<DetailHead title="This computer" />
@@ -220,7 +241,15 @@ export function ConnectionsPanel({
 									</p>
 								)}
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
-								{ndiOf(row.id) !== null ? (
+								{captureOf(row.id) !== null ? (
+									operator ? (
+										<CaptureEditor key={row.id} input={captureOf(row.id)!} all={view.captureInputs} save={save} onRemoved={() => setPicked(null)} />
+									) : (
+										<p className="text-sm text-booth-dim">
+											<span className="font-mono text-booth-ink">{captureOf(row.id)!.device}</span>. {notOperator}
+										</p>
+									)
+								) : ndiOf(row.id) !== null ? (
 									operator ? (
 										<NdiEditor key={row.id} source={ndiOf(row.id)!} all={view.ndiSources} save={save} onRemoved={() => setPicked(null)} />
 									) : (
@@ -568,6 +597,108 @@ function NdiEditor({ source, all, save, onRemoved }: { source: NdiSource; all: r
 				<span className="text-sm text-booth-dim">Its tabs leave the screen. It can be added again from the list.</span>
 			</div>
 			<NdiNotice />
+		</>
+	)
+}
+
+/** Add a capture input as a view of its own (../../shared/capture.ts):
+ *  picked from the cameras this computer lists, never typed. */
+function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: Save }) {
+	const cameras = useCameras(true)
+	const [added, setAdded] = useState<string | null>(null)
+	const [error, setError] = useState<string | null>(null)
+	const full = all.length >= CAPTURE_INPUTS_MAX
+	const add = async (device: string) => {
+		setAdded(null)
+		setError(null)
+		const name = captureShortName(device)
+		const entry: CaptureInput = { id: newEmbedId(Date.now(), Math.random()), name, device, on: true }
+		const result = await save({ captureInputs: [...all, entry] })
+		if (result !== null) return setError(result.captureInputs ?? result.form ?? 'Not added.')
+		setAdded(name)
+	}
+	return (
+		<section className="flex flex-col gap-5">
+			<DetailHead title="Add a capture input" />
+			<p className="max-w-prose text-sm text-booth-dim">
+				Anything this computer sees as a camera becomes a view of its own: a Blackmagic card’s input (with Desktop Video
+				installed), an ATEM Mini’s USB output, OBS’s Virtual Camera (Start Virtual Camera in OBS), or a webcam.
+			</p>
+			{full && <p className="text-sm text-booth-dim">That is {CAPTURE_INPUTS_MAX}, the most there can be. Remove one to add another.</p>}
+			{cameras === null ? (
+				<p className="text-sm text-booth-dim">Looking for cameras…</p>
+			) : cameras.length === 0 ? (
+				<p className="text-sm text-booth-dim">This computer lists no cameras.</p>
+			) : (
+				<ul className="flex flex-col gap-1.5">
+					{cameras.map((device) => (
+						<li key={device} className="flex min-h-14 items-center gap-4 rounded-xl bg-booth-raise px-4 py-2">
+							<Webcam size={18} className="shrink-0 text-booth-dim" aria-hidden />
+							<span className="flex min-w-0 flex-1 flex-col leading-tight">
+								<span className="truncate text-base">{captureShortName(device)}</span>
+								<span className="truncate font-mono text-xs text-booth-dim">{device}</span>
+							</span>
+							{all.some((c) => c.device === device) ? (
+								<span className="text-sm text-booth-dim">Added</span>
+							) : (
+								<Button icon={Plus} disabled={full} onClick={() => void add(device)}>
+									Add
+								</Button>
+							)}
+						</li>
+					))}
+				</ul>
+			)}
+			{added !== null && <span className="text-sm text-state-live">Added {added}. Layouts › Edit this layout, then a window's +, puts it on screen.</span>}
+			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
+		</section>
+	)
+}
+
+/** A capture input's name, and Remove. */
+function CaptureEditor({ input, all, save, onRemoved }: { input: CaptureInput; all: readonly CaptureInput[]; save: Save; onRemoved: () => void }) {
+	const [name, setName] = useState(input.name)
+	const [local, setLocal] = useState<string | undefined>(undefined)
+	const [removing, setRemoving] = useState(false)
+	useEffect(() => {
+		if (!removing) return
+		const id = setTimeout(() => setRemoving(false), 4_000)
+		return () => clearTimeout(id)
+	}, [removing])
+	return (
+		<>
+			<p className="text-sm text-booth-dim">
+				<span className="font-mono text-booth-ink">{input.device}</span>, as this computer names it. A card input shows a
+				picture once its signal matches the format set in Desktop Video Setup.
+			</p>
+			<Editor
+				save={async (patch) => {
+					const e = captureNameError(name.trim())
+					setLocal(e ?? undefined)
+					if (e !== null) return {}
+					return save(patch)
+				}}
+				patch={() => ({ captureInputs: all.map((c) => (c.id === input.id ? { ...c, name: name.trim() } : c)) })}
+			>
+				{(err) => (
+					<Field label="Name" error={local ?? err('captureInputs')} hint="What its tab says.">
+						<Input value={name} onChange={setName} placeholder={captureShortName(input.device)} />
+					</Field>
+				)}
+			</Editor>
+			<div className="flex items-center gap-4 border-t border-booth-edge pt-5">
+				<Button
+					variant={removing ? 'danger' : 'quiet'}
+					icon={Trash2}
+					onClick={() => {
+						if (!removing) return setRemoving(true)
+						void save({ captureInputs: all.filter((c) => c.id !== input.id) }).then((e) => e === null && onRemoved())
+					}}
+				>
+					{removing ? 'Tap again to remove' : 'Remove this input'}
+				</Button>
+				<span className="text-sm text-booth-dim">Its tabs leave the screen. It can be added again from the list.</span>
+			</div>
 		</>
 	)
 }

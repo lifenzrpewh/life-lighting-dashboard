@@ -20,6 +20,7 @@ import { CONNECTIONS, type ConnectionId } from './connections.js'
 import { embedsFrom, type Embed } from './embeds.js'
 import { isFolderPath } from './media-fetch.js'
 import { ndiSourcesFrom, type NdiSource } from './ndi.js'
+import { captureInputsFrom, type CaptureInput } from './capture.js'
 import { DEFAULT_REMOTE_USER, DEFAULT_WEB_REMOTE_PORT, isConsoleHost, isPort } from './ma-pane.js'
 import { CAMPUS_MAX } from './showfile-write.js'
 
@@ -75,6 +76,9 @@ export type Settings = {
 	/** NDI sources added in Connections, each a view of its own (./ndi.ts).
 	 *  Which of the network's sources a booth watches is a habit of the booth. */
 	ndiSources: NdiSource[]
+	/** Capture inputs added in Connections, each a view of its own
+	 *  (./capture.ts): which of this computer's cameras a booth watches. */
+	captureInputs: CaptureInput[]
 	/** A window rather than the whole screen: for testers on a laptop (the
 	 *  owner, 2026-10-04). The booth stays full screen. */
 	windowed: boolean
@@ -121,6 +125,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	off: [],
 	embeds: [],
 	ndiSources: [],
+	captureInputs: [],
 	windowed: false,
 	graphicsFolder: null,
 	localMediaFolder: null,
@@ -328,6 +333,11 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		if (sources === null) errors.ndiSources = 'Each NDI source needs a name, and each source can be added once.'
 		else next.ndiSources = sources
 	}
+	if (patch.captureInputs !== undefined) {
+		const inputs = captureInputsFrom(patch.captureInputs)
+		if (inputs === null) errors.captureInputs = 'Each capture input needs a name, and each camera can be added once.'
+		else next.captureInputs = inputs
+	}
 	for (const key of ['volunteerPassword', 'operatorPassword'] as const) {
 		const pw = patch[key]
 		if (typeof pw === 'string' && pw === '') errors[key] = 'Leave blank to keep the password; use Remove to clear it.'
@@ -360,6 +370,7 @@ export function fromDisk(raw: unknown): Settings {
 	out.off = offFrom(r['off']) ?? []
 	out.embeds = embedsFrom(r['embeds']) ?? []
 	out.ndiSources = ndiSourcesFrom(r['ndiSources']) ?? []
+	out.captureInputs = captureInputsFrom(r['captureInputs']) ?? []
 	out.windowed = r['windowed'] === true
 	for (const key of ['graphicsFolder', 'localMediaFolder'] as const) {
 		const v = r[key]
@@ -394,6 +405,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['off', Array.isArray],
 		['embeds', Array.isArray],
 		['ndiSources', Array.isArray],
+		['captureInputs', Array.isArray],
 		['windowed', (v) => typeof v === 'boolean'],
 		['graphicsFolder', strOrNull],
 		['localMediaFolder', strOrNull],

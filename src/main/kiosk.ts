@@ -48,7 +48,7 @@
 // its place only from the window it is in, so the kiosk and a pop-out never
 // fight over where the MA goes.
 
-import { app, BrowserWindow, Menu, dialog, ipcMain, powerSaveBlocker, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, Menu, dialog, ipcMain, powerSaveBlocker, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -85,6 +85,7 @@ import { createEmbeds, type EmbedPane, type Embeds } from './embeds.js'
 import { embedIdOf, isEmbedId, type EmbedReport } from '../shared/embeds.js'
 import { createNdi, type Ndi } from './ndi.js'
 import { isNdiId, ndiIdOf, type NdiState } from '../shared/ndi.js'
+import { captureIdOf, isCaptureId, type CaptureInput } from '../shared/capture.js'
 import { settleDataDir } from '../bridge/data-dir.js'
 import { logPage, startLog } from './log.js'
 import type { About } from '../shared/about.js'
@@ -183,7 +184,7 @@ function createWindow(): void {
 	popouts = createPopouts({
 		kiosk: window,
 		paneOf,
-		labelOf: (view) => viewLabel(view, settings?.current().embeds ?? [], settings?.current().ndiSources ?? []),
+		labelOf: (view) => viewLabel(view, settings?.current().embeds ?? [], settings?.current().ndiSources ?? [], settings?.current().captureInputs ?? []),
 		load: loadPage,
 		preload: PRELOAD,
 		icon: ICON,
@@ -578,6 +579,8 @@ app.whenReady().then(() => {
 			if (id !== null && embeds?.pane(id) === undefined) popouts?.close(view)
 			const ndiId = ndiIdOf(view)
 			if (ndiId !== null && !ndiOn.has(ndiId)) popouts?.close(view)
+			const captureId = captureIdOf(view)
+			if (captureId !== null && !store.current().captureInputs.some((c) => c.id === captureId && c.on)) popouts?.close(view)
 		}
 	})
 
@@ -587,6 +590,11 @@ app.whenReady().then(() => {
 	ndi.setSources(store.current().ndiSources)
 	store.onChange(() => ndi?.setSources(store.current().ndiSources))
 	const isToken = (v: unknown): v is string => typeof v === 'string' && /^[a-z0-9]{1,32}$/.test(v)
+	// Capture inputs (../shared/capture.ts) are the page's own, through the
+	// browser's camera route; a pop-out reads its one input here.
+	ipcMain.handle('capture:input', (e, id: unknown): CaptureInput | null =>
+		fromOurs(e) && isCaptureId(id) ? (store.current().captureInputs.find((c) => c.id === id) ?? null) : null,
+	)
 	ipcMain.handle('ndi:state', (e): NdiState | null => (fromOurs(e) ? (ndi?.state() ?? null) : null))
 	ipcMain.on('ndi:watch', (e, id: unknown, token: unknown) => {
 		if (fromOurs(e) && isNdiId(id) && isToken(token)) ndi?.watch(e.sender, id, token)
@@ -713,6 +721,17 @@ app.whenReady().then(() => {
 		// The renderer is told whether it worked, never handed the settings back:
 		// it asks for the view again, which carries no passwords.
 		return checked.ok ? { ok: true } : checked
+	})
+
+	// The camera rule for Pāua's own pages (the kiosk and its pop-outs, in the
+	// default session; the MA, the run order and embeds have sessions of their
+	// own that refuse everything): video only, for capture inputs
+	// (../shared/capture.ts). Never the microphone. Other permissions keep
+	// Electron's default, as they had before this rule.
+	session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {
+		if (permission !== 'media') return callback(true)
+		const types = 'mediaTypes' in details ? (details.mediaTypes ?? []) : []
+		callback(types.length > 0 && types.every((t) => t === 'video'))
 	})
 
 	createWindow()

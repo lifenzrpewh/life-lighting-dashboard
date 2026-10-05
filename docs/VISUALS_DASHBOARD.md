@@ -942,6 +942,40 @@ runtime's paths there are the SDK's documented ones, untried); the installed bui
 unpacked from the archive, `asarUnpack`). **Arena can send NDI itself**, so this could also be
 a multiview on another computer (Spout is this machine only).
 
+## Capture inputs: Blackmagic, ATEM, OBS, webcams (owner's ask, 2026-10-05; built the same day)
+
+The owner: "accept input from Blackmagic devices", and "this would work for stuff like OBS as
+well". Blackmagic's Desktop Video driver presents each card input (DeckLink, UltraStudio,
+Intensity) as a camera, an ATEM Mini's USB output is one, and so is OBS's Virtual Camera, so the
+page takes any of them with **`getUserMedia`**, the browser's own camera route: no native code,
+decoded and drawn on the GPU in a `<video>`, nothing through main.
+
+**The shape**, as NDI's: Connections › **Add a capture input** (operator mode) lists the cameras
+this computer has; Add makes one a view (`capture:<id>`) and a row, renamed, turned off and
+removed there. Kept by its **name** (Windows' USB ids such as `(5986:2159)` dropped from the tab's
+name, kept in the stored one), not by the browser's device id, which belongs to the page and is
+not promised to last. One stream per device per page however many tabs show it, let go with the
+last; a stream that ends is said and reopened every 3 s. Asked for 1920×1080 at up to 60 fps,
+video only. `src/shared/capture.ts` has the rules, `src/renderer/capture.ts` the streams,
+`src/renderer/components/CaptureView.tsx` the view.
+
+**Main's camera rule** (`src/main/kiosk.ts`): the kiosk's own pages had no permission rule at all,
+so Electron's default granted everything. Now `media` is granted for video only, never the
+microphone; other permissions keep the default they had. The MA, run order and embeds have
+sessions of their own that refuse everything, as before.
+
+✅ **In the kiosk on the Windows box, 2026-10-05**, over CDP: the page lists `FHD Webcam
+(5986:2159)` and `OBS Virtual Camera` with no prompt (Desktop Video 's driver is installed here,
+no card). Added through Connections, popped out: **the webcam at 1920×1080, 29.7 fps**, live.
+OBS Virtual Camera with OBS not running refuses to start (`NotReadableError`), which the view says
+in words naming both causes (another program has it, or OBS's Start Virtual Camera not pressed).
+Test inputs removed after.
+
+⚠️ Not yet: **a Blackmagic card** (none here) and whether its input opens while Arena also uses
+it (usually one program at a time); an ATEM; OBS with its virtual camera started; by finger; the
+installed build; macOS (it would ask for camera access the first time). A card shows nothing
+until its signal matches the format in Desktop Video Setup; the view says so while it waits.
+
 ## Open questions
 
 - **Briefs:** where should a brief's link live? The candidates were the item in the

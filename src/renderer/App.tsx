@@ -4,6 +4,9 @@ import { ArrowLeftRight, Check, PictureInPicture2, Plus, RotateCw, SquareStack, 
 import { embedIdOf, embedView, type Embed, type EmbedReport } from '../shared/embeds.js'
 import { ndiIdOf, ndiView, type NdiSource, type NdiState } from '../shared/ndi.js'
 import { NdiStrip, NdiView } from './components/NdiView.js'
+import { captureIdOf, captureView, type CaptureInput } from '../shared/capture.js'
+import { CaptureStrip, CaptureView } from './components/CaptureView.js'
+import { captureStateOf, useCameras } from './capture.js'
 
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
@@ -18,6 +21,7 @@ import {
 	cueStatus,
 	embedStatus,
 	ndiStatus,
+	captureStatus,
 	viewIsOn,
 	polledStatus,
 	turnedOff,
@@ -146,6 +150,7 @@ export function App() {
 	const [off, setOff] = useState<ConnectionId[]>([])
 	const [embeds, setEmbeds] = useState<Embed[]>([])
 	const [ndiSources, setNdiSources] = useState<NdiSource[]>([])
+	const [captureInputs, setCaptureInputs] = useState<CaptureInput[]>([])
 	// Nothing on screen is moved for a view that is off until the settings
 	// that say so have been read: before then, every embed looks removed.
 	const [settingsRead, setSettingsRead] = useState(false)
@@ -154,10 +159,11 @@ export function App() {
 			setOff(s.off)
 			setEmbeds(s.embeds)
 			setNdiSources(s.ndiSources)
+			setCaptureInputs(s.captureInputs)
 			setSettingsRead(true)
 		})
 	useEffect(readOff, [])
-	const label = (view: ViewId) => viewLabel(view, embeds, ndiSources)
+	const label = (view: ViewId) => viewLabel(view, embeds, ndiSources, captureInputs)
 	const { layout, update, saved, setSaved } = useLayout()
 	// The saved layouts (./components/LayoutsPanel.tsx), in the grid's place.
 	const [layoutsOpen, setLayoutsOpen] = useState(false)
@@ -303,6 +309,10 @@ export function App() {
 			clearInterval(id)
 		}
 	}, [anyNdi])
+
+	// The cameras this computer has (./capture.ts), once a capture input is
+	// added: for their rows, and for a view to say one has gone.
+	const cameras = useCameras(captureInputs.length > 0)
 
 	// The space the picture has, for the strip's size readout. Fit is a
 	// pop-out's: a window on the grid snaps to cells, so it cannot take a
@@ -502,16 +512,18 @@ export function App() {
 		.map((row) => (off.includes(row.id as ConnectionId) ? turnedOff(row.id, row.name) : row))
 		.concat(embeds.map((e) => embedStatus(e, embedReport(e.id)?.pane ?? null)))
 		.concat(ndiSources.map((s) => ndiStatus(s, ndi ?? null, now)))
+		.concat(captureInputs.map((c) => captureStatus(c, captureStateOf(c.device, cameras), now)))
 	const consoleOn = !off.includes('console')
 
 	// A tab whose connection is off is not on screen (../shared/layout.ts),
 	// and comes back when it is on. Until settings are read, nothing is off:
 	// every embed would otherwise look removed for a moment.
-	const visible = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds, ndiSources)
+	const visible = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds, ndiSources, captureInputs)
 	const embedViews = embeds.filter((e) => e.on).map((e) => embedView(e.id))
 	const ndiViews = ndiSources.filter((s) => s.on).map((s) => ndiView(s.id))
 	/** What a window's + offers: every view that may be on screen. */
-	const offer = [...VIEWS, ...embedViews, ...ndiViews].filter(visible)
+	const captureViews = captureInputs.filter((c) => c.on).map((c) => captureView(c.id))
+	const offer = [...VIEWS, ...embedViews, ...ndiViews, ...captureViews].filter(visible)
 	const maShown = viewsShown(layout, visible).includes('ma')
 
 	/** A view's own buttons, in its window's strip. Reload reconnects a picture
@@ -523,6 +535,15 @@ export function App() {
 			window.life === undefined ? null : (
 				<IconButton icon={PictureInPicture2} size="sm" label={`Pop ${label(view)} out into its own window`} onClick={() => popOut(view)} />
 			)
+		const captureId = captureIdOf(view)
+		if (captureId !== null) {
+			return (
+				<>
+					<CaptureStrip input={captureInputs.find((c) => c.id === captureId)} now={now} />
+					{out}
+				</>
+			)
+		}
 		const ndiId = ndiIdOf(view)
 		if (ndiId !== null) {
 			return (
@@ -621,6 +642,8 @@ export function App() {
 		}
 		const ndiId = ndiIdOf(view)
 		if (ndiId !== null) return <NdiView id={ndiId} ndi={ndi} now={now} />
+		const captureId = captureIdOf(view)
+		if (captureId !== null) return <CaptureView input={captureInputs.find((c) => c.id === captureId)} cameras={cameras} now={now} />
 		const embedId = embedIdOf(view)
 		if (embedId !== null) {
 			return (

@@ -19,6 +19,7 @@ import type { MaPaneState } from './ma-pane.js'
 import type { Channel, LinkState } from './reading.js'
 import { readingOf } from './reading.js'
 import { NDI_STALLED_AFTER_MS, ndiIdOf, ndiView, type NdiSource, type NdiState, type NdiView } from './ndi.js'
+import { CAPTURE_STALLED_AFTER_MS, captureIdOf, captureView, type CaptureInput, type CaptureState, type CaptureView } from './capture.js'
 import { currentFrame, type VideoFeedState } from './video-feed.js'
 
 /** LIVE, STALE, down, or not set up. Down covers UNKNOWN and UNREACHABLE: in a
@@ -46,7 +47,15 @@ export const CONNECTION_OF_VIEW: Record<BuiltInView, ConnectionId> = {
 
 /** Whether a view may be on screen: its connection is on, or for an embed or
  *  an NDI source, it still exists and is on. */
-export function viewIsOn(view: ViewId, off: readonly ConnectionId[], embeds: readonly Embed[], ndi: readonly NdiSource[] = []): boolean {
+export function viewIsOn(
+	view: ViewId,
+	off: readonly ConnectionId[],
+	embeds: readonly Embed[],
+	ndi: readonly NdiSource[] = [],
+	capture: readonly CaptureInput[] = [],
+): boolean {
+	const captureId = captureIdOf(view)
+	if (captureId !== null) return capture.some((c) => c.id === captureId && c.on)
 	const ndiId = ndiIdOf(view)
 	if (ndiId !== null) return ndi.some((s) => s.id === ndiId && s.on)
 	const id = embedIdOf(view)
@@ -97,9 +106,25 @@ export function turnedOff(id: RowId, name: string): ConnectionStatus {
 	return { id, name, tone: 'off', status: 'turned off', detail: null }
 }
 
+/** A capture input's row, as the NDI source's: found is live (there to
+ *  show), added and on and not on this computer is down. */
+export function captureStatus(input: CaptureInput, state: CaptureState | null, now: number): ConnectionStatus {
+	const base = { id: captureView(input.id), name: input.name }
+	if (!input.on) return { ...base, tone: 'off', status: 'turned off', detail: null }
+	if (state === null || state.present === null) return { ...base, tone: 'off', status: 'not heard yet', detail: null }
+	const live = state.live
+	if (live !== null && now - live.at <= CAPTURE_STALLED_AFTER_MS) {
+		return { ...base, tone: 'live', status: 'LIVE', detail: `${live.width}×${live.height}${live.fps === null ? '' : `, ${Math.round(live.fps)} fps`}` }
+	}
+	if (!state.present) return { ...base, tone: 'down', status: 'not found', detail: state.failure }
+	if (state.failure !== null) return { ...base, tone: 'down', status: 'not opening', detail: state.failure }
+	if (live !== null) return { ...base, tone: 'stale', status: 'no picture', detail: null }
+	return { ...base, tone: 'live', status: 'found', detail: null }
+}
+
 /** A connection's row: a built-in connection, or an embed's or NDI source's
  *  own row. */
-export type RowId = ConnectionId | EmbedView | NdiView
+export type RowId = ConnectionId | EmbedView | NdiView | CaptureView
 
 export type ConnectionStatus = {
 	id: RowId

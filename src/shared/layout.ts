@@ -29,13 +29,14 @@
 
 import { embedIdOf, type Embed, type EmbedView } from './embeds.js'
 import { ndiIdOf, type NdiSource, type NdiView } from './ndi.js'
+import { captureIdOf, type CaptureInput, type CaptureView } from './capture.js'
 
 /** The views that come with Pāua. */
 export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video'
 
-/** A built-in view, or an embed or NDI source someone added in Connections
- *  (./embeds.ts, ./ndi.ts). */
-export type ViewId = BuiltInView | EmbedView | NdiView
+/** A built-in view, or an embed, NDI source or capture input someone added in
+ *  Connections (./embeds.ts, ./ndi.ts, ./capture.ts). */
+export type ViewId = BuiltInView | EmbedView | NdiView | CaptureView
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
 export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video']
@@ -57,11 +58,13 @@ export const VIEW_LABEL: Record<BuiltInView, string> = {
  *  that one still exists is the caller's question: a layout outlives an embed
  *  removed. */
 export function isViewId(v: unknown): v is ViewId {
-	return typeof v === 'string' && ((VIEWS as readonly string[]).includes(v) || embedIdOf(v) !== null || ndiIdOf(v) !== null)
+	return typeof v === 'string' && ((VIEWS as readonly string[]).includes(v) || embedIdOf(v) !== null || ndiIdOf(v) !== null || captureIdOf(v) !== null)
 }
 
-/** What a view is called: its label, or an embed's or NDI source's own name. */
-export function viewLabel(view: ViewId, embeds: readonly Embed[], ndi: readonly NdiSource[] = []): string {
+/** What a view is called: its label, or an added one's own name. */
+export function viewLabel(view: ViewId, embeds: readonly Embed[], ndi: readonly NdiSource[] = [], capture: readonly CaptureInput[] = []): string {
+	const captureId = captureIdOf(view)
+	if (captureId !== null) return capture.find((c) => c.id === captureId)?.name ?? 'Capture'
 	const ndiId = ndiIdOf(view)
 	if (ndiId !== null) return ndi.find((s) => s.id === ndiId)?.name ?? 'NDI'
 	const id = embedIdOf(view)

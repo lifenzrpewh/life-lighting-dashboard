@@ -21,6 +21,9 @@ import { embedIdOf, type EmbedReport } from '../shared/embeds.js'
 import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
 import { ndiIdOf, type NdiState } from '../shared/ndi.js'
 import { NdiStrip, NdiView } from './components/NdiView.js'
+import { captureIdOf, type CaptureInput } from '../shared/capture.js'
+import { CaptureStrip, CaptureView } from './components/CaptureView.js'
+import { useCameras } from './capture.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { HoldingView } from './components/HoldingView.js'
@@ -70,8 +73,14 @@ export function PopOut({ view }: { view: ViewId }) {
 	)
 	const ndiId = ndiIdOf(view)
 	const ndi = usePolled<NdiState | null>(ndiId === null ? null : (api) => api.ndi(), 500)
+	// A capture input is read from settings; main lets a pop-out read only its own one.
+	const captureId = captureIdOf(view)
+	const capture = usePolled<CaptureInput | null>(captureId === null ? null : (api) => api.captureInput(captureId), 2000)
+	const cameras = useCameras(captureId !== null)
 	const label =
-		ndiId !== null
+		captureId !== null
+			? (capture?.name ?? 'Capture')
+			: ndiId !== null
 			? (ndi?.feeds.find((f) => f.id === ndiId)?.name ?? 'NDI')
 			: embedId === null
 				? VIEW_LABEL[view as BuiltInView]
@@ -124,6 +133,7 @@ export function PopOut({ view }: { view: ViewId }) {
 					<span aria-hidden className="nacre-line absolute inset-x-3 -bottom-px h-[3px] rounded-t-full" />
 				</h1>
 				<span className="ml-auto flex items-center gap-2">
+				{captureId !== null && <CaptureStrip input={capture ?? undefined} now={now} />}
 				{ndiId !== null && <NdiStrip id={ndiId} ndi={ndi} now={now} />}
 				{view === 'video' && <VideoStrip feed={video} space={videoSpace} onFit={fitVideo} />}
 				{embedId !== null && embed !== undefined && (
@@ -141,7 +151,9 @@ export function PopOut({ view }: { view: ViewId }) {
 				</span>
 			</div>
 			<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-bg">
-				{ndiId !== null ? (
+				{captureId !== null ? (
+					<CaptureView input={capture ?? undefined} cameras={cameras} now={now} />
+				) : ndiId !== null ? (
 					<NdiView id={ndiId} ndi={ndi} now={now} />
 				) : view === 'arena' ? (
 					<ArenaView status={arena} now={now} />
