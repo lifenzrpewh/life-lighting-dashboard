@@ -359,6 +359,19 @@ bpc): **47-48 fps, up from 27**, Arena's own target being 50; no frame slower th
 reach the page (the log now says when one is). ⚠️ Not yet watched by the owner during a
 full-screen fade, nor Arena's own frame rate with the view at this rate.
 
+**Still freezing on Arena's fades to black (the owner, 2026-10-05, afternoon):** "holding
+frames and taking ages to update". Not reproduced without Arena: `spikes/video-lag/` is a
+stand-in sender fading the whole 1920×1080 picture white to black at 50 fps with its clock in
+the corner, and a receiver through the shipped feed. ✅ Standalone: 47 fps at the page, ~65 ms
+late, no gap over 30 ms. ✅ In the kiosk (the sender picked over CDP, the canvas read back): 41
+picture changes a second, ~55 ms late. ✅ Arena's `MULTIVIEW` idle through the receiver: 47 fps,
+no gap over 23 ms. So the feed keeps up with a full-screen fade; what differs during Arena's is
+Arena. **Each 5 s with a stall now says where, in `paua.log`:** `[video] in the last 5 s:` the
+kiosk's main process busy, the sender sending nothing, or a slow take (main's half), and `[video]
+the page, in the last 5 s:` the longest wait between frames, without drawing, and the slowest
+draw (the page's, only while it is on screen). Next: the owner fades to black, taps MARK, and the
+lines around the mark name the half that stalls.
+
 **Still to do:** lay out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
 
@@ -799,6 +812,41 @@ in both the Media row and here (taken without an answer: the owner can trim one)
     Update all opened their confirmations and sent nothing until Load (checked by trapping the
     send); the Media line opened Holding and came back. ⚠️ The live tick not seen (nothing was on
     screen); nothing by finger.
+- **A SCREEN BG** (the owner, 2026-10-05): the A-screen layer's new name. PRE & POST is still
+  read as it, for a campus not yet renamed.
+
+## The Lookbook view (owner's ask, 2026-10-05; built the same day)
+
+The owner: another holding view that "mimics the lookbook idea, have the images BIG and
+obvious", keeping Holding, and not the lookbook embedded, so the looks can still be loaded;
+merge them if that is better. **Taken (the owner's to change): a view of its own, on the same
+rules.** Holding is Arena's shape (layers by columns, every clip) and is for fixing; the
+Lookbook is the service's (moments in order) and is for seeing. One screen doing both is the
+clutter the owner dislikes. Both read `looksOf` and the same check, so they never disagree, and
+both load through the same confirmation.
+
+- One card per run-sheet item with media, two across a wide window: **the lookbook's own
+  picture of the moment** (`previewPath`, background and foreground composed, 5800×2037, served
+  1600 wide on `lookbook://large/…`; a preview is not kept, since the lookbook redraws it at the
+  same address), the A-screen or lower third beside its name (a lower third on grey), its column
+  name, its codes.
+- Quiet when right: a tick. **Amber ring and Load** when Arena lacks any of it; **green ring and
+  On screen** when a clip of its own plays in its column. A code chip: plain (in Arena), dashed +
+  (not in its column), amber (another file, or missing), struck (no file in the lookbook), faint
+  (not Arena's: a lower third). A one-off with no column says to choose its slot in Holding.
+- **Load** is that moment only (`lookSteps`): its codes into its column, a code it shares (the
+  background) freshened wherever it is old. **Load all** is Holding's Update all.
+- ✅ In the kiosk over CDP, against the live composition and Central PM 4 Oct: seven cards with
+  their pictures, six ticked, End amber with +CB095 for POST. Load not pressed. ⚠️ Nothing by finger.
+
+## The Creative Guide (owner's ask, 2026-10-05)
+
+LIFE's in-service creative guide (Notion, public) behind **Guide** on the top bar, in the
+windows' place like Connections, with zoom and reload: read, then closed. The owner had tried it
+as an embed in a window and taken it out. Fixed in `src/shared/guide.ts`, not a setting: one
+guide for every campus. An embed of main's own (own session, links out to the browser, zoom
+remembered), never listed in Connections. ✅ In the kiosk: opened, Notion loaded in ~8 s and
+filled the sheet, closed. ⚠️ Not by finger; a pop-out of it not offered.
 
 ## Open questions
 

@@ -37,11 +37,42 @@ let onVideoFrame: ((frame: VideoFrame) => void) | null = null
 // the transfer (the addon's own consumer, and its note, do the same).
 // Guarded: the module is experimental, and a preload that threw here would
 // take the whole surface below with it. Without it the feed only waits.
+// Where a stall comes from, the page's half (src/main/video-feed.ts has
+// main's): the longest wait between frames, the longest the page drew nothing
+// at all (a frame of the page's own, not the feed's), and the slowest draw.
+// Sent every 5 s while the feed is watched, only if one passed 250 ms (40 for
+// a draw), and only while the page is on screen, since a hidden page draws
+// nothing by design.
+let pageHealth = { frameGap: 0, drewNothing: 0, draw: 0, lastFrame: 0, lastPaint: 0 }
+setInterval(() => {
+	const h = pageHealth
+	pageHealth = { ...h, frameGap: 0, drewNothing: 0, draw: 0 }
+	if (onVideoFrame === null || document.hidden) return
+	if (h.frameGap >= 250 || h.drewNothing >= 250 || h.draw >= 40) {
+		ipcRenderer.send('video:page-health', { frameGap: h.frameGap, drewNothing: h.drewNothing, draw: h.draw })
+	}
+}, 5_000)
+const paint = (t: number) => {
+	if (onVideoFrame !== null && !document.hidden && pageHealth.lastPaint > 0) pageHealth.drewNothing = Math.max(pageHealth.drewNothing, t - pageHealth.lastPaint)
+	pageHealth.lastPaint = document.hidden ? 0 : t
+	requestAnimationFrame(paint)
+}
+if (typeof requestAnimationFrame === 'function') requestAnimationFrame(paint)
+// Time off screen is not a stall.
+document.addEventListener('visibilitychange', () => {
+	pageHealth.lastPaint = 0
+	pageHealth.lastFrame = 0
+})
+
 try {
 	sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }) => {
 		const frame = importedSharedTexture.getVideoFrame()
+		const at = performance.now()
+		if (pageHealth.lastFrame > 0 && !document.hidden) pageHealth.frameGap = Math.max(pageHealth.frameGap, at - pageHealth.lastFrame)
+		pageHealth.lastFrame = at
 		try {
 			onVideoFrame?.(frame)
+			pageHealth.draw = Math.max(pageHealth.draw, performance.now() - at)
 		} finally {
 			frame.close()
 			setTimeout(() => importedSharedTexture.release(), 0)

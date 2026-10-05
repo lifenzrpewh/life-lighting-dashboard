@@ -22,6 +22,7 @@ import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { HoldingView } from './components/HoldingView.js'
+import { LookbookView } from './components/LookbookView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import { currentFrame, type VideoFeedState } from '../shared/video-feed.js'
 import { CueMessage } from './components/CuePane.js'
@@ -58,7 +59,7 @@ export function PopOut({ view }: { view: ViewId }) {
 
 	const ma = usePolled<MaPaneReport>(view === 'ma' ? (api) => api.maPane() : null, 1000)
 	const cue = usePolled<CuePaneReport>(view === 'cue' ? (api) => api.cuePane() : null, 1000)
-	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' || view === 'holding' ? (api) => api.arenaStatus() : null, 250)
+	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' || view === 'holding' || view === 'lookbook' ? (api) => api.arenaStatus() : null, 250)
 	const video = usePolled<VideoFeedState | null>(view === 'video' ? (api) => api.videoFeed() : null, 500)
 	const embedId = embedIdOf(view)
 	const embed = usePolled<EmbedReport | undefined>(
@@ -136,6 +137,8 @@ export function PopOut({ view }: { view: ViewId }) {
 					<ClipsView status={arena} now={now} />
 				) : view === 'holding' ? (
 					<HoldingView status={arena} now={now} />
+				) : view === 'lookbook' ? (
+					<LookbookView status={arena} now={now} />
 				) : view === 'video' ? (
 					<VideoView feed={video} now={now} onSpace={setVideoSpace} />
 				) : (

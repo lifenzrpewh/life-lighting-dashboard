@@ -34,6 +34,7 @@ import {
 	reserved,
 	slotCode,
 	slotMark,
+	TYPE_LAYER,
 	type Placement,
 	type SlotMark,
 	type Unplaced,
@@ -54,7 +55,6 @@ export function HoldingView({ status, now }: { status: Channel<ArenaStatus> | nu
 type Choosing = { item: number; title: string; label: string | null; code: string; want: string; lookbookPath: string }
 type Picked = { kind: 'clip'; id: number } | { kind: 'choose'; what: Choosing } | null
 
-const TYPE_LAYER: Record<string, RegExp> = { B: /^hold\s*bg$/i, F: /^hold\s*fg$/i, A: /^pre\s*(?:&|and)?\s*post$/i }
 const unnamedColumn = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
 const needsLook = (mark: SlotMark | null) => mark === 'may-differ' || mark === 'different' || mark === 'missing'
 

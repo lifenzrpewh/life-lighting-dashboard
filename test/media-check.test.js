@@ -3,7 +3,20 @@ import assert from 'node:assert/strict'
 
 import { decodeItems, decodeServices, decodeWeeks } from '../dist/src/bridge/lookbook.js'
 import { planOf } from '../dist/src/shared/cue-pane.js'
-import { checkMedia, sameFile, fileStem, lookbookStem, mediaCodeOf, nzDate, offeredServices, sameKey, sameMarkFrom, sameMarksFrom } from '../dist/src/shared/media-check.js'
+import {
+	checkMedia,
+	sameFile,
+	fileStem,
+	lookbookPictureOf,
+	lookbookStem,
+	lookbookThumbUrl,
+	mediaCodeOf,
+	nzDate,
+	offeredServices,
+	sameKey,
+	sameMarkFrom,
+	sameMarksFrom,
+} from '../dist/src/shared/media-check.js'
 
 // Two items as the lookbook sent them for Central AM, 2026-10-04.
 const ITEMS = [
@@ -81,6 +94,22 @@ test('the lookbook items decode, in order, each file under its code, the mask ig
 	assert.equal(r.value[0].label, 'Walk In')
 	assert.deepEqual(Object.keys(r.value[0].files).sort(), ['CA635', 'CB095', 'CF588'])
 	assert.equal(r.value[1].files.CT108, '/storage/library/C/CT108-Sunday-ConnectWithUs_1788998311752.png')
+})
+
+test("an item's picture is the lookbook's own composed preview, and nothing else", () => {
+	const preview = '/storage/previews/2e571270-7f21-44c7-97af-cb1b16ca878d/83d2708f-6df5-4aba-97eb-ffa5643a5027/0.jpg'
+	const [ok, none, foreign] = decodeItems([
+		{ ...ITEMS[0], previewPath: preview, previewType: 'composite' },
+		{ ...ITEMS[1], orderIndex: 1 },
+		{ ...ITEMS[0], orderIndex: 2, previewPath: 'https://elsewhere.example/0.jpg' },
+	]).value
+	assert.equal(ok.preview, preview)
+	assert.equal(none.preview, null)
+	assert.equal(foreign.preview, null)
+	assert.equal(lookbookThumbUrl(preview, 'large'), `lookbook://large${preview}`)
+	assert.deepEqual(lookbookPictureOf(`lookbook://large${preview}`), { path: preview, size: 'large' })
+	assert.equal(lookbookPictureOf('lookbook://large/storage/previews/../../secret.jpg'), null)
+	assert.equal(lookbookPictureOf('lookbook://huge/storage/library/C/CF588-x.png'), null)
 })
 
 test('a run sheet of the wrong shape fails whole', () => {

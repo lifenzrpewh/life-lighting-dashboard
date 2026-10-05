@@ -13,7 +13,7 @@
 import { nativeImage, protocol } from 'electron'
 
 import { ARENA_REQUEST_TIMEOUT_MS, THUMBNAIL_SCHEME, clipIdOfThumbnail } from '../shared/arena.js'
-import { LOOKBOOK_SCHEME, LOOKBOOK_TIMEOUT_MS, LOOKBOOK_URL, lookbookPathOf } from '../shared/media-check.js'
+import { LOOKBOOK_SCHEME, LOOKBOOK_TIMEOUT_MS, LOOKBOOK_URL, lookbookPictureOf, type LookbookSize } from '../shared/media-check.js'
 
 /** Before the app is ready, as Electron requires. Standard, so the address
  *  parses as host and path; secure, so a page on https or file may show it. */
@@ -46,31 +46,45 @@ export function serveThumbnails(arena: () => { host: string; port: number } | nu
 }
 
 /** The lookbook's pictures, for media the Holding view shows before it is in
- *  Arena, on `lookbook://thumbnail/storage/library/…`. Only a library still
- *  is asked for (`lookbookPathOf`), shrunk to 480 px wide (the library's
- *  are as big as 5800 px), and kept: a library file's name carries its upload
- *  time, so a new upload is a new address. */
-const LOOKBOOK_THUMB_WIDTH = 480
+ *  Arena, on `lookbook://thumbnail/storage/library/…`, and the Lookbook
+ *  view's big ones on `lookbook://large/…`. Only a library still or an
+ *  item's composed preview is asked for (`lookbookPictureOf`), shrunk (the
+ *  library's are as big as 5800 px). A library file is kept: its name carries
+ *  its upload time, so a new upload is a new address. A preview is not: the
+ *  lookbook redraws it at the same address when the run sheet changes. */
+const LOOKBOOK_WIDTH: Record<LookbookSize, number> = { thumbnail: 480, large: 1600 }
 const LOOKBOOK_KEPT = 60
 const lookbookKept = new Map<string, Buffer>()
 
 export function serveLookbookThumbnails(): void {
 	protocol.handle(LOOKBOOK_SCHEME, async (request) => {
-		const path = lookbookPathOf(request.url)
-		if (path === null) return new Response(null, { status: 404 })
-		const kept = lookbookKept.get(path)
-		const png = (b: Buffer) => new Response(new Uint8Array(b), { headers: { 'content-type': 'image/png', 'cache-control': 'max-age=86400' } })
-		if (kept !== undefined) return png(kept)
+		const picture = lookbookPictureOf(request.url)
+		if (picture === null) return new Response(null, { status: 404 })
+		const { path, size } = picture
+		const key = `${size}:${path}`
+		const library = path.startsWith('/storage/library/')
+		const kept = library ? lookbookKept.get(key) : undefined
+		// A photo stays a JPEG (a large preview as PNG is megabytes); anything
+		// else a PNG, which keeps a foreground's transparency.
+		const jpeg = /\.jpe?g$/i.test(path)
+		const reply = (b: Buffer) =>
+			new Response(new Uint8Array(b), {
+				headers: { 'content-type': jpeg ? 'image/jpeg' : 'image/png', 'cache-control': library ? 'max-age=86400' : 'max-age=60' },
+			})
+		if (kept !== undefined) return reply(kept)
 		try {
 			const r = await fetch(LOOKBOOK_URL + path, { signal: AbortSignal.timeout(LOOKBOOK_TIMEOUT_MS * 2) })
 			if (!r.ok || !(r.headers.get('content-type') ?? '').startsWith('image/')) return new Response(null, { status: 502 })
 			const image = nativeImage.createFromBuffer(Buffer.from(await r.arrayBuffer()))
 			if (image.isEmpty()) return new Response(null, { status: 502 })
-			const small = image.getSize().width > LOOKBOOK_THUMB_WIDTH ? image.resize({ width: LOOKBOOK_THUMB_WIDTH, quality: 'good' }) : image
-			const out = small.toPNG()
-			lookbookKept.set(path, out)
-			if (lookbookKept.size > LOOKBOOK_KEPT) lookbookKept.delete(lookbookKept.keys().next().value as string)
-			return png(out)
+			const width = LOOKBOOK_WIDTH[size]
+			const small = image.getSize().width > width ? image.resize({ width, quality: 'good' }) : image
+			const out = jpeg ? small.toJPEG(85) : small.toPNG()
+			if (library) {
+				lookbookKept.set(key, out)
+				if (lookbookKept.size > LOOKBOOK_KEPT) lookbookKept.delete(lookbookKept.keys().next().value as string)
+			}
+			return reply(out)
 		} catch {
 			return new Response(null, { status: 504 })
 		}

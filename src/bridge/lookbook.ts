@@ -9,14 +9,17 @@
 // - `GET /api/services/<id>/items`: the run sheet's items with media, each
 //   `{ orderIndex, title, mediaLabel, codes: ["CB095", …], rawMediaNo,
 //   resolvedAssetPaths: { background, foreground, aScreen, lowerThird, mask },
-//   missingCodes }`. A resolved path is `/storage/library/C/CF588-…_<ms>.png`;
+//   missingCodes, previewPath, previewType }`. ✅ 2026-10-05: `previewPath` is
+//   the lookbook's own picture of the moment, background and foreground
+//   composed (`previewType: "composite"`), `/storage/previews/<week>/<service>/0.jpg`
+//   at 5800 px wide. A resolved path is `/storage/library/C/CF588-…_<ms>.png`;
 //   `mask` is `"applied"`, not a path.
 //
 // THE RULE THIS FILE ENFORCES: as everywhere, a reply of the wrong shape fails
 // whole, with what was wrong. An item list that half-decoded would check half
 // the run sheet and say the rest was fine.
 
-import { mediaCodeOf, type LookbookItem, type LookbookService } from '../shared/media-check.js'
+import { isLookbookPicture, mediaCodeOf, type LookbookItem, type LookbookService } from '../shared/media-check.js'
 import type { Decoded } from './ontime.js'
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -94,6 +97,10 @@ export function decodeItems(body: unknown): Decoded<LookbookItem[]> {
 			if (code !== null && files[code.code] === undefined) files[code.code] = path
 		}
 		const label = it['mediaLabel']
+		// The lookbook's picture of the moment: only one of its own previews,
+		// never an address of anyone else's. Anything else is no picture, not a
+		// failed run sheet, since the check does not need it.
+		const preview = it['previewPath']
 		items.push({
 			order,
 			title: isStr(it['title']) && it['title'].trim() !== '' ? it['title'].trim() : `Item ${i + 1}`,
@@ -101,6 +108,7 @@ export function decodeItems(body: unknown): Decoded<LookbookItem[]> {
 			codes: codes.map((c) => c.trim().toUpperCase()),
 			files,
 			missingCodes: missing.map((c) => c.trim().toUpperCase()),
+			preview: isStr(preview) && isLookbookPicture(preview) ? preview : null,
 		})
 	}
 	return { ok: true, value: items.sort((a, b) => a.order - b.order).map(({ order: _, ...item }) => item) }

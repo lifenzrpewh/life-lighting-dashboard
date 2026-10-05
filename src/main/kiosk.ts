@@ -599,6 +599,16 @@ app.whenReady().then(() => {
 	ipcMain.on('video:choose', (e, name: unknown) => {
 		if (fromOurs(e) && typeof name === 'string') videoFeed?.choose(name)
 	})
+	// The page's half of where a stall comes from (src/main/video-feed.ts): only
+	// numbers are taken, so a page cannot write words of its own into the log.
+	ipcMain.on('video:page-health', (e, h: unknown) => {
+		if (!fromOurs(e) || typeof h !== 'object' || h === null) return
+		const { frameGap, drewNothing, draw } = h as Record<string, unknown>
+		const ms = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 3_600_000 ? Math.round(v) : null)
+		const [gap, still, slow] = [ms(frameGap), ms(drewNothing), ms(draw)]
+		if (gap === null || still === null || slow === null) return
+		console.log(`[video] the page, in the last 5 s: longest wait between frames ${gap} ms, longest without drawing ${still} ms, slowest draw ${slow} ms`)
+	})
 
 	// Pop-outs. The kiosk opens them; the kiosk or the pop-out itself closes one.
 	const asView = (v: unknown): ViewId | null => (isViewId(v) ? v : null)

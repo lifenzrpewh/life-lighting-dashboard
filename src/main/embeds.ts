@@ -23,6 +23,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { isZoom, zoomStep, type Embed, type EmbedPaneState, type EmbedReport } from '../shared/embeds.js'
+import { GUIDE } from '../shared/guide.js'
 import { PANE_LOAD_TIMEOUT_MS, PANE_RETRY_MS, type PaneRect } from '../shared/ma-pane.js'
 import { clampToWindow } from './ma-pane.js'
 import { snapshotOf } from './pane-snapshot.js'
@@ -62,8 +63,14 @@ export type EmbedPane = {
 	close(): void
 }
 
-function createEmbedPane(window: BrowserWindow, embed: Embed, zoom: number, onZoom: (z: number) => void): EmbedPane {
-	const ses = session.fromPartition(partitionOf(embed.id))
+function createEmbedPane(
+	window: BrowserWindow,
+	embed: Embed,
+	zoom: number,
+	onZoom: (z: number) => void,
+	partition = partitionOf(embed.id),
+): EmbedPane {
+	const ses = session.fromPartition(partition)
 	ses.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === 'clipboard-sanitized-write'))
 	ses.setPermissionCheckHandler((_wc, permission) => permission === 'clipboard-sanitized-write')
 	ses.setUserAgent(plainUserAgent(ses.getUserAgent()))
@@ -228,7 +235,9 @@ function createEmbedPane(window: BrowserWindow, embed: Embed, zoom: number, onZo
 }
 
 export type Embeds = {
+	/** Every embed's report, and the Creative Guide's. */
 	reports(): EmbedReport[]
+	/** An embed's pane, or the Creative Guide's for its id (../shared/guide.ts). */
 	pane(id: string): EmbedPane | undefined
 	/** Every embed's pane that exists, to picture or move. */
 	panes(): EmbedPane[]
@@ -319,14 +328,20 @@ export function createEmbeds(window: BrowserWindow, dataDir: string): Embeds {
 		known = ids
 	}
 
+	// The Creative Guide: an embed of main's own, never in settings, so never
+	// swept or removed. Its session is not an `embed-` one, and it opens its
+	// page only once the guide is opened.
+	const guide = createEmbedPane(window, GUIDE, readZooms()[GUIDE.id] ?? 1, (z) => remember(GUIDE.id, z), 'persist:guide')
+
 	window.on('closed', () => {
 		for (const p of panes.values()) p.close()
 		panes.clear()
+		guide.close()
 	})
 
 	return {
-		reports: () => [...panes.values()].map((p) => p.report()),
-		pane: (id) => panes.get(id),
+		reports: () => [...panes.values(), guide].map((p) => p.report()),
+		pane: (id) => (id === GUIDE.id ? guide : panes.get(id)),
 		panes: () => [...panes.values()],
 		sync,
 	}

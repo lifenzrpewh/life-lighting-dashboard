@@ -24,7 +24,7 @@
 // Arena's default (`Column #`) mean nothing is placed, and the view says
 // which names to use. Nothing is guessed from what a column happens to hold.
 //
-// Also the owner's: B on HOLD BG, F on HOLD FG, A on PRE & POST; nothing from
+// Also the owner's: B on HOLD BG, F on HOLD FG, A on A SCREEN BG; nothing from
 // the lookbook on PLAYBACK; each service has its own deck, so a clip this run
 // sheet does not use may be replaced.
 //
@@ -44,13 +44,15 @@ import type { ArenaLayer, ArenaSlot, ArenaStatus } from './arena.js'
 import { ARENA_TYPES, fileStem, lookbookStem, mediaCodeOf, sameFile, sameKey, type FileSizes, type LookbookItem } from './media-check.js'
 import type { FetchRequest } from './media-fetch.js'
 
-/** Each type's layer, by name. */
-const TYPE_LAYER: Record<string, RegExp> = {
+/** Each type's layer, by name. The A-screen layer was PRE & POST until the
+ *  owner renamed it A SCREEN BG (2026-10-05); a campus not yet renamed still
+ *  works. */
+export const TYPE_LAYER: Record<string, RegExp> = {
 	B: /^hold\s*bg$/i,
 	F: /^hold\s*fg$/i,
-	A: /^pre\s*(?:&|and)?\s*post$/i,
+	A: /^(?:a\s*screens?\s*bg|pre\s*(?:&|and)?\s*post)$/i,
 }
-const TYPE_LAYER_NAME: Record<string, string> = { B: 'HOLD BG', F: 'HOLD FG', A: 'PRE & POST' }
+const TYPE_LAYER_NAME: Record<string, string> = { B: 'HOLD BG', F: 'HOLD FG', A: 'A SCREEN BG' }
 
 /** The names a campus gives its columns, for the screen. */
 export const COLUMN_NAMES = 'PRE, POST, WTL, NSL, BIBLES, WTG and PROMO'
@@ -71,7 +73,7 @@ export function columnNamesOf(layer: ArenaLayer, status: ArenaStatus): string[] 
 }
 
 /** The layers the Holding view shows, top first as Arena's panel reads:
- *  HOLDING's and PRE & POST, PLAYBACK last as it is rarely used. */
+ *  HOLDING's and A SCREEN BG, PLAYBACK last as it is rarely used. */
 export function holdingLayers(status: ArenaStatus): ArenaLayer[] {
 	const top = [...status.layers].reverse()
 	const holding = top.filter((l) => l.group !== null && /holding/i.test(l.group) && !/playback/i.test(l.name))
@@ -244,7 +246,17 @@ function arenaCodes(item: LookbookItem): { code: string; type: string; want: str
 /** Every run-sheet item's codes, into its column: what is missing from
  *  where it belongs, and what has no place. A code already in its column (any
  *  version: an old one is Update's, by `clipsToUpdate`) needs nothing. */
-export function planPlacements(items: LookbookItem[], status: ArenaStatus): { placements: Placement[]; unplaced: Unplaced[] } {
+export function planPlacements(
+	items: LookbookItem[],
+	status: ArenaStatus,
+): {
+	placements: Placement[]
+	unplaced: Unplaced[]
+	/** Each item's column (counted from 0), for those that have one. */
+	columns: Map<number, number>
+	/** The column names the items were placed by. */
+	names: string[]
+} {
 	const today = codesOn(items)
 	const layerOf = (type: string) => {
 		const p = TYPE_LAYER[type]
@@ -358,7 +370,9 @@ export function planPlacements(items: LookbookItem[], status: ArenaStatus): { pl
 			})
 		}
 	}
-	return { placements, unplaced }
+	const columns = new Map<number, number>()
+	for (const [i, where] of columnOf) if (!('none' in where)) columns.set(i, where.column)
+	return { placements, unplaced, columns, names }
 }
 
 /** Every clip carrying `code` that is not the lookbook's `want`, or whose file
@@ -418,13 +432,117 @@ export function updatePlan(
 	for (const p of placements) byCode.get(p.code)?.place.push(p)
 	const steps: UpdateStep[] = []
 	for (const [code, { want, path, update, place }] of byCode) {
-		const clipIds = [...new Set([...update, ...place.map((p) => p.clipId)])]
-		if (clipIds.length === 0) continue
-		const parts = [
-			...(update.length === 0 ? [] : [update.length === 1 ? 'its clip with the old file' : `its ${update.length} clips with the old file`]),
-			...place.map(placementWords),
-		]
-		steps.push({ request: { code, want, clipIds, lookbookPath: path, allowLookbook: false, allowLive: [] }, what: `${code} into ${parts.join('; ')}` })
+		const step = stepFor(code, want, path, update, place)
+		if (step !== null) steps.push(step)
 	}
 	return { steps, unplaced }
+}
+
+/** One code's step: its file into the clips with an old one and the slots it
+ *  is placed in, or null when there is nothing to do. */
+function stepFor(code: string, want: string, path: string | null, update: number[], place: Placement[]): UpdateStep | null {
+	const clipIds = [...new Set([...update, ...place.map((p) => p.clipId)])]
+	if (clipIds.length === 0) return null
+	const parts = [
+		...(update.length === 0 ? [] : [update.length === 1 ? 'its clip with the old file' : `its ${update.length} clips with the old file`]),
+		...place.map(placementWords),
+	]
+	return { request: { code, want, clipIds, lookbookPath: path, allowLookbook: false, allowLive: [] }, what: `${code} into ${parts.join('; ')}` }
+}
+
+/** What one code of a run-sheet item is in Arena, for the Lookbook view:
+ *  - `ready`: in its column, the lookbook's file, found on this computer
+ *  - `place`: not yet in its column
+ *  - `look`: its file may differ or differs from the lookbook's somewhere
+ *  - `missing`: a clip carrying it cannot find its file
+ *  - `no-place`: it has no column (a one-off) or no layer, said, not guessed
+ *  - `no-file`: the lookbook has no file for it
+ *  - `not-arena`: not Arena's (a lower third, a countdown) */
+export type CodeState = 'ready' | 'place' | 'look' | 'missing' | 'no-place' | 'no-file' | 'not-arena'
+
+/** One moment of the service as the Lookbook view draws it. */
+export type Look = {
+	item: number
+	codes: { code: string; type: string; state: CodeState }[]
+	/** Its column, counted from 1, and that column's name, when it has one. */
+	column: { number: number; name: string } | null
+	/** Something of it is on screen in Arena now: a clip of its codes playing in its column. */
+	live: boolean
+	/** Everything of Arena's is where it belongs and right. */
+	ready: boolean
+}
+
+/** Every run-sheet item as a look: what each of its codes is in Arena. */
+export function looksOf(items: LookbookItem[], status: ArenaStatus, marks: ReadonlySet<string>, sizes?: FileSizes): Look[] {
+	const { placements, unplaced, columns, names } = planPlacements(items, status)
+	const today = codesOn(items)
+	// A code's worst mark over every clip carrying it: one of CB095's eighteen
+	// with an old file is enough to look at.
+	const worst = new Map<string, SlotMark>()
+	for (const layer of status.layers) {
+		for (const slot of layer.slots) {
+			const code = slotCode(slot)
+			if (code === null || !today.has(code)) continue
+			const mark = slotMark(slot, items, today, marks, sizes)
+			if (mark === 'missing' || (mark !== 'today' && mark !== 'confirmed' && worst.get(code) !== 'missing')) worst.set(code, mark)
+		}
+	}
+	return items.map((item, i) => {
+		const column = columns.get(i)
+		const codes = arenaCodesAll(item).map(({ code, type }) => {
+			const state: CodeState = !ARENA_TYPES.includes(type)
+				? 'not-arena'
+				: item.files[code] === undefined
+					? 'no-file'
+					: unplaced.some((u) => u.item === i && u.code === code)
+						? 'no-place'
+						: placements.some((p) => p.item === i && p.code === code)
+							? 'place'
+							: worst.get(code) === 'missing'
+								? 'missing'
+								: worst.has(code)
+									? 'look'
+									: 'ready'
+			return { code, type, state }
+		})
+		const live =
+			column !== undefined &&
+			codes.some(({ code }) => status.layers.some((l) => l.slots[column]?.state === 'playing' && slotCode(l.slots[column] as ArenaSlot) === code))
+		return {
+			item: i,
+			codes,
+			column: column === undefined ? null : { number: column + 1, name: names[column] ?? '' },
+			live,
+			// The lookbook having no file is the lookbook's to fix, not Arena's.
+			ready: codes.every((c) => c.state === 'ready' || c.state === 'not-arena' || c.state === 'no-file'),
+		}
+	})
+}
+
+/** Every code on an item, each once, with its type letter, in the note's order. */
+function arenaCodesAll(item: LookbookItem): { code: string; type: string }[] {
+	const out: { code: string; type: string }[] = []
+	for (const raw of item.codes) {
+		const c = mediaCodeOf(raw)
+		if (c !== null && !out.some((o) => o.code === c.code)) out.push({ code: c.code, type: c.type })
+	}
+	return out
+}
+
+/** What loading one look would do: each of its codes into the clips with an
+ *  old file and into its column. A code it shares with other items (a
+ *  background) is updated everywhere it is old, since a code is one piece,
+ *  but placed only in this item's column. */
+export function lookSteps(index: number, items: LookbookItem[], status: ArenaStatus, marks: ReadonlySet<string>, sizes?: FileSizes): UpdateStep[] {
+	const item = items[index]
+	if (item === undefined) return []
+	const { placements } = planPlacements(items, status)
+	const steps: UpdateStep[] = []
+	for (const c of arenaCodes(item)) {
+		if (c.want === null) continue
+		const update = clipsToUpdate(c.code, c.want, c.path ?? '', status, marks, sizes)
+		const step = stepFor(c.code, c.want, c.path, update, placements.filter((p) => p.item === index && p.code === c.code))
+		if (step !== null) steps.push(step)
+	}
+	return steps
 }

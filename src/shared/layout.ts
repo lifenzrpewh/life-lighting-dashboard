@@ -30,13 +30,13 @@
 import { embedIdOf, type Embed, type EmbedView } from './embeds.js'
 
 /** The views that come with Pāua. */
-export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'video'
+export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video'
 
 /** A built-in view, or an embed someone added in Connections (./embeds.ts). */
 export type ViewId = BuiltInView | EmbedView
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
-export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'video']
+export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video']
 
 export const VIEW_LABEL: Record<BuiltInView, string> = {
 	cue: 'Run order',
@@ -46,6 +46,8 @@ export const VIEW_LABEL: Record<BuiltInView, string> = {
 	clips: 'Clips',
 	/** The holding layers against today's run sheet, to prepare (./components/HoldingView.tsx). */
 	holding: 'Holding',
+	/** The run sheet's moments as the lookbook draws them, big, against Arena (./components/LookbookView.tsx). */
+	lookbook: 'Lookbook',
 	video: 'Video',
 }
 

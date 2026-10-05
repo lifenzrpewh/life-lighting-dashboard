@@ -1,7 +1,7 @@
 // Top band: READ-ONLY. Status where you look; actions where your hand rests.
 // Nothing in here fires, stores, or deletes anything. The mode button,
-// Layouts, Edit layout (operator mode), Connections and the console card are the only controls, and none
-// of them touches the show: the console card opens a sheet, whose Save As and
+// Guide, Layouts, Edit layout (operator mode), Connections and the console card are the only controls,
+// and none of them touches the show: the console card opens a sheet, whose Save As and
 // Load are behind operator mode and their own guards (./ShowfileSheet.tsx).
 //
 // Kept to what a volunteer acts on during a service (the owner's call,
@@ -22,7 +22,7 @@
 // computer. The strip's controls are only the chevron back.
 
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, ChevronUp, Flag, PanelsTopLeft, Pencil } from 'lucide-react'
+import { BookOpen, Check, ChevronDown, ChevronUp, Flag, PanelsTopLeft, Pencil } from 'lucide-react'
 
 import type { LinkState, Reading, UnknownReason } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
@@ -156,6 +156,8 @@ export function StatusBar({
 	onLeave,
 	connectionsOpen,
 	onMark,
+	guideOpen,
+	onGuide,
 	layoutName,
 	layoutsOpen,
 	onLayouts,
@@ -182,6 +184,9 @@ export function StatusBar({
 	/** "Mark this moment": a line in the log for a tester. Answers which mark,
 	 *  or null when it could not be written. */
 	onMark: () => Promise<number | null>
+	/** The Creative Guide (../../shared/guide.ts), for everyone to read. */
+	guideOpen: boolean
+	onGuide: () => void
 	/** The saved layout on screen, if it is one (../../shared/layout.ts). */
 	layoutName: string | null
 	layoutsOpen: boolean
@@ -233,6 +238,9 @@ export function StatusBar({
 
 			{/* Controls, where the hand rests. None touches the show. */}
 			<div className="flex min-w-0 items-center justify-end gap-2">
+				<Button icon={BookOpen} onClick={onGuide} pressed={guideOpen} className={guideOpen ? open : ''}>
+					Guide
+				</Button>
 				<Button icon={PanelsTopLeft} onClick={onLayouts} pressed={layoutsOpen} className={`max-w-72 ${layoutsOpen ? open : ''}`}>
 					<span className="truncate">{layoutName ?? 'Layouts'}</span>
 					<ChevronDown size={16} className="-mr-1 text-booth-dim" aria-hidden />

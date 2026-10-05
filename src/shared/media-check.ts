@@ -80,23 +80,37 @@ export const LOOKBOOK_SCHEME = 'lookbook'
 
 /** A lookbook library file: `/storage/library/C/CF588-…_1789857226772.png`. */
 const LIBRARY_PATH = /^\/storage\/library\/[A-Za-z]\/[^/\\]{1,200}\.(?:png|jpe?g|webp|gif)$/i
+/** A run-sheet item's picture as the lookbook composes it, background and
+ *  foreground together: `/storage/previews/<week>/<service>/0.jpg`. */
+const PREVIEW_PATH = /^\/storage\/previews\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/\d{1,4}\.(?:png|jpe?g|webp)$/i
 
-/** The thumbnail address for a lookbook file, or null for one that is not a
- *  still picture (a video has nothing to shrink). */
-export function lookbookThumbUrl(path: string): string | null {
-	return LIBRARY_PATH.test(path) ? `${LOOKBOOK_SCHEME}://thumbnail${path.split('/').map(encodeURIComponent).join('/')}` : null
+export const isLookbookPicture = (path: string): boolean => LIBRARY_PATH.test(path) || PREVIEW_PATH.test(path)
+
+/** How big main makes a lookbook picture: a thumbnail for a tile, large for
+ *  the Lookbook view's cards. */
+export type LookbookSize = 'thumbnail' | 'large'
+
+/** The address for a lookbook picture, or null for one that is not a still
+ *  picture (a video has nothing to shrink). */
+export function lookbookThumbUrl(path: string, size: LookbookSize = 'thumbnail'): string | null {
+	return isLookbookPicture(path) ? `${LOOKBOOK_SCHEME}://${size}${path.split('/').map(encodeURIComponent).join('/')}` : null
+}
+
+/** The picture's path and size in a lookbook picture address, or null. */
+export function lookbookPictureOf(url: string): { path: string; size: LookbookSize } | null {
+	try {
+		const u = new URL(url)
+		if (u.protocol !== `${LOOKBOOK_SCHEME}:` || (u.host !== 'thumbnail' && u.host !== 'large')) return null
+		const path = u.pathname.split('/').map(decodeURIComponent).join('/')
+		return isLookbookPicture(path) ? { path, size: u.host } : null
+	} catch {
+		return null
+	}
 }
 
 /** The library path in a lookbook thumbnail address, or null. */
 export function lookbookPathOf(url: string): string | null {
-	try {
-		const u = new URL(url)
-		if (u.protocol !== `${LOOKBOOK_SCHEME}:` || u.host !== 'thumbnail') return null
-		const path = u.pathname.split('/').map(decodeURIComponent).join('/')
-		return LIBRARY_PATH.test(path) ? path : null
-	} catch {
-		return null
-	}
+	return lookbookPictureOf(url)?.path ?? null
 }
 
 /** A file's name without its folder or extension, whichever separator the
@@ -140,6 +154,9 @@ export type LookbookItem = {
 	files: Record<string, string>
 	/** Codes the lookbook could not find a file for. */
 	missingCodes: string[]
+	/** The lookbook's own picture of the moment, its background and foreground
+	 *  composed (`previewPath`), when it has made one. */
+	preview?: string | null
 }
 
 export type LookbookRead<T> = { ok: true; value: T; at: number } | { ok: false; detail: string; at: number }

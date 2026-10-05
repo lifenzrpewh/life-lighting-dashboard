@@ -29,6 +29,7 @@ import { Centered, MaMessage, paneSummary } from './components/MaPane.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { HoldingView } from './components/HoldingView.js'
+import { LookbookView } from './components/LookbookView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { Still } from './components/Still.js'
@@ -61,6 +62,8 @@ import { usePopouts } from './popouts.js'
 import { PanePlacer } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
 import { ShowfileSheet } from './components/ShowfileSheet.js'
+import { GuideSheet } from './components/GuideSheet.js'
+import { GUIDE } from '../shared/guide.js'
 import { useMode } from './mode.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
@@ -121,7 +124,12 @@ export function App() {
 	// name Save As offers.
 	const [showfileOpen, setShowfileOpen] = useState(false)
 	const [campus, setCampus] = useState<string | null>(null)
+	// The Creative Guide (../shared/guide.ts), in the windows' place like the
+	// sheets above; one at a time. Its page is placed over the sheet's body.
+	const [guideOpen, setGuideOpen] = useState(false)
+	const [guideBox, setGuideBox] = useState<HTMLElement | null>(null)
 	const openShowfile = () => {
+		setGuideOpen(false)
 		setLayoutsOpen(false)
 		setConnectionsOpen(false)
 		setEditing(false)
@@ -521,6 +529,7 @@ export function App() {
 			case 'arena':
 			case 'clips':
 			case 'holding':
+			case 'lookbook':
 				return out
 			case 'video':
 				return (
@@ -609,6 +618,8 @@ export function App() {
 				return <ClipsView status={arenaStatus} now={now} />
 			case 'holding':
 				return <HoldingView status={arenaStatus} now={now} />
+			case 'lookbook':
+				return <LookbookView status={arenaStatus} now={now} />
 			case 'video':
 				return <VideoView feed={videoFeed} now={now} onSpace={setVideoSpace} />
 		}
@@ -630,6 +641,7 @@ export function App() {
 			{pages.map((p) => (
 				<PanePlacer key={p.view} box={boxes[p.view] ?? null} hidden={pageHidden(p.view)} send={p.send} />
 			))}
+			<PanePlacer box={guideOpen ? guideBox : null} hidden={!guideOpen} send={(rect) => window.life?.placeEmbed(GUIDE.id, rect)} />
 			{DEV && (
 				<div className="flex items-center gap-3 bg-warn px-4 py-1.5 text-xs font-semibold text-booth-bg">
 					{scenario === 'real' ? (
@@ -665,7 +677,16 @@ export function App() {
 				}
 				layoutName={layoutName}
 				layoutsOpen={layoutsOpen}
+				guideOpen={guideOpen}
+				onGuide={() => {
+					setConnectionsOpen(false)
+					setShowfileOpen(false)
+					setLayoutsOpen(false)
+					setEditing(false)
+					setGuideOpen(!guideOpen)
+				}}
 				onLayouts={() => {
+					setGuideOpen(false)
 					setConnectionsOpen(false)
 					setShowfileOpen(false)
 					setEditing(false)
@@ -674,12 +695,14 @@ export function App() {
 				editing={editing}
 				onEditLayout={() => {
 					if (editing) return setEditing(false)
+					setGuideOpen(false)
 					setConnectionsOpen(false)
 					setShowfileOpen(false)
 					setLayoutsOpen(false)
 					startEditing()
 				}}
 				onConnections={() => {
+					setGuideOpen(false)
 					setLayoutsOpen(false)
 					setShowfileOpen(false)
 					setEditing(false)
@@ -742,7 +765,9 @@ export function App() {
 			    a rule someone has to remember. Connections and the showfile sheet
 			    stand in the grid's place; every page is hidden, not closed. */}
 			<main className="flex min-h-0 min-w-0 flex-1 flex-col">
-				{connectionsOpen ? (
+				{guideOpen ? (
+					<GuideSheet report={embedReport(GUIDE.id)} now={now} boxRef={setGuideBox} onClose={() => setGuideOpen(false)} />
+				) : connectionsOpen ? (
 					<ConnectionsPanel
 						rows={connections}
 						operator={mode === 'operator'}

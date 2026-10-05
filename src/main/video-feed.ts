@@ -120,6 +120,26 @@ export function startVideoFeed(): VideoFeed {
 	let failure: string | null = typeof addon === 'string' ? `the video addon did not load: ${addon}` : null
 	/** When a slow frame was last logged: at most one line every 10 s. */
 	let slowLoggedAt = 0
+	// Where a stall comes from (the owner, 2026-10-05: frozen and slow to catch
+	// up while Arena fades to black, which a stand-in fading the whole picture
+	// at 50 fps did not reproduce: 47 fps, ~65 ms late, no gap over 30 ms).
+	// Each 5 s with something wrong says which, in one line: this process too
+	// busy to ask for frames, the sender sending none, or a receive slow.
+	let health = { since: performance.now(), lastTick: performance.now(), busy: 0, quiet: 0, receive: 0, lastNew: performance.now() }
+	const HEALTH_MS = 5_000
+	const BAD_MS = 250
+	const reportHealth = (now: number) => {
+		if (now - health.since < HEALTH_MS) return
+		const h = health
+		health = { ...h, since: now, busy: 0, quiet: 0, receive: 0 }
+		if (h.busy < BAD_MS && h.quiet < BAD_MS && h.receive < 40) return
+		const parts = [
+			h.busy >= BAD_MS ? `the kiosk's main process was busy for ${Math.round(h.busy)} ms` : null,
+			h.quiet >= BAD_MS ? `the sender sent nothing for ${Math.round(h.quiet)} ms` : null,
+			h.receive >= 40 ? `taking a frame took ${Math.round(h.receive)} ms` : null,
+		].filter((p) => p !== null)
+		console.log(`[video] in the last ${Math.round(HEALTH_MS / 1000)} s: ${parts.join('; ')} (${receiver?.name ?? 'no sender'}, ${counted.fps} fps)`)
+	}
 	/** Frames delivered in the current second, and the last whole second's count. */
 	let counted = { second: 0, frames: 0, fps: 0 }
 
@@ -157,6 +177,8 @@ export function startVideoFeed(): VideoFeed {
 			failure = null
 			// This sender's own count; the last one's is not its frame rate.
 			counted = { second: 0, frames: 0, fps: 0 }
+			const now = performance.now()
+			health = { since: now, lastTick: now, busy: 0, quiet: 0, receive: 0, lastNew: now }
 			console.log(`[video] receiving "${name}"`)
 		} catch (e) {
 			failure = `could not open "${name}": ${(e as Error).message}`
@@ -166,14 +188,26 @@ export function startVideoFeed(): VideoFeed {
 	}
 
 	const tick = () => {
-		if (typeof addon === 'string' || receiver === null || inFlight) return
-		if (performance.now() - lastSentAt < MIN_FRAME_MS) return
+		const started = performance.now()
+		health.busy = Math.max(health.busy, started - health.lastTick - POLL_MS)
+		health.lastTick = started
+		reportHealth(started)
+		// Not asking the sender is not the sender being quiet.
+		if (typeof addon === 'string' || receiver === null || inFlight || started - lastSentAt < MIN_FRAME_MS) {
+			health.lastNew = started
+			return
+		}
 		let frame: ReturnType<Receiver['receiveSharedTexture']>
 		try {
 			// ✅ 2026-10-03: without this check the addon hands back the same frame
 			// on every call (554 in 3 s from a 30 fps sender).
 			if (!receiver.native.hasNewFrame()) return
+			// Measured when the next frame comes, so a sender that has gone for
+			// good is the view's to say (stalled), not a line every 5 s.
+			health.quiet = Math.max(health.quiet, started - health.lastNew)
+			health.lastNew = started
 			frame = receiver.native.receiveSharedTexture()
+			health.receive = Math.max(health.receive, performance.now() - started)
 		} catch (e) {
 			// ✅ 2026-10-03: it throws, rather than returning null, while the
 			// sender is gone. The list notices the sender leaving. It also refuses

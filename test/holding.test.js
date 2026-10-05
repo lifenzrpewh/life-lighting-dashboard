@@ -7,6 +7,8 @@ import {
 	codesOn,
 	holdingLayers,
 	likeness,
+	lookSteps,
+	looksOf,
 	nameWords,
 	placementWords,
 	planPlacements,
@@ -133,6 +135,19 @@ test('Doors Open goes in PRE and End in POST, on every layer; a code both use go
 	assert.equal(at(placements, 'Walk Out', 'CB095'), undefined)
 })
 
+test('the A-screen layer by its new name, A SCREEN BG (the owner, 2026-10-05), as by its old', () => {
+	const s = composition()
+	s.layers[0] = { ...s.layers[0], name: 'A SCREEN BG' }
+	assert.deepEqual(holdingLayers(s).map((l) => l.name), ['HOLD FG', 'HOLD BG', 'A SCREEN BG', 'PLAYBACK'])
+	const end636 = at(planPlacements(ITEMS, s).placements, 'Walk Out', 'CA636')
+	assert.equal(end636.layer, 'A SCREEN BG')
+	assert.equal(end636.column, 2)
+	// Without it, an A code has nowhere to go, and says which layer it wants.
+	s.layers[0] = { ...s.layers[0], name: 'SCREENS' }
+	const lost = planPlacements(ITEMS, s).unplaced.find((u) => u.code === 'CA636')
+	assert.match(lost.detail, /no A SCREEN BG layer/)
+})
+
 test('WTL, NSL, BIBLES and WTG go in their own columns by label, replacing what is there', () => {
 	const { placements } = planPlacements(ITEMS, composition())
 	assert.equal(at(placements, 'WTL', 'CF445'), undefined) // already in WTL
@@ -246,4 +261,49 @@ test('Update all: one step per code, its old clips and its missing columns toget
 	assert.equal(by.CF445, undefined)
 	assert.ok(unplaced.some((u) => u.code === 'CB105'))
 	assert.equal(new Set(steps.map((x) => x.request.code)).size, steps.length)
+})
+
+test('each moment as a look: what each of its codes is in Arena, its column, and whether it is all there', () => {
+	const s = composition()
+	const marks = new Set([sameKey('CB095', s.layers[1].slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])
+	const looks = looksOf(ITEMS, s, marks)
+	const state = (i) => Object.fromEntries(looks[i].codes.map((c) => [c.code, c.state]))
+	// Doors Open: all in PRE, the background confirmed the same; the lower third is not Arena's.
+	assert.deepEqual(looks[0].column, { number: 1, name: 'PRE' })
+	assert.deepEqual(state(0), { CB095: 'ready', CF588: 'ready', CA635: 'ready' })
+	assert.equal(looks[0].ready, true)
+	assert.equal(state(1).CT108, 'not-arena')
+	assert.equal(looks[1].ready, true)
+	// NSL: its foreground is not in its column yet.
+	assert.equal(state(2).CF465, 'place')
+	assert.equal(looks[2].ready, false)
+	// Without the confirmation, CB095 needs a look wherever it is used.
+	assert.equal(Object.fromEntries(looksOf(ITEMS, s, new Set())[0].codes.map((c) => [c.code, c.state])).CB095, 'look')
+	// A one-off with no column is said, and the look is not ready.
+	const w = withoutPreach()
+	const preach = looksOf(ITEMS, w, marks).find((l) => ITEMS[l.item].label === 'Preach BG')
+	assert.deepEqual(preach.codes, [{ code: 'CB105', type: 'B', state: 'no-place' }])
+	assert.equal(preach.column, null)
+	assert.equal(preach.ready, false)
+	// A clip of its own playing in its column is the look on screen.
+	assert.equal(looks[0].live, false)
+	s.layers[3].slots[0] = { ...s.layers[3].slots[0], state: 'playing' }
+	assert.equal(looksOf(ITEMS, s, marks)[0].live, true)
+	assert.equal(looksOf(ITEMS, s, marks)[8].live, false)
+})
+
+test("loading one look: its codes into its column, a shared code's old files everywhere", () => {
+	const s = composition()
+	const steps = lookSteps(2, ITEMS, s, new Set())
+	const by = Object.fromEntries(steps.map((x) => [x.request.code, x]))
+	// NSL: CF465 into NSL, replacing CF446; CB095's seven old clips, NSL's included.
+	assert.match(by.CF465.what, /HOLD FG · NSL \(column 6\), replacing CF446/)
+	assert.equal(by.CB095.request.clipIds.length, 7)
+	assert.ok(steps.every((x) => x.request.allowLookbook === false && x.request.allowLive.length === 0))
+	// Not another item's columns: End's CF588 into POST is End's, not NSL's.
+	assert.equal(by.CF588, undefined)
+	// Doors Open is all there, with CB095 confirmed: nothing to do.
+	const marks = new Set([sameKey('CB095', s.layers[1].slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])
+	assert.deepEqual(lookSteps(0, ITEMS, s, marks), [])
+	assert.deepEqual(lookSteps(99, ITEMS, s, marks), [])
 })
