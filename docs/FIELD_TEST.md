@@ -92,7 +92,7 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Installed over 0.2.4: Connections' addresses, the MA logging in by itself (passwords kept), the Cue Manager still signed in, saved layouts all still there
 - [ ] In volunteer mode, Holding and Lookbook show no Update all, Load, Load all, Clear old FGs or "+ place"; the console card's sheet shows no Save As or Load. Hold for operator mode: they appear
 - [ ] Layouts opens as a dropdown over the windows (pages show as still pictures while it is open), from the bar and from the folded strip; tap a layout to switch, tap outside to close
-- [ ] Update all fills HOLD BG's empty or old slots up to the last PROMO with the normal background; COUNTDOWN and VIDEO BG (columns 3 and 4) are left alone (say whether they should be filled too)
+- [ ] Update all fills HOLD BG's empty or old slots up to the last PROMO with the normal background, columns 3 and 4 included; only a column named VIDEO or BROADCAST is left alone
 - [ ] Name a HOLD column PREACH in Arena: the message's background (Preach BG) goes there
 
 **Capture inputs** (0.2.4)

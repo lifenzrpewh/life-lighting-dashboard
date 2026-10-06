@@ -855,11 +855,11 @@ in both the Media row and here (taken without an answer: the owner can trim one)
   slot from column 1 to the last PROMO that no item's own background claims, empty or
   holding a code this service does not use. Part of Update all's step for that code ("the
   gaps in HOLD BG as the normal background (9, 10, PROMO 6)"), drawn as dashed tiles in
-  Holding. **Taken without an answer:** a column named for something else is left (COUNTDOWN,
-  VIDEO BG), and so are **HOLD BG's columns 3 and 4 while unnamed** (the owner's earlier
-  "kept": Countdown and Video / Broadcast BG); a clip on screen and one with no code are left.
-  A one-off background (Preach BG) may still be chosen into a gap that holds the normal
-  background. ⚠️ Not yet run against Arena.
+  Holding. **Central's columns 3 and 4 are filled too** (the owner, 2026-10-06: "yes they
+  should"), and so is a column named COUNTDOWN; only a column named VIDEO or BROADCAST (the
+  vignetted black behind videos at the other campuses) is left, with a clip on screen and one
+  with no code. A one-off background (Preach BG) may still be chosen into a gap that holds the
+  normal background (the owner: "ok good"). ⚠️ Not yet run against Arena.
 - **PREACH** (2026-10-06): a column named PREACH takes the message's background (an item
   titled Message, or labelled Preach or Sermon). Without one, Preach BG stays a one-off, as
   before. Central has no PREACH column yet: its CB105 sat in HOLD BG column 3.

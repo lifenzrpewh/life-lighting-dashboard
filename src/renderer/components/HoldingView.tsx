@@ -95,10 +95,9 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 		const type = mediaCodeOf(what.code)?.type ?? ''
 		if (TYPE_LAYER[type]?.test(layer.name.trim()) !== true) return false
 		const mark = slotMark(slot, items, today, m.same, m.sizes)
-		if (reserved(layer, column, status)) return false
-		if (mark === 'empty' || mark === 'not-today') return true
 		const filler = TYPE_LAYER['B']?.test(layer.name.trim()) === true && fillable.has(column) && slot.state !== 'playing'
-		return filler && normal !== null && slotCode(slot) === normal
+		if (filler && normal !== null && slotCode(slot) === normal) return true
+		return !reserved(layer, column, status) && (mark === 'empty' || mark === 'not-today')
 	}
 
 	const tapSlot = (layer: ArenaLayer, slot: ArenaSlot, column: number) => {

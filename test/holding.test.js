@@ -256,9 +256,9 @@ test('Update all: one step per code, its old clips and its missing columns toget
 	const { steps, unplaced } = updatePlan(ITEMS, s, marks)
 	const by = Object.fromEntries(steps.map((x) => [x.request.code, x]))
 	// CB095 is confirmed, so only the columns missing it: BIBLES and WTG, and
-	// the last PROMO, empty, as the normal background.
-	assert.equal(by.CB095.request.clipIds.length, 3)
-	assert.match(by.CB095.what, /the gaps in HOLD BG as the normal background \(PROMO\)$/)
+	// as the normal background the empty COUNTDOWN and the last PROMO.
+	assert.equal(by.CB095.request.clipIds.length, 4)
+	assert.match(by.CB095.what, /the gaps in HOLD BG as the normal background \(COUNTDOWN, PROMO\)$/)
 	assert.match(by.CF588.what, /HOLD FG · POST \(column 2\)/)
 	// Each step names the lookbook's file, and never downloads unless asked at the confirmation.
 	assert.equal(by.CF588.request.lookbookPath, F.CF588)
@@ -347,9 +347,17 @@ test('the gaps in HOLD BG up to the last PROMO take the normal background (the o
 	bg.slots[11] = clip('CB050-Sunday-OldSeries.png') // last week's, in the last PROMO
 	bg.slots[10] = clip('Vignette.png') // no code: left alone
 	const gaps = backgroundGaps(ITEMS, s)
-	// Not COUNTDOWN or VIDEO BG, not BIBLES or the PROMOs the announcements took
-	// (their own backgrounds are placed there), not past the last PROMO.
+	// Not VIDEO BG, not BIBLES or the PROMOs the announcements took (their own
+	// backgrounds are placed there), not past the last PROMO. COUNTDOWN holds
+	// CB105, today's: left.
 	assert.deepEqual(gaps.map((g) => [g.column, g.code, g.why, g.replaces?.code ?? null]), [[12, 'CB095', 'fill', 'CB050']])
+	// Central's columns 3 and 4 unnamed (the owner, 2026-10-06: "yes they should"); a VIDEO BG never.
+	const plain34 = composition(NAMES.map((n, i) => (i === 2 || i === 3 ? 'Column #' : n)))
+	plain34.layers[1].slots[2] = empty()
+	assert.deepEqual(backgroundGaps(ITEMS, plain34).map((g) => g.column), [3, 4, 12])
+	const video = composition()
+	video.layers[1].slots[2] = empty()
+	assert.deepEqual(backgroundGaps(ITEMS, video).map((g) => g.columnName), ['COUNTDOWN', 'PROMO'])
 	bg.slots[11] = { ...bg.slots[11], state: 'playing' }
 	assert.deepEqual(backgroundGaps(ITEMS, s), [])
 	// No PROMO column: where to stop is not known, so nothing.

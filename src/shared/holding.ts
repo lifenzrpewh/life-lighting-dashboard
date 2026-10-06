@@ -32,8 +32,9 @@
 // announcements, which may have their own (`normalBackground`). Every HOLD BG
 // slot from the first column to the last PROMO that no run-sheet item's own
 // background claims, empty or holding one this service does not use, gets it
-// (`backgroundGaps`). Not a column named for something else (COUNTDOWN), not
-// one on screen, not a clip with no code.
+// (`backgroundGaps`). The Countdown column and Central's unnamed 3 and 4 too
+// (the owner, 2026-10-06); not a column named VIDEO or BROADCAST, not one on
+// screen, not a clip with no code.
 //
 // Also the owner's: B on HOLD BG, F on HOLD FG, A on A SCREEN BG; nothing from
 // the lookbook on PLAYBACK; each service has its own deck, so a clip this run
@@ -452,9 +453,15 @@ export function backgroundGaps(items: LookbookItem[], status: ArenaStatus): Plac
 	})
 }
 
+/** A column named for the video / broadcast background, the vignetted black
+ *  behind videos at the other campuses: never filled. */
+const videoBackground = (name: string) => /video|broadcast/i.test(name)
+
 /** The HOLD BG columns (counted from 1) the normal background is for, whatever
  *  they hold now: up to the last PROMO, not claimed by an item's own
- *  background, not named for something else. A one-off background may be
+ *  background, not a video background. The Countdown column and Central's
+ *  unnamed 3 and 4 are filled (the owner, 2026-10-06: "yes they should"),
+ *  though nothing else is placed there. A one-off background may be
  *  chosen into one that holds the normal background, as into a free slot. */
 export function fillColumns(items: LookbookItem[], status: ArenaStatus): number[] {
 	const layer = status.layers.find((l) => TYPE_LAYER['B']?.test(l.name.trim()))
@@ -465,7 +472,7 @@ export function fillColumns(items: LookbookItem[], status: ArenaStatus): number[
 	for (const [i, column] of columns) if (arenaCodes(items[i] as LookbookItem).some((c) => c.type === 'B')) claimed.add(column)
 	const out: number[] = []
 	for (let column = 0; column <= last && column < layer.slots.length; column++) {
-		if (!claimed.has(column) && !reserved(layer, column + 1, status)) out.push(column + 1)
+		if (!claimed.has(column) && !videoBackground(columnNamesOf(layer, status)[column] ?? '')) out.push(column + 1)
 	}
 	return out
 }
