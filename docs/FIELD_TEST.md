@@ -28,6 +28,12 @@ Each new build asks again. The first time it stores an MA password, macOS asks
 whether Pāua may use the keychain: **Always Allow**. That too comes back with
 each new build.
 
+**Updating keeps your settings** (by design, ⚠️ not yet watched): run the new
+installer over the old one. Everything Pāua knows (addresses, MA passwords, the
+Cue Manager's sign-in, saved layouts) lives in `%APPDATA%\paua`, outside the
+install, and the installer never touches it, uninstalling included. It belongs
+to the Windows user, so another user on the same PC starts from nothing.
+
 **Getting out:** Alt+F4 on Windows, Cmd+Q on a Mac. It runs full screen; on a
 laptop, **Connections › This screen › Window** (operator mode) gives it a window.
 
@@ -81,6 +87,13 @@ Tick what you saw; anything odd is worth a line.
 - [ ] A clip whose file is missing shows the notice above Clips
 - [ ] Clips fire from the Clips view; faders move
 - [ ] The Video view shows Arena's output and keeps up
+
+**Volunteer mode, Layouts, backgrounds** (0.2.5)
+- [ ] Installed over 0.2.4: Connections' addresses, the MA logging in by itself (passwords kept), the Cue Manager still signed in, saved layouts all still there
+- [ ] In volunteer mode, Holding and Lookbook show no Update all, Load, Load all, Clear old FGs or "+ place"; the console card's sheet shows no Save As or Load. Hold for operator mode: they appear
+- [ ] Layouts opens as a dropdown over the windows (pages show as still pictures while it is open), from the bar and from the folded strip; tap a layout to switch, tap outside to close
+- [ ] Update all fills HOLD BG's empty or old slots up to the last PROMO with the normal background; COUNTDOWN and VIDEO BG (columns 3 and 4) are left alone (say whether they should be filled too)
+- [ ] Name a HOLD column PREACH in Arena: the message's background (Preach BG) goes there
 
 **Capture inputs** (0.2.4)
 - [ ] Connections › Add a capture input (operator mode) lists this computer's cameras: a Blackmagic card's inputs (Desktop Video installed), an ATEM Mini on USB, OBS Virtual Camera, a webcam
