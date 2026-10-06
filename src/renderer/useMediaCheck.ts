@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ArenaStatus } from '../shared/arena.js'
-import { codesOn, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { backgroundGaps, codesOn, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	nzDate,
@@ -201,6 +201,9 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
 		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status)
 	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes)
+	// HOLD BG's gaps, for the normal background (the owner, 2026-10-06): in
+	// Update all, and drawn where they go. Not counted as something to look at.
+	const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status)
 	// To look at, by code, as the Holding view marks them: a code with any clip
 	// whose file may differ, differs or is missing (one of CB095's eighteen is
 	// enough), one not where its item belongs, or one with no place (a code the
@@ -303,6 +306,7 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		trouble,
 		placements,
 		unplaced,
+		fills,
 		plannedUpdate,
 		same,
 		sizes,

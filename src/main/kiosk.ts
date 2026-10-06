@@ -544,6 +544,8 @@ app.whenReady().then(() => {
 		mode = next
 		maPane?.setMode(next)
 	})
+	// Read by a pop-out, to hide the buttons operator mode alone may use.
+	ipcMain.handle('mode:get', (e): Mode => (fromOurs(e) ? mode : 'volunteer'))
 
 	// The Cue Manager is the same for every mode: the booth device's rights,
 	// held by the app's own backend, are what it may do. Clearing its sign-in

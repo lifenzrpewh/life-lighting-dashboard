@@ -710,16 +710,20 @@ function ThisScreen({ windowed, operator, save }: { windowed: boolean; operator:
 		<Card>
 			<SectionTitle>This screen</SectionTitle>
 			<div className="flex flex-wrap items-center gap-4">
-				<Segmented
-					label="This screen"
-					disabled={!operator}
-					value={windowed}
-					onChange={(v) => void save({ windowed: v })}
-					options={[
-						{ value: false, label: 'Full screen' },
-						{ value: true, label: 'Window' },
-					]}
-				/>
+				{/* The switch only in operator mode; volunteer mode reads which. */}
+				{operator ? (
+					<Segmented
+						label="This screen"
+						value={windowed}
+						onChange={(v) => void save({ windowed: v })}
+						options={[
+							{ value: false, label: 'Full screen' },
+							{ value: true, label: 'Window' },
+						]}
+					/>
+				) : (
+					<span className="text-sm">{windowed ? 'Window' : 'Full screen'}</span>
+				)}
 				<span className="text-sm text-booth-dim">
 					{operator ? 'A window is for testing on a laptop; the booth stays full screen.' : 'Operator mode changes it.'}
 				</span>

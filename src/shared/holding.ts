@@ -12,6 +12,7 @@
 //   WTL, NSL, BIBLES, WTG                the item with that run-sheet label,
 //                                        always the same column
 //   PROMO  (as many as the campus has)   announcements and promos
+//   PREACH (if a campus names one)       the message's background
 //   anything else (COUNTDOWN, …)         never placed into
 //
 // A label with no column of its own goes to a PROMO column if it is an
@@ -23,6 +24,16 @@
 // comes back every week is the sign to name a column after it. Columns still named
 // Arena's default (`Column #`) mean nothing is placed, and the view says
 // which names to use. Nothing is guessed from what a column happens to hold.
+//
+// THE NORMAL BACKGROUND FILLS THE GAPS (the owner, 2026-10-06: "update all the
+// backgrounds in the bg layer up to promo 6, including the blank ones, to use
+// whatever the normal bg is"). The normal background is the one the rest of
+// the service uses, leaving out Doors Open, Pre & Post, Preach and the
+// announcements, which may have their own (`normalBackground`). Every HOLD BG
+// slot from the first column to the last PROMO that no run-sheet item's own
+// background claims, empty or holding one this service does not use, gets it
+// (`backgroundGaps`). Not a column named for something else (COUNTDOWN), not
+// one on screen, not a clip with no code.
 //
 // Also the owner's: B on HOLD BG, F on HOLD FG, A on A SCREEN BG; nothing from
 // the lookbook on PLAYBACK; each service has its own deck, so a clip this run
@@ -198,8 +209,9 @@ export type Placement = {
 	clipId: number
 	/** What is there now and would be replaced, or null for an empty slot. */
 	replaces: { code: string | null; name: string } | null
-	/** Its own column by name, or which PROMO column and why; `chosen` by hand. */
-	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen'
+	/** Its own column by name, or which PROMO column and why; `chosen` by
+	 *  hand; `fill`, the normal background into a gap (`backgroundGaps`). */
+	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill'
 	/** The slot is playing: loading changes what is on screen. */
 	live: boolean
 }
@@ -218,6 +230,9 @@ export type Unplaced = {
 const isPromo = (item: LookbookItem) => /announce|promo/i.test(`${item.title} ${item.label ?? ''}`)
 const isPre = (item: LookbookItem) => /walk\s*in|doors?\s*open|^pre$/i.test(item.label ?? '') || /doors?\s*open/i.test(item.title)
 const isPost = (item: LookbookItem) => /walk\s*out|^post$/i.test(item.label ?? '') || /^\s*end\b/i.test(item.title)
+const isPrePost = (item: LookbookItem) => /pre\s*(?:&|and)\s*post/i.test(`${item.title} ${item.label ?? ''}`)
+/** The message: `Message (Incl. Altar Call)`, labelled `Preach BG`. */
+const isPreach = (item: LookbookItem) => /preach|sermon/i.test(`${item.title} ${item.label ?? ''}`) || /^\s*message\b/i.test(item.title)
 
 /** The column (counted from 0) an item has by name, or null. */
 function namedColumn(item: LookbookItem, names: string[]): number | null {
@@ -227,6 +242,10 @@ function namedColumn(item: LookbookItem, names: string[]): number | null {
 	}
 	if (isPre(item)) return find('PRE')
 	if (isPost(item)) return find('POST')
+	if (isPreach(item)) {
+		const own = find('PREACH')
+		if (own !== null) return own
+	}
 	if (item.label !== null && norm(item.label) !== '') return find(norm(item.label))
 	return null
 }
@@ -375,6 +394,82 @@ export function planPlacements(
 	return { placements, unplaced, columns, names }
 }
 
+/** The background the rest of the service uses (the owner, 2026-10-06): the
+ *  commonest B code among the items that are not Doors Open, Pre & Post,
+ *  Preach or an announcement, the earliest on a tie. Null when none of them
+ *  has one the lookbook has a file for: said, not guessed from the others. */
+export function normalBackground(items: LookbookItem[]): { code: string; want: string; path: string } | null {
+	const counts = new Map<string, { code: string; want: string; path: string; n: number }>()
+	for (const item of items) {
+		if (isPre(item) || isPost(item) || isPrePost(item) || isPreach(item) || isPromo(item)) continue
+		for (const c of arenaCodes(item)) {
+			if (c.type !== 'B' || c.want === null || c.path === null) continue
+			const seen = counts.get(c.code)
+			if (seen === undefined) counts.set(c.code, { code: c.code, want: c.want, path: c.path, n: 1 })
+			else seen.n += 1
+		}
+	}
+	let best: { code: string; want: string; path: string; n: number } | null = null
+	for (const c of counts.values()) if (best === null || c.n > best.n) best = c
+	return best === null ? null : { code: best.code, want: best.want, path: best.path }
+}
+
+/** The HOLD BG slots the normal background goes into (the owner, 2026-10-06:
+ *  "update all the backgrounds in the bg layer up to promo 6, including the
+ *  blank ones"): from the first column to the last PROMO, every slot no
+ *  run-sheet item's own background claims (those are `planPlacements`'),
+ *  that is empty or holds a code this service does not use. Never a column
+ *  named for something else, a clip on screen or one with no code. Nothing
+ *  while the columns have no PROMO, since then where to stop is unknown. */
+export function backgroundGaps(items: LookbookItem[], status: ArenaStatus): Placement[] {
+	const normal = normalBackground(items)
+	const layer = status.layers.find((l) => TYPE_LAYER['B']?.test(l.name.trim()))
+	if (normal === null || layer === undefined) return []
+	const names = columnNamesOf(layer, status)
+	const today = codesOn(items)
+	return fillColumns(items, status).flatMap((column): Placement[] => {
+		const slot = layer.slots[column - 1]
+		if (slot === undefined || slot.state === 'playing') return []
+		const code = slotCode(slot)
+		if (slot.state !== 'empty' && (code === null || today.has(code))) return []
+		return [
+			{
+				item: -1,
+				title: 'The normal background',
+				label: null,
+				code: normal.code,
+				want: normal.want,
+				lookbookPath: normal.path,
+				layer: layer.name,
+				column,
+				columnName: names[column - 1] ?? '',
+				clipId: slot.id,
+				replaces: slot.state === 'empty' ? null : { code, name: slot.name },
+				why: 'fill',
+				live: false,
+			},
+		]
+	})
+}
+
+/** The HOLD BG columns (counted from 1) the normal background is for, whatever
+ *  they hold now: up to the last PROMO, not claimed by an item's own
+ *  background, not named for something else. A one-off background may be
+ *  chosen into one that holds the normal background, as into a free slot. */
+export function fillColumns(items: LookbookItem[], status: ArenaStatus): number[] {
+	const layer = status.layers.find((l) => TYPE_LAYER['B']?.test(l.name.trim()))
+	if (layer === undefined || normalBackground(items) === null) return []
+	const last = columnNamesOf(layer, status).reduce((at, n, i) => (norm(n).startsWith('PROMO') ? i : at), -1)
+	const { columns } = planPlacements(items, status)
+	const claimed = new Set<number>()
+	for (const [i, column] of columns) if (arenaCodes(items[i] as LookbookItem).some((c) => c.type === 'B')) claimed.add(column)
+	const out: number[] = []
+	for (let column = 0; column <= last && column < layer.slots.length; column++) {
+		if (!claimed.has(column) && !reserved(layer, column + 1, status)) out.push(column + 1)
+	}
+	return out
+}
+
 /** Every clip carrying `code` that is not the lookbook's `want`, or whose file
  *  is missing: an update loads the new file into all of them, not only the
  *  first (CB095 sits in 18 columns of HOLD BG). Confirmed-same clips are left. */
@@ -413,8 +508,9 @@ export function placementWords(p: Placement): string {
 export type UpdateStep = { request: FetchRequest; what: string }
 
 /** What Update all would do, one step per code: its file into every clip
- *  with an old or missing version, and into every column it is missing from.
- *  What has no place is listed apart, never guessed. */
+ *  with an old or missing version, into every column it is missing from, and
+ *  the normal background into HOLD BG's gaps (`backgroundGaps`). What has no
+ *  place is listed apart, never guessed. */
 export function updatePlan(
 	items: LookbookItem[],
 	status: ArenaStatus,
@@ -430,22 +526,25 @@ export function updatePlan(
 		}
 	}
 	for (const p of placements) byCode.get(p.code)?.place.push(p)
+	const fill = backgroundGaps(items, status)
 	const steps: UpdateStep[] = []
 	for (const [code, { want, path, update, place }] of byCode) {
-		const step = stepFor(code, want, path, update, place)
+		const step = stepFor(code, want, path, update, place, fill.filter((p) => p.code === code))
 		if (step !== null) steps.push(step)
 	}
 	return { steps, unplaced }
 }
 
-/** One code's step: its file into the clips with an old one and the slots it
- *  is placed in, or null when there is nothing to do. */
-function stepFor(code: string, want: string, path: string | null, update: number[], place: Placement[]): UpdateStep | null {
-	const clipIds = [...new Set([...update, ...place.map((p) => p.clipId)])]
+/** One code's step: its file into the clips with an old one, the slots it
+ *  is placed in and the gaps it fills, or null when there is nothing to do. */
+function stepFor(code: string, want: string, path: string | null, update: number[], place: Placement[], fill: Placement[] = []): UpdateStep | null {
+	const clipIds = [...new Set([...update, ...place.map((p) => p.clipId), ...fill.map((p) => p.clipId)])]
 	if (clipIds.length === 0) return null
+	const gaps = fill.map((p) => (unnamed(p.columnName) ? `${p.column}` : p.columnName))
 	const parts = [
 		...(update.length === 0 ? [] : [update.length === 1 ? 'its clip with the old file' : `its ${update.length} clips with the old file`]),
 		...place.map(placementWords),
+		...(fill.length === 0 ? [] : [`the gaps in ${fill[0]?.layer} as the normal background (${gaps.join(', ')})`]),
 	]
 	return { request: { code, want, clipIds, lookbookPath: path, allowLookbook: false, allowLive: [] }, what: `${code} into ${parts.join('; ')}` }
 }

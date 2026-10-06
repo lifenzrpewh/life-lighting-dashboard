@@ -13,7 +13,8 @@
 // Pictures over words: a moment that is all there says nothing but its codes.
 // One that is not has an amber ring and a Load button; one on screen in Arena
 // a green ring. A one-off with no column says to place it in Holding, where
-// its slot is chosen.
+// its slot is chosen. Load and Load all are operator mode's and not drawn in
+// volunteer mode (the owner, 2026-10-06).
 
 import { useState } from 'react'
 import { Check, FileX, RefreshCw } from 'lucide-react'
@@ -23,6 +24,7 @@ import { lookSteps, looksOf, type CodeState, type Look } from '../../shared/hold
 import { lookbookThumbUrl, mediaCodeOf, type LookbookItem } from '../../shared/media-check.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
+import { useOperator } from '../mode.js'
 import { ArenaReading } from './ArenaView.js'
 import { Confirm, FetchWords, ServiceLine, SmallButton, fetchShort, under } from './MediaCheck.js'
 import { Button } from './ui.js'
@@ -34,6 +36,7 @@ export function LookbookView({ status, now }: { status: Channel<ArenaStatus> | n
 
 function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | null; now: number }) {
 	const m = useMediaCheck(status, now, true)
+	const operator = useOperator()
 	const [details, setDetails] = useState(false)
 	const items = m.runSheet ?? []
 	const looks = looksOf(items, status, m.same, m.sizes).filter((l) => (items[l.item]?.codes.length ?? 0) > 0)
@@ -52,8 +55,8 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
 						</span>
 					)}
 					<span className="ml-auto flex shrink-0 items-center gap-2">
-						{m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
-					{m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Load all</SmallButton>}
+						{operator && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
+						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Load all</SmallButton>}
 						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-lg bg-booth-raise hover:bg-booth-hover">
 							<RefreshCw size={16} aria-hidden />
 						</button>
@@ -75,7 +78,7 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
 			<div className={`min-h-0 flex-1 snap-y snap-proximity overflow-y-auto p-4 ${ageMs !== null ? staleContent : ''}`}>
 				<div className="mx-auto flex max-w-[2200px] flex-col gap-6">
 					{looks.map((look) => (
-						<Card key={look.item} m={m} status={status} item={items[look.item] as LookbookItem} look={look} order={look.item + 1} />
+						<Card key={look.item} m={m} status={status} operator={operator} item={items[look.item] as LookbookItem} look={look} order={look.item + 1} />
 					))}
 				</div>
 				{m.runSheet !== null && looks.length === 0 && <p className="p-6 text-center text-booth-dim">This run sheet has no media.</p>}
@@ -88,7 +91,21 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
  *  "single announcement/look per that fills the screen"): its picture across
  *  the top, its A-screen or lower third big under it beside its name, its
  *  codes, and Load when Arena lacks any of it. */
-function Card({ m, status, item, look, order }: { m: MediaCheckState; status: ArenaStatus; item: LookbookItem; look: Look; order: number }) {
+function Card({
+	m,
+	status,
+	operator,
+	item,
+	look,
+	order,
+}: {
+	m: MediaCheckState
+	status: ArenaStatus
+	operator: boolean
+	item: LookbookItem
+	look: Look
+	order: number
+}) {
 	const fileOf = (type: string) => look.codes.find((c) => c.type === type && item.files[c.code] !== undefined)
 	// The lookbook's composed picture; else its foreground or background alone.
 	const main = item.preview ?? item.files[fileOf('F')?.code ?? ''] ?? item.files[fileOf('B')?.code ?? ''] ?? null
@@ -135,12 +152,12 @@ function Card({ m, status, item, look, order }: { m: MediaCheckState; status: Ar
 					</div>
 					{!look.ready && (
 						<div className="flex min-w-0 flex-wrap items-center gap-3">
-							{steps.length > 0 && busy.length === 0 && (
+							{operator && steps.length > 0 && busy.length === 0 && (
 								<Button variant="primary" onClick={() => m.ask(`Load ${item.label ?? item.title}`, steps)}>
 									Load
 								</Button>
 							)}
-							{look.codes.some((c) => c.state === 'no-place') && <span className="text-sm text-booth-dim">No column of its own: choose its slot in Holding</span>}
+							{look.codes.some((c) => c.state === 'no-place') && <span className="text-sm text-booth-dim">No column of its own{operator ? ': choose its slot in Holding' : ''}</span>}
 							{failed !== undefined && <FetchWords fetch={m.fetches[failed.code]} refused={m.refused[failed.code]} />}
 						</div>
 					)}

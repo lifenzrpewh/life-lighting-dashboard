@@ -71,7 +71,7 @@ import { ConnectionsPanel } from './components/ConnectionsPanel.js'
 import { ShowfileSheet } from './components/ShowfileSheet.js'
 import { GuideSheet } from './components/GuideSheet.js'
 import { GUIDE } from '../shared/guide.js'
-import { useMode } from './mode.js'
+import { OperatorContext, useMode } from './mode.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
@@ -165,7 +165,8 @@ export function App() {
 	useEffect(readOff, [])
 	const label = (view: ViewId) => viewLabel(view, embeds, ndiSources, captureInputs)
 	const { layout, update, saved, setSaved } = useLayout()
-	// The saved layouts (./components/LayoutsPanel.tsx), in the grid's place.
+	// The saved layouts (./components/LayoutsPanel.tsx), a dropdown over the
+	// windows; the pages stand in as pictures while it is open (below).
 	const [layoutsOpen, setLayoutsOpen] = useState(false)
 	const layoutName = saved.find((l) => sameArrangement(l.layout, layout))?.name ?? null
 	const { popped, popOut, bringBack } = usePopouts()
@@ -421,12 +422,26 @@ export function App() {
 		setFrozen(false)
 		setTimeout(() => editTurn.current === id && setStills(null), 300)
 	}
-	useEffect(() => {
-		if (editing) return
+	// The Layouts dropdown (the owner, 2026-10-06: "on top of the screen, not
+	// take you to a whole different screen"): drawn over the windows, so the
+	// pages are pictures while it is open, taken before it opens.
+	const openLayouts = () => {
 		const id = ++editTurn.current
+		const pictures = window.life?.snapshotPanes() ?? Promise.resolve({})
+		void pictures.then((s) => {
+			if (editTurn.current !== id) return
+			setStills(s)
+			setLayoutsOpen(true)
+		})
+	}
+	// Not a turn of its own: Edit this layout closes the dropdown and starts
+	// editing in one tap, and its pictures must not be dropped by the close.
+	useEffect(() => {
+		if (editing || layoutsOpen) return
+		const id = editTurn.current
 		const t = setTimeout(() => editTurn.current === id && setStills(null), 300)
 		return () => clearTimeout(t)
-	}, [editing])
+	}, [editing, layoutsOpen])
 
 	/** Every page main draws, and how this screen places it. */
 	const pages: Array<{ view: ViewId; send: (rect: PaneRect | null) => void }> = [
@@ -436,7 +451,7 @@ export function App() {
 			.filter((e) => e.on)
 			.map((e) => ({ view: embedView(e.id), send: (rect: PaneRect | null) => window.life?.placeEmbed(e.id, rect) })),
 	]
-	const pageHidden = (view: ViewId) => popped.has(view) || editing || (frozen && stills?.[view] != null)
+	const pageHidden = (view: ViewId) => popped.has(view) || editing || layoutsOpen || (frozen && stills?.[view] != null)
 	// Unmounting closes the MA connection. It happens when the renderer goes
 	// away, which main also covers, since a crashed renderer cannot say goodbye.
 	useEffect(
@@ -629,13 +644,13 @@ export function App() {
 				</Centered>
 			)
 		}
-		if (isNative(view) && (editing || frozen)) {
+		if (isNative(view) && (editing || frozen || layoutsOpen)) {
 			const still = stills?.[view] ?? null
 			if (still !== null) return <Still src={still} side="left" />
-			if (editing) {
+			if (editing || layoutsOpen) {
 				return (
 					<Centered>
-						<Placeholder head={label(view)} body="Shown again when the layout is done." />
+						<Placeholder head={label(view)} body={editing ? 'Shown again when the layout is done.' : 'Shown again when Layouts closes.'} />
 					</Centered>
 				)
 			}
@@ -695,194 +710,209 @@ export function App() {
 	}, [noRoom])
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden">
-			{pages.map((p) => (
-				<PanePlacer key={p.view} box={boxes[p.view] ?? null} hidden={pageHidden(p.view)} send={p.send} />
-			))}
-			<PanePlacer box={guideOpen ? guideBox : null} hidden={!guideOpen} send={(rect) => window.life?.placeEmbed(GUIDE.id, rect)} />
-			{DEV && (
-				<div className="flex items-center gap-3 bg-warn px-4 py-1.5 text-xs font-semibold text-booth-bg">
-					{scenario === 'real' ? (
-						<>
-							<span className="tracking-widest">DEV — REAL CONSOLE LINK</span>
-							<span className="font-normal">the link and showfile are main's own; the run order is the real Cue Manager</span>
-						</>
-					) : (
-						<>
-							<span className="tracking-widest">MOCK DESK — NOT A REAL CONSOLE</span>
-							<span className="font-normal">{SCENARIO_LABEL[scenario]}</span>
-						</>
-					)}
-					<span className="ml-auto font-normal opacity-80">
-						{['0 real', ...SCENARIOS.map((s, i) => `${i + 1} ${s}`)].join('   ')}
-					</span>
-				</div>
-			)}
-
-			<StatusBar
-				link={sources.link}
-				consoleOn={consoleOn}
-				now={now}
-				mode={mode}
-				onEnter={enter}
-				onLeave={leave}
-				connectionsOpen={connectionsOpen}
-				showfileOpen={showfileOpen}
-				onMark={() =>
-					window.life?.mark(
-						`${mode}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
-					) ?? Promise.resolve(null)
-				}
-				layoutName={layoutName}
-				layoutsOpen={layoutsOpen}
-				guideOpen={guideOpen}
-				onGuide={() => {
-					setConnectionsOpen(false)
-					setShowfileOpen(false)
-					setLayoutsOpen(false)
-					setEditing(false)
-					setGuideOpen(!guideOpen)
-				}}
-				onLayouts={() => {
-					setGuideOpen(false)
-					setConnectionsOpen(false)
-					setShowfileOpen(false)
-					setEditing(false)
-					setLayoutsOpen(!layoutsOpen)
-				}}
-				editing={editing}
-				onEditLayout={() => {
-					if (editing) return setEditing(false)
-					setGuideOpen(false)
-					setConnectionsOpen(false)
-					setShowfileOpen(false)
-					setLayoutsOpen(false)
-					startEditing()
-				}}
-				onConnections={() => {
-					setGuideOpen(false)
-					setLayoutsOpen(false)
-					setShowfileOpen(false)
-					setEditing(false)
-					setConnectionsOpen(!connectionsOpen)
-				}}
-				onShowfile={openShowfile}
-				connections={worstTone(connections)}
-				showfile={showfile}
-				showfileFailure={failureOf(sources.showfile)}
-				timers={timers}
-				collapsed={barCollapsed}
-				onCollapse={collapseBar}
-			/>
-
-			{/* Above the windows, never over them: a native view cannot be overlaid.
-			    Only while a window shows the MA: an Arena machine with no console
-			    has nothing to be told about one. */}
-			{maShown && sources.link.state === 'unreachable' && (
-				<div className="flex shrink-0 items-center gap-3 border-b border-state-unreachable/30 bg-state-unreachable/10 px-5 py-2.5 text-sm">
-					<Unplug size={18} className="shrink-0 text-state-unreachable" aria-hidden />
-					<span className="text-state-unreachable">The console is not answering, so Pāua can't confirm the MA picture is current.</span>
-					<span className="text-booth-dim">The web remote shows its own “disconnected” once it notices.</span>
-				</div>
-			)}
-
-			{editing && (
-				// Above the grid: while editing, pages are pictures, and the bar says
-				// what can be done and how to finish.
-				<div className="nacre-tint relative flex h-16 shrink-0 animate-rise items-center gap-4 border-b border-nacre-blue/40 bg-booth-panel px-5">
-					<span className="text-base font-medium">Editing the layout</span>
-					<span className={`min-w-0 truncate text-sm ${noRoom ? 'text-state-stale' : 'text-booth-dim'}`}>
-						{noRoom
-							? 'No room for another window. Make one smaller first.'
-							: 'Drag a window to move it, an edge or corner to resize, a tab to reorder it or move it to another window. + adds a tab, × takes one away.'}
-					</span>
-					<span className="ml-auto flex shrink-0 items-center gap-2">
-						<Button
-							icon={Plus}
-							onClick={() => {
-								const id = newId('w')
-								const next = addWindow(layout, null, { window: id, tab: newId('t') })
-								if (next === layout) setNoRoom(true)
-								else {
-									update(() => next)
-									setFresh(id)
-								}
-							}}
-						>
-							Add window
-						</Button>
-						<Button variant="primary" icon={Check} onClick={() => setEditing(false)} className="px-6">
-							Done
-						</Button>
-					</span>
-				</div>
-			)}
-
-			{/* The windows on the grid (../shared/layout.ts), siblings and never
-			    overlays, so "never covered" is a fact about the layout rather than
-			    a rule someone has to remember. Connections and the showfile sheet
-			    stand in the grid's place; every page is hidden, not closed. */}
-			<main className="flex min-h-0 min-w-0 flex-1 flex-col">
-				{guideOpen ? (
-					<GuideSheet report={embedReport(GUIDE.id)} now={now} boxRef={setGuideBox} onClose={() => setGuideOpen(false)} />
-				) : connectionsOpen ? (
-					<ConnectionsPanel
-						rows={connections}
-						operator={mode === 'operator'}
-						paneSummary={paneSummary(pane, mode)}
-						desk={desk}
-						now={now}
-						onChanged={readOff}
-						onClose={() => setConnectionsOpen(false)}
-					/>
-				) : layoutsOpen ? (
-					<LayoutsPanel
-						layout={layout}
-						saved={saved}
-						operator={mode === 'operator'}
-						onSwitch={(l) => update(() => l)}
-						onSaved={setSaved}
-						labelOf={label}
-						onEdit={() => {
-							setLayoutsOpen(false)
-							startEditing()
-						}}
-						onClose={() => setLayoutsOpen(false)}
-					/>
-				) : showfileOpen ? (
-					<ShowfileSheet
-						showfile={showfile}
-						linkLive={sources.link.state === 'live'}
-						operator={mode === 'operator'}
-						campus={campus}
-						now={now}
-						onClose={() => setShowfileOpen(false)}
-					/>
-				) : (
-					<Grid
-						layout={layout}
-						editing={editing}
-						visible={visible}
-						labelOf={label}
-						offer={offer}
-						body={bodyOf}
-						boxRef={(_win, tab) =>
-							isNative(tab.view) && !editing && homeOf(layout, tab.view, visible) === tab.id ? boxRefOf(tab.view) : undefined
-						}
-						actions={(_win, tab) => actionsOf(tab.view)}
-						onSelect={(w, t) => update((l) => selectTab(l, w, t))}
-						onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
-						onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
-						onMoveTab={(from, t, to, before) => update((l) => moveTab(l, from, t, to, before))}
-						onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
-						onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
-						fresh={fresh}
-						onResize={(l) => update(() => l)}
-						onSeamStart={startSeam}
-						onSeamEnd={endSeam}
-					/>
+		<OperatorContext.Provider value={mode === 'operator'}>
+			<div className="flex h-full flex-col overflow-hidden">
+				{pages.map((p) => (
+					<PanePlacer key={p.view} box={boxes[p.view] ?? null} hidden={pageHidden(p.view)} send={p.send} />
+				))}
+				<PanePlacer box={guideOpen ? guideBox : null} hidden={!guideOpen} send={(rect) => window.life?.placeEmbed(GUIDE.id, rect)} />
+				{DEV && (
+					<div className="flex items-center gap-3 bg-warn px-4 py-1.5 text-xs font-semibold text-booth-bg">
+						{scenario === 'real' ? (
+							<>
+								<span className="tracking-widest">DEV — REAL CONSOLE LINK</span>
+								<span className="font-normal">the link and showfile are main's own; the run order is the real Cue Manager</span>
+							</>
+						) : (
+							<>
+								<span className="tracking-widest">MOCK DESK — NOT A REAL CONSOLE</span>
+								<span className="font-normal">{SCENARIO_LABEL[scenario]}</span>
+							</>
+						)}
+						<span className="ml-auto font-normal opacity-80">
+							{['0 real', ...SCENARIOS.map((s, i) => `${i + 1} ${s}`)].join('   ')}
+						</span>
+					</div>
 				)}
-			</main>
-		</div>
+
+				<StatusBar
+					link={sources.link}
+					consoleOn={consoleOn}
+					now={now}
+					mode={mode}
+					onEnter={enter}
+					onLeave={leave}
+					connectionsOpen={connectionsOpen}
+					showfileOpen={showfileOpen}
+					onMark={() =>
+						window.life?.mark(
+							`${mode}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
+						) ?? Promise.resolve(null)
+					}
+					layoutName={layoutName}
+					layoutsOpen={layoutsOpen}
+					guideOpen={guideOpen}
+					onGuide={() => {
+						setConnectionsOpen(false)
+						setShowfileOpen(false)
+						setLayoutsOpen(false)
+						setEditing(false)
+						setGuideOpen(!guideOpen)
+					}}
+					onLayouts={() => {
+						setGuideOpen(false)
+						setConnectionsOpen(false)
+						setShowfileOpen(false)
+						setEditing(false)
+						if (layoutsOpen) setLayoutsOpen(false)
+						else openLayouts()
+					}}
+					editing={editing}
+					onEditLayout={() => {
+						if (editing) return setEditing(false)
+						setGuideOpen(false)
+						setConnectionsOpen(false)
+						setShowfileOpen(false)
+						setLayoutsOpen(false)
+						startEditing()
+					}}
+					onConnections={() => {
+						setGuideOpen(false)
+						setLayoutsOpen(false)
+						setShowfileOpen(false)
+						setEditing(false)
+						setConnectionsOpen(!connectionsOpen)
+					}}
+					onShowfile={openShowfile}
+					connections={worstTone(connections)}
+					showfile={showfile}
+					showfileFailure={failureOf(sources.showfile)}
+					timers={timers}
+					collapsed={barCollapsed}
+					onCollapse={collapseBar}
+				/>
+
+				{/* Above the windows, never over them: a native view cannot be overlaid.
+				    Only while a window shows the MA: an Arena machine with no console
+				    has nothing to be told about one. */}
+				{maShown && sources.link.state === 'unreachable' && (
+					<div className="flex shrink-0 items-center gap-3 border-b border-state-unreachable/30 bg-state-unreachable/10 px-5 py-2.5 text-sm">
+						<Unplug size={18} className="shrink-0 text-state-unreachable" aria-hidden />
+						<span className="text-state-unreachable">The console is not answering, so Pāua can't confirm the MA picture is current.</span>
+						<span className="text-booth-dim">The web remote shows its own “disconnected” once it notices.</span>
+					</div>
+				)}
+
+				{editing && (
+					// Above the grid: while editing, pages are pictures, and the bar says
+					// what can be done and how to finish.
+					<div className="nacre-tint relative flex h-16 shrink-0 animate-rise items-center gap-4 border-b border-nacre-blue/40 bg-booth-panel px-5">
+						<span className="text-base font-medium">Editing the layout</span>
+						<span className={`min-w-0 truncate text-sm ${noRoom ? 'text-state-stale' : 'text-booth-dim'}`}>
+							{noRoom
+								? 'No room for another window. Make one smaller first.'
+								: 'Drag a window to move it, an edge or corner to resize, a tab to reorder it or move it to another window. + adds a tab, × takes one away.'}
+						</span>
+						<span className="ml-auto flex shrink-0 items-center gap-2">
+							<Button
+								icon={Plus}
+								onClick={() => {
+									const id = newId('w')
+									const next = addWindow(layout, null, { window: id, tab: newId('t') })
+									if (next === layout) setNoRoom(true)
+									else {
+										update(() => next)
+										setFresh(id)
+									}
+								}}
+							>
+								Add window
+							</Button>
+							<Button variant="primary" icon={Check} onClick={() => setEditing(false)} className="px-6">
+								Done
+							</Button>
+						</span>
+					</div>
+				)}
+
+				{/* The windows on the grid (../shared/layout.ts), siblings and never
+				    overlays, so "never covered" is a fact about the layout rather than
+				    a rule someone has to remember. Connections and the showfile sheet
+				    stand in the grid's place; every page is hidden, not closed. */}
+				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
+					{guideOpen ? (
+						<GuideSheet report={embedReport(GUIDE.id)} now={now} boxRef={setGuideBox} onClose={() => setGuideOpen(false)} />
+					) : connectionsOpen ? (
+						<ConnectionsPanel
+							rows={connections}
+							operator={mode === 'operator'}
+							paneSummary={paneSummary(pane, mode)}
+							desk={desk}
+							now={now}
+							onChanged={readOff}
+							onClose={() => setConnectionsOpen(false)}
+						/>
+					) : showfileOpen ? (
+						<ShowfileSheet
+							showfile={showfile}
+							linkLive={sources.link.state === 'live'}
+							operator={mode === 'operator'}
+							campus={campus}
+							now={now}
+							onClose={() => setShowfileOpen(false)}
+						/>
+					) : (
+						<div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+							<Grid
+								layout={layout}
+								editing={editing}
+								visible={visible}
+								labelOf={label}
+								offer={offer}
+								body={bodyOf}
+								boxRef={(_win, tab) =>
+									isNative(tab.view) && !editing && homeOf(layout, tab.view, visible) === tab.id ? boxRefOf(tab.view) : undefined
+								}
+								actions={(_win, tab) => actionsOf(tab.view)}
+								onSelect={(w, t) => update((l) => selectTab(l, w, t))}
+								onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
+								onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
+								onMoveTab={(from, t, to, before) => update((l) => moveTab(l, from, t, to, before))}
+								onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
+								onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
+								fresh={fresh}
+								onResize={(l) => update(() => l)}
+								onSeamStart={startSeam}
+								onSeamEnd={endSeam}
+							/>
+							{layoutsOpen && (
+								<>
+									{/* A tap outside the dropdown closes it. */}
+									<button
+										type="button"
+										aria-label="Close Layouts"
+										onClick={() => setLayoutsOpen(false)}
+										className="absolute inset-0 z-20 cursor-default bg-black/30"
+									/>
+									<LayoutsPanel
+										layout={layout}
+										saved={saved}
+										operator={mode === 'operator'}
+										onSwitch={(l) => update(() => l)}
+										onSaved={setSaved}
+										labelOf={label}
+										onEdit={() => {
+											setLayoutsOpen(false)
+											startEditing()
+										}}
+										onClose={() => setLayoutsOpen(false)}
+									/>
+								</>
+							)}
+						</div>
+					)}
+				</main>
+			</div>
+		</OperatorContext.Provider>
 	)
 }

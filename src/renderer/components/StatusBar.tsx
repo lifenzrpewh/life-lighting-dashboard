@@ -19,7 +19,8 @@
 // of screen space"): 60 px, the countdown one line, and a chevron that
 // collapses the bar to a 36 px strip of the same readings (link, show,
 // countdown, clock, the connections' dot, the mode), remembered on this
-// computer. The strip's controls are only the chevron back.
+// computer. The strip's controls are Layouts (the owner, 2026-10-06: layouts
+// "still appear in the collapsed view") and the chevron back.
 
 import { useEffect, useState } from 'react'
 import { BookOpen, Check, ChevronDown, ChevronUp, Flag, PanelsTopLeft, Pencil } from 'lucide-react'
@@ -213,7 +214,9 @@ export function StatusBar({
 }) {
 	const operator = mode === 'operator'
 	const open = 'bg-booth-hover ring-1 ring-inset ring-booth-dim/40'
-	if (collapsed) return <Strip {...{ link, consoleOn, now, operator, connections, showfile, timers }} onExpand={() => onCollapse(false)} />
+	if (collapsed) {
+		return <Strip {...{ link, consoleOn, now, operator, connections, showfile, timers, layoutName, layoutsOpen, onLayouts }} onExpand={() => onCollapse(false)} />
+	}
 	return (
 		<header className="relative grid h-[60px] shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-6 border-b border-booth-edge bg-booth-panel px-4">
 			{/* The console: is it there, and which show it is on. */}
@@ -276,6 +279,9 @@ function Strip({
 	connections,
 	showfile,
 	timers,
+	layoutName,
+	layoutsOpen,
+	onLayouts,
 	onExpand,
 }: {
 	link: LinkState
@@ -285,6 +291,9 @@ function Strip({
 	connections: Tone
 	showfile: Reading<Showfile>
 	timers: TimerSources | null
+	layoutName: string | null
+	layoutsOpen: boolean
+	onLayouts: () => void
 	onExpand: () => void
 }) {
 	const live = link.state === 'live'
@@ -316,6 +325,17 @@ function Strip({
 					Connections
 				</span>
 				<span className={`text-xs ${operator ? 'text-booth-ink' : 'text-booth-dim'}`}>{operator ? 'Operator' : 'Volunteer'}</span>
+				<button
+					type="button"
+					onClick={onLayouts}
+					aria-pressed={layoutsOpen}
+					aria-label="Layouts"
+					className={`flex h-9 max-w-56 items-center gap-1.5 px-3 text-xs hover:bg-booth-raise ${layoutsOpen ? 'bg-booth-hover text-booth-ink' : 'text-booth-dim hover:text-booth-ink'}`}
+				>
+					<PanelsTopLeft size={15} strokeWidth={1.8} className="shrink-0" aria-hidden />
+					<span className="truncate">{layoutName ?? 'Layouts'}</span>
+					<ChevronDown size={14} className="shrink-0" aria-hidden />
+				</button>
 			</span>
 			<button
 				type="button"

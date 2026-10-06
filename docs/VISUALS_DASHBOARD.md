@@ -622,9 +622,22 @@ CDP, not yet by a finger.
   biggest free place; with no room, it says so.
 - **Video's Fit is a pop-out's only.** Built when windows snapped to cells; with free
   windows, a Fit in a window is possible again but not built.
-- **Saved layouts open in the windows' place** (like Connections), from Layouts in the
-  top bar, because a menu over a live page cannot be drawn. The button names the
-  layout on screen; switching a tab still counts as that layout. Up to 12.
+- **Saved layouts open as a dropdown over the windows** (the owner, 2026-10-06: "on top
+  of the screen, not take you to a whole different screen"; until then they opened in
+  the windows' place), from Layouts in the top bar **and in the folded strip**. A menu
+  over a live page cannot be drawn, so while it is open each page stands in as a
+  picture of itself, as in Edit layout; a tap outside closes it, a layout tapped
+  switches and closes it. The button names the layout on screen; switching a tab still
+  counts as that layout. Up to 12. ✅ In a browser against the mock desk, 2026-10-06:
+  opened from the bar and the strip, switched, closed by a tap outside. ⚠️ Not yet in
+  the kiosk over live pages, nor by finger.
+- **Operator-only buttons are not drawn in volunteer mode** (the owner, 2026-10-06:
+  Update all and the like should "not even show up"): Update all, Load all, Load,
+  Clear old FGs, a ghost's Place, the No column tray's choosing, an inspected clip's
+  answers, Save As and Load in the showfile sheet, and the This screen switch. What
+  goes where still shows ("goes here"). Main still refuses them outside operator mode;
+  that is the guard, this is only what a volunteer sees. A pop-out asks main for the
+  mode (`mode:get`) each second.
 - **Embeds open only once a window shows them**, so a booth can add many without each
   loading in the background. Off closes the page and keeps its sign-in; removing one
   clears its session, and its folder at the next start. The Google sign-in page on
@@ -834,6 +847,22 @@ in both the Media row and here (taken without an answer: the owner can trim one)
     screen); nothing by finger.
 - **A SCREEN BG** (the owner, 2026-10-05): the A-screen layer's new name. PRE & POST is still
   read as it, for a campus not yet renamed.
+- **The normal background fills HOLD BG's gaps** (the owner, 2026-10-06: "update all the
+  backgrounds in the bg layer up to promo 6 (including the blank ones) to use whatever the
+  normal bg is … whatever everything else (besides Doors Open, Pre & Post, Preach and
+  announcements) is using"). `normalBackground`: the commonest B code among the other items
+  (WTL, NSL, WTG: CB095 at Central), none if they have none. `backgroundGaps`: every HOLD BG
+  slot from column 1 to the last PROMO that no item's own background claims, empty or
+  holding a code this service does not use. Part of Update all's step for that code ("the
+  gaps in HOLD BG as the normal background (9, 10, PROMO 6)"), drawn as dashed tiles in
+  Holding. **Taken without an answer:** a column named for something else is left (COUNTDOWN,
+  VIDEO BG), and so are **HOLD BG's columns 3 and 4 while unnamed** (the owner's earlier
+  "kept": Countdown and Video / Broadcast BG); a clip on screen and one with no code are left.
+  A one-off background (Preach BG) may still be chosen into a gap that holds the normal
+  background. ⚠️ Not yet run against Arena.
+- **PREACH** (2026-10-06): a column named PREACH takes the message's background (an item
+  titled Message, or labelled Preach or Sermon). Without one, Preach BG stays a one-off, as
+  before. Central has no PREACH column yet: its CB105 sat in HOLD BG column 3.
 
 ## The Lookbook view (owner's ask, 2026-10-05; built the same day)
 

@@ -35,6 +35,7 @@ import { Centered, MaMessage } from './components/MaPane.js'
 import { Button, IconButton, viewIcon } from './components/ui.js'
 import { RotateCw, SendToBack, Undo2 } from 'lucide-react'
 import { usePanePlacement } from './panePlacement.js'
+import { OperatorContext, useMainMode } from './mode.js'
 
 /** What main last said, asked every `ms`. Undefined until it has answered. */
 function usePolled<T>(ask: ((api: NonNullable<Window['life']>) => Promise<T>) | null, ms: number): T | undefined {
@@ -86,6 +87,7 @@ export function PopOut({ view }: { view: ViewId }) {
 				? VIEW_LABEL[view as BuiltInView]
 				: (embed?.name ?? 'Embed')
 	const ViewIcon = viewIcon(view)
+	const operator = useMainMode() === 'operator'
 	/** The MA, the run order and embeds are native pages main moves in here. */
 	const native = view === 'ma' || view === 'cue' || embedId !== null
 
@@ -125,58 +127,60 @@ export function PopOut({ view }: { view: ViewId }) {
 		)
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden bg-booth-panel">
-			<div className="flex h-14 shrink-0 items-stretch gap-2 border-b border-booth-edge bg-booth-strip pr-2 pl-1">
-				<h1 className="relative flex items-center gap-2 px-4 text-sm font-medium">
-					<ViewIcon size={17} strokeWidth={1.8} aria-hidden />
-					{label}
-					<span aria-hidden className="nacre-line absolute inset-x-3 -bottom-px h-[3px] rounded-t-full" />
-				</h1>
-				<span className="ml-auto flex items-center gap-2">
-				{captureId !== null && <CaptureStrip input={capture ?? undefined} now={now} />}
-				{ndiId !== null && <NdiStrip id={ndiId} ndi={ndi} now={now} />}
-				{view === 'video' && <VideoStrip feed={video} space={videoSpace} onFit={fitVideo} />}
-				{embedId !== null && embed !== undefined && (
-					<ZoomControl name={label} zoom={embed.zoom} onZoom={(by) => window.life?.zoomEmbed(embedId, by)} />
-				)}
-				{reload}
-				{/* Behind the kiosk until its tab's Show (src/main/popout.ts). */}
-				<Button size="sm" variant="ghost" icon={SendToBack} onClick={() => window.life?.sendPopoutBehind(view)}>
-					Send behind
-				</Button>
-				{/* Big enough for a finger: the system's own close is not. */}
-				<Button size="sm" icon={Undo2} onClick={() => window.life?.bringBack(view)}>
-					Back to the dashboard
-				</Button>
-				</span>
+		<OperatorContext.Provider value={operator}>
+			<div className="flex h-full flex-col overflow-hidden bg-booth-panel">
+				<div className="flex h-14 shrink-0 items-stretch gap-2 border-b border-booth-edge bg-booth-strip pr-2 pl-1">
+					<h1 className="relative flex items-center gap-2 px-4 text-sm font-medium">
+						<ViewIcon size={17} strokeWidth={1.8} aria-hidden />
+						{label}
+						<span aria-hidden className="nacre-line absolute inset-x-3 -bottom-px h-[3px] rounded-t-full" />
+					</h1>
+					<span className="ml-auto flex items-center gap-2">
+					{captureId !== null && <CaptureStrip input={capture ?? undefined} now={now} />}
+					{ndiId !== null && <NdiStrip id={ndiId} ndi={ndi} now={now} />}
+					{view === 'video' && <VideoStrip feed={video} space={videoSpace} onFit={fitVideo} />}
+					{embedId !== null && embed !== undefined && (
+						<ZoomControl name={label} zoom={embed.zoom} onZoom={(by) => window.life?.zoomEmbed(embedId, by)} />
+					)}
+					{reload}
+					{/* Behind the kiosk until its tab's Show (src/main/popout.ts). */}
+					<Button size="sm" variant="ghost" icon={SendToBack} onClick={() => window.life?.sendPopoutBehind(view)}>
+						Send behind
+					</Button>
+					{/* Big enough for a finger: the system's own close is not. */}
+					<Button size="sm" icon={Undo2} onClick={() => window.life?.bringBack(view)}>
+						Back to the dashboard
+					</Button>
+					</span>
+				</div>
+				<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-bg">
+					{captureId !== null ? (
+						<CaptureView input={capture ?? undefined} cameras={cameras} now={now} />
+					) : ndiId !== null ? (
+						<NdiView id={ndiId} ndi={ndi} now={now} />
+					) : view === 'arena' ? (
+						<ArenaView status={arena} now={now} />
+					) : view === 'clips' ? (
+						<ClipsView status={arena} now={now} />
+					) : view === 'holding' ? (
+						<HoldingView status={arena} now={now} />
+					) : view === 'lookbook' ? (
+						<LookbookView status={arena} now={now} />
+					) : view === 'video' ? (
+						<VideoView feed={video} now={now} onSpace={setVideoSpace} />
+					) : (
+						<Centered>
+							{embedId !== null ? (
+								<EmbedMessage name={label} pane={embed?.pane ?? null} now={now} onRetry={retry} />
+							) : view === 'ma' ? (
+								<MaMessage pane={ma?.pane ?? null} now={now} />
+							) : (
+								<CueMessage pane={cue?.pane ?? null} now={now} />
+							)}
+						</Centered>
+					)}
+				</div>
 			</div>
-			<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-bg">
-				{captureId !== null ? (
-					<CaptureView input={capture ?? undefined} cameras={cameras} now={now} />
-				) : ndiId !== null ? (
-					<NdiView id={ndiId} ndi={ndi} now={now} />
-				) : view === 'arena' ? (
-					<ArenaView status={arena} now={now} />
-				) : view === 'clips' ? (
-					<ClipsView status={arena} now={now} />
-				) : view === 'holding' ? (
-					<HoldingView status={arena} now={now} />
-				) : view === 'lookbook' ? (
-					<LookbookView status={arena} now={now} />
-				) : view === 'video' ? (
-					<VideoView feed={video} now={now} onSpace={setVideoSpace} />
-				) : (
-					<Centered>
-						{embedId !== null ? (
-							<EmbedMessage name={label} pane={embed?.pane ?? null} now={now} onRetry={retry} />
-						) : view === 'ma' ? (
-							<MaMessage pane={ma?.pane ?? null} now={now} />
-						) : (
-							<CueMessage pane={cue?.pane ?? null} now={now} />
-						)}
-					</Centered>
-				)}
-			</div>
-		</div>
+		</OperatorContext.Provider>
 	)
 }

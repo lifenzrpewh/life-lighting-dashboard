@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import { sameKey } from '../dist/src/shared/media-check.js'
 import {
+	backgroundGaps,
 	clipsToUpdate,
 	codesOn,
 	holdingLayers,
@@ -10,6 +11,7 @@ import {
 	lookSteps,
 	looksOf,
 	nameWords,
+	normalBackground,
 	oldForegrounds,
 	placementWords,
 	planPlacements,
@@ -253,8 +255,10 @@ test('Update all: one step per code, its old clips and its missing columns toget
 	s.layers[1].slots[2] = empty()
 	const { steps, unplaced } = updatePlan(ITEMS, s, marks)
 	const by = Object.fromEntries(steps.map((x) => [x.request.code, x]))
-	// CB095 is confirmed, so only the columns missing it: BIBLES and WTG.
-	assert.equal(by.CB095.request.clipIds.length, 2)
+	// CB095 is confirmed, so only the columns missing it: BIBLES and WTG, and
+	// the last PROMO, empty, as the normal background.
+	assert.equal(by.CB095.request.clipIds.length, 3)
+	assert.match(by.CB095.what, /the gaps in HOLD BG as the normal background \(PROMO\)$/)
 	assert.match(by.CF588.what, /HOLD FG · POST \(column 2\)/)
 	// Each step names the lookbook's file, and never downloads unless asked at the confirmation.
 	assert.equal(by.CF588.request.lookbookPath, F.CF588)
@@ -321,4 +325,48 @@ test('old foregrounds: HOLD FG clips this run sheet does not use, never on scree
 	fg.slots[2] = clip('CF100-Old-Countdown.png') // COUNTDOWN: reserved
 	assert.deepEqual(oldForegrounds(ITEMS, s, new Set([fg.slots[5].id])).map((c) => c.code), ['CF593'])
 	assert.deepEqual(oldForegrounds([], s), [])
+})
+
+test('the normal background: what the rest of the service uses, not Doors Open, Pre & Post, Preach or announcements', () => {
+	assert.equal(normalBackground(ITEMS).code, 'CB095')
+	// Another background on Doors Open, End, the message and an announcement changes nothing.
+	const own = (it, code) => ({ ...it, codes: [code, ...it.codes.slice(1)], files: { ...it.files, [code]: L(`${code}-Own`) } })
+	const varied = ITEMS.map((it) =>
+		it.title === 'Doors Open' || it.title === 'End' || it.label === 'Prayer & Fasting' ? own(it, 'CB777') : it.label === 'Preach BG' ? own(it, 'CB888') : it,
+	)
+	assert.equal(normalBackground(varied).code, 'CB095')
+	assert.equal(normalBackground([...varied, item('Pre & Post', null, ['CB777'], { CB777: L('CB777-Own') })]).code, 'CB095')
+	// None of the rest has a background: none, not a guess.
+	assert.equal(normalBackground(ITEMS.filter((it) => !['WTL', 'NSL', 'WTG'].includes(it.label))), null)
+})
+
+test('the gaps in HOLD BG up to the last PROMO take the normal background (the owner, 2026-10-06)', () => {
+	const s = composition([...NAMES, 'EXTRA'])
+	for (const l of s.layers) if (l.slots.length === NAMES.length) l.slots.push(empty())
+	const bg = s.layers[1]
+	bg.slots[11] = clip('CB050-Sunday-OldSeries.png') // last week's, in the last PROMO
+	bg.slots[10] = clip('Vignette.png') // no code: left alone
+	const gaps = backgroundGaps(ITEMS, s)
+	// Not COUNTDOWN or VIDEO BG, not BIBLES or the PROMOs the announcements took
+	// (their own backgrounds are placed there), not past the last PROMO.
+	assert.deepEqual(gaps.map((g) => [g.column, g.code, g.why, g.replaces?.code ?? null]), [[12, 'CB095', 'fill', 'CB050']])
+	bg.slots[11] = { ...bg.slots[11], state: 'playing' }
+	assert.deepEqual(backgroundGaps(ITEMS, s), [])
+	// No PROMO column: where to stop is not known, so nothing.
+	assert.deepEqual(backgroundGaps(ITEMS, composition(NAMES.map((n) => (n === 'PROMO' ? 'Column #' : n)))), [])
+	// An item with no background of its own leaves its column a gap.
+	const fgOnly = ITEMS.map((it) => (it.label === 'Alpha' ? { ...it, codes: ['CF562'] } : it))
+	const t = composition()
+	t.layers[1].slots[8] = empty()
+	assert.deepEqual(backgroundGaps(fgOnly, t).map((g) => g.column).sort((a, b) => a - b), [9, 12])
+})
+
+test('a column named PREACH is the message background\'s home', () => {
+	const s = withoutPreach()
+	const names = NAMES.map((n, i) => (i === 3 ? 'PREACH' : n))
+	s.columns = names.map((name, i) => ({ id: 900 + i, name, state: 'loaded' }))
+	const p = at(planPlacements(ITEMS, s).placements, 'Preach BG', 'CB105')
+	assert.equal(p.columnName, 'PREACH')
+	assert.equal(p.layer, 'HOLD BG')
+	assert.equal(p.why, 'named')
 })

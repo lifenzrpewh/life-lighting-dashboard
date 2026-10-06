@@ -58,7 +58,7 @@ export function ShowfileSheet({
 	const [saveFirst, setSaveFirst] = useState(true)
 
 	const canAct = operator && linkLive
-	const why = !operator ? 'Operator mode only: hold Volunteer (top right) for 3 seconds.' : !linkLive ? 'The console is not answering.' : null
+	const why = !operator ? 'Save As and Load are operator mode’s: hold Volunteer (top right) for 3 seconds.' : !linkLive ? 'The console is not answering.' : null
 	const problem = saveAsProblem(offered, current?.base ?? null)
 
 	// The read-back: the console's own name for its show, through LifeBridge.
@@ -115,73 +115,77 @@ export function ShowfileSheet({
 					</div>
 				)}
 
-				<div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-24 gap-y-6">
-					<Card>
-						<SectionTitle aside="A new file, named for now. The show stays loaded.">Save as</SectionTitle>
-						<div className="flex items-center gap-3">
-							<span className="min-w-0 flex-1 truncate rounded-lg bg-booth-bg px-4 py-3 font-mono text-lg ring-1 ring-booth-edge ring-inset">
-								{offered}
-							</span>
-							<Button icon={Clock} onClick={() => setOffered(offeredName(campus, new Date()))}>
-								New time
-							</Button>
-						</div>
-						<Budget used={offered.length} />
-						{problem !== null && <p className="text-sm text-warn">{problem}</p>}
-						{campus === null && <p className="text-sm text-booth-dim">Set this booth’s campus in Connections › Console and names begin with it.</p>}
-						<Button variant="primary" icon={Save} disabled={!canAct || problem !== null} onClick={saveAs} className="self-start">
-							Save as “{offered}”
-						</Button>
-					</Card>
-
-					<Card>
-						<SectionTitle>Load another show</SectionTitle>
-						<p className="text-sm text-booth-dim">
-							The console goes quiet while it loads. If the show has no OSC row for this dashboard, the link stays down until
-							one is loaded that has.
-						</p>
-						{list === null || list === 'asking' ? (
-							<Button icon={List} disabled={!canAct || list === 'asking'} onClick={askList} className="self-start">
-								{list === 'asking' ? 'Asking the console…' : 'List the shows on the console'}
-							</Button>
-						) : !list.ok ? (
+				{/* Save As and Load are operator mode's: in volunteer mode they are not
+				    drawn at all (the owner, 2026-10-06), and the notice says why. */}
+				{operator && (
+					<div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-24 gap-y-6">
+						<Card>
+							<SectionTitle aside="A new file, named for now. The show stays loaded.">Save as</SectionTitle>
 							<div className="flex items-center gap-3">
-								<p className="text-sm text-state-unreachable">{list.detail}</p>
-								<Button size="sm" onClick={askList}>
-									Ask again
+								<span className="min-w-0 flex-1 truncate rounded-lg bg-booth-bg px-4 py-3 font-mono text-lg ring-1 ring-booth-edge ring-inset">
+									{offered}
+								</span>
+								<Button icon={Clock} onClick={() => setOffered(offeredName(campus, new Date()))}>
+									New time
 								</Button>
 							</div>
-						) : list.shows.length === 0 ? (
-							<p className="text-sm text-booth-dim">The console has no show files.</p>
-						) : (
-							<ul className="max-h-80 overflow-y-auto rounded-lg bg-booth-bg p-1 ring-1 ring-booth-edge ring-inset">
-								{list.shows.map((s) => (
-									<li key={s.name}>
-										<button
-											type="button"
-											// The loaded show is not offered: its name is already the one the
-											// read-back would wait for, so a Load of it could never be confirmed.
-											disabled={!s.loadable || current?.name === s.name}
-											onClick={() => setChosen(s.name)}
-											className={`flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm disabled:opacity-40 ${
-												chosen === s.name ? 'bg-booth-raise ring-1 ring-warn/60 ring-inset' : 'hover:bg-booth-strip'
-											}`}
-										>
-											<span className="min-w-0 flex-1 truncate font-mono">{s.name}</span>
-											{current?.name === s.name && <span className="text-xs text-booth-dim">loaded now</span>}
-											{!s.loadable && <span className="text-xs text-booth-dim">load it at the console</span>}
-										</button>
-									</li>
-								))}
-							</ul>
-						)}
-						<label className="flex h-12 items-center gap-3 text-sm">
-							<input type="checkbox" checked={saveFirst} onChange={(e) => setSaveFirst(e.target.checked)} className="size-5 accent-[var(--color-nacre-blue)]" />
-							Save the current show first
-						</label>
-						<HoldButton disabled={!canAct || chosen === null} label={chosen === null ? 'Pick a show to load' : `Hold to load “${chosen}”`} onHeld={load} />
-					</Card>
-				</div>
+							<Budget used={offered.length} />
+							{problem !== null && <p className="text-sm text-warn">{problem}</p>}
+							{campus === null && <p className="text-sm text-booth-dim">Set this booth’s campus in Connections › Console and names begin with it.</p>}
+							<Button variant="primary" icon={Save} disabled={!canAct || problem !== null} onClick={saveAs} className="self-start">
+								Save as “{offered}”
+							</Button>
+						</Card>
+
+						<Card>
+							<SectionTitle>Load another show</SectionTitle>
+							<p className="text-sm text-booth-dim">
+								The console goes quiet while it loads. If the show has no OSC row for this dashboard, the link stays down until
+								one is loaded that has.
+							</p>
+							{list === null || list === 'asking' ? (
+								<Button icon={List} disabled={!canAct || list === 'asking'} onClick={askList} className="self-start">
+									{list === 'asking' ? 'Asking the console…' : 'List the shows on the console'}
+								</Button>
+							) : !list.ok ? (
+								<div className="flex items-center gap-3">
+									<p className="text-sm text-state-unreachable">{list.detail}</p>
+									<Button size="sm" onClick={askList}>
+										Ask again
+									</Button>
+								</div>
+							) : list.shows.length === 0 ? (
+								<p className="text-sm text-booth-dim">The console has no show files.</p>
+							) : (
+								<ul className="max-h-80 overflow-y-auto rounded-lg bg-booth-bg p-1 ring-1 ring-booth-edge ring-inset">
+									{list.shows.map((s) => (
+										<li key={s.name}>
+											<button
+												type="button"
+												// The loaded show is not offered: its name is already the one the
+												// read-back would wait for, so a Load of it could never be confirmed.
+												disabled={!s.loadable || current?.name === s.name}
+												onClick={() => setChosen(s.name)}
+												className={`flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm disabled:opacity-40 ${
+													chosen === s.name ? 'bg-booth-raise ring-1 ring-warn/60 ring-inset' : 'hover:bg-booth-strip'
+												}`}
+											>
+												<span className="min-w-0 flex-1 truncate font-mono">{s.name}</span>
+												{current?.name === s.name && <span className="text-xs text-booth-dim">loaded now</span>}
+												{!s.loadable && <span className="text-xs text-booth-dim">load it at the console</span>}
+											</button>
+										</li>
+									))}
+								</ul>
+							)}
+							<label className="flex h-12 items-center gap-3 text-sm">
+								<input type="checkbox" checked={saveFirst} onChange={(e) => setSaveFirst(e.target.checked)} className="size-5 accent-[var(--color-nacre-blue)]" />
+								Save the current show first
+							</label>
+							<HoldButton disabled={!canAct || chosen === null} label={chosen === null ? 'Pick a show to load' : `Hold to load “${chosen}”`} onHeld={load} />
+						</Card>
+					</div>
+				)}
 			</div>
 		</Sheet>
 	)

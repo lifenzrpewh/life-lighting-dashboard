@@ -204,6 +204,8 @@ const api = {
 	retryMaPane: (): void => ipcRenderer.send('ma-pane:retry'),
 	/** Which MA user the pane should be: volunteer or operator. */
 	setMaPaneMode: (mode: Mode): void => ipcRenderer.send('ma-pane:mode', mode),
+	/** The kiosk's mode, for a pop-out to hide what only operator mode may use. */
+	mode: (): Promise<Mode> => ipcRenderer.invoke('mode:get'),
 
 	/** The views popped out of their slots into windows of their own
 	 *  (src/main/popout.ts). */

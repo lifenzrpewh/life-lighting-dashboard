@@ -10,11 +10,39 @@
 // Becoming more restricted is always safe, so leaving is easy and entering is
 // not.
 
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
 import { operatorExpired, type Mode } from '../shared/ma-pane.js'
 
 export type { Mode }
+
+/** Whether the screen is in operator mode, for any view that has buttons only
+ *  operator mode may use. Those buttons are not drawn at all in volunteer mode
+ *  (the owner, 2026-10-06: Update all and the like "not even show up"), not
+ *  drawn and refused: main still refuses them, which is the guard; this is
+ *  only what a volunteer sees. The kiosk provides it from its mode chip, a
+ *  pop-out from main (`useMainMode`). */
+export const OperatorContext = createContext(false)
+export const useOperator = () => useContext(OperatorContext)
+
+/** The kiosk's mode, as main holds it, for a pop-out: asked every second, so
+ *  the idle drop reaches a pop-out's buttons too. Volunteer until main says. */
+export function useMainMode(): Mode {
+	const [mode, setMode] = useState<Mode>('volunteer')
+	useEffect(() => {
+		const api = window.life
+		if (api === undefined) return
+		let alive = true
+		const poll = () => void api.mode().then((m) => alive && setMode(m))
+		poll()
+		const id = setInterval(poll, 1000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [])
+	return mode
+}
 
 /** Long enough that a palm resting on the chip is not an elevation. */
 export const HOLD_MS = 3_000
