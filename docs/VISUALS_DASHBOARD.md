@@ -863,6 +863,28 @@ in both the Media row and here (taken without an answer: the owner can trim one)
 - **PREACH** (2026-10-06): a column named PREACH takes the message's background (an item
   titled Message, or labelled Preach or Sermon). Without one, Preach BG stays a one-off, as
   before. Central has no PREACH column yet: its CB105 sat in HOLD BG column 3.
+- **Overflow, for one-off events** (the owner's rule, agreed 2026-10-08; built the same day): the
+  four or five events a year whose lookbook has far more foregrounds or backgrounds than the
+  named columns take, loaded by hand until now. A code on HOLD FG or HOLD BG with no column of
+  its own (a one-off, or an announcement past the last free PROMO) goes, **in run-sheet order,
+  into that layer's empty clips after its last named column** (`overflowSlots`, `why:
+  'overflow'`): never a loaded clip, never one on screen, nothing while the columns are unnamed,
+  capacity whatever Arena reports. A code two one-offs share takes one clip. What still does not
+  fit is said, "**N didn't fit**", in the No column tray and the confirmation, and waits there to
+  be placed by hand; nothing is dropped. The confirmation names each clip ("CF703 into HOLD FG ·
+  column 15, an empty clip past the named columns"); same confirmation and Admin rules as any
+  placement. Normal services are unchanged: a named column always wins. Taken without asking:
+  a one-off on a normal service (Preach BG at a campus with no PREACH column) is now offered an
+  empty clip past the named columns too, instead of only the tray (once its code is anywhere on
+  its layer it is done, as before); an item's FG and BG overflow on each layer separately, so
+  they need not share a column; A SCREEN BG does not overflow (the rule names FG and BG). **The
+  normal background's gaps** stop at the last PROMO and overflow starts after the last named
+  column, so they never meet (and `backgroundGaps` leaves any clip a placement takes).
+  **Clear old FGs**: an overflow clip, once loaded, carries a code this run sheet uses, so it is
+  never old; the last event's leftovers past the named columns are, and clearing them frees
+  room for the next Update all. HOLD BG has no clear, so its leftovers stay and take room.
+  ✅ Unit tests (`test/holding.test.js`, overflow). ⚠️ Not yet run against Arena or seen in the
+  kiosk: no Arena or lookbook mock on the Mac.
 
 ## The Lookbook view (owner's ask, 2026-10-05; built the same day)
 

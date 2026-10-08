@@ -36,6 +36,20 @@
 // (the owner, 2026-10-06); not a column named VIDEO or BROADCAST, not one on
 // screen, not a clip with no code.
 //
+// MORE THAN THE NAMED COLUMNS TAKE: OVERFLOW (the owner, 2026-10-08, for the
+// four or five one-off events a year whose lookbook has far more foregrounds
+// or backgrounds than the composition has named columns). A code on HOLD FG or
+// HOLD BG with no column of its own (a one-off, or a promo past the last free
+// PROMO) goes, in run-sheet order, into that layer's EMPTY clips after its
+// last named column (`overflowSlots`). Never a loaded clip, never one on
+// screen; what still does not fit is said ("didn't fit") and waits in the No
+// column tray to be placed by hand. Capacity is whatever Arena reports, never a
+// count assumed. Normal services are unchanged: a named column still wins.
+// Overflow and the normal background's gaps never meet: the gaps stop at the
+// last PROMO, overflow starts after the last named column (and `backgroundGaps`
+// leaves any clip a placement takes, to be sure). An overflow clip, once
+// loaded, carries a code this run sheet uses, so it is never an old foreground.
+//
 // Also the owner's: B on HOLD BG, F on HOLD FG, A on A SCREEN BG; nothing from
 // the lookbook on PLAYBACK; each service has its own deck, so a clip this run
 // sheet does not use may be replaced.
@@ -211,8 +225,10 @@ export type Placement = {
 	/** What is there now and would be replaced, or null for an empty slot. */
 	replaces: { code: string | null; name: string } | null
 	/** Its own column by name, or which PROMO column and why; `chosen` by
-	 *  hand; `fill`, the normal background into a gap (`backgroundGaps`). */
-	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill'
+	 *  hand; `fill`, the normal background into a gap (`backgroundGaps`);
+	 *  `overflow`, an empty clip after the layer's last named column, for a code
+	 *  with no column of its own (`overflowSlots`). */
+	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill' | 'overflow'
 	/** The slot is playing: loading changes what is on screen. */
 	live: boolean
 }
@@ -226,7 +242,29 @@ export type Unplaced = {
 	want: string | null
 	kind: 'unnamed' | 'no-column' | 'no-promo' | 'no-layer' | 'no-file'
 	detail: string
+	/** It would have gone into an empty clip after the last named column, and
+	 *  there was none left: said as "didn't fit", placed by hand. */
+	didntFit?: true
 }
+
+/** The layer's last named column, counted from 0, or -1 when none is named. */
+function lastNamed(layer: ArenaLayer, status: ArenaStatus): number {
+	return columnNamesOf(layer, status).reduce((at, n, i) => (unnamed(n) ? at : i), -1)
+}
+
+/** Where overflow goes on a layer (the owner, 2026-10-08): its empty clips
+ *  after its last named column, left to right, each with its column counted
+ *  from 1. Never a loaded clip or one on screen, never a reserved column, and
+ *  none while the layer's columns are not named. */
+export function overflowSlots(layer: ArenaLayer, status: ArenaStatus): { slot: ArenaSlot; column: number }[] {
+	const last = lastNamed(layer, status)
+	if (last < 0) return []
+	return layer.slots.flatMap((slot, i) => (i > last && slot.state === 'empty' && !reserved(layer, i + 1, status) ? [{ slot, column: i + 1 }] : []))
+}
+
+/** The types that overflow: foregrounds and backgrounds (the owner's rule names
+ *  HOLD FG and HOLD BG; an A-screen one-off still waits to be placed by hand). */
+const OVERFLOWS = new Set(['F', 'B'])
 
 const isPromo = (item: LookbookItem) => /announce|promo/i.test(`${item.title} ${item.label ?? ''}`)
 const isPre = (item: LookbookItem) => /walk\s*in|doors?\s*open|^pre$/i.test(item.label ?? '') || /doors?\s*open/i.test(item.title)
@@ -352,6 +390,15 @@ export function planPlacements(
 
 	const placements: Placement[] = []
 	const unplaced: Unplaced[] = []
+	// Overflow: each layer's spare clips, handed out in run-sheet order, and
+	// which clip each code already took (a code two one-offs share takes one).
+	const spare = new Map<string, { slot: ArenaSlot; column: number }[]>()
+	const spareOf = (type: string, layer: ArenaLayer) => {
+		let q = spare.get(type)
+		if (q === undefined) spare.set(type, (q = overflowSlots(layer, status)))
+		return q
+	}
+	const overflowed = new Map<string, Placement>()
 	for (const [i, item] of items.entries()) {
 		const where = columnOf.get(i)
 		if (where === undefined) continue
@@ -360,7 +407,46 @@ export function planPlacements(
 			if ('none' in where) {
 				// A one-off already on its layer was placed by hand: done.
 				const oneOff = where.none === 'no-column' || where.none === 'no-promo'
-				if (oneOff && layerOf(c.type)?.slots.some((s) => slotCode(s) === c.code) === true) continue
+				const layer = layerOf(c.type)
+				if (oneOff && layer?.slots.some((s) => slotCode(s) === c.code) === true) continue
+				if (oneOff && OVERFLOWS.has(c.type) && c.want !== null && layer !== undefined) {
+					const key = `${c.type}:${c.code}`
+					const taken = overflowed.get(key)
+					if (taken !== undefined) {
+						placements.push({ ...taken, ...base })
+						continue
+					}
+					const next = spareOf(c.type, layer).shift()
+					if (next !== undefined) {
+						const p: Placement = {
+							...base,
+							code: c.code,
+							want: c.want,
+							lookbookPath: c.path ?? '',
+							layer: layer.name,
+							column: next.column,
+							columnName: columnNamesOf(layer, status)[next.column - 1] ?? '',
+							clipId: next.slot.id,
+							replaces: null,
+							why: 'overflow',
+							live: false,
+						}
+						overflowed.set(key, p)
+						placements.push(p)
+						continue
+					}
+					const last = lastNamed(layer, status)
+					const lastName = columnNamesOf(layer, status)[last] ?? ''
+					unplaced.push({
+						...base,
+						code: c.code,
+						want: c.want,
+						kind: where.none,
+						detail: `${where.detail}, and no empty clip left on ${layer.name} after ${lastName} (column ${last + 1})`,
+						didntFit: true,
+					})
+					continue
+				}
 				unplaced.push({ ...base, code: c.code, want: c.want, kind: where.none, detail: where.detail })
 				continue
 			}
@@ -428,9 +514,12 @@ export function backgroundGaps(items: LookbookItem[], status: ArenaStatus): Plac
 	if (normal === null || layer === undefined) return []
 	const names = columnNamesOf(layer, status)
 	const today = codesOn(items)
+	// A clip a run-sheet item takes (its own column, or overflow) is the
+	// item's: overflow comes first, though by the rules the two never meet.
+	const taken = new Set(planPlacements(items, status).placements.map((p) => p.clipId))
 	return fillColumns(items, status).flatMap((column): Placement[] => {
 		const slot = layer.slots[column - 1]
-		if (slot === undefined || slot.state === 'playing') return []
+		if (slot === undefined || slot.state === 'playing' || taken.has(slot.id)) return []
 		const code = slotCode(slot)
 		if (slot.state !== 'empty' && (code === null || today.has(code))) return []
 		return [
@@ -508,7 +597,8 @@ export function clipsToUpdate(
 /** Where a placement goes, said: `HOLD FG · POST (column 2), replacing CF445`. */
 export function placementWords(p: Placement): string {
 	const column = unnamed(p.columnName) ? `column ${p.column}` : `${p.columnName} (column ${p.column})`
-	return `${p.layer} · ${column}${p.replaces === null ? '' : `, replacing ${p.replaces.code ?? p.replaces.name}`}`
+	const extra = p.why === 'overflow' ? ', an empty clip past the named columns' : ''
+	return `${p.layer} · ${column}${extra}${p.replaces === null ? '' : `, replacing ${p.replaces.code ?? p.replaces.name}`}`
 }
 
 /** One line of a confirmation, to show before it runs. */
@@ -547,6 +637,8 @@ export function updatePlan(
 function stepFor(code: string, want: string, path: string | null, update: number[], place: Placement[], fill: Placement[] = []): UpdateStep | null {
 	const clipIds = [...new Set([...update, ...place.map((p) => p.clipId), ...fill.map((p) => p.clipId)])]
 	if (clipIds.length === 0) return null
+	// Two items sharing an overflow clip: said once.
+	place = place.filter((p, i) => place.findIndex((q) => q.clipId === p.clipId) === i)
 	const gaps = fill.map((p) => (unnamed(p.columnName) ? `${p.column}` : p.columnName))
 	const parts = [
 		...(update.length === 0 ? [] : [update.length === 1 ? 'its clip with the old file' : `its ${update.length} clips with the old file`]),
