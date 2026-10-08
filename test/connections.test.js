@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { CONNECTIONS, CONNECTION_OF_VIEW, consoleStatus, cueStatus, polledStatus, turnedOff, videoStatus, worstTone } from '../dist/src/shared/connections.js'
+import { CONNECTIONS, CONNECTION_OF_VIEW, consoleStatus, cueStatus, polledStatus, turnedOff, videoStatus, viewIsOn, worstTone } from '../dist/src/shared/connections.js'
 import { record, unread } from '../dist/src/shared/reading.js'
 
 const T0 = 1_000_000
@@ -99,4 +99,12 @@ test('the video feed: a sender listed but no picture is never LIVE', () => {
 	assert.equal(videoStatus(old, T0 + 60_000).status, 'stalled')
 	// Nobody watching receives nothing: found, not a fault.
 	assert.deepEqual(videoStatus({ ...listed, watched: false }, T0), { id: 'video', name: 'Video feed', tone: 'live', status: 'found', detail: 'Arena' })
+})
+
+test('the Timer view is on while either countdown program is', () => {
+	// 2026-10-08: it follows the chip's rule, OnTime else ProPresenter.
+	assert.equal(viewIsOn('timer', [], []), true)
+	assert.equal(viewIsOn('timer', ['ontime'], []), true)
+	assert.equal(viewIsOn('timer', ['propresenter'], []), true)
+	assert.equal(viewIsOn('timer', ['ontime', 'propresenter'], []), false)
 })

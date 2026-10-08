@@ -105,6 +105,7 @@ Tick what you saw; anything odd is worth a line.
 - [ ] As a volunteer: the pencil at the end of a window's strip puts the screen into Edit layout; move, resize, add a window, Done. No "Edit this layout" left in Layouts
 - [ ] As a volunteer: Layouts › save the layout on screen under a name, switch away and back, delete it with two taps
 - [ ] In Edit layout, a tab's ✎: name it ("Stage cam"), Done; save the layout, switch to another and back: the name comes with it and the other layout's tab of the same view keeps its own. Empty the name: the view's own name returns. By finger: the Windows touch keyboard comes up for it
+- [ ] Edit layout › + › Timer: the countdown fills the window, reads across the booth, matches the bar's chip, goes red past zero; in two windows at once; popped out
 
 **Installing**
 - [ ] What Windows SmartScreen showed, word for word, and whether Run anyway worked

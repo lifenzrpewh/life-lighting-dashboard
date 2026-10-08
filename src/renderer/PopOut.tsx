@@ -30,6 +30,8 @@ import { HoldingView } from './components/HoldingView.js'
 import { LookbookView } from './components/LookbookView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import { currentFrame, type VideoFeedState } from '../shared/video-feed.js'
+import type { TimerSources } from '../shared/timer.js'
+import { TimerView } from './components/TimerView.js'
 import { CueMessage } from './components/CuePane.js'
 import { Centered, MaMessage } from './components/MaPane.js'
 import { Button, IconButton, viewIcon } from './components/ui.js'
@@ -67,6 +69,7 @@ export function PopOut({ view }: { view: ViewId }) {
 	const cue = usePolled<CuePaneReport>(view === 'cue' ? (api) => api.cuePane() : null, 1000)
 	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' || view === 'holding' || view === 'lookbook' ? (api) => api.arenaStatus() : null, 250)
 	const video = usePolled<VideoFeedState | null>(view === 'video' ? (api) => api.videoFeed() : null, 500)
+	const timers = usePolled<TimerSources>(view === 'timer' ? (api) => api.timers() : null, 250)
 	const embedId = embedIdOf(view)
 	const embed = usePolled<EmbedReport | undefined>(
 		embedId === null ? null : (api) => api.embeds().then((all) => all.find((r) => r.id === embedId)),
@@ -168,6 +171,8 @@ export function PopOut({ view }: { view: ViewId }) {
 						<LookbookView status={arena} now={now} />
 					) : view === 'video' ? (
 						<VideoView feed={video} now={now} onSpace={setVideoSpace} />
+					) : view === 'timer' ? (
+						<TimerView sources={timers} />
 					) : (
 						<Centered>
 							{embedId !== null ? (

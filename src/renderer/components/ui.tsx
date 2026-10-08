@@ -8,7 +8,7 @@
 // controls are 48.
 
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { BookImage, Cast, Webcam, GalleryHorizontalEnd, Globe, Layers, LayoutGrid, ListChecks, MonitorPlay, SlidersHorizontal, X } from 'lucide-react'
+import { BookImage, Cast, Webcam, GalleryHorizontalEnd, Globe, Layers, LayoutGrid, ListChecks, MonitorPlay, SlidersHorizontal, Timer, X } from 'lucide-react'
 
 import type { Tone } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -241,6 +241,8 @@ export function viewIcon(view: ViewId): Icon {
 			return BookImage
 		case 'video':
 			return MonitorPlay
+		case 'timer':
+			return Timer
 		default:
 			return Globe
 	}

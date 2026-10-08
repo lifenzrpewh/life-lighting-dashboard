@@ -34,14 +34,14 @@ import { ndiIdOf, type NdiSource, type NdiView } from './ndi.js'
 import { captureIdOf, type CaptureInput, type CaptureView } from './capture.js'
 
 /** The views that come with Pāua. */
-export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video'
+export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video' | 'timer'
 
 /** A built-in view, or an embed, NDI source or capture input someone added in
  *  Connections (./embeds.ts, ./ndi.ts, ./capture.ts). */
 export type ViewId = BuiltInView | EmbedView | NdiView | CaptureView
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
-export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video']
+export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video', 'timer']
 
 export const VIEW_LABEL: Record<BuiltInView, string> = {
 	cue: 'Run order',
@@ -54,6 +54,8 @@ export const VIEW_LABEL: Record<BuiltInView, string> = {
 	/** The run sheet's moments as the lookbook draws them, big, against Arena (./components/LookbookView.tsx). */
 	lookbook: 'Lookbook',
 	video: 'Video',
+	/** The countdown beside the clock, big (./components/TimerView.tsx, 2026-10-08). */
+	timer: 'Timer',
 }
 
 /** A built-in view, or any embed's or NDI source's view by its shape. Whether

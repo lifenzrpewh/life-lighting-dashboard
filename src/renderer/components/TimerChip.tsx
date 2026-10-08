@@ -25,7 +25,7 @@ import { formatAge, staleContent, stateClass, unknownWhy } from './vocabulary.js
  *  number for nearly two seconds when its tick and the clock's fall apart. */
 const TICK_MS = 250
 
-function useNow(): number {
+export function useNow(): number {
 	const [now, setNow] = useState(() => Date.now())
 	useEffect(() => {
 		const id = setInterval(() => setNow(Date.now()), TICK_MS)
@@ -45,91 +45,104 @@ export function TimerChip({ sources, compact = false }: { sources: TimerSources 
 	)
 }
 
-function Chosen({ sources }: { sources: TimerSources | null }) {
-	const now = useNow()
-	if (sources === null) return null
-	const view = chooseTimer(sources, now)
+/** What a countdown shows, whichever program it is from and however big it
+ *  is drawn: the chip in the bar and the Timer view (./TimerView.tsx) both
+ *  draw this, so they cannot disagree. */
+export type TimerFace = {
+	source: 'OnTime' | 'ProPresenter'
+	/** What the number counts to, or why there is none. */
+	caption: string
+	/** The countdown in ms; null with `number` is a timer with no time to give. */
+	ms: number | null
+	/** Whether there is a countdown to draw at all. */
+	number: boolean
+	/** The stage message, where ProPresenter has no timer counting. */
+	text: string | null
+	over: boolean
+	extra: string | null
+	ageMs: number | null
+	unknown: boolean
+	/** What OnTime is, when it is not answering. */
+	note: OnTimeAside
+}
 
+/** The face for `sources` at `now`, or null when neither program is set up. */
+export function timerFace(sources: TimerSources, now: number): TimerFace | null {
+	const view = chooseTimer(sources, now)
+	const blank = { ms: null, number: false, text: null, over: false, extra: null, ageMs: null, unknown: false, note: null }
 	switch (view.kind) {
 		case 'none':
 			return null
-		case 'ontime':
+		case 'ontime': {
+			const ontime = (value: OnTimeNow, live: boolean, ageMs: number | null): TimerFace => {
+				if (!onTimeRunning(value)) return { ...blank, source: 'OnTime', caption: 'No event running', ageMs }
+				const remaining = onTimeRemaining(value, view.readAt ?? now, now, live)
+				// What the countdown is counting to: the next event, by name. At the end of
+				// the rundown there is none, and it counts to the end of this one.
+				const caption =
+					value.nextTitle !== null
+						? `Next: “${value.nextTitle || 'Untitled event'}”`
+						: value.nowTitle !== null
+							? `End of ${value.nowTitle || 'this event'}`
+							: 'End of rundown'
+				return {
+					...blank,
+					source: 'OnTime',
+					caption,
+					ms: remaining,
+					number: true,
+					over: remaining !== null && remaining < 0,
+					extra: value.playback === 'pause' ? 'Paused' : null,
+					ageMs,
+				}
+			}
 			return matchReading(view.reading, {
-				live: (v) => <OnTime value={v} remaining={onTimeRemaining(v, view.readAt ?? now, now, true)} ageMs={null} />,
-				stale: (v, ageMs) => <OnTime value={v} remaining={onTimeRemaining(v, view.readAt ?? now, now, false)} ageMs={ageMs} />,
-				unknown: (why) => (
-					<Frame source="OnTime" ageMs={null} unknown caption={`? ${unknownWhy[why]}`}>
-						{null}
-					</Frame>
-				),
+				live: (v) => ontime(v, true, null),
+				stale: (v, ageMs) => ontime(v, false, ageMs),
+				unknown: (why) => ({ ...blank, source: 'OnTime', caption: `? ${unknownWhy[why]}`, unknown: true }),
 			})
-		case 'propresenter':
+		}
+		case 'propresenter': {
+			const pro = (value: ProPresenterNow, ageMs: number | null): TimerFace => {
+				const shown = proPresenterShown(value, view.wanted)
+				if (shown.kind === 'timer') {
+					const ms = shown.timer.seconds * 1000
+					// The stage message labels the timer, `Wrap up: 3:38`, and the timer's
+					// own name is never shown (the owner's call, 2026-10-02): the message
+					// is what the stage is being told, the name is just ProPresenter's.
+					return { ...blank, source: 'ProPresenter', caption: value.message ?? 'Timer', ms, number: true, over: ms < 0, ageMs, note: view.ontimeAside }
+				}
+				// Said, not hidden: the booth asked for this timer, and an empty chip
+				// would read as "nothing running" when it is "renamed or deleted".
+				const caption =
+					shown.kind === 'missing' ? `No timer “${shown.name}” in ProPresenter` : value.message === null ? 'No timer running' : null
+				return { ...blank, source: 'ProPresenter', caption: caption ?? 'Stage message', text: value.message, ageMs, note: view.ontimeAside }
+			}
 			return matchReading(view.reading, {
-				live: (v) => <ProPresenter value={v} wanted={view.wanted} ageMs={null} ontime={view.ontimeAside} />,
-				stale: (v, ageMs) => <ProPresenter value={v} wanted={view.wanted} ageMs={ageMs} ontime={view.ontimeAside} />,
-				unknown: (why) => (
-					<Frame source="ProPresenter" ageMs={null} unknown note={view.ontimeAside} caption={`? ${unknownWhy[why]}`}>
-						{null}
-					</Frame>
-				),
+				live: (v) => pro(v, null),
+				stale: (v, ageMs) => pro(v, ageMs),
+				unknown: (why) => ({ ...blank, source: 'ProPresenter', caption: `? ${unknownWhy[why]}`, unknown: true, note: view.ontimeAside }),
 			})
+		}
 	}
 }
 
-function OnTime({ value, remaining, ageMs }: { value: OnTimeNow; remaining: number | null; ageMs: number | null }) {
-	if (!onTimeRunning(value)) {
-		return (
-			<Frame source="OnTime" ageMs={ageMs} caption="No event running">
-				{null}
-			</Frame>
-		)
-	}
-	// What the countdown is counting to: the next event, by name. At the end of
-	// the rundown there is none, and it counts to the end of this one.
-	const label =
-		value.nextTitle !== null
-			? `Next: “${value.nextTitle || 'Untitled event'}”`
-			: value.nowTitle !== null
-				? `End of ${value.nowTitle || 'this event'}`
-				: 'End of rundown'
-	const over = remaining !== null && remaining < 0
+function Chosen({ sources }: { sources: TimerSources | null }) {
+	const now = useNow()
+	if (sources === null) return null
+	const face = timerFace(sources, now)
+	if (face === null) return null
 	return (
-		<Frame source="OnTime" ageMs={ageMs} caption={label} over={over} extra={value.playback === 'pause' ? 'Paused' : null}>
-			<Big ms={remaining} />
-		</Frame>
-	)
-}
-
-function ProPresenter({
-	value,
-	wanted,
-	ageMs,
-	ontime,
-}: {
-	value: ProPresenterNow
-	wanted: string | null
-	ageMs: number | null
-	ontime: OnTimeAside
-}) {
-	const shown = proPresenterShown(value, wanted)
-	if (shown.kind === 'timer') {
-		const ms = shown.timer.seconds * 1000
-		// The stage message labels the timer, `Wrap up: 3:38`, and the timer's
-		// own name is never shown (the owner's call, 2026-10-02): the message
-		// is what the stage is being told, the name is just ProPresenter's.
-		return (
-			<Frame source="ProPresenter" ageMs={ageMs} note={ontime} caption={value.message ?? 'Timer'} over={ms < 0}>
-				<Big ms={ms} />
-			</Frame>
-		)
-	}
-	// Said, not hidden: the booth asked for this timer, and an empty chip
-	// would read as "nothing running" when it is "renamed or deleted".
-	const caption =
-		shown.kind === 'missing' ? `No timer “${shown.name}” in ProPresenter` : value.message === null ? 'No timer running' : null
-	return (
-		<Frame source="ProPresenter" ageMs={ageMs} note={ontime} caption={caption ?? 'Stage message'}>
-			{value.message !== null && <span className="max-w-[24rem] truncate text-base">{value.message}</span>}
+		<Frame
+			source={face.source}
+			ageMs={face.ageMs}
+			caption={face.caption}
+			unknown={face.unknown}
+			over={face.over}
+			extra={face.extra}
+			note={face.note}
+		>
+			{face.number ? <Big ms={face.ms} /> : face.text !== null ? <span className="max-w-[24rem] truncate text-base">{face.text}</span> : null}
 		</Frame>
 	)
 }

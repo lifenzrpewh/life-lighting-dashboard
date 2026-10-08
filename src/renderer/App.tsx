@@ -38,6 +38,7 @@ import { ClipsView } from './components/ClipsView.js'
 import { HoldingView } from './components/HoldingView.js'
 import { LookbookView } from './components/LookbookView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
+import { TimerView } from './components/TimerView.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { Still } from './components/Still.js'
 import { Button, IconButton, Placeholder } from './components/ui.js'
@@ -642,6 +643,7 @@ export function App() {
 			case 'clips':
 			case 'holding':
 			case 'lookbook':
+			case 'timer':
 				return out
 			case 'video':
 				return (
@@ -738,6 +740,8 @@ export function App() {
 				return <LookbookView status={arenaStatus} now={now} />
 			case 'video':
 				return <VideoView feed={videoFeed} now={now} onSpace={setVideoSpace} />
+			case 'timer':
+				return <TimerView sources={window.life === undefined ? null : timers} />
 		}
 	}
 

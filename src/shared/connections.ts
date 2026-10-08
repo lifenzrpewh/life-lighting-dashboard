@@ -35,7 +35,7 @@ export const CONNECTIONS: readonly ConnectionId[] = ['console', 'ontime', 'propr
  *  leaves the slot pickers (the owner, 2026-10-04). The video feed is its own
  *  connection, not Arena's: it reads a Spout or Syphon sender on this computer,
  *  which works with Arena's web server off, or with no Arena at all. */
-export const CONNECTION_OF_VIEW: Record<BuiltInView, ConnectionId> = {
+export const CONNECTION_OF_VIEW: Record<Exclude<BuiltInView, 'timer'>, ConnectionId> = {
 	cue: 'cue',
 	ma: 'console',
 	arena: 'arena',
@@ -60,7 +60,10 @@ export function viewIsOn(
 	if (ndiId !== null) return ndi.some((s) => s.id === ndiId && s.on)
 	const id = embedIdOf(view)
 	if (id !== null) return embeds.some((e) => e.id === id && e.on)
-	return !off.includes(CONNECTION_OF_VIEW[view as BuiltInView])
+	// The Timer view (2026-10-08) is either program's countdown, the chip's
+	// rule: on while either is.
+	if (view === 'timer') return !off.includes('ontime') || !off.includes('propresenter')
+	return !off.includes(CONNECTION_OF_VIEW[view as Exclude<BuiltInView, 'timer'>])
 }
 
 /** An NDI source's row. Found on the network and not on screen is live: it is
