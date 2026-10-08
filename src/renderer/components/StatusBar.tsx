@@ -21,8 +21,8 @@
 // doing all it does unfolded. It was a separate strip with its own
 // arrangement and fewer controls (2026-10-05, the owner: the bar "seems to
 // take A LOT of screen space"), so things moved under the finger. The fold is
-// remembered on this computer. Edit layout left the bar the same day; it is
-// in Layouts › Edit this layout.
+// remembered on this computer. Edit layout left the bar the same day; since
+// 2026-10-08 it is the pencil in any window's strip (./Grid.tsx).
 //
 // THE TIME IS NEVER COVERED (the owner's bug, 2026-10-08: in Admin the clock
 // went behind the buttons). The zones are flex, not a 1fr/auto/1fr grid,
@@ -280,7 +280,7 @@ export function StatusBar({
 	/** The saved layout on screen, if it is one (../../shared/layout.ts). */
 	layoutName: string | null
 	layoutsOpen: boolean
-	/** Open Layouts: everyone may switch; Admin edits and saves. */
+	/** Open Layouts: everyone may switch, save and delete (2026-10-08). */
 	onLayouts: () => void
 	onConnections: () => void
 	/** Settings (./SettingsPanel.tsx): Admin only, not drawn otherwise. */

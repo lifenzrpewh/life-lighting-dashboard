@@ -16,8 +16,10 @@
 //   page is in one place at a time. (A second Cue Manager page could sync its
 //   offline queue twice; one page cannot.)
 // - A turned-off connection's tabs disappear, and come back when it is on.
-// - Arranging (windows, and adding or removing tabs) is operator mode only,
-//   behind an Edit layout switch. Switching tabs is everyone's.
+// - Arranging (windows, and adding or removing tabs) is behind an Edit layout
+//   switch. Switching tabs is everyone's. Arranging is everyone's too since
+//   2026-10-08 (the owner: nothing in a layout touches the show), started
+//   from a pencil in any window's strip.
 // - The default, fresh or with nothing saved: the run order on the left third,
 //   the MA on the right two-thirds, as the slots were.
 //
@@ -463,9 +465,9 @@ export function freshId(layout: Layout, prefix: 'w' | 't', random: () => number 
 // ─── Saved layouts ─────────────────────────────────────────────────────────
 //
 // Named layouts on this machine (the owner, 2026-10-04): everyone may switch
-// between them, from the status bar; saving and deleting is arranging, so
-// operator mode's. A saved layout keeps its windows, their tabs and which tab
-// shows.
+// between them, from the status bar. Saving and deleting were operator mode's
+// until 2026-10-08; now everyone's (the owner: nothing in a layout touches the
+// show). A saved layout keeps its windows, their tabs and which tab shows.
 
 export type SavedLayout = { name: string; layout: Layout }
 

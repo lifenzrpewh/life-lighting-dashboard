@@ -6,8 +6,11 @@
 // a window that page cannot cover. That is why the tabs and the view's own
 // buttons live in it.
 //
-// EDITING (operator mode, behind Edit layout): every page stands in as a
-// picture of itself, so the windows can be drawn over. Drag a window's body to
+// EDITING (Edit layout, for everyone since 2026-10-08, the owner's ask: a
+// layout touches nothing on the show, so a volunteer may arrange one; started
+// from the pencil at the end of any window's strip, ended by Done in the bar
+// above): every page stands in as a picture of itself, so the windows can be
+// drawn over. Drag a window's body to
 // move it, its edges or corners to resize it. The drag follows the finger; an
 // edge near the screen's edge or another window's snaps onto it, a resized
 // edge stops flush against a window in its way, and a move onto another window
@@ -23,7 +26,7 @@
 // pictures while it is dragged.
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { Move, PanelTop, Plus, Trash2, X } from 'lucide-react'
+import { Move, PanelTop, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 import {
 	HEIGHT,
@@ -83,6 +86,8 @@ export type GridProps = {
 	/** The shown view's own buttons, at the strip's far end. */
 	actions: (win: GridWindow, tab: Tab) => ReactNode
 	onSelect: (windowId: string, tabId: string) => void
+	/** A window's pencil: the whole screen into Edit layout. */
+	onEdit: () => void
 	onAddTab: (windowId: string, view: ViewId) => void
 	onRemoveTab: (windowId: string, tabId: string) => void
 	/** A tab dragged: to before `beforeTabId` in `toWindow`, or its end. */
@@ -302,6 +307,7 @@ export function Grid(p: GridProps) {
 							<span className="ml-auto" />
 							<span className="flex items-center gap-1">
 								{!p.editing && tab !== null && p.actions(win, tab)}
+								{!p.editing && <IconButton icon={Pencil} size="sm" label="Edit the layout: move, resize and add windows and tabs" onClick={p.onEdit} />}
 								{p.editing && (
 									<Button size="sm" variant="ghost" icon={Trash2} onClick={() => p.onRemoveWindow(win.id)}>
 										Remove window
@@ -319,7 +325,7 @@ export function Grid(p: GridProps) {
 											win.tabs.length === 0
 												? p.editing
 													? 'Tap + in its strip to put a view here, or remove the window.'
-													: 'In Admin, Layouts › Edit this layout puts a view here.'
+													: 'The pencil in its strip edits the layout; then + puts a view here.'
 												: 'Turn them on again in Settings.'
 										}
 									/>

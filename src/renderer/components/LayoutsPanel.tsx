@@ -1,8 +1,9 @@
 // Layouts (../../shared/layout.ts): the saved arrangements, each drawn as a
 // picture of its windows, so one is known at a glance rather than by "3
-// windows". Tap one to switch to it. Everyone may switch; editing the layout
-// on screen, saving it under a name and deleting one are operator mode's,
-// because they are arranging, and are not drawn in volunteer mode.
+// windows". Tap one to switch to it. Everyone may switch, save the layout on
+// screen under a name and delete one (2026-10-08, the owner: nothing in a
+// layout touches the show; until then saving and deleting were operator
+// mode's).
 //
 // A dropdown over the windows since 2026-10-06 (the owner: "appear as a
 // dropdown on top of the screen, not take you to a whole different screen"),
@@ -10,11 +11,12 @@
 // over, so while it is open every page stands in as a picture of itself, as
 // in Edit layout (../App.tsx). A tap outside closes it.
 //
-// Edit this layout lives here since 2026-10-05: one Layouts button on the bar
-// rather than LAYOUT and EDIT LAYOUT side by side.
+// Edit this layout lived here from 2026-10-05 to 2026-10-08; it left for a
+// pencil in every window's strip (./Grid.tsx), the owner's ask: edit from the
+// windows themselves.
 
 import { useEffect, useState } from 'react'
-import { Pencil, Save, Trash2, X } from 'lucide-react'
+import { Save, Trash2, X } from 'lucide-react'
 
 import {
 	HEIGHT,
@@ -34,21 +36,16 @@ import { Button, IconButton, viewIcon } from './ui.js'
 export function LayoutsPanel({
 	layout,
 	saved,
-	operator,
 	labelOf,
 	onSwitch,
 	onSaved,
-	onEdit,
 	onClose,
 }: {
 	layout: Layout
 	saved: readonly SavedLayout[]
-	operator: boolean
 	labelOf: (view: ViewId) => string
 	onSwitch: (layout: Layout) => void
 	onSaved: (saved: SavedLayout[]) => void
-	/** Start arranging the layout on screen. */
-	onEdit: () => void
 	onClose: () => void
 }) {
 	const current = saved.find((s) => sameArrangement(s.layout, layout))?.name ?? null
@@ -83,79 +80,64 @@ export function LayoutsPanel({
 				<h2 className="text-lg font-medium">Layouts</h2>
 				<p className="min-w-0 truncate text-sm text-booth-dim">Tap one to switch to it.</p>
 				<span className="ml-auto flex shrink-0 items-center gap-2">
-					{operator && (
-						<Button size="sm" icon={Pencil} onClick={onEdit}>
-							Edit this layout
-						</Button>
-					)}
 					<IconButton icon={X} label="Close" onClick={onClose} />
 				</span>
 			</div>
 			<div className="min-h-0 overflow-y-auto p-4">
-				{saved.length === 0 && !operator ? (
-					<p className="px-1 py-6 text-center text-sm text-booth-dim">
-						No layouts saved on this computer yet. Admin arranges the windows and saves them here.
-					</p>
-				) : (
-					<div className="grid grid-cols-2 items-start gap-3">
-						{saved.map((s) => {
-							const on = s.name === current
-							return (
-								<div
-									key={s.name}
-									className={`group relative flex flex-col gap-2 rounded-xl bg-booth-bg p-2.5 transition-colors hover:bg-booth-strip ${
-										on ? 'nacre-ring' : 'ring-1 ring-booth-edge ring-inset'
-									}`}
+				<div className="grid grid-cols-2 items-start gap-3">
+					{saved.map((s) => {
+						const on = s.name === current
+						return (
+							<div
+								key={s.name}
+								className={`group relative flex flex-col gap-2 rounded-xl bg-booth-bg p-2.5 transition-colors hover:bg-booth-strip ${
+									on ? 'nacre-ring' : 'ring-1 ring-booth-edge ring-inset'
+								}`}
+							>
+								<button
+									type="button"
+									onClick={() => {
+										onSwitch(s.layout)
+										onClose()
+									}}
+									className="flex flex-col gap-2 text-left"
+									aria-label={`Switch to ${s.name}`}
 								>
-									<button
-										type="button"
-										onClick={() => {
-											onSwitch(s.layout)
-											onClose()
-										}}
-										className="flex flex-col gap-2 text-left"
-										aria-label={`Switch to ${s.name}`}
+									<Miniature layout={s.layout} labelOf={labelOf} />
+									<span className="flex items-baseline justify-between gap-3 px-0.5 pr-11">
+										<span className="truncate font-medium">{s.name}</span>
+										<span className={`shrink-0 text-xs ${on ? 'text-booth-ink' : 'text-booth-dim'}`}>
+											{on ? 'On screen' : `${s.layout.windows.length} ${s.layout.windows.length === 1 ? 'window' : 'windows'}`}
+										</span>
+									</span>
+								</button>
+								<span className="absolute right-2 bottom-1.5">
+									<Button
+										size="sm"
+										variant={deleting === s.name ? 'danger' : 'quiet'}
+										icon={Trash2}
+										label={deleting === s.name ? undefined : `Delete ${s.name}`}
+										onClick={() =>
+											deleting === s.name ? (onSaved(deleteLayout(saved, s.name)), setDeleting(null)) : setDeleting(s.name)
+										}
+										className={deleting === s.name ? 'bg-booth-panel' : 'opacity-80 group-hover:opacity-100'}
 									>
-										<Miniature layout={s.layout} labelOf={labelOf} />
-										<span className={`flex items-baseline justify-between gap-3 px-0.5 ${operator ? 'pr-11' : ''}`}>
-											<span className="truncate font-medium">{s.name}</span>
-											<span className={`shrink-0 text-xs ${on ? 'text-booth-ink' : 'text-booth-dim'}`}>
-												{on ? 'On screen' : `${s.layout.windows.length} ${s.layout.windows.length === 1 ? 'window' : 'windows'}`}
-											</span>
-										</span>
-									</button>
-									{operator && (
-										<span className="absolute right-2 bottom-1.5">
-											<Button
-												size="sm"
-												variant={deleting === s.name ? 'danger' : 'quiet'}
-												icon={Trash2}
-												label={deleting === s.name ? undefined : `Delete ${s.name}`}
-												onClick={() =>
-													deleting === s.name ? (onSaved(deleteLayout(saved, s.name)), setDeleting(null)) : setDeleting(s.name)
-												}
-												className={deleting === s.name ? 'bg-booth-panel' : 'opacity-80 group-hover:opacity-100'}
-											>
-												{deleting === s.name ? 'Tap again to delete' : undefined}
-											</Button>
-										</span>
-									)}
-								</div>
-							)
-						})}
-						{operator && (
-							<div className="flex flex-col gap-2 rounded-xl p-2.5 ring-1 ring-booth-edge ring-inset [border-style:dashed]">
-								<Miniature layout={layout} labelOf={labelOf} />
-								<Field label="Save the layout on screen as" error={error ?? undefined} hint={note ?? 'The same name replaces that layout.'}>
-									<Input value={name} onChange={setName} placeholder="Sunday" />
-								</Field>
-								<Button variant="primary" icon={Save} onClick={save} className="self-start">
-									Save
-								</Button>
+										{deleting === s.name ? 'Tap again to delete' : undefined}
+									</Button>
+								</span>
 							</div>
-						)}
+						)
+					})}
+					<div className="flex flex-col gap-2 rounded-xl p-2.5 ring-1 ring-booth-edge ring-inset [border-style:dashed]">
+						<Miniature layout={layout} labelOf={labelOf} />
+						<Field label="Save the layout on screen as" error={error ?? undefined} hint={note ?? 'The same name replaces that layout.'}>
+							<Input value={name} onChange={setName} placeholder="Sunday" />
+						</Field>
+						<Button variant="primary" icon={Save} onClick={save} className="self-start">
+							Save
+						</Button>
 					</div>
-				)}
+				</div>
 			</div>
 		</div>
 	)

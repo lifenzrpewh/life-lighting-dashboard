@@ -101,6 +101,9 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Fold the bar (⌃): every item stays where it was, smaller; the console card, Guide, Layouts, Connections, Mark, Settings and the lock all still work folded
 - [ ] In Admin, at the booth's own screen width: the clock and countdown are never covered; the buttons lose their words, not the clock
 - [ ] Settings › Top bar: hide Mark and the Guide; they leave the bar on this computer only and come back when shown
+- [ ] Video: with Arena's Spout output picked and no picture, after 10 s the view says why; **Restart video** (the view's ↻, beside the Video feed in Connections, as a volunteer too) brings it back without restarting Pāua. On a computer with two graphics cards, say which
+- [ ] As a volunteer: the pencil at the end of a window's strip puts the screen into Edit layout; move, resize, add a window, Done. No "Edit this layout" left in Layouts
+- [ ] As a volunteer: Layouts › save the layout on screen under a name, switch away and back, delete it with two taps
 
 **Installing**
 - [ ] What Windows SmartScreen showed, word for word, and whether Run anyway worked

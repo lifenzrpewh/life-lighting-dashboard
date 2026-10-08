@@ -112,7 +112,8 @@ export function App() {
 	// 'real' is dev's way to watch main's own link, against onPC or a stand-in,
 	// in a window rather than the full-screen kiosk. The run order stays cold.
 	const [scenario, setScenario] = useState<Scenario | 'real'>('cold')
-	// Arranging the windows: operator mode only (../shared/layout.ts).
+	// Arranging the windows: everyone's since 2026-10-08, from a window's
+	// pencil (../shared/layout.ts).
 	const [editing, setEditing] = useState(false)
 	// The top bar folded to a strip: a convenience of this computer's, so a
 	// machine that keeps nothing shows the bar.
@@ -458,8 +459,8 @@ export function App() {
 			setLayoutsOpen(true)
 		})
 	}
-	// Not a turn of its own: Edit this layout closes the dropdown and starts
-	// editing in one tap, and its pictures must not be dropped by the close.
+	// Not a turn of its own: the pictures outlast editing and the dropdown by
+	// a moment, and a turn started meanwhile keeps them.
 	useEffect(() => {
 		if (editing || layoutsOpen) return
 		const id = editTurn.current
@@ -903,6 +904,7 @@ export function App() {
 								}
 								actions={(_win, tab) => actionsOf(tab.view)}
 								onSelect={(w, t) => update((l) => selectTab(l, w, t))}
+								onEdit={startEditing}
 								onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
 								onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
 								onMoveTab={(from, t, to, before) => update((l) => moveTab(l, from, t, to, before))}
@@ -925,14 +927,9 @@ export function App() {
 									<LayoutsPanel
 										layout={layout}
 										saved={saved}
-										operator={mode === 'operator'}
 										onSwitch={(l) => update(() => l)}
 										onSaved={setSaved}
 										labelOf={label}
-										onEdit={() => {
-											setLayoutsOpen(false)
-											startEditing()
-										}}
 										onClose={() => setLayoutsOpen(false)}
 									/>
 								</>

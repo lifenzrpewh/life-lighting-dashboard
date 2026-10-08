@@ -124,7 +124,7 @@ export function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 							Add
 						</Button>
 						{added !== null && (
-							<span className="text-sm text-state-live">Added {added}. Layouts › Edit this layout, then a window's +, puts it on screen.</span>
+							<span className="text-sm text-state-live">Added {added}. A window's pencil, then its +, puts it on screen.</span>
 						)}
 					</div>
 				</>
@@ -215,7 +215,7 @@ export function AddNdi({ all, save }: { all: readonly NdiSource[]; save: Save })
 			</p>
 			{full && <p className="text-sm text-booth-dim">That is {NDI_SOURCES_MAX}, the most there can be. Remove one to add another.</p>}
 			{body}
-			{added !== null && <span className="text-sm text-state-live">Added {added}. Layouts › Edit this layout, then a window's +, puts it on screen.</span>}
+			{added !== null && <span className="text-sm text-state-live">Added {added}. A window's pencil, then its +, puts it on screen.</span>}
 			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
 			<NdiNotice />
 		</section>
@@ -318,7 +318,7 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 					))}
 				</ul>
 			)}
-			{added !== null && <span className="text-sm text-state-live">Added {added}. Layouts › Edit this layout, then a window's +, puts it on screen.</span>}
+			{added !== null && <span className="text-sm text-state-live">Added {added}. A window's pencil, then its +, puts it on screen.</span>}
 			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
 		</section>
 	)
