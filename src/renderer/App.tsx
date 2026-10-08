@@ -133,7 +133,7 @@ export function App() {
 		}
 	}
 	// What Admin has hidden on the bar, on this computer (./barItems.ts).
-	const [barHidden] = useBarHidden()
+	const [barHidden, setBarHidden] = useBarHidden()
 	// The sheets that stand in the windows' place, one at a time: Connections
 	// (a list to read), Settings (Admin's), the showfile sheet (Save As, Load),
 	// the Creative Guide (../shared/guide.ts; its page is placed over the
@@ -875,6 +875,8 @@ export function App() {
 							now={now}
 							onChanged={readOff}
 							onClose={() => setSheet(null)}
+							barHidden={barHidden}
+							onBarHidden={setBarHidden}
 						/>
 					) : sheet === 'passcode' && mode === 'volunteer' ? (
 						<PasscodeSheet now={now} onUnlocked={enter} onClose={() => setSheet(null)} />

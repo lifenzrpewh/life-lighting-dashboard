@@ -14,7 +14,7 @@
 // configured here (src/shared/settings.ts).
 
 import { useEffect, useState } from 'react'
-import { Cast, Lock, Monitor, Plus, Webcam } from 'lucide-react'
+import { Cast, Lock, Monitor, PanelTop, Plus, Webcam } from 'lucide-react'
 
 import type { ConnectionId, ConnectionStatus, RowId } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -26,15 +26,17 @@ import type { SettingsView } from '../../shared/settings.js'
 import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor } from './settings/connection-editors.js'
 import { AdminSettings } from './settings/admin.js'
 import { AboutFoot, ThisScreen } from './settings/computer.js'
+import { TopBarSettings } from './settings/top-bar.js'
+import type { BarItem } from '../barItems.js'
 import { DetailHead, Empty, ListRow, OnOff, tonePill, toneText, type Save } from './settings/parts.js'
 import { AddCapture, AddEmbed, AddNdi, CaptureEditor, EmbedEditor, NdiEditor } from './settings/views.js'
 import { Dot, Sheet } from './ui.js'
 import { sentence } from './vocabulary.js'
 
 /** What the right side shows: a connection, or one of the pages after them. */
-export type SettingsPage = RowId | 'add' | 'add-ndi' | 'add-capture' | 'admin' | 'computer'
+export type SettingsPage = RowId | 'add' | 'add-ndi' | 'add-capture' | 'admin' | 'bar' | 'computer'
 
-const PAGES: readonly string[] = ['add', 'add-ndi', 'add-capture', 'admin', 'computer']
+const PAGES: readonly string[] = ['add', 'add-ndi', 'add-capture', 'admin', 'bar', 'computer']
 
 /** Every connection's address as the list shows it, from the stored settings. */
 export function addressOf(view: SettingsView, id: RowId): string | null {
@@ -78,6 +80,8 @@ export function SettingsPanel({
 	now,
 	onChanged,
 	onClose,
+	barHidden,
+	onBarHidden,
 }: {
 	rows: readonly ConnectionStatus[]
 	/** The page to open on: a connection tapped in Connections, or null for
@@ -90,6 +94,9 @@ export function SettingsPanel({
 	/** Settings were saved: the screen re-reads what is turned off. */
 	onChanged: () => void
 	onClose: () => void
+	/** The top bar's hidden items, on this computer (../barItems.ts). */
+	barHidden: ReadonlySet<BarItem>
+	onBarHidden: (item: BarItem, hidden: boolean) => void
 }) {
 	const [view, setView] = useState<SettingsView | null>(null)
 	const [picked, setPicked] = useState<SettingsPage | null>(start)
@@ -208,6 +215,13 @@ export function SettingsPanel({
 						}
 					/>
 					<ListRow
+						selected={selected === 'bar'}
+						onClick={() => setPicked('bar')}
+						lead={<PanelTop size={18} className="text-booth-dim" aria-hidden />}
+						title="Top bar"
+						sub={<span className="text-booth-dim">{barHidden.size === 0 ? 'Everything shown' : `${barHidden.size} hidden`}</span>}
+					/>
+					<ListRow
 						selected={selected === 'computer'}
 						onClick={() => setPicked('computer')}
 						lead={<Monitor size={18} className="text-booth-dim" aria-hidden />}
@@ -227,6 +241,8 @@ export function SettingsPanel({
 							<AddCapture all={view.captureInputs} save={save} />
 						) : selected === 'admin' ? (
 							<AdminSettings view={view} save={save} />
+						) : selected === 'bar' ? (
+							<TopBarSettings hidden={barHidden} onSet={onBarHidden} />
 						) : selected === 'computer' ? (
 							<>
 								<DetailHead title="This computer" />
