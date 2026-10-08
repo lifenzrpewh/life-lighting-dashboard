@@ -8,16 +8,20 @@
 // row is a way into Settings at that connection, where its fields are
 // (./SettingsPanel.tsx). The statuses come from src/shared/connections.ts, the
 // same rows the status bar's dot is the worst of.
+//
+// One action, for anyone (2026-10-08, merged from the video-restart branch):
+// Restart video beside the Video feed's row. It fires nothing anywhere else;
+// it lets the receivers go and opens them again (src/main/video-feed.ts).
 
 import { useEffect, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, RotateCw } from 'lucide-react'
 
 import type { ConnectionStatus, RowId } from '../../shared/connections.js'
 import type { SettingsView } from '../../shared/settings.js'
 
 import { addressOf, isOff } from './SettingsPanel.js'
 import { toneText } from './settings/parts.js'
-import { Dot, Sheet } from './ui.js'
+import { Button, Dot, Sheet } from './ui.js'
 import { sentence } from './vocabulary.js'
 
 export function ConnectionsPanel({
@@ -52,13 +56,20 @@ export function ConnectionsPanel({
 						</li>
 					)}
 					{rows.map((r) => (
-						<li key={r.id}>
-							<StatusRow
-								row={r}
-								address={view === null ? null : addressOf(view, r.id)}
-								off={view !== null && isOff(view, r.id)}
-								onOpen={operator ? () => onOpen(r.id) : null}
-							/>
+						<li key={r.id} className="flex items-center gap-2">
+							<div className="min-w-0 flex-1">
+								<StatusRow
+									row={r}
+									address={view === null ? null : addressOf(view, r.id)}
+									off={view !== null && isOff(view, r.id)}
+									onOpen={operator ? () => onOpen(r.id) : null}
+								/>
+							</div>
+							{r.id === 'video' && r.tone !== 'off' && window.life !== undefined && (
+								<Button icon={RotateCw} onClick={() => window.life?.restartVideo()}>
+									Restart video
+								</Button>
+							)}
 						</li>
 					))}
 				</ul>

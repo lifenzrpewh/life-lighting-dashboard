@@ -392,6 +392,40 @@ kiosk 211, 188, … 25, 1, 23, … 212 at 100 ms steps. The ring build (tearing)
 stay; the stall was never the feed. ✅ The owner, watching Arena's own fades in the kiosk
 afterwards: "Seems good now."
 
+**Listed but waiting for ever, and Restart video (2026-10-08, branch `video-restart`).** The
+owner, from another Windows booth machine: the picker listed the Spout senders, a pick only
+ever said it was waiting, through app restarts, a machine restart and a reinstall; other
+machines work. Nothing was in the log. Read from the addon's source (upstream `7f7d589`,
+`spout_bridge.cpp`; ⚠️ not seen on that machine, nothing tried there):
+- **The likeliest cause: two graphics cards.** Each receiver makes its own D3D11 device on
+  the *default* adapter and opens the sender's texture on it. Spout's handle is a legacy
+  shared handle, which opens only on the card that made it, so with Arena on the discrete
+  card and Pāua on the other every open fails, and the addon says only "not connected
+  (sender disconnected or never appeared)" while the sender is still listed. That went into
+  the view's small print and nowhere else. **The fix is Windows' own:** Settings › System ›
+  Display › Graphics › Pāua (and Arena): High performance, then restart both. It moves the
+  addon's default adapter and Chromium's together. Chromium's `force_high_performance_gpu`
+  switch was **not** added: it moves Chromium only, so the page would be on one card and
+  the addon's textures on the other, which would break a machine that works.
+- **A freeze where Spout's frame counting is on** (`HKCU\Software\Leading Edge\Spout`
+  `Framecount` = 1, SpoutSettings): the kiosk asked `hasNewFrame()` before each receive, a
+  flag only a receive updates, so one poll with nothing new left it false for good. Off (as
+  on the Windows box here) it always says yes, so it was dropped on Windows (Syphon's kept).
+- **Now:** a sender tried for 10 s with no frame reaching the page is said in the view
+  ("No picture from …") and in one `[video] no picture from …` line with the counts (how
+  often "not connected", frames taken, frames that reached the page, a send the page never
+  took). Every new failure is a `[video]` line. `[video] graphics:` logs the cards Chromium
+  sees and which it draws with (`app.getGPUInfo('basic')`), 5 s after start and at each
+  restart. The Connections row no longer says LIVE for a sender listed without a picture.
+  **Restart video** (↻ in the view's strip, a button over the waiting message,
+  beside the Video feed in Connections, and in Settings › Video feed; since the 2026-10-08
+  merge, Connections is the read-only list and Settings holds the two-card advice), for
+  anyone: lets every receiver go and opens them again,
+  keeping the pick and the watchers, no app restart. ✅ On this Mac with a Syphon stand-in:
+  frames, Restart while watched, frames again, the lines in the log. ⚠️ Not on Windows,
+  not on a two-card machine; the addon's own `[SpoutBridge]` lines go to stderr
+  (kiosk.log), not paua.log.
+
 **Still to do:** lay out the real multiview in Arena (slices taking Layer / Group / Composition); then macOS
 (Syphon needs `Syphon.framework` bundled and signed, per the addon's docs).
 

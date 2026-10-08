@@ -23,7 +23,7 @@ import { captureIdOf } from '../../shared/capture.js'
 import type { DeskState } from '../../shared/desk.js'
 import type { SettingsView } from '../../shared/settings.js'
 
-import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor } from './settings/connection-editors.js'
+import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor, VideoInfo } from './settings/connection-editors.js'
 import { AdminSettings } from './settings/admin.js'
 import { AboutFoot, ThisScreen } from './settings/computer.js'
 import { TopBarSettings } from './settings/top-bar.js'
@@ -268,6 +268,7 @@ export function SettingsPanel({
 										multiview. Separate from Arena: it works with Arena’s web server off.
 									</p>
 								)}
+								{row.id === 'video' && <VideoInfo />}
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
 								{captureOf(row.id) !== null ? (
 									<CaptureEditor key={row.id} input={captureOf(row.id)!} all={view.captureInputs} save={save} onRemoved={() => setPicked(null)} />

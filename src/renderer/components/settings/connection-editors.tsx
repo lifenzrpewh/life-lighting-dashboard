@@ -5,12 +5,14 @@
 // password box means "leave it as it is", and Remove is its own button.
 
 import { useState } from 'react'
+import { RotateCw } from 'lucide-react'
 
 import type { DeskState } from '../../../shared/desk.js'
 import { replyPortOf, type SettingsPatch, type SettingsView } from '../../../shared/settings.js'
 
 import { CueManagerSettings } from '../CueManagerSettings.js'
 import { Field, Input, Select, User, portOf, useProPresenterNames } from '../form.js'
+import { Button } from '../ui.js'
 import { formatAge } from '../vocabulary.js'
 import { Editor, FolderInput, HostPort, type Save } from './parts.js'
 
@@ -307,3 +309,25 @@ export function CueInfo() {
 	)
 }
 
+
+/** The video feed's Restart, for anyone (Settings is Admin's, but the same
+ *  button is in the Video view and on the feed's row in Connections), and what
+ *  to do on a computer with two graphics cards (src/main/video-feed.ts has why). */
+export function VideoInfo() {
+	return (
+		<>
+			{window.life !== undefined && (
+				<div>
+					<Button size="sm" icon={RotateCw} onClick={() => window.life?.restartVideo()}>
+						Restart video
+					</Button>
+				</div>
+			)}
+			<p className="max-w-prose text-sm text-booth-dim">
+				A sender listed but no picture, on a computer with two graphics cards: the sender (Arena) and Pāua must draw on the
+				same one. In Windows Settings › System › Display › Graphics, set both Pāua and Arena to High performance, then
+				restart both. The log’s <span className="font-mono">[video] graphics</span> line says which cards Pāua sees.
+			</p>
+		</>
+	)
+}
