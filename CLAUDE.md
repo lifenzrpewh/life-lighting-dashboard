@@ -322,6 +322,19 @@ two heights** (folded keeps everything in place); the **clock no longer hides** 
 buttons; ProPresenter on **1025**. Checked over CDP in the dev kiosk on the Mac only
 (`docs/FIELD_TEST.md` § Admin, Settings and the bar).
 
+**2026-10-08: v0.2.6 tagged** at the owner's ask, from a Mac session: Operator is **Admin**,
+opened by a passcode (keypad or keyboard) with a set timeout; Connections a status list and a
+**Settings** gear; the bar the same folded or not, its items hideable, the clock never covered;
+ProPresenter on 1025; Edit layout from a pencil on each window, for everyone; tabs renamed per
+layout; a **Timer** view; one **Video** view for Spout/Syphon, NDI and capture; Restart video and
+a no-picture reason after 10 s (the Spout "waiting forever" at one booth: likely two graphics
+cards, unconfirmed); Holding's **overflow** into empty clips past the named columns. All checked
+on the Mac against the mock only (`docs/FIELD_TEST.md` § 0.2.6). Waiting on the owner:
+`spikes/propresenter-playlist.mjs` run at a booth (ProPresenter's announcements: a presentation
+playlist, base items then announcements; the plan is a Smart Playlist folder plus a PUT of the
+playlist, announcements told by their lookbook code). visuals-song-comms branch `devices-wording`
+(Booth devices → Devices) is pushed, not merged.
+
 **2026-10-06: v0.2.5 tagged** at the owner's ask, from a Mac session: operator-only buttons
 not drawn in volunteer mode, Layouts as a dropdown over the windows (and in the folded strip),
 the normal background filling HOLD BG's gaps in Update all, a PREACH column. Checked in a

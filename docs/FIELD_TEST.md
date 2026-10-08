@@ -49,7 +49,7 @@ bar is the list anyone can read: what is up, what is down.
 
 ## Admin
 
-Admin (called operator mode before the next version) is for changing
+Admin (called operator mode before 0.2.6) is for changing
 settings, layouts and the show. Tap **Volunteer** and enter the passcode, on
 Pāua's own keypad or, for one with letters, after **Keyboard**. One tap on
 **Admin** goes back. Admin also goes back by itself after a while with nobody
@@ -88,7 +88,7 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
-**Admin, Settings and the bar** (next version, after 0.2.5)
+**Admin, Settings and the bar** (0.2.6)
 - [ ] Installed over 0.2.5: addresses, MA logins, the Cue Manager's sign-in and saved layouts still there; Admin opens with a tap (no passcode yet) and Settings › Admin says so
 - [ ] Settings › Admin › Set a passcode, by keypad (digits) and once by Keyboard (letters); tap Admin to leave, tap Volunteer: the passcode sheet opens on the keypad for digits, on the field for letters
 - [ ] By finger: the keypad's keys are easy to hit; the Windows touch keyboard (or none) for the Keyboard field
