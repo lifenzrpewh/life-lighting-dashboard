@@ -88,6 +88,20 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**Admin, Settings and the bar** (next version, after 0.2.5)
+- [ ] Installed over 0.2.5: addresses, MA logins, the Cue Manager's sign-in and saved layouts still there; Admin opens with a tap (no passcode yet) and Settings › Admin says so
+- [ ] Settings › Admin › Set a passcode, by keypad (digits) and once by Keyboard (letters); tap Admin to leave, tap Volunteer: the passcode sheet opens on the keypad for digits, on the field for letters
+- [ ] By finger: the keypad's keys are easy to hit; the Windows touch keyboard (or none) for the Keyboard field
+- [ ] Five wrong tries: the screen says to wait 30 seconds, counts down, then takes the right one
+- [ ] Forgotten-passcode recovery (§ Admin): delete `adminPasscode`, restart, Admin opens with a tap
+- [ ] Settings › Admin timeout at 2 min: Admin drops back by itself after 2 min untouched; working in the MA or the run order keeps it
+- [ ] A popped-out Holding or Lookbook follows Admin and volunteer
+- [ ] Connections is a list to read as a volunteer (no fields); in Admin, a row opens Settings at that connection
+- [ ] ProPresenter's port starts at 1025
+- [ ] Fold the bar (⌃): every item stays where it was, smaller; the console card, Guide, Layouts, Connections, Mark, Settings and the lock all still work folded
+- [ ] In Admin, at the booth's own screen width: the clock and countdown are never covered; the buttons lose their words, not the clock
+- [ ] Settings › Top bar: hide Mark and the Guide; they leave the bar on this computer only and come back when shown
+
 **Installing**
 - [ ] What Windows SmartScreen showed, word for word, and whether Run anyway worked
 - [ ] On a Mac: which of the two ways in worked, on which macOS
