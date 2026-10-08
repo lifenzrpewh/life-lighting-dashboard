@@ -107,4 +107,6 @@ test('the Timer view is on while either countdown program is', () => {
 	assert.equal(viewIsOn('timer', ['ontime'], []), true)
 	assert.equal(viewIsOn('timer', ['propresenter'], []), true)
 	assert.equal(viewIsOn('timer', ['ontime', 'propresenter'], []), false)
+	// The Guide is LIFE's page, not a connection: on whatever is off.
+	assert.equal(viewIsOn('guide', ['console', 'arena', 'cue', 'ontime', 'propresenter', 'video'], []), true)
 })

@@ -187,7 +187,7 @@ export function AddNdi({ all, save }: { all: readonly NdiSource[]; save: Save })
 				{ndi.found.map((source) => {
 					const have = all.some((s) => s.source === source)
 					return (
-						<li key={source} className="flex min-h-14 items-center gap-4 rounded-xl bg-booth-raise px-4 py-2">
+						<li key={source} className="flex min-h-14 items-center gap-4 rounded-win bg-booth-raise px-4 py-2">
 							<Cast size={18} className="shrink-0 text-booth-dim" aria-hidden />
 							<span className="flex min-w-0 flex-1 flex-col leading-tight">
 								<span className="truncate text-base">{ndiShortName(source)}</span>
@@ -301,7 +301,7 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 			) : (
 				<ul className="flex flex-col gap-1.5">
 					{cameras.map((device) => (
-						<li key={device} className="flex min-h-14 items-center gap-4 rounded-xl bg-booth-raise px-4 py-2">
+						<li key={device} className="flex min-h-14 items-center gap-4 rounded-win bg-booth-raise px-4 py-2">
 							<Webcam size={18} className="shrink-0 text-booth-dim" aria-hidden />
 							<span className="flex min-w-0 flex-1 flex-col leading-tight">
 								<span className="truncate text-base">{captureShortName(device)}</span>

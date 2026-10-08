@@ -44,7 +44,7 @@ export function EmbedMessage({ name, pane, now, onRetry }: { name: string; pane:
 /** − 100 % +, on an embed's strip. Tapping the number goes back to 100 %. */
 export function ZoomControl({ name, zoom, onZoom }: { name: string; zoom: number; onZoom: (by: -1 | 0 | 1) => void }) {
 	return (
-		<span className="flex h-10 shrink-0 items-center rounded-lg bg-booth-raise">
+		<span className="flex h-10 shrink-0 items-center rounded-ctl bg-booth-raise">
 			<button type="button" onClick={() => onZoom(-1)} className="grid h-10 w-9 place-items-center rounded-l-lg text-booth-dim hover:text-booth-ink" aria-label={`Zoom ${name} out`} title="Zoom out">
 				<Minus size={16} aria-hidden />
 			</button>

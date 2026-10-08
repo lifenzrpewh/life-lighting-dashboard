@@ -5,7 +5,7 @@
 // READ-ONLY, like the rest of the status bar: it starts, stops and sends
 // nothing to either program.
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 
 import { matchReading } from '../../shared/reading.js'
 import {
@@ -34,15 +34,16 @@ export function useNow(): number {
 	return now
 }
 
-/** The collapsed bar's chip: one line, no frame's padding, the number small. */
-const Compact = createContext(false)
-
+/** The bar's countdown (./StatusBar.tsx): the number big, and under it what
+ *  it counts to, as a track's title sits over its artist (the 2026-10-08
+ *  look). Folded, the two side by side on one line. Which program it is from
+ *  is in its label, not on the bar: the caption says what matters. */
 export function TimerChip({ sources, compact = false }: { sources: TimerSources | null; compact?: boolean }) {
-	return (
-		<Compact.Provider value={compact}>
-			<Chosen sources={sources} />
-		</Compact.Provider>
-	)
+	const now = useNow()
+	if (sources === null) return null
+	const face = timerFace(sources, now)
+	if (face === null) return null
+	return <BarFace face={face} compact={compact} />
 }
 
 /** What a countdown shows, whichever program it is from and however big it
@@ -127,85 +128,51 @@ export function timerFace(sources: TimerSources, now: number): TimerFace | null 
 	}
 }
 
-function Chosen({ sources }: { sources: TimerSources | null }) {
-	const now = useNow()
-	if (sources === null) return null
-	const face = timerFace(sources, now)
-	if (face === null) return null
-	return (
-		<Frame
-			source={face.source}
-			ageMs={face.ageMs}
-			caption={face.caption}
-			unknown={face.unknown}
-			over={face.over}
-			extra={face.extra}
-			note={face.note}
-		>
-			{face.number ? <Big ms={face.ms} /> : face.text !== null ? <span className="max-w-[24rem] truncate text-base">{face.text}</span> : null}
-		</Frame>
-	)
-}
-
-/** The number, big. Red once it passes zero and counts up, from either
- *  program (the owner's call, 2026-10-02), with its caption, so it reads
- *  across the booth. Zero itself is not yet over. */
-function Big({ ms }: { ms: number | null }) {
-	const compact = useContext(Compact)
-	return <span className={`${compact ? 'text-base' : 'text-[26px]'} leading-none font-medium tracking-tight tabular-nums`}>{ms === null ? '–:––' : formatCountdown(ms)}</span>
-}
-
 /** A countdown is a reading, not a control: no surface while live, so it can
- *  never be mistaken for a button. STALE and UNKNOWN take their outlines. */
-function Frame({
-	source,
-	ageMs,
-	caption,
-	unknown = false,
-	over = false,
-	extra = null,
-	note = null,
-	children,
-}: {
-	source: 'OnTime' | 'ProPresenter'
-	ageMs: number | null
-	/** What the number counts to, or why there is none. */
-	caption: string
-	unknown?: boolean
-	over?: boolean
-	extra?: string | null
-	/** What OnTime is, when it is not answering. */
-	note?: OnTimeAside
-	children: ReactNode
-}) {
-	const compact = useContext(Compact)
-	const stale = ageMs !== null
-	const frame = unknown ? stateClass.unknown : stale ? stateClass.stale : stateClass.live
-	// Nothing to count: one line, quieter, so an idle or silent program does
-	// not take the room a running countdown would.
-	const quiet = children === null || children === undefined || children === false
+ *  never be mistaken for a button. STALE and UNKNOWN take their outlines, and
+ *  STALE dims the value and says its age at full strength. Red once it passes
+ *  zero and counts up, from either program (the owner's call, 2026-10-02),
+ *  with a small jump as it goes over, so it reads across the booth. */
+function BarFace({ face, compact }: { face: TimerFace; compact: boolean }) {
+	const stale = face.ageMs !== null
+	const frame = face.unknown ? stateClass.unknown : stale ? stateClass.stale : stateClass.live
+	const value = face.number ? (face.ms === null ? '–:––' : formatCountdown(face.ms)) : face.unknown ? '?' : null
+	// The unknown caption begins with its own `?`; the number slot holds it.
+	const caption = face.unknown ? `${face.source} ${face.caption.replace(/^\? /, '')}` : face.caption
+	const aside =
+		face.note?.state === 'unknown' ? (
+			<span className="text-booth-dim">OnTime ? {unknownWhy[face.note.why]}</span>
+		) : face.note?.state === 'stale' ? (
+			<span className="text-state-stale">OnTime {formatAge(face.note.ageMs)}</span>
+		) : null
 	return (
-		// Caption and number side by side (2026-10-05, the owner: the bar "seems
-		// to take A LOT of screen space"), so the chip is one line high.
-		<span className={`flex min-w-0 items-center gap-3 rounded-lg border ${compact ? 'h-7 px-2' : 'h-11 px-3'} ${frame} ${over ? 'text-overtime' : ''}`}>
-			<span className={`flex min-w-0 items-center gap-3 ${stale ? staleContent : ''}`}>
-				<span className={`flex max-w-[22rem] items-center gap-1.5 truncate ${quiet && !compact ? 'text-sm' : 'text-xs'} ${over ? '' : 'text-booth-dim'}`}>
-					<span className="font-medium">{source}</span>
-					<span>·</span>
-					<span className="truncate">{caption}</span>
-					{extra !== null && <span className="rounded bg-booth-raise px-1.5 text-booth-ink">{extra}</span>}
+		<span
+			title={`${face.source} · ${face.caption}`}
+			aria-label={`${face.source}: ${face.caption}${value === null ? '' : `, ${value}`}`}
+			className={`flex min-w-0 rounded-ctl border-2 ${frame} ${face.over ? 'text-overtime' : ''} ${
+				compact ? 'flex-row items-baseline gap-2 px-1.5' : 'flex-col items-end justify-center gap-1.5 px-2 py-0.5'
+			}`}
+		>
+			{value !== null ? (
+				<span
+					key={String(face.over)}
+					className={`leading-none font-extrabold tracking-tight tabular-nums ${face.over ? 'animate-over-pop' : ''} ${stale ? staleContent : ''} ${
+						compact ? 'text-base' : 'text-[26px]'
+					}`}
+				>
+					{value}
 				</span>
-				{children}
+			) : face.text !== null ? (
+				<span className={`max-w-[20rem] truncate leading-none font-extrabold ${stale ? staleContent : ''} ${compact ? 'text-sm' : 'text-lg'}`}>{face.text}</span>
+			) : null}
+			<span className={`flex max-w-[22rem] min-w-0 items-baseline gap-1.5 leading-none whitespace-nowrap ${compact ? 'text-xs' : 'text-[12.5px]'}`}>
+				<span className={`truncate font-medium ${face.over ? '' : 'text-booth-dim'} ${value === null && face.text === null && !compact ? 'text-sm' : ''}`}>
+					{face.extra !== null && <span className="mr-1.5 rounded-ctl bg-booth-raise px-1.5 text-booth-ink">{face.extra}</span>}
+					{caption}
+				</span>
+				{stale && <span className="font-bold text-state-stale">{formatAge(face.ageMs!)}</span>}
+				{aside}
 			</span>
-			{stale && <span className="text-xs whitespace-nowrap text-state-stale">{formatAge(ageMs)}</span>}
-			{/* An event may be running in OnTime that nobody can see: said here,
-			    beside the ProPresenter timer standing in for it. */}
-			{note?.state === 'unknown' && (
-				<span className="text-xs whitespace-nowrap text-booth-dim">OnTime ? {unknownWhy[note.why]}</span>
-			)}
-			{note?.state === 'stale' && (
-				<span className="text-xs whitespace-nowrap text-state-stale">OnTime {formatAge(note.ageMs)}</span>
-			)}
 		</span>
 	)
 }

@@ -210,7 +210,7 @@ function Thumbnail({ clip }: { clip: ArenaClip | null }) {
 	// A picture that would not load leaves the frame empty, not broken.
 	const [failed, setFailed] = useState<string | null>(null)
 	return (
-		<span className="h-11 w-20 shrink-0 overflow-hidden rounded-md bg-booth-raise">
+		<span className="h-11 w-20 shrink-0 overflow-hidden rounded-ctl bg-booth-raise">
 			{url !== null && failed !== url && (
 				<img src={url} alt="" draggable={false} onError={() => setFailed(url)} className="size-full object-cover" />
 			)}

@@ -128,8 +128,8 @@ function ServicePicker({
 					key={s.id}
 					type="button"
 					onClick={() => onPick(s.id)}
-					className={`flex h-12 min-w-0 flex-col justify-center rounded-lg px-3.5 text-left text-xs transition-colors active:scale-[0.98] ${
-						s.id === picked ? 'bg-booth-raise nacre-ring' : 'bg-booth-panel ring-1 ring-booth-edge ring-inset hover:bg-booth-strip'
+					className={`flex h-12 min-w-0 flex-col justify-center rounded-ctl px-3.5 text-left text-xs transition-colors active:scale-[0.98] ${
+						s.id === picked ? 'bg-booth-raise accent-ring' : 'bg-booth-panel ring-1 ring-booth-edge ring-inset hover:bg-booth-strip'
 					}`}
 				>
 					<span className="truncate text-sm">{s.name}</span>
@@ -172,7 +172,7 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 	// More than the named columns and the empty clips past them take (the owner, 2026-10-08).
 	const didntFit = unplaced.filter((u) => u.didntFit === true).length
 	return (
-		<div className="my-2 flex flex-col gap-2 rounded-lg bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
+		<div className="my-2 flex flex-col gap-2 rounded-ctl bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
 			<p className="font-medium">{title}</p>
 			<ul className="flex flex-col gap-0.5 text-xs">
 				{steps.map((s) => {
@@ -253,7 +253,7 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 function Tick({ on, onChange, tone, children }: { on: boolean; onChange: (on: boolean) => void; tone: 'warn' | 'live'; children: React.ReactNode }) {
 	const colour = tone === 'live' ? 'text-overtime' : 'text-warn'
 	return (
-		<label className={`flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 text-xs ${colour} ${on ? 'bg-booth-hover' : ''}`}>
+		<label className={`flex min-h-10 cursor-pointer items-center gap-3 rounded-ctl px-2 text-xs ${colour} ${on ? 'bg-booth-hover' : ''}`}>
 			<input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} className="size-5 shrink-0 accent-current" />
 			{tone === 'live' && <TriangleAlert size={16} className="shrink-0" aria-hidden />}
 			<span className="min-w-0">{children}</span>
@@ -348,7 +348,7 @@ export function fileName(path: string): string {
 export function SmallButton({ onClick, children, tone = 'plain' }: { onClick: () => void; children: React.ReactNode; tone?: 'plain' | 'live' }) {
 	const colour = tone === 'live' ? 'bg-overtime/20 text-overtime ring-1 ring-overtime/60 ring-inset hover:bg-overtime/30' : 'bg-booth-raise hover:bg-booth-hover'
 	return (
-		<button type="button" onClick={onClick} className={`h-10 shrink-0 rounded-lg px-3.5 text-sm font-medium active:scale-[0.98] ${colour}`}>
+		<button type="button" onClick={onClick} className={`h-10 shrink-0 rounded-ctl px-3.5 text-sm font-medium active:scale-[0.98] ${colour}`}>
 			{children}
 		</button>
 	)

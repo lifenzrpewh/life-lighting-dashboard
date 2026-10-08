@@ -39,18 +39,17 @@ export function ListRow({
 			type="button"
 			onClick={onClick}
 			aria-current={selected}
-			className={`relative grid min-h-16 w-full grid-cols-[1.25rem_1fr_auto] items-center gap-3.5 rounded-xl px-4 py-2 text-left transition-colors ${
-				selected ? 'bg-booth-raise' : 'hover:bg-booth-strip'
+			className={`group relative grid min-h-16 w-full grid-cols-[1.25rem_1fr_auto] items-center gap-3.5 rounded-ctl px-4 py-2 text-left transition-[background-color,transform] duration-150 active:scale-[0.99] ${
+				selected ? 'bg-accent text-accent-ink' : 'hover:bg-booth-raise'
 			}`}
 		>
-			{selected && <span aria-hidden className="nacre-line absolute inset-y-3 left-0 w-[3px] rounded-r-full" />}
 			<span className="flex justify-center">{lead}</span>
 			<span className="flex min-w-0 flex-col leading-tight">
-				<span className="truncate text-base font-medium">{title}</span>
-				<span className="mt-0.5 truncate text-sm">{sub}</span>
+				<span className="truncate text-base font-bold">{title}</span>
+				<span className={`mt-0.5 truncate text-sm ${selected ? '[&_*]:!text-accent-ink/80' : ''}`}>{sub}</span>
 			</span>
 			{aside !== null && (
-				<span className={`max-w-40 truncate font-mono text-xs text-booth-dim ${struck ? 'line-through opacity-60' : ''}`}>{aside}</span>
+				<span className={`max-w-40 truncate text-xs ${selected ? 'text-accent-ink/80' : 'text-booth-dim'} ${struck ? 'line-through opacity-60' : ''}`}>{aside}</span>
 			)}
 		</button>
 	)
@@ -59,9 +58,9 @@ export function ListRow({
 export function DetailHead({ title, status, address = null }: { title: string; status?: ReactNode; address?: string | null }) {
 	return (
 		<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-			<h3 className="text-2xl font-medium">{title}</h3>
+			<h3 className="text-3xl font-extrabold tracking-tight">{title}</h3>
 			{status}
-			{address !== null && <span className="font-mono text-sm text-booth-dim">{address}</span>}
+			{address !== null && <span className="text-[15px] font-medium text-booth-dim">{address}</span>}
 		</div>
 	)
 }

@@ -30,7 +30,7 @@ export const staleContent = 'opacity-60'
 /** The one shape every chip in the status bar takes, so the bar reads as a
  *  row of like things: same height, same corners, same spacing. The state
  *  classes above go on top of it. */
-export const chip = 'flex h-12 min-w-0 items-center gap-3 rounded-lg border bg-booth-raise px-3.5'
+export const chip = 'flex h-12 min-w-0 items-center gap-3 rounded-ctl border bg-booth-raise px-3.5'
 
 /** The small label naming what a value is (Show, OnTime, Deck). Sentence
  *  case since 2026-10-05: a screen of uppercase labels all shouted at once. */
@@ -38,7 +38,7 @@ export const chipLabel = 'text-xs font-medium whitespace-nowrap text-booth-dim'
 
 /** A quiet button in a bar: chip-sized, so it lines up with the chips. */
 export const barButton =
-	'inline-flex h-10 shrink-0 items-center rounded-lg bg-booth-raise px-3.5 text-sm font-medium whitespace-nowrap text-booth-ink transition-colors hover:bg-booth-hover active:scale-[0.98]'
+	'inline-flex h-10 shrink-0 items-center rounded-ctl bg-booth-raise px-3.5 text-sm font-medium whitespace-nowrap text-booth-ink transition-colors hover:bg-booth-hover active:scale-[0.98]'
 
 /** A status word as a person writes it: "LIVE" as "Live". The shared code
  *  speaks in the old capitals; the screen does not shout them. */

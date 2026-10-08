@@ -17,7 +17,7 @@
 // is shown in red and not taken. + adds a tab, × takes one away, and the
 // strip's × removes the window. A tab is dragged along its strip to reorder
 // it, or onto another window to move it there (the owner, 2026-10-05: "don't
-// have to delete them to allow them to be reorganised"); a nacre bar shows
+// have to delete them to allow them to be reorganised"); a blue bar shows
 // where it will land. A tab's pencil names it in this layout (2026-10-08,
 // the owner's ask: "Stage cam" rather than "Video"); emptied, it takes its
 // view's own name again.
@@ -27,7 +27,7 @@
 // one more room and the other less, as the old divider did. Pages stand in as
 // pictures while it is dragged.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Check, Move, PanelTop, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 import {
@@ -249,23 +249,24 @@ export function Grid(p: GridProps) {
 				const target = tabDrag?.to?.win === win.id && tabDrag.win !== win.id
 				const ring =
 					target
-						? 'ring-2 ring-nacre-blue'
+						? 'ring-2 ring-accent-hi'
 						: moving !== null
 						? moving.ok
-							? 'ring-2 ring-nacre-blue'
+							? 'ring-2 ring-accent-hi'
 							: 'ring-2 ring-state-unreachable'
 						: p.editing
-							? 'ring-1 ring-nacre-blue/50'
-							: 'ring-1 ring-booth-edge'
+							? 'ring-2 ring-accent-hi/60'
+							: ''
 				return (
 					<section
 						key={win.id}
 						data-win={win.id}
 						style={place(box)}
-						className={`absolute z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl bg-booth-panel ${ring}`}
+						className={`absolute z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-win bg-booth-panel ${ring}`}
 					>
-						<div className="flex h-12 shrink-0 items-stretch gap-0.5 border-b border-booth-edge bg-booth-strip pr-1.5 pl-1">
-							<div role="tablist" className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+						<div className="flex h-14 shrink-0 items-center gap-1 bg-booth-strip px-2">
+							<div role="tablist" className="relative flex h-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+								<TabFill on={tab?.id ?? null} tabs={`${p.editing}|${naming?.tab ?? ''}|${tabs.map((t) => `${t.id}:${titleOf(t)}`).join('|')}`} />
 								{tabs.map((t) => {
 									const on = t.id === tab?.id
 									const TabIcon = viewIcon(tabView(t))
@@ -277,7 +278,7 @@ export function Grid(p: GridProps) {
 											className={`relative flex shrink-0 items-center ${tabDrag?.tab === t.id ? 'opacity-40' : ''}`}
 										>
 											{tabDrag?.to?.win === win.id && tabDrag.to.before === t.id && (
-												<span aria-hidden className="nacre-line absolute inset-y-2 -left-0.5 w-1 rounded-full" />
+												<span aria-hidden className="absolute inset-y-2 -left-1 w-1 rounded-full bg-accent-hi" />
 											)}
 											{naming?.tab === t.id ? (
 												<form
@@ -297,7 +298,7 @@ export function Grid(p: GridProps) {
 														onChange={(e) => setNaming({ ...naming, text: e.target.value })}
 														onKeyDown={(e) => e.key === 'Escape' && endNaming(false)}
 														onBlur={() => endNaming(true)}
-														className="h-9 w-40 rounded-md bg-booth-bg px-2.5 text-sm font-medium text-booth-ink ring-1 ring-nacre-blue outline-none placeholder:text-booth-faint"
+														className="h-9 w-40 rounded-ctl bg-booth-bg px-2.5 text-sm font-medium text-booth-ink ring-1 ring-accent-hi outline-none placeholder:text-booth-faint"
 													/>
 													<IconButton icon={Check} size="sm" label="Keep this name" onClick={() => endNaming(true)} />
 												</form>
@@ -309,11 +310,12 @@ export function Grid(p: GridProps) {
 													onClick={() => !dragged() && p.onSelect(win.id, t.id)}
 													{...tabHandle(win, t)}
 													title={p.editing ? 'Drag to move this tab' : undefined}
-													className={`flex h-full shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${p.editing ? 'cursor-grab touch-none' : ''} ${
-														on ? 'text-booth-ink' : 'text-booth-dim hover:text-booth-ink'
+													data-tab-button={on ? 'on' : undefined}
+													className={`relative flex h-10 shrink-0 items-center gap-2 rounded-ctl px-4 text-sm font-bold transition-[color,background-color,transform] duration-150 active:scale-95 ${p.editing ? 'cursor-grab touch-none' : ''} ${
+														on ? 'text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
 													}`}
 												>
-													<TabIcon size={17} strokeWidth={1.8} aria-hidden />
+													<TabIcon size={17} strokeWidth={2} aria-hidden />
 													{titleOf(t)}
 												</button>
 											)}
@@ -323,7 +325,7 @@ export function Grid(p: GridProps) {
 													onClick={() => setNaming({ win: win.id, tab: t.id, text: t.label ?? '' })}
 													aria-label={`Name the ${titleOf(t)} tab`}
 													title={`Name the ${titleOf(t)} tab`}
-													className="-ml-2 grid size-8 shrink-0 place-items-center rounded-md text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
+													className="-ml-2 grid size-8 shrink-0 place-items-center rounded-ctl text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
 												>
 													<Pencil size={14} aria-hidden />
 												</button>
@@ -334,17 +336,16 @@ export function Grid(p: GridProps) {
 													onClick={() => p.onRemoveTab(win.id, t.id)}
 													aria-label={`Remove the ${titleOf(t)} tab`}
 													title={`Remove the ${titleOf(t)} tab`}
-													className="mr-1 grid size-8 shrink-0 place-items-center rounded-md text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
+													className="mr-1 grid size-8 shrink-0 place-items-center rounded-ctl text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
 												>
 													<X size={15} aria-hidden />
 												</button>
 											)}
-											{on && <span aria-hidden className="nacre-line absolute inset-x-2.5 bottom-0 h-[3px] rounded-t-full" />}
 										</span>
 									)
 								})}
 								{tabDrag?.to?.win === win.id && tabDrag.to.before === null && (
-									<span aria-hidden className="nacre-line my-2 w-1 shrink-0 rounded-full" />
+									<span aria-hidden className="my-2 h-8 w-1 shrink-0 rounded-full bg-accent-hi" />
 								)}
 								{tabs.length === 0 && !p.editing && <span className="flex items-center px-3.5 text-sm text-booth-dim">Empty</span>}
 							</div>
@@ -370,7 +371,7 @@ export function Grid(p: GridProps) {
 								)}
 							</span>
 						</div>
-						<div ref={tab === null ? undefined : p.boxRef(win, tab)} className="relative flex min-h-0 min-w-0 flex-1 bg-booth-bg">
+						<div ref={tab === null ? undefined : p.boxRef(win, tab)} className="relative flex min-h-0 min-w-0 flex-1 bg-booth-panel">
 							{tab === null ? (
 								<div className="flex flex-1 items-center justify-center">
 									<Placeholder
@@ -397,7 +398,7 @@ export function Grid(p: GridProps) {
 											moving !== null && !moving.ok ? 'bg-state-unreachable/15' : 'bg-booth-bg/55'
 										}`}
 									>
-										<span className="pointer-events-none flex items-center gap-2.5 rounded-xl bg-booth-raise px-4 py-3 text-sm text-booth-ink shadow-lg ring-1 ring-booth-edge">
+										<span className="pointer-events-none flex items-center gap-2.5 rounded-win bg-booth-raise px-4 py-3 text-sm text-booth-ink shadow-lg ring-1 ring-booth-edge">
 											<Move size={19} strokeWidth={1.8} aria-hidden />
 											{moving !== null && !moving.ok ? 'Not over another window' : 'Drag to move'}
 										</span>
@@ -423,7 +424,7 @@ export function Grid(p: GridProps) {
 				<span
 					aria-hidden
 					style={{ left: tabDrag.x + 12, top: tabDrag.y + 12 }}
-					className="pointer-events-none fixed z-50 rounded-lg bg-booth-raise px-3.5 py-2 text-sm font-medium shadow-2xl ring-1 ring-nacre-blue"
+					className="pointer-events-none fixed z-50 rounded-ctl bg-booth-raise px-3.5 py-2 text-sm font-medium shadow-2xl ring-1 ring-accent-hi"
 				>
 					{tabDrag.label}
 				</span>
@@ -484,7 +485,7 @@ export function Grid(p: GridProps) {
 						>
 							<span
 								className={`rounded-full transition-colors ${upright ? 'h-14 w-1.5' : 'h-1.5 w-14'} ${
-									dragging ? 'bg-nacre-blue' : 'bg-booth-faint group-hover:bg-booth-dim group-active:bg-nacre-blue'
+									dragging ? 'bg-accent-hi' : 'bg-booth-faint group-hover:bg-booth-dim group-active:bg-accent-hi'
 								}`}
 							/>
 						</div>
@@ -492,6 +493,40 @@ export function Grid(p: GridProps) {
 				})}
 		</div>
 	)
+}
+
+/** The tab showing is filled in the selected blue, behind its words, and the
+ *  fill slides from the tab that was showing to the one tapped (the owner's
+ *  references, 2026-10-08: one colour fill marks what is selected). Placed by
+ *  measuring, so a renamed tab or a resized window carries it along without
+ *  the slide. */
+function TabFill({ on, tabs }: { on: string | null; /** What the strip holds: placed again when it changes. */ tabs: string }) {
+	const ref = useRef<HTMLSpanElement | null>(null)
+	const last = useRef<string | null>(null)
+	useLayoutEffect(() => {
+		const fill = ref.current
+		const list = fill?.parentElement
+		if (fill == null || list == null) return
+		const place = (slide: boolean) => {
+			const button = list.querySelector<HTMLElement>('[data-tab-button="on"]')
+			if (button === null) {
+				fill.style.opacity = '0'
+				return
+			}
+			const x = button.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft
+			fill.style.transition = slide ? 'transform 320ms cubic-bezier(.3,.8,.2,1), width 320ms cubic-bezier(.3,.8,.2,1)' : 'none'
+			fill.style.opacity = '1'
+			fill.style.transform = `translateX(${x}px)`
+			fill.style.width = `${button.offsetWidth}px`
+		}
+		place(last.current !== null && last.current !== on)
+		last.current = on
+		const ro = new ResizeObserver(() => place(false))
+		ro.observe(list)
+		for (const b of list.querySelectorAll('[role="tab"]')) ro.observe(b)
+		return () => ro.disconnect()
+	}, [on, tabs])
+	return <span ref={ref} aria-hidden className="pointer-events-none absolute top-[calc(50%-20px)] left-0 h-10 rounded-ctl bg-accent opacity-0" />
 }
 
 const seamKey = (seam: Seam) => `${seam.axis}:${seam.before.join(',')}|${seam.after.join(',')}`
@@ -502,8 +537,8 @@ const seamKey = (seam: Seam) => `${seam.axis}:${seam.before.join(',')}|${seam.af
  *  cannot do. */
 function EdgeHandles({ win, handle }: { win: GridWindow; handle: (win: GridWindow, edges: Edges) => object }) {
 	const band = 'group absolute z-10 touch-none flex items-center justify-center'
-	const pill = 'rounded-full bg-nacre-blue/70 transition-colors group-hover:bg-nacre-blue group-active:bg-nacre-blue'
-	const corner = 'pointer-events-none absolute size-5 border-nacre-blue/80 transition-colors group-hover:border-nacre-blue'
+	const pill = 'rounded-full bg-accent-hi/70 transition-colors group-hover:bg-accent-hi group-active:bg-accent-hi'
+	const corner = 'pointer-events-none absolute size-5 border-accent-hi/80 transition-colors group-hover:border-accent-hi'
 	const e = (l: boolean, r: boolean, t: boolean, b: boolean): Edges => ({ l, r, t, b })
 	return (
 		<>
@@ -538,7 +573,7 @@ function EdgeHandles({ win, handle }: { win: GridWindow; handle: (win: GridWindo
 /** + : every view that may be on screen, each with its icon. */
 function AddMenu({ offer, labelOf, onPick }: { offer: readonly ViewId[]; labelOf: (v: ViewId) => string; onPick: (v: ViewId) => void }) {
 	return (
-		<div className="absolute top-2 left-2 z-20 flex max-h-[calc(100%-1rem)] w-64 animate-rise flex-col overflow-y-auto rounded-xl bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
+		<div className="absolute top-2 left-2 z-20 flex max-h-[calc(100%-1rem)] w-64 animate-rise flex-col overflow-y-auto rounded-win bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
 			<span className="px-3 pt-2 pb-1.5 text-xs font-medium text-booth-dim">Add a view</span>
 			{offer.map((v) => {
 				const ViewIcon = viewIcon(v)
@@ -547,7 +582,7 @@ function AddMenu({ offer, labelOf, onPick }: { offer: readonly ViewId[]; labelOf
 						key={v}
 						type="button"
 						onClick={() => onPick(v)}
-						className="flex h-12 shrink-0 items-center gap-3 rounded-lg px-3 text-left text-sm hover:bg-booth-hover active:bg-booth-hover"
+						className="flex h-12 shrink-0 items-center gap-3 rounded-ctl px-3 text-left text-sm hover:bg-booth-hover active:bg-booth-hover"
 					>
 						<ViewIcon size={18} strokeWidth={1.8} className="text-booth-dim" aria-hidden />
 						{labelOf(v)}

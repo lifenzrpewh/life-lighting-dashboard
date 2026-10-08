@@ -76,7 +76,7 @@ export function LayoutsPanel({
 		<div
 			role="dialog"
 			aria-label="Layouts"
-			className="absolute top-2 right-4 z-30 flex max-h-[calc(100%-1rem)] w-[min(44rem,calc(100%-2rem))] animate-rise flex-col overflow-hidden rounded-2xl bg-booth-panel shadow-2xl ring-1 ring-booth-edge"
+			className="absolute top-2 right-4 z-30 flex max-h-[calc(100%-1rem)] w-[min(44rem,calc(100%-2rem))] animate-rise flex-col overflow-hidden rounded-win bg-booth-panel shadow-2xl ring-1 ring-booth-edge"
 		>
 			<div className="flex h-14 shrink-0 items-center gap-3 border-b border-booth-edge pr-2 pl-5">
 				<h2 className="text-lg font-medium">Layouts</h2>
@@ -92,8 +92,8 @@ export function LayoutsPanel({
 						return (
 							<div
 								key={s.name}
-								className={`group relative flex flex-col gap-2 rounded-xl bg-booth-bg p-2.5 transition-colors hover:bg-booth-strip ${
-									on ? 'nacre-ring' : 'ring-1 ring-booth-edge ring-inset'
+								className={`group relative flex flex-col gap-2 rounded-win bg-booth-bg p-2.5 transition-colors hover:bg-booth-strip ${
+									on ? 'accent-ring' : 'ring-1 ring-booth-edge ring-inset'
 								}`}
 							>
 								<button
@@ -130,7 +130,7 @@ export function LayoutsPanel({
 							</div>
 						)
 					})}
-					<div className="flex flex-col gap-2 rounded-xl p-2.5 ring-1 ring-booth-edge ring-inset [border-style:dashed]">
+					<div className="flex flex-col gap-2 rounded-win p-2.5 ring-1 ring-booth-edge ring-inset [border-style:dashed]">
 						<Miniature layout={layout} nameOf={nameOf} />
 						<Field label="Save the layout on screen as" error={error ?? undefined} hint={note ?? 'The same name replaces that layout.'}>
 							<Input value={name} onChange={setName} placeholder="Sunday" />
@@ -149,14 +149,14 @@ export function LayoutsPanel({
  *  shows. */
 function Miniature({ layout, nameOf }: { layout: Layout; nameOf: (tab: Tab) => string }) {
 	return (
-		<div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-booth-bg" aria-hidden>
+		<div className="relative aspect-[16/10] w-full overflow-hidden rounded-win bg-booth-bg" aria-hidden>
 			{layout.windows.map((w) => {
 				const tab = w.tabs.find((t) => t.id === w.active) ?? w.tabs[0] ?? null
 				const ViewIcon = tab === null ? null : viewIcon(tabView(tab))
 				return (
 					<span
 						key={w.id}
-						className="absolute flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md bg-booth-raise px-1 text-xs text-booth-dim"
+						className="absolute flex min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-ctl bg-booth-raise px-1 text-xs text-booth-dim"
 						style={{
 							left: `calc(${(w.x / WIDTH) * 100}% + 3px)`,
 							top: `calc(${(w.y / HEIGHT) * 100}% + 3px)`,

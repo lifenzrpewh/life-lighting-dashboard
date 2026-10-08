@@ -77,7 +77,7 @@ export function PasscodeEntry({
 	}, [style])
 
 	const press = (d: string) => !off && setCode((c) => (c.length < 64 ? c + d : c))
-	const key = 'grid h-[4.5rem] place-items-center rounded-xl bg-booth-raise text-3xl font-medium tabular-nums transition-colors select-none hover:bg-booth-hover active:scale-[0.97] active:bg-booth-hover disabled:opacity-35'
+	const key = 'grid h-[4.5rem] place-items-center rounded-win bg-booth-raise text-3xl font-medium tabular-nums transition-colors select-none hover:bg-booth-hover active:scale-[0.97] active:bg-booth-hover disabled:opacity-35'
 
 	return (
 		<div className="flex w-full max-w-sm flex-col items-stretch gap-4">
@@ -98,7 +98,7 @@ export function PasscodeEntry({
 			{style === 'keypad' ? (
 				<>
 					{/* What has been typed, as dots: how many, never what. */}
-					<div aria-live="polite" className="flex h-14 items-center justify-center gap-3 rounded-xl bg-booth-bg ring-1 ring-booth-edge ring-inset">
+					<div aria-live="polite" className="flex h-14 items-center justify-center gap-3 rounded-win bg-booth-bg ring-1 ring-booth-edge ring-inset">
 						{code === '' ? (
 							<span className="text-base text-booth-faint">Passcode</span>
 						) : (
@@ -143,7 +143,7 @@ export function PasscodeEntry({
 						spellCheck={false}
 						placeholder="Passcode"
 						aria-label="Passcode"
-						className="h-14 w-full rounded-xl bg-booth-bg px-5 text-lg ring-1 ring-booth-edge ring-inset outline-none placeholder:text-booth-faint focus:ring-2 focus:ring-nacre-blue/70 disabled:opacity-50"
+						className="h-14 w-full rounded-win bg-booth-bg px-5 text-lg ring-1 ring-booth-edge ring-inset outline-none placeholder:text-booth-faint focus:ring-2 focus:ring-accent-hi/70 disabled:opacity-50"
 					/>
 				</form>
 			)}

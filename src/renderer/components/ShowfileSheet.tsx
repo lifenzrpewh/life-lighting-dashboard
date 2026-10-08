@@ -125,7 +125,7 @@ export function ShowfileSheet({
 						<Card>
 							<SectionTitle aside="A new file, named for now. The show stays loaded.">Save as</SectionTitle>
 							<div className="flex items-center gap-3">
-								<span className="min-w-0 flex-1 truncate rounded-lg bg-booth-bg px-4 py-3 font-mono text-lg ring-1 ring-booth-edge ring-inset">
+								<span className="min-w-0 flex-1 truncate rounded-ctl bg-booth-bg px-4 py-3 font-mono text-lg ring-1 ring-booth-edge ring-inset">
 									{offered}
 								</span>
 								<Button icon={Clock} onClick={() => setOffered(offeredName(campus, new Date()))}>
@@ -160,7 +160,7 @@ export function ShowfileSheet({
 							) : list.shows.length === 0 ? (
 								<p className="text-sm text-booth-dim">The console has no show files.</p>
 							) : (
-								<ul className="max-h-80 overflow-y-auto rounded-lg bg-booth-bg p-1 ring-1 ring-booth-edge ring-inset">
+								<ul className="max-h-80 overflow-y-auto rounded-ctl bg-booth-bg p-1 ring-1 ring-booth-edge ring-inset">
 									{list.shows.map((s) => (
 										<li key={s.name}>
 											<button
@@ -169,7 +169,7 @@ export function ShowfileSheet({
 												// read-back would wait for, so a Load of it could never be confirmed.
 												disabled={!s.loadable || current?.name === s.name}
 												onClick={() => setChosen(s.name)}
-												className={`flex h-12 w-full items-center gap-3 rounded-md px-3 text-left text-sm disabled:opacity-40 ${
+												className={`flex h-12 w-full items-center gap-3 rounded-ctl px-3 text-left text-sm disabled:opacity-40 ${
 													chosen === s.name ? 'bg-booth-raise ring-1 ring-warn/60 ring-inset' : 'hover:bg-booth-strip'
 												}`}
 											>
@@ -182,7 +182,7 @@ export function ShowfileSheet({
 								</ul>
 							)}
 							<label className="flex h-12 items-center gap-3 text-sm">
-								<input type="checkbox" checked={saveFirst} onChange={(e) => setSaveFirst(e.target.checked)} className="size-5 accent-[var(--color-nacre-blue)]" />
+								<input type="checkbox" checked={saveFirst} onChange={(e) => setSaveFirst(e.target.checked)} className="size-5 accent-[var(--color-accent-hi)]" />
 								Save the current show first
 							</label>
 							<HoldButton disabled={!canAct || chosen === null} label={chosen === null ? 'Pick a show to load' : `Hold to load “${chosen}”`} onHeld={load} />
@@ -197,7 +197,7 @@ export function ShowfileSheet({
 /** A line above the two cards: what was sent and what the console said. */
 function Notice({ tone, children }: { tone: 'dim' | 'live' | 'warn' | 'down'; children: ReactNode }) {
 	const colour = { dim: 'bg-booth-panel text-booth-dim', live: 'bg-state-live/10 text-state-live', warn: 'bg-warn/10 text-warn', down: 'bg-state-unreachable/10 text-state-unreachable' }[tone]
-	return <p className={`rounded-lg px-4 py-3 text-sm ${colour}`}>{children}</p>
+	return <p className={`rounded-ctl px-4 py-3 text-sm ${colour}`}>{children}</p>
 }
 
 /** The 31-character budget, and the string it measures. */
@@ -241,7 +241,7 @@ function HoldButton({ disabled, label, onHeld }: { disabled: boolean; label: str
 			onPointerLeave={cancel}
 			onPointerCancel={cancel}
 			onContextMenu={(e) => e.preventDefault()}
-			className="relative h-14 w-full overflow-hidden rounded-lg px-6 text-base font-semibold text-warn ring-1 ring-warn/70 ring-inset disabled:text-booth-dim disabled:opacity-40 disabled:ring-booth-edge"
+			className="relative h-14 w-full overflow-hidden rounded-ctl px-6 text-base font-semibold text-warn ring-1 ring-warn/70 ring-inset disabled:text-booth-dim disabled:opacity-40 disabled:ring-booth-edge"
 		>
 			{holding && (
 				<span aria-hidden className="absolute inset-0 origin-left bg-warn/25" style={{ animation: `hold-fill ${HOLD_MS}ms linear forwards` }} />

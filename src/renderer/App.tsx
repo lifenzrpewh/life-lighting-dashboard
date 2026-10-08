@@ -27,7 +27,6 @@ import {
 	polledStatus,
 	turnedOff,
 	videoStatus,
-	worstTone,
 	type ConnectionId,
 	type ConnectionStatus,
 } from '../shared/connections.js'
@@ -81,10 +80,9 @@ import { SettingsPanel, type SettingsPage } from './components/SettingsPanel.js'
 import { PasscodeSheet } from './components/PasscodeSheet.js'
 import { DEFAULT_ADMIN_TIMEOUT_MIN } from '../shared/admin.js'
 import { ShowfileSheet } from './components/ShowfileSheet.js'
-import { GuideSheet } from './components/GuideSheet.js'
 import { GUIDE } from '../shared/guide.js'
 import { OperatorContext, useMode } from './mode.js'
-import { useBarHidden } from './barItems.js'
+import { useBarHidden, useTesting } from './barItems.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
@@ -111,7 +109,7 @@ function failureOf<T>(channel: Channel<T>): string | null {
 }
 
 /** The sheets that stand in the windows' place. */
-type SheetId = 'guide' | 'connections' | 'settings' | 'showfile' | 'passcode'
+type SheetId = 'connections' | 'settings' | 'showfile' | 'passcode'
 
 /** Where this computer remembers the top bar folded. */
 const BAR_KEY = 'paua.barCollapsed'
@@ -144,19 +142,18 @@ export function App() {
 	}
 	// What Admin has hidden on the bar, on this computer (./barItems.ts).
 	const [barHidden, setBarHidden] = useBarHidden()
+	// Testing: Mark on the bar, on this computer (./barItems.ts).
+	const [testing, setTesting] = useTesting()
 	// The sheets that stand in the windows' place, one at a time: Connections
-	// (a list to read), Settings (Admin's), the showfile sheet (Save As, Load),
-	// the Creative Guide (../shared/guide.ts; its page is placed over the
-	// sheet's body). The campus is read as the showfile sheet opens, for the
-	// name Save As offers.
+	// (a list to read), Settings (Admin's), the showfile sheet (Save As, Load).
+	// The campus is read as the showfile sheet opens, for the name Save As
+	// offers.
 	const [sheet, setSheet] = useState<SheetId | null>(null)
 	const [settingsStart, setSettingsStart] = useState<SettingsPage | null>(null)
 	const connectionsOpen = sheet === 'connections'
 	const showfileOpen = sheet === 'showfile'
-	const guideOpen = sheet === 'guide'
 	const settingsOpen = sheet === 'settings'
 	const [campus, setCampus] = useState<string | null>(null)
-	const [guideBox, setGuideBox] = useState<HTMLElement | null>(null)
 	/** Open a sheet, or close it if it is the one open. Layouts and Edit
 	 *  layout give way to it. */
 	const toggleSheet = (id: SheetId) => {
@@ -481,6 +478,7 @@ export function App() {
 	const pages: Array<{ view: ViewId; send: (rect: PaneRect | null) => void }> = [
 		{ view: 'ma', send: (rect) => window.life?.placeMaPane(rect) },
 		{ view: 'cue', send: (rect) => window.life?.placeCuePane(rect) },
+		{ view: 'guide', send: (rect) => window.life?.placeEmbed(GUIDE.id, rect) },
 		...embeds
 			.filter((e) => e.on)
 			.map((e) => ({ view: embedView(e.id), send: (rect: PaneRect | null) => window.life?.placeEmbed(e.id, rect) })),
@@ -675,6 +673,16 @@ export function App() {
 			)
 		}
 		switch (view) {
+			case 'guide': {
+				const r = embedReport(GUIDE.id)
+				return (
+					<>
+						{r !== null && <ZoomControl name={GUIDE.name} zoom={r.zoom} onZoom={(by) => window.life?.zoomEmbed(GUIDE.id, by)} />}
+						{out}
+						{r?.pane.state === 'showing' && reload('Reload the guide', () => window.life?.retryEmbed(GUIDE.id))}
+					</>
+				)
+			}
 			case 'cue':
 				return (
 					<>
@@ -779,6 +787,17 @@ export function App() {
 			)
 		}
 		switch (view) {
+			case 'guide':
+				return (
+					<Centered>
+						<EmbedMessage
+							name={GUIDE.name}
+							pane={window.life === undefined ? null : (embedReport(GUIDE.id)?.pane ?? { state: 'idle', url: GUIDE.url })}
+							now={now}
+							onRetry={() => window.life?.retryEmbed(GUIDE.id)}
+						/>
+					</Centered>
+				)
 			case 'cue':
 				return (
 					<Centered>
@@ -876,7 +895,6 @@ export function App() {
 				{pages.map((p) => (
 					<PanePlacer key={p.view} box={boxes[p.view] ?? null} hidden={pageHidden(p.view)} send={p.send} />
 				))}
-				<PanePlacer box={guideOpen ? guideBox : null} hidden={!guideOpen} send={(rect) => window.life?.placeEmbed(GUIDE.id, rect)} />
 				{DEV && (
 					<div className="flex items-center gap-3 bg-warn px-4 py-1.5 text-xs font-semibold text-booth-bg">
 						{scenario === 'real' ? (
@@ -905,7 +923,7 @@ export function App() {
 					asking={sheet === 'passcode'}
 					onLeave={leave}
 					connectionsOpen={connectionsOpen}
-					showfileOpen={showfileOpen}
+					testing={testing}
 					onMark={() =>
 						window.life?.mark(
 							`${mode === 'operator' ? 'admin' : 'volunteer'}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
@@ -913,8 +931,6 @@ export function App() {
 					}
 					layoutName={layoutName}
 					layoutsOpen={layoutsOpen}
-					guideOpen={guideOpen}
-					onGuide={() => toggleSheet('guide')}
 					onLayouts={() => {
 						setSheet(null)
 						setEditing(false)
@@ -925,9 +941,8 @@ export function App() {
 					settingsOpen={settingsOpen}
 					onSettings={() => (settingsOpen ? setSheet(null) : openSettings(null))}
 					onShowfile={openShowfile}
-					connections={worstTone(connections)}
+					rows={connections}
 					showfile={showfile}
-					showfileFailure={failureOf(sources.showfile)}
 					timers={timers}
 					hidden={barHidden}
 					collapsed={barCollapsed}
@@ -948,9 +963,9 @@ export function App() {
 				{editing && (
 					// Above the grid: while editing, pages are pictures, and the bar says
 					// what can be done and how to finish.
-					<div className="nacre-tint relative flex h-16 shrink-0 animate-rise items-center gap-4 border-b border-nacre-blue/40 bg-booth-panel px-5">
-						<span className="text-base font-medium">Editing the layout</span>
-						<span className={`min-w-0 truncate text-sm ${noRoom ? 'text-state-stale' : 'text-booth-dim'}`}>
+					<div className="relative flex h-16 shrink-0 animate-rise items-center gap-4 bg-accent px-5 text-accent-ink">
+						<span className="text-lg font-extrabold tracking-tight whitespace-nowrap">Editing the layout</span>
+						<span className={`min-w-0 truncate text-sm ${noRoom ? 'font-bold text-warn' : 'text-accent-ink/80'}`}>
 							{noRoom
 								? 'No room for another window. Make one smaller first.'
 								: 'Drag a window to move it, an edge or corner to resize, a tab to reorder it or move it to another window. + adds a tab, × takes one away, ✎ names one.'}
@@ -982,10 +997,16 @@ export function App() {
 				    a rule someone has to remember. Connections and the showfile sheet
 				    stand in the grid's place; every page is hidden, not closed. */}
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
-					{guideOpen ? (
-						<GuideSheet report={embedReport(GUIDE.id)} now={now} boxRef={setGuideBox} onClose={() => setSheet(null)} />
-					) : connectionsOpen ? (
-						<ConnectionsPanel rows={connections} operator={mode === 'operator'} onOpen={(id) => openSettings(id)} onClose={() => setSheet(null)} />
+					{connectionsOpen ? (
+						<ConnectionsPanel
+							rows={connections}
+							operator={mode === 'operator'}
+							showfile={consoleOn ? showfile : null}
+							showfileFailure={failureOf(sources.showfile)}
+							onShowfile={openShowfile}
+							onOpen={(id) => openSettings(id)}
+							onClose={() => setSheet(null)}
+						/>
 					) : settingsOpen && mode === 'operator' ? (
 						<SettingsPanel
 							rows={connections}
@@ -997,6 +1018,8 @@ export function App() {
 							onClose={() => setSheet(null)}
 							barHidden={barHidden}
 							onBarHidden={setBarHidden}
+							testing={testing}
+							onTesting={setTesting}
 						/>
 					) : sheet === 'passcode' && mode === 'volunteer' ? (
 						<PasscodeSheet now={now} onUnlocked={enter} onClose={() => setSheet(null)} />

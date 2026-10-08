@@ -5,21 +5,21 @@
 //
 // Not hideable: the mode lock (or nobody could reach Admin to show anything
 // again), Settings (Admin's only, and the way back to this list) and the
-// fold chevron.
+// fold handle. Since the 2026-10-08 look the console card has gone (the show
+// is on the console itself and on Connections' Console row, the bar speaking
+// up only for the base show or a console not answering), the Guide is a view
+// for a window, and Mark is on the bar only while Testing is on.
 
 import { useState } from 'react'
 
-export const BAR_ITEMS = ['console', 'countdown', 'clock', 'guide', 'layouts', 'connections', 'mark'] as const
+export const BAR_ITEMS = ['countdown', 'clock', 'layouts', 'connections'] as const
 export type BarItem = (typeof BAR_ITEMS)[number]
 
 export const BAR_ITEM_LABEL: Record<BarItem, { name: string; what: string }> = {
-	console: { name: 'Console', what: 'Whether the console answers, and its show; opens Save As and Load' },
 	countdown: { name: 'Countdown', what: 'OnTime’s or ProPresenter’s timer' },
 	clock: { name: 'Clock', what: 'The time and date' },
-	guide: { name: 'Guide', what: 'The Creative Guide' },
 	layouts: { name: 'Layouts', what: 'Switch between saved layouts' },
 	connections: { name: 'Connections', what: 'What is up and what is down, and its dot' },
-	mark: { name: 'Mark', what: 'The flag that marks a moment in the log, for testers' },
 }
 
 const KEY = 'paua.barHidden'
@@ -49,4 +49,29 @@ export function useBarHidden(): [ReadonlySet<BarItem>, (item: BarItem, hidden: b
 		}
 	}
 	return [hidden, set]
+}
+
+const TESTING_KEY = 'paua.testing'
+
+/** Testing (the owner, 2026-10-08): while a field test is on, Mark sits on the
+ *  bar, and one tap writes a numbered line to the log at that moment. Off,
+ *  the bar has no flag a volunteer might wonder about. Per computer. */
+export function useTesting(): [boolean, (on: boolean) => void] {
+	const [on, setOn] = useState(() => {
+		try {
+			return localStorage.getItem(TESTING_KEY) === '1'
+		} catch {
+			return false
+		}
+	})
+	const set = (next: boolean) => {
+		setOn(next)
+		try {
+			if (next) localStorage.setItem(TESTING_KEY, '1')
+			else localStorage.removeItem(TESTING_KEY)
+		} catch {
+			// Kept for this run only.
+		}
+	}
+	return [on, set]
 }

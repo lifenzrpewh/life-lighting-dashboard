@@ -133,8 +133,8 @@ export function FeedList({
 									disabled={row.off && !on}
 									onClick={() => onPick(row.feed)}
 									aria-pressed={on}
-									className={`flex min-h-12 w-full shrink-0 items-center gap-3 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-booth-hover active:bg-booth-hover disabled:opacity-50 disabled:hover:bg-transparent ${
-										on ? 'text-booth-ink ring-1 ring-nacre-blue ring-inset' : 'text-booth-dim'
+									className={`flex min-h-12 w-full shrink-0 items-center gap-3 rounded-ctl px-3 py-1.5 text-left text-sm hover:bg-booth-hover active:bg-booth-hover disabled:opacity-50 disabled:hover:bg-transparent ${
+										on ? 'text-booth-ink ring-1 ring-accent-hi ring-inset' : 'text-booth-dim'
 									}`}
 								>
 									<g.icon size={18} strokeWidth={1.8} className="shrink-0" aria-hidden />
@@ -177,7 +177,7 @@ export function FeedMenu({
 				<ChevronDown size={16} className="shrink-0 text-booth-dim" aria-hidden />
 			</button>
 			{open && (
-				<div className="absolute top-12 right-0 z-20 max-h-[min(32rem,70vh)] w-80 animate-rise overflow-y-auto rounded-xl bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
+				<div className="absolute top-12 right-0 z-20 max-h-[min(32rem,70vh)] w-80 animate-rise overflow-y-auto rounded-win bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
 					<FeedList
 						options={options}
 						current={current}
