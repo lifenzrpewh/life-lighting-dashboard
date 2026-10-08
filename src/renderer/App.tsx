@@ -746,7 +746,7 @@ export function App() {
 					showfileOpen={showfileOpen}
 					onMark={() =>
 						window.life?.mark(
-							`${mode}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
+							`${mode === 'operator' ? 'admin' : 'volunteer'}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
 						) ?? Promise.resolve(null)
 					}
 					layoutName={layoutName}

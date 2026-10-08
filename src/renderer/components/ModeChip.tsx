@@ -52,8 +52,8 @@ export function ModeChip({ mode, onEnter, onLeave }: { mode: Mode; onEnter: () =
 			onClick={() => pressedIn.current === 'operator' && onLeave()}
 			// A long press on a touchscreen opens a context menu. Not here.
 			onContextMenu={(e) => e.preventDefault()}
-			aria-label={mode === 'operator' ? 'Operator mode. Tap to go back to volunteer.' : 'Volunteer mode. Hold for 3 seconds for operator mode.'}
-			title={mode === 'operator' ? 'Tap to go back to volunteer' : 'Hold for 3 seconds for operator mode'}
+			aria-label={mode === 'operator' ? 'Admin. Tap to go back to volunteer.' : 'Volunteer mode. Hold for 3 seconds for Admin.'}
+			title={mode === 'operator' ? 'Tap to go back to volunteer' : 'Hold for 3 seconds for Admin'}
 			className={`relative inline-flex h-12 w-36 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-lg text-sm font-medium transition-colors ${
 				mode === 'operator' ? 'nacre-tint nacre-ring text-booth-ink' : 'bg-booth-raise text-booth-dim hover:text-booth-ink'
 			}`}
@@ -67,7 +67,7 @@ export function ModeChip({ mode, onEnter, onLeave }: { mode: Mode; onEnter: () =
 			)}
 			<span className="relative flex items-center gap-2">
 				{mode === 'operator' ? <LockOpen size={18} strokeWidth={1.9} aria-hidden /> : <Lock size={18} strokeWidth={1.9} aria-hidden />}
-				{mode === 'operator' ? 'Operator' : holding ? 'Keep holding…' : 'Volunteer'}
+				{mode === 'operator' ? 'Admin' : holding ? 'Keep holding…' : 'Volunteer'}
 			</span>
 		</button>
 	)

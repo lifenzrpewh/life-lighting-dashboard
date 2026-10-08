@@ -254,7 +254,7 @@ export function StatusBar({
 					</Button>
 				)}
 				{/* For everyone: a volunteer can see what is down and say so. The
-				    fields inside are operator mode's. */}
+				    fields inside are Admin's. */}
 				<Button onClick={onConnections} pressed={connectionsOpen} className={connectionsOpen ? open : ''}>
 					<Dot tone={connections} />
 					Connections
@@ -324,7 +324,7 @@ function Strip({
 					<Dot tone={connections} size="sm" />
 					Connections
 				</span>
-				<span className={`text-xs ${operator ? 'text-booth-ink' : 'text-booth-dim'}`}>{operator ? 'Operator' : 'Volunteer'}</span>
+				<span className={`text-xs ${operator ? 'text-booth-ink' : 'text-booth-dim'}`}>{operator ? 'Admin' : 'Volunteer'}</span>
 				<button
 					type="button"
 					onClick={onLayouts}

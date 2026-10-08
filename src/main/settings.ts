@@ -119,7 +119,7 @@ function readSecrets(raw: unknown): Secrets {
 		try {
 			out[mode] = safeStorage.decryptString(Buffer.from(b64, 'base64'))
 		} catch {
-			console.error(`[settings] the ${mode} password would not decrypt on this machine; dropped`)
+			console.error(`[settings] the ${mode === 'operator' ? 'admin' : mode} MA password would not decrypt on this machine; dropped`)
 		}
 	}
 	return out

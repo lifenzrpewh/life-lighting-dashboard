@@ -94,7 +94,7 @@ export function LayoutsPanel({
 			<div className="min-h-0 overflow-y-auto p-4">
 				{saved.length === 0 && !operator ? (
 					<p className="px-1 py-6 text-center text-sm text-booth-dim">
-						No layouts saved on this computer yet. Operator mode arranges the windows and saves them here.
+						No layouts saved on this computer yet. Admin arranges the windows and saves them here.
 					</p>
 				) : (
 					<div className="grid grid-cols-2 items-start gap-3">

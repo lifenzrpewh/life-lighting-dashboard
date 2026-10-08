@@ -143,7 +143,7 @@ export function ConnectionsPanel({
 	const selected: Selected =
 		picked === null || (picked !== 'add' && picked !== 'add-ndi' && picked !== 'add-capture' && picked !== 'computer' && !rows.some((r) => r.id === picked)) ? fallback : picked
 	const row = rows.find((r) => r.id === selected) ?? null
-	const notOperator = 'Hold Volunteer (top right) for 3 seconds for operator mode to change these.'
+	const notOperator = 'Hold Volunteer (top right) for 3 seconds for Admin to change these.'
 
 	return (
 		<Sheet title="Connections" description={description} onClose={onClose}>
@@ -154,7 +154,7 @@ export function ConnectionsPanel({
 						// unless something says it is only empty.
 						<p className="mb-2 rounded-lg bg-booth-raise px-4 py-3 text-sm">
 							Nothing is set up yet.{' '}
-							{operator ? 'Tap a connection to give it an address; start with the Console.' : 'Operator mode sets them up.'}
+							{operator ? 'Tap a connection to give it an address; start with the Console.' : 'Admin sets them up.'}
 						</p>
 					)}
 					{rows.map((r) => (
@@ -710,7 +710,7 @@ function ThisScreen({ windowed, operator, save }: { windowed: boolean; operator:
 		<Card>
 			<SectionTitle>This screen</SectionTitle>
 			<div className="flex flex-wrap items-center gap-4">
-				{/* The switch only in operator mode; volunteer mode reads which. */}
+				{/* The switch only in Admin; volunteer mode reads which. */}
 				{operator ? (
 					<Segmented
 						label="This screen"
@@ -725,7 +725,7 @@ function ThisScreen({ windowed, operator, save }: { windowed: boolean; operator:
 					<span className="text-sm">{windowed ? 'Window' : 'Full screen'}</span>
 				)}
 				<span className="text-sm text-booth-dim">
-					{operator ? 'A window is for testing on a laptop; the booth stays full screen.' : 'Operator mode changes it.'}
+					{operator ? 'A window is for testing on a laptop; the booth stays full screen.' : 'Admin changes it.'}
 				</span>
 			</div>
 		</Card>
@@ -1094,8 +1094,8 @@ function ConsoleEditor({ view, save }: { view: SettingsView; save: Save }) {
 						errors={[err('volunteerUser'), err('volunteerPassword')]}
 					/>
 					<User
-						label="Operator"
-						hint="Leave blank and operator mode keeps the volunteer user."
+						label="Admin"
+						hint="The LD’s MA user. Leave blank and Admin keeps the volunteer user."
 						user={operatorUser}
 						onUser={setOperatorUser}
 						password={operatorPassword}

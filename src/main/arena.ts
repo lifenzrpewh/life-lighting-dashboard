@@ -257,7 +257,7 @@ function watchArena(
 			const layer = latest.value.layers.find((l) => l.slots.some((s) => s.id === clipId))
 			const column = (layer?.slots.findIndex((s) => s.id === clipId) ?? -1) + 1
 			const playing = layer?.slots[column - 1]?.state === 'playing'
-			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}${playing ? ', ON SCREEN (the operator said yes)' : ''}`)
+			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}${playing ? ', ON SCREEN (Admin said yes)' : ''}`)
 			return send(wire.value)
 		},
 		async empty(clipId, code) {

@@ -58,7 +58,7 @@ export function ShowfileSheet({
 	const [saveFirst, setSaveFirst] = useState(true)
 
 	const canAct = operator && linkLive
-	const why = !operator ? 'Save As and Load are operator mode’s: hold Volunteer (top right) for 3 seconds.' : !linkLive ? 'The console is not answering.' : null
+	const why = !operator ? 'Save As and Load are Admin’s: hold Volunteer (top right) for 3 seconds.' : !linkLive ? 'The console is not answering.' : null
 	const problem = saveAsProblem(offered, current?.base ?? null)
 
 	// The read-back: the console's own name for its show, through LifeBridge.

@@ -31,7 +31,7 @@ export function paneSummary(report: MaPaneReport | null, mode: Mode): string {
 			return `connecting to ${hostOf(pane.url)} as ${pane.user}`
 		case 'showing':
 			return mode === 'operator' && !report.hasOperatorUser
-				? `${hostOf(pane.url)} · still ${pane.user}: no operator user set`
+				? `${hostOf(pane.url)} · still ${pane.user}: no admin user set`
 				: `${hostOf(pane.url)} · ${pane.user}`
 		case 'failed':
 			return `${hostOf(pane.url)} not reachable`
@@ -47,7 +47,7 @@ export function MaMessage({ pane, now }: { pane: MaPaneState | null; now: number
 			return (
 				<Say
 					head="No console address set"
-					body="There is nothing to connect to yet. Set the console's address in Connections, in operator mode."
+					body="There is nothing to connect to yet. Set the console's address in Connections, in Admin."
 				/>
 			)
 		case 'idle':

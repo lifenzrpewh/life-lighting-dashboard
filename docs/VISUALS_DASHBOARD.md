@@ -424,7 +424,7 @@ the dashboard adds.
 - **A view that stops answering stays, and says so.** The screen never rearranges
   itself under a volunteer. "Only what answers" is what the picker offers, not what a
   slot keeps.
-- **Everyone picks**, not only operator mode: an Arena op and a lighting op can each get
+- **Everyone picks**, not only Admin: an Arena op and a lighting op can each get
   their view.
 - **Each machine remembers its layout** across a restart, as it does the run order's
   width.
@@ -433,7 +433,7 @@ the dashboard adds.
 
 - **The trigger screen is wanted now**, not later: tap a clip to play it, fire a column,
   clear a layer, drag a layer's fader. **Everyone may fire**, as everyone picks views:
-  it is for a single-screen volunteer op, so no operator-mode guard.
+  it is for a single-screen volunteer op, so no Admin guard.
 - **"Keeping Arena in sync" means a missing-media check**: every clip in the composition
   whose file is not on this machine, said before a service. Not comparing compositions
   between booths, not numbering, not pushing media.
@@ -546,14 +546,14 @@ over the composition and the live lookbook for 4 October's Central AM and PM:
   rule already did, now a test says so).
 - **"May differ", and Same by hand** (the owner's ask, 2026-10-05, built the same day): a
   name that differs reads **may differ**, not "another version", since a name is only a
-  guess at the file. Beside it, **Same** (operator mode) confirms it the same file: it then
+  guess at the file. Beside it, **Same** (Admin) confirms it the same file: it then
   reads "✓ … confirmed the same by hand", never a plain ✓, with **Undo**; the summary
   counts them. (The screen avoids the word "mark", which is the testers' MARK flag.) A
   confirmation holds for that pair of names only (code, Arena's file name and the
   lookbook's, without folder, extension or case), so a new file on either side asks again;
   a confirmed file missing from this computer still says so. Main keeps them in
   `media-same.json` in the data folder and logs each. ✅ In the kiosk over CDP, 2026-10-05:
-  refused in volunteer mode; in operator mode, Same on CB095 turned all seven of its rows to
+  refused in volunteer mode; in Admin, Same on CB095 turned all seven of its rows to
   "confirmed the same by hand" and the summary from 2 to 1 to look at; Undo put it back.
 - **Following the run order** (the owner's ask, 2026-10-05, built the same day): the check
   takes the service the Cue Manager has open. Its address carries the Planning Center plan
@@ -597,7 +597,7 @@ CDP, not yet by a finger.
   this also settles the offline-queue question: there is never a second page to sync
   twice. A second live copy of an embed would need a second page in the same session;
   not built.
-- **Adding and removing tabs is arranging**, so it is in Edit layout (operator mode).
+- **Adding and removing tabs is arranging**, so it is in Edit layout (Admin).
   Switching tabs and **Move it here** are everyone's. **Since 2026-10-05 a tab is dragged**
   in Edit layout (the owner: "don't have to delete them to allow them to be reorganised"):
   along its strip to reorder, onto another window to move it there; a nacre bar shows where
@@ -631,11 +631,11 @@ CDP, not yet by a finger.
   counts as that layout. Up to 12. ✅ In a browser against the mock desk, 2026-10-06:
   opened from the bar and the strip, switched, closed by a tap outside. ⚠️ Not yet in
   the kiosk over live pages, nor by finger.
-- **Operator-only buttons are not drawn in volunteer mode** (the owner, 2026-10-06:
+- **Admin-only buttons (called operator mode until 2026-10-08) are not drawn in volunteer mode** (the owner, 2026-10-06:
   Update all and the like should "not even show up"): Update all, Load all, Load,
   Clear old FGs, a ghost's Place, the No column tray's choosing, an inspected clip's
   answers, Save As and Load in the showfile sheet, and the This screen switch. What
-  goes where still shows ("goes here"). Main still refuses them outside operator mode;
+  goes where still shows ("goes here"). Main still refuses them outside Admin;
   that is the guard, this is only what a volunteer sees. A pop-out asks main for the
   mode (`mode:get`) each second.
 - **Embeds open only once a window shows them**, so a booth can add many without each
@@ -645,7 +645,7 @@ CDP, not yet by a finger.
   is Google offering a passkey, and Cancel or another way in both work.
 - **MARK** is for everyone and writes the mode, the layout and the views on screen
   beside the mark's number. **This screen** (Full screen / Window) is in Connections,
-  operator mode.
+  Admin.
 
 ## The look (owner, 2026-10-05)
 
@@ -660,10 +660,10 @@ tokens and their reasons are in `src/renderer/theme.css`; the shared pieces in
 
 **Choices made without asking** (kept by the owner so far):
 
-- **Edit layout lives in Layouts** (operator mode), not on the bar: one Layouts button
+- **Edit layout lives in Layouts** (Admin), not on the bar: one Layouts button
   instead of LAYOUT and EDIT LAYOUT side by side. One more tap to arrange.
 - **MARK is a flag icon**, for testers; it says "Mark N" for 3 s when tapped.
-- **The mode button is a lock**: Volunteer, closed and quiet; Operator, open, with the
+- **The mode button is a lock**: Volunteer, closed and quiet; Admin (Operator until 2026-10-08), open, with the
   nacre line under the bar. The words "hold the mode chip" became "hold Volunteer (top
   right)" everywhere.
 - **The countdown has no surface while live**, so it reads as a reading, not a button;
@@ -705,7 +705,7 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
   **Load** sends it. Same and Undo touch only Pāua's own record, so they stay one tap.
 - **Guards**: never into a playing clip (checked at sending), nothing overwritten (a same-size
   file of that name is reused, a different one left alone and said), the page sends a code, a
-  file name and clip ids (at most 100) and main builds every path, operator mode only.
+  file name and clip ids (at most 100) and main builds every path, Admin only.
 - ✅ Copy, 2026-10-05, in the kiosk: a 60 MB file found two folders down, progress shown,
   copied, and reused on a second fetch; the folders-not-set message. 260+ tests cover finding,
   copying, no overwrite, a cut-off copy, the `file:///` address and the open request's guards.
@@ -745,8 +745,8 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
     "not on the drive" and CB105 "another version" downloaded from the lookbook into `D:\Holding`
     and loaded, into HOLD FG column 6 and HOLD BG column 3.
 - **Browse** (the owner's ask, 2026-10-05): beside each folder on the Arena row, Windows' own
-  folder picker over the window that asked; the pick fills the field, Save keeps it. Operator
-  mode. ⚠️ Not opened from a session (it would raise a dialog on the owner's screen).
+  folder picker over the window that asked; the pick fills the field, Save keeps it. Admin
+  only. ⚠️ Not opened from a session (it would raise a dialog on the owner's screen).
 
 ## The Holding view (owner's idea, 2026-10-05; built the same day)
 
@@ -759,7 +759,7 @@ as in Clips. The column headers carry Arena's column names. The rules
 are `src/shared/holding.ts`; the state is shared with the Media row (`src/renderer/useMediaCheck.ts`).
 
 The owner's answers (2026-10-05): **inspect only** (a tap never fires; Clips is for playing);
-operator mode for every change; the lookbook's own pictures for media not yet in Arena;
+Admin for every change; the lookbook's own pictures for media not yet in Arena;
 nothing from the lookbook on PLAYBACK ("normally we wouldn't have anything in the lookbook for
 it"); HOLD BG's columns 3 and 4 kept, no other layer's; each service has its own deck, so a
 clip not on this run sheet may be replaced. Keep the Fetch, Same, Place and Update all buttons
@@ -901,7 +901,7 @@ not without a code, and not one Update all is about to load into (`oldForeground
   foregrounds this service does not use (CF561 in PROMO 1, …)".
 - **Clear old FGs (N)** in Holding's and the Lookbook's header when there are any: a
   confirmation that is only that question, and **Clear N**.
-- Main's guard (`emptyWire`, operator mode only): the clip must be on HOLD FG, still hold the code
+- Main's guard (`emptyWire`, Admin only): the clip must be on HOLD FG, still hold the code
   the operator was shown, and not be on screen. This is Arena's `/clips/by-id/<id>/clear`, which
   empties a slot of its file and settings; the Clips view still cannot reach it (tested).
   ⚠️ Not yet pressed: what Arena 7.28 does with it is its API's word, not yet watched.
@@ -920,7 +920,7 @@ filled the sheet, closed. ⚠️ Not by finger; a pop-out of it not offered.
 The owner: add NDI sources as views, "similar to the embeds": a camera, ProPresenter's output,
 another machine's screen, each a view a window can hold or pop out.
 
-**The shape.** Connections › **Add an NDI source** (operator mode) lists what NDI finds on the
+**The shape.** Connections › **Add an NDI source** (Admin) lists what NDI finds on the
 network, and Add makes one a view (`ndi:<id>`) and a row, named by the part of NDI's name in
 brackets (`2413-RUAP (Arena - Composition)` is "Arena - Composition"), renamed and removed in its
 row, turned off like any connection. Never typed: a saved source missing is "not found", never
@@ -979,7 +979,7 @@ Intensity) as a camera, an ATEM Mini's USB output is one, and so is OBS's Virtua
 page takes any of them with **`getUserMedia`**, the browser's own camera route: no native code,
 decoded and drawn on the GPU in a `<video>`, nothing through main.
 
-**The shape**, as NDI's: Connections › **Add a capture input** (operator mode) lists the cameras
+**The shape**, as NDI's: Connections › **Add a capture input** (Admin) lists the cameras
 this computer has; Add makes one a view (`capture:<id>`) and a row, renamed, turned off and
 removed there. Kept by its **name** (Windows' USB ids such as `(5986:2159)` dropped from the tab's
 name, kept in the stored one), not by the browser's device id, which belongs to the page and is

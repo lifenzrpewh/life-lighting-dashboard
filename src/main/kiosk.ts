@@ -390,7 +390,7 @@ app.whenReady().then(() => {
 	// the kiosk only, and the link checks it is live before anything is sent.
 	// Each is logged, so the booth log says who saved or loaded what, and when.
 	const operatorOnly = (e: IpcMainInvokeEvent): string | null =>
-		!fromKiosk(e) ? 'Not from the kiosk.' : mode !== 'operator' ? 'Operator mode only.' : null
+		!fromKiosk(e) ? 'Not from the kiosk.' : mode !== 'operator' ? 'Admin only.' : null
 	ipcMain.handle('showfile:shows', (e): Promise<ShowList> | ShowList => {
 		const why = operatorOnly(e)
 		if (why !== null) return { ok: false, detail: why }
@@ -466,7 +466,7 @@ app.whenReady().then(() => {
 	})
 	ipcMain.handle('media:fetch', (e, raw: unknown): { ok: true } | { ok: false; detail: string } => {
 		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
-		if (mode !== 'operator') return { ok: false, detail: 'Operator mode only.' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
 		const req = fetchRequestFrom(raw)
 		if (req === null) return { ok: false, detail: 'not a fetch' }
 		return mediaFetch.ask(req)
@@ -476,7 +476,7 @@ app.whenReady().then(() => {
 	// checks both against the composition it holds and builds the path.
 	ipcMain.handle('media:empty', async (e, clipId: unknown, code: unknown): Promise<ArenaCommandResult> => {
 		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
-		if (mode !== 'operator') return { ok: false, detail: 'Operator mode only.' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
 		if (typeof clipId !== 'number' || typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return { ok: false, detail: 'not a clip to clear' }
 		return arena?.empty(clipId, code) ?? { ok: false, detail: 'no Arena is set up' }
 	})
@@ -500,7 +500,7 @@ app.whenReady().then(() => {
 	ipcMain.handle('media:same', (e): string[] => (fromOurs(e) ? mediaSame.marks() : []))
 	ipcMain.handle('media:mark-same', (e, raw: unknown): { ok: true } | { ok: false; detail: string } => {
 		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
-		if (mode !== 'operator') return { ok: false, detail: 'Operator mode only.' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
 		const m = sameMarkFrom(raw)
 		return m === null ? { ok: false, detail: 'not a mark' } : mediaSame.mark(m)
 	})
@@ -716,7 +716,7 @@ app.whenReady().then(() => {
 	ipcMain.handle('settings:get', (e) => (fromKiosk(e) ? settings?.view() : undefined))
 	ipcMain.handle('settings:save', (e, raw: unknown) => {
 		if (!fromKiosk(e) || settings === null) return undefined
-		if (mode !== 'operator') return { ok: false, errors: { form: 'Settings can be changed in operator mode only.' } }
+		if (mode !== 'operator') return { ok: false, errors: { form: 'Settings can be changed in Admin only.' } }
 		const patch = patchFrom(raw)
 		if (patch === null) return { ok: false, errors: { form: 'Those settings could not be read.' } }
 		const checked = settings.save(patch)
