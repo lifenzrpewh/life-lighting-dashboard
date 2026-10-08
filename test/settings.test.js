@@ -61,7 +61,7 @@ test('a corrupt file costs only the bad values', () => {
 		onTimeHost: null,
 		onTimePort: 4001,
 		proPresenterHost: null,
-		proPresenterPort: null,
+		proPresenterPort: 1025,
 		proPresenterTimer: null,
 		arenaHost: null,
 		arenaPort: 8080,

@@ -133,7 +133,7 @@ export function ConnectionsPanel({
 		console: view.consoleHost,
 		ontime: view.onTimeHost === null ? null : `${view.onTimeHost}:${view.onTimePort}`,
 		propresenter:
-			view.proPresenterHost === null ? null : `${view.proPresenterHost}:${view.proPresenterPort ?? '?'}`,
+			view.proPresenterHost === null ? null : `${view.proPresenterHost}:${view.proPresenterPort}`,
 		arena: view.arenaHost === null ? null : `${view.arenaHost}:${view.arenaPort}`,
 		cue: null,
 		video: null,
@@ -882,7 +882,7 @@ function OnTimeEditor({ view, save }: { view: SettingsView; save: Save }) {
 
 function ProPresenterEditor({ view, save }: { view: SettingsView; save: Save }) {
 	const [host, setHost] = useState(view.proPresenterHost ?? '')
-	const [port, setPort] = useState(view.proPresenterPort === null ? '' : String(view.proPresenterPort))
+	const [port, setPort] = useState(String(view.proPresenterPort))
 	const [timer, setTimer] = useState(view.proPresenterTimer ?? '')
 	const names = useProPresenterNames()
 	return (
@@ -890,7 +890,7 @@ function ProPresenterEditor({ view, save }: { view: SettingsView; save: Save }) 
 			save={save}
 			patch={() => ({
 				proPresenterHost: host,
-				proPresenterPort: port.trim() === '' ? null : portOf(port),
+				proPresenterPort: portOf(port),
 				proPresenterTimer: timer === '' ? null : timer,
 			})}
 		>
@@ -908,7 +908,7 @@ function ProPresenterEditor({ view, save }: { view: SettingsView; save: Save }) 
 						hostField="proPresenterHost"
 						portField="proPresenterPort"
 						hostLabel="ProPresenter address"
-						portHint="ProPresenter › Settings › Network, with Enable Network on."
+						portHint="1025 unless ProPresenter › Settings › Network says otherwise (Enable Network on)."
 					/>
 					<Field
 						label="Timer"

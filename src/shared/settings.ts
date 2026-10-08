@@ -46,10 +46,11 @@ export type Settings = {
 	/** OnTime, for the countdown chip. Null host: OnTime is not used. */
 	onTimeHost: string | null
 	onTimePort: number
-	/** ProPresenter, likewise. Its port is whatever its Network settings show,
-	 *  which it picks itself, so there is no default to offer. */
+	/** ProPresenter, likewise. Its port is whatever its Network settings show;
+	 *  1025 is the one LIFE's booths use (the owner, 2026-10-08), so it is
+	 *  offered, and a booth on another changes it. */
 	proPresenterHost: string | null
-	proPresenterPort: number | null
+	proPresenterPort: number
 	/** Which ProPresenter timer the chip follows, by its name there. Null: the
 	 *  first one counting. A booth can run several timers at once, and which
 	 *  one counts to the next thing is a habit of the people, not a fact any
@@ -93,6 +94,11 @@ export type Settings = {
 /** OnTime's own default (docs.getontime.no, HTTP API). */
 export const DEFAULT_ONTIME_PORT = 4001
 
+/** ProPresenter's port at LIFE's booths (the owner, 2026-10-08). Before, there
+ *  was no default and the field began blank, because ProPresenter picks its
+ *  own; every booth had set it to this. */
+export const DEFAULT_PROPRESENTER_PORT = 1025
+
 /** The working config's port (✅ 2026-09-21, OSC row 3). */
 export const DEFAULT_OSC_PORT = 8003
 
@@ -117,7 +123,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	onTimeHost: null,
 	onTimePort: DEFAULT_ONTIME_PORT,
 	proPresenterHost: null,
-	proPresenterPort: null,
+	proPresenterPort: DEFAULT_PROPRESENTER_PORT,
 	proPresenterTimer: null,
 	arenaHost: null,
 	arenaPort: DEFAULT_ARENA_PORT,
@@ -251,11 +257,8 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		else errors.proPresenterHost = hostError
 	}
 	if (patch.proPresenterPort !== undefined) {
-		if (patch.proPresenterPort === null || isPort(patch.proPresenterPort)) next.proPresenterPort = patch.proPresenterPort
-		else errors.proPresenterPort = 'A whole number from 1 to 65535: the port in ProPresenter’s Network settings.'
-	}
-	if (next.proPresenterHost !== null && next.proPresenterPort === null && errors.proPresenterPort === undefined) {
-		errors.proPresenterPort = 'ProPresenter picks its own port: copy it from ProPresenter’s Network settings.'
+		if (isPort(patch.proPresenterPort)) next.proPresenterPort = patch.proPresenterPort
+		else errors.proPresenterPort = `A whole number from 1 to 65535: the port in ProPresenter’s Network settings, ${DEFAULT_PROPRESENTER_PORT} at LIFE.`
 	}
 	if (patch.campus !== undefined) {
 		const name = patch.campus === null ? '' : patch.campus.trim()
@@ -397,7 +400,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['onTimeHost', strOrNull],
 		['onTimePort', num],
 		['proPresenterHost', strOrNull],
-		['proPresenterPort', (v) => v === null || num(v)],
+		['proPresenterPort', num],
 		['proPresenterTimer', strOrNull],
 		['arenaHost', strOrNull],
 		['arenaPort', num],

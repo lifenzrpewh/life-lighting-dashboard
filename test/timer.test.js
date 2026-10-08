@@ -182,13 +182,15 @@ test('settings: neither program is used until an address is set', () => {
 	assert.equal(DEFAULT_SETTINGS.onTimeHost, null)
 	assert.equal(DEFAULT_SETTINGS.onTimePort, 4001)
 	assert.equal(DEFAULT_SETTINGS.proPresenterHost, null)
-	assert.equal(DEFAULT_SETTINGS.proPresenterPort, null)
+	assert.equal(DEFAULT_SETTINGS.proPresenterPort, 1025, 'the port LIFE booths use (the owner, 2026-10-08)')
 })
 
-test('settings: ProPresenter needs its port, which it picks itself', () => {
+test('settings: ProPresenter on 1025 unless told otherwise', () => {
 	const r = applyPatch(DEFAULT_SETTINGS, { proPresenterHost: '10.11.60.50' })
-	assert.equal(r.ok, false)
-	assert.ok(r.errors.proPresenterPort)
+	assert.ok(r.ok)
+	assert.equal(r.settings.proPresenterPort, 1025)
+	assert.equal(applyPatch(DEFAULT_SETTINGS, { proPresenterPort: 0 }).ok, false)
+	assert.equal(patchFrom({ proPresenterPort: null }), null, 'no blank port any more')
 	const ok = applyPatch(DEFAULT_SETTINGS, { proPresenterHost: '10.11.60.50', proPresenterPort: 50001, onTimeHost: ' 10.11.60.51 ' })
 	assert.ok(ok.ok)
 	assert.equal(ok.settings.onTimeHost, '10.11.60.51')

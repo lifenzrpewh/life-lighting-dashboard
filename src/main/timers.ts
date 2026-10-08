@@ -41,7 +41,7 @@ export function startTimers(s: Settings): TimersHandle {
 				})
 
 	const propresenter =
-		s.proPresenterHost === null || s.proPresenterPort === null
+		s.proPresenterHost === null
 			? null
 			: poll<ProPresenterNow>({
 					log: 'timers',
