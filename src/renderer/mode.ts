@@ -1,14 +1,16 @@
-// Volunteer and operator mode (docs/PLAN.md, Mode switching).
+// Volunteer and Admin (docs/PLAN.md, Mode switching). Admin was called
+// operator mode until 2026-10-08, and the code still says `operator`.
 //
 // The mode is which MA user the pane is logged in as: volunteer is the
-// volunteer user (Remote by default), operator is the LD's. What each may do
-// is set on the console, in those users' rights.
+// volunteer user (Remote by default), Admin is the LD's. What each may do is
+// set on the console, in those users' rights.
 //
 // Boots into volunteer, always, and nothing here is remembered across a
-// restart. In: a 3-second hold on the mode chip. Out: one tap, or 15 minutes
-// with no input anywhere, which logs the pane back to the volunteer user.
-// Becoming more restricted is always safe, so leaving is easy and entering is
-// not.
+// restart. In: the passcode, checked by main (../shared/admin.ts), or a tap
+// when none is set; a 3-second hold until 2026-10-08. Out: one tap, or the
+// timeout Settings › Admin picks (15 minutes unless changed) with no input
+// anywhere, which logs the pane back to the volunteer user. Becoming more
+// restricted is always safe, so leaving is easy and entering is not.
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
@@ -44,12 +46,10 @@ export function useMainMode(): Mode {
 	return mode
 }
 
-/** Long enough that a palm resting on the chip is not an elevation. */
-export const HOLD_MS = 3_000
-
-/** `paneLastInputAt` is input inside the MA pane, which the renderer cannot
- *  see for itself: an operator working in the MA is not idle. */
-export function useMode(now: number, paneLastInputAt: number | null) {
+/** `paneLastInputAt` is input inside the MA pane, the run order and embeds,
+ *  which the renderer cannot see for itself: an LD working in the MA is not
+ *  idle. `idleMs` is Settings › Admin's timeout. */
+export function useMode(now: number, paneLastInputAt: number | null, idleMs: number) {
 	const [mode, setMode] = useState<Mode>('volunteer')
 	const lastInput = useRef(Date.now())
 
@@ -68,11 +68,12 @@ export function useMode(now: number, paneLastInputAt: number | null) {
 	// Checked on the 1 s clock, so the drop needs nothing to happen to arrive.
 	useEffect(() => {
 		if (mode !== 'operator') return
-		if (operatorExpired(Math.max(lastInput.current, paneLastInputAt ?? 0), now)) setMode('volunteer')
-	}, [mode, now, paneLastInputAt])
+		if (operatorExpired(Math.max(lastInput.current, paneLastInputAt ?? 0), now, idleMs)) setMode('volunteer')
+	}, [mode, now, paneLastInputAt, idleMs])
 
 	return {
 		mode,
+		/** Main has let the screen in (`unlockAdmin`): follow it. */
 		enter: () => {
 			lastInput.current = Date.now()
 			setMode('operator')

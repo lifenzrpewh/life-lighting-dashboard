@@ -89,6 +89,7 @@ import { captureIdOf, isCaptureId, type CaptureInput } from '../shared/capture.j
 import { settleDataDir } from '../bridge/data-dir.js'
 import { logPage, startLog } from './log.js'
 import type { About } from '../shared/about.js'
+import { NO_LOCKOUT, lockoutWait, tryUnlock, type AdminState, type Lockout, type UnlockResult } from '../shared/admin.js'
 
 // Pāua's data folder, %APPDATA%paua, moved in whole from the name before the
 // rename on the first run after it (../bridge/data-dir.ts). Before anything
@@ -127,10 +128,14 @@ let cuePane: CuePane | null = null
 let popouts: Popouts | null = null
 let embeds: Embeds | null = null
 let settings: SettingsStore | null = null
-/** The screen's mode, as the renderer last reported it. Main learns it only to
- *  pick the pane's MA user and to keep settings operator-only. It is not a
- *  security boundary: the MA users' own rights are. */
+/** The screen's mode: 'operator' is Admin. Main decides the way in, by the
+ *  passcode (`admin:unlock`), and the renderer reports the way out (a tap, or
+ *  the idle drop). Main uses it to pick the pane's MA user and to keep
+ *  settings and the writes Admin's. The MA users' own rights remain the real
+ *  boundary on the console. */
 let mode: Mode = 'volunteer'
+/** Wrong passcode tries, and the wait they have earned (../shared/admin.ts). */
+let lockout: Lockout = NO_LOCKOUT
 let channelB: ChannelBHandle | null = null
 let consoleLink: LinkHandle | null = null
 let timers: TimersHandle | null = null
@@ -539,10 +544,39 @@ app.whenReady().then(() => {
 	})
 	ipcMain.on('ma-pane:release', (e) => fromKiosk(e) && maPane?.release())
 	ipcMain.on('ma-pane:retry', (e) => fromHost(e, maPane) && maPane?.retry())
+	// The renderer may only step down. Into Admin is `admin:unlock`'s alone,
+	// which checks the passcode (../shared/admin.ts); an 'operator' here is the
+	// renderer agreeing with what main already decided.
 	ipcMain.on('ma-pane:mode', (e, next: unknown) => {
-		if (!fromKiosk(e) || (next !== 'volunteer' && next !== 'operator')) return
-		mode = next
-		maPane?.setMode(next)
+		if (!fromKiosk(e) || next !== 'volunteer' || mode === 'volunteer') return
+		mode = 'volunteer'
+		console.log('[admin] back to volunteer')
+		maPane?.setMode('volunteer')
+	})
+	// Admin, by passcode (../shared/admin.ts). The count of wrong tries is
+	// main's, so reloading the page does not reset it. The passcode itself is
+	// never logged, right or wrong.
+	ipcMain.handle('admin:state', (e): AdminState | undefined => {
+		if (!fromKiosk(e) || settings === null) return undefined
+		const p = settings.passcode()
+		return { hasPasscode: p !== null, numeric: p?.numeric ?? true, waitMs: lockoutWait(lockout, Date.now()) }
+	})
+	ipcMain.handle('admin:unlock', (e, code: unknown): UnlockResult | undefined => {
+		if (!fromKiosk(e) || settings === null) return undefined
+		const store = settings
+		const has = store.passcode() !== null
+		const { result, lockout: next } = tryUnlock(lockout, Date.now(), has, () => typeof code === 'string' && store.checkPasscode(code))
+		lockout = next
+		if (result.ok) {
+			mode = 'operator'
+			console.log(`[admin] into Admin${has ? ', by passcode' : ' (no passcode set)'}`)
+			maPane?.setMode('operator')
+		} else if (result.why === 'wrong') {
+			console.log(`[admin] a wrong passcode; ${result.triesLeft} before a wait`)
+		} else {
+			console.log(`[admin] passcode refused: waiting ${Math.ceil(result.waitMs / 1000)} s after wrong tries`)
+		}
+		return result
 	})
 	// Read by a pop-out, to hide the buttons operator mode alone may use.
 	ipcMain.handle('mode:get', (e): Mode => (fromOurs(e) ? mode : 'volunteer'))

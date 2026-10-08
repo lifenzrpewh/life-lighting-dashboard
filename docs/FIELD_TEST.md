@@ -35,15 +35,34 @@ install, and the installer never touches it, uninstalling included. It belongs
 to the Windows user, so another user on the same PC starts from nothing.
 
 **Getting out:** Alt+F4 on Windows, Cmd+Q on a Mac. It runs full screen; on a
-laptop, **Connections › This screen › Window** (operator mode) gives it a window.
+laptop, **Settings › This computer › Window** (Admin) gives it a window.
 
 ## First run
 
-Everything starts off. Tap **Connections** in the status bar, hold the mode
-chip for 3 s for operator mode, then tap a row to give it an address: the
-Console first, then Arena, OnTime and ProPresenter if the booth has them. The
-Cue Manager signs in from its own column, by QR, approved as this campus's
-booth device.
+Everything starts off. Tap **Volunteer** (top right) for Admin: with no
+passcode set yet it opens at once. Then the gear, **Settings**, and tap a
+connection to give it an address: the Console first, then Arena, OnTime and
+ProPresenter if the booth has them. Set a passcode in **Settings › Admin**
+before the booth is left with volunteers. The Cue Manager signs in from its own
+column, by QR, approved as this campus's booth device. **Connections** on the
+bar is the list anyone can read: what is up, what is down.
+
+## Admin
+
+Admin (called operator mode before the next version) is for changing
+settings, layouts and the show. Tap **Volunteer** and enter the passcode, on
+Pāua's own keypad or, for one with letters, after **Keyboard**. One tap on
+**Admin** goes back. Admin also goes back by itself after a while with nobody
+touching anything: 15 minutes unless **Settings › Admin** says 2, 5, 10, 30 or
+60. Five wrong tries make the screen wait 30 seconds; it says so.
+
+**Forgotten the passcode?** Quit Pāua (Alt+F4, or Cmd+Q). Open `settings.json`
+in the data folder (`%APPDATA%\paua\settings.json` on Windows,
+`~/Library/Application Support/paua/settings.json` on a Mac) in Notepad or
+TextEdit, delete the `"adminPasscode": { … }` entry and the comma before it,
+save, and start Pāua again. Admin then opens with a tap; set a new passcode in
+Settings › Admin. Touch nothing else in that file: it holds the booth's
+addresses and its sealed MA passwords.
 
 ## The log
 
@@ -52,8 +71,8 @@ Pāua writes `paua.log` as it goes, with times on every line:
 - Windows: `%APPDATA%\paua\paua.log`
 - Mac: `~/Library/Application Support/paua/paua.log`
 
-The path and the version are at the foot of Connections; in operator mode,
-**Show the log** opens its folder. The file before it is `paua.1.log`.
+The path and the version are at the foot of Settings (Admin), where **Show the
+log** opens its folder. The file before it is `paua.1.log`.
 
 ## Reporting something
 
@@ -61,7 +80,7 @@ When something happens, tap the **flag** in the top bar (MARK in 0.2.0): it writ
 mark in the log at that moment, with what was on screen, and shows the number.
 Write the number down with what you saw.
 
-Say: the **version** (foot of Connections), roughly **when** it happened, what
+Say: the **version** (foot of Settings), roughly **when** it happened, what
 you did, what you saw. Send `paua.log` with it. A photo of the screen helps
 more than a description of it.
 

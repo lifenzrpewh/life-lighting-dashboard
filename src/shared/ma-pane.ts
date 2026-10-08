@@ -150,10 +150,11 @@ export function isWebRemote(url: string, target: string): boolean {
 	}
 }
 
-/** Operator mode drops back to volunteer after this long with no input
- *  anywhere, including inside the pane. docs/PLAN.md, Mode switching. */
+/** Admin (operator mode in the code) drops back to volunteer after this long
+ *  with no input anywhere, including inside the pane, unless Settings › Admin
+ *  says otherwise (./admin.ts). docs/PLAN.md, Mode switching. */
 export const OPERATOR_IDLE_MS = 15 * 60_000
 
-export function operatorExpired(lastInputAt: number, now: number): boolean {
-	return now - lastInputAt >= OPERATOR_IDLE_MS
+export function operatorExpired(lastInputAt: number, now: number, idleMs: number = OPERATOR_IDLE_MS): boolean {
+	return now - lastInputAt >= idleMs
 }

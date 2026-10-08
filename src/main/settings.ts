@@ -7,12 +7,16 @@
 // - A password never leaves main. The renderer learns only whether one is set.
 // - A save is all or nothing, and lands by rename, so a crash mid-write leaves
 //   the old file rather than half a new one.
+// - Admin's passcode is kept as a salted hash only (../bridge/passcode.ts),
+//   under `adminPasscode`, and checked here. Deleting that entry, with Pāua
+//   closed, is the way back in when it is forgotten (../shared/admin.ts).
 
 import { app, safeStorage } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import type { Mode } from '../shared/ma-pane.js'
+import { checkPasscode, hashPasscode, storedPasscodeFrom, type StoredPasscode } from '../bridge/passcode.js'
 import {
 	applyPatch,
 	fromDisk,
@@ -32,6 +36,10 @@ export type SettingsStore = {
 	/** For main alone: the pane's login. Never sent over IPC. */
 	password(mode: Mode): string | null
 	view(): SettingsView
+	/** Admin's passcode, as far as anyone outside this file may know it. */
+	passcode(): { numeric: boolean } | null
+	/** True when `code` is the passcode. False when none is set. */
+	checkPasscode(code: string): boolean
 	save(patch: SettingsPatch): Checked
 	onChange(listener: () => void): void
 }
@@ -43,11 +51,13 @@ export function openSettings(): SettingsStore {
 
 	let settings: Settings = fromDisk(null)
 	let secrets: Secrets = { volunteer: null, operator: null }
+	let passcode: StoredPasscode | null = null
 
 	try {
 		const raw: unknown = JSON.parse(fs.readFileSync(file, 'utf8'))
 		settings = fromDisk(raw)
 		secrets = readSecrets(raw)
+		passcode = storedPasscodeFrom((raw as { adminPasscode?: unknown } | null)?.adminPasscode)
 	} catch (e) {
 		// No file yet is the normal first boot. Anything else is worth a line in
 		// the log, and still boots: on defaults, the pane says no address is set.
@@ -62,7 +72,10 @@ export function openSettings(): SettingsStore {
 			volunteerHasPassword: secrets.volunteer !== null,
 			operatorHasPassword: secrets.operator !== null,
 			canStorePasswords: canEncrypt,
+			hasAdminPasscode: passcode !== null,
 		}),
+		passcode: () => (passcode === null ? null : { numeric: passcode.numeric }),
+		checkPasscode: (code) => passcode !== null && checkPasscode(passcode, code),
 
 		save(patch) {
 			const checked = applyPatch(settings, patch)
@@ -77,11 +90,13 @@ export function openSettings(): SettingsStore {
 				}
 				next[mode] = pw
 			}
+			const nextPasscode = patch.adminPasscode === undefined ? passcode : patch.adminPasscode === null ? null : hashPasscode(patch.adminPasscode)
 
 			try {
 				const tmp = `${file}.tmp`
 				fs.mkdirSync(path.dirname(file), { recursive: true })
-				fs.writeFileSync(tmp, JSON.stringify({ ...checked.settings, secrets: writeSecrets(next) }, null, '\t'))
+				const out = { ...checked.settings, secrets: writeSecrets(next), ...(nextPasscode === null ? {} : { adminPasscode: nextPasscode }) }
+				fs.writeFileSync(tmp, JSON.stringify(out, null, '\t'))
 				fs.renameSync(tmp, file)
 			} catch (e) {
 				return { ok: false, errors: { form: `Could not save settings: ${String(e)}` } }
@@ -89,6 +104,8 @@ export function openSettings(): SettingsStore {
 
 			settings = checked.settings
 			secrets = next
+			if (patch.adminPasscode !== undefined) console.log(`[admin] passcode ${nextPasscode === null ? 'removed' : 'set'} in Settings`)
+			passcode = nextPasscode
 			for (const l of listeners) l()
 			return checked
 		},

@@ -15,6 +15,7 @@
 // Passwords are write-only from the renderer's side. `SettingsView` says
 // whether one is set and never what it is; main keeps them encrypted at rest.
 
+import { DEFAULT_ADMIN_TIMEOUT_MIN, isAdminTimeout, passcodeError } from './admin.js'
 import { DEFAULT_ARENA_PORT } from './arena.js'
 import { CONNECTIONS, type ConnectionId } from './connections.js'
 import { embedsFrom, type Embed } from './embeds.js'
@@ -89,6 +90,10 @@ export type Settings = {
 	/** Where fetched media is copied on this computer, for Arena to play from.
 	 *  Null: no fetching. Where a booth keeps files is a fact about the booth. */
 	localMediaFolder: string | null
+	/** Minutes with no input before Admin drops back to volunteer, one of
+	 *  ADMIN_TIMEOUTS_MIN (./admin.ts). How long an LD walks away for is a
+	 *  habit of the booth (the owner, 2026-10-08). */
+	adminTimeoutMin: number
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -135,6 +140,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	windowed: false,
 	graphicsFolder: null,
 	localMediaFolder: null,
+	adminTimeoutMin: DEFAULT_ADMIN_TIMEOUT_MIN,
 }
 
 /** The settings main works from: a connection turned off is treated as one
@@ -164,6 +170,9 @@ export type SettingsView = Settings & {
 	/** False when the OS offers no keystore, in which case passwords cannot be
 	 *  saved at all. Plaintext on disk is not the fallback. */
 	canStorePasswords: boolean
+	/** Whether Admin asks for a passcode (./admin.ts). Never the passcode,
+	 *  nor its hash. */
+	hasAdminPasscode: boolean
 }
 
 /** A change from the settings panel. For passwords, a missing key leaves the
@@ -171,6 +180,9 @@ export type SettingsView = Settings & {
 export type SettingsPatch = Partial<Settings> & {
 	volunteerPassword?: string | null
 	operatorPassword?: string | null
+	/** Admin's passcode: a string sets it, null removes it (./admin.ts). Main
+	 *  keeps only a salted hash of it. */
+	adminPasscode?: string | null
 }
 
 /** A field, or `form` for a failure that belongs to no one field (the disk). */
@@ -345,6 +357,14 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		const pw = patch[key]
 		if (typeof pw === 'string' && pw === '') errors[key] = 'Leave blank to keep the password; use Remove to clear it.'
 	}
+	if (typeof patch.adminPasscode === 'string') {
+		const e = passcodeError(patch.adminPasscode)
+		if (e !== null) errors.adminPasscode = e
+	}
+	if (patch.adminTimeoutMin !== undefined) {
+		if (isAdminTimeout(patch.adminTimeoutMin)) next.adminTimeoutMin = patch.adminTimeoutMin
+		else errors.adminTimeoutMin = 'One of 2, 5, 10, 15, 30 or 60 minutes.'
+	}
 
 	return Object.keys(errors).length === 0 ? { ok: true, settings: next } : { ok: false, errors }
 }
@@ -379,6 +399,7 @@ export function fromDisk(raw: unknown): Settings {
 		const v = r[key]
 		if (typeof v === 'string' && isFolderPath(v)) out[key] = v
 	}
+	if (isAdminTimeout(r['adminTimeoutMin'])) out.adminTimeoutMin = r['adminTimeoutMin']
 	return out
 }
 
@@ -416,6 +437,8 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['operatorUser', strOrNull],
 		['volunteerPassword', strOrNull],
 		['operatorPassword', strOrNull],
+		['adminPasscode', strOrNull],
+		['adminTimeoutMin', num],
 	]
 	for (const [key, ok] of checks) {
 		if (!(key in r)) continue

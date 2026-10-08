@@ -69,6 +69,8 @@ import { usePopouts } from './popouts.js'
 import { PanePlacer } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
 import { SettingsPanel, type SettingsPage } from './components/SettingsPanel.js'
+import { PasscodeSheet } from './components/PasscodeSheet.js'
+import { DEFAULT_ADMIN_TIMEOUT_MIN } from '../shared/admin.js'
 import { ShowfileSheet } from './components/ShowfileSheet.js'
 import { GuideSheet } from './components/GuideSheet.js'
 import { GUIDE } from '../shared/guide.js'
@@ -99,7 +101,7 @@ function failureOf<T>(channel: Channel<T>): string | null {
 }
 
 /** The sheets that stand in the windows' place. */
-type SheetId = 'guide' | 'connections' | 'settings' | 'showfile'
+type SheetId = 'guide' | 'connections' | 'settings' | 'showfile' | 'passcode'
 
 /** Where this computer remembers the top bar folded. */
 const BAR_KEY = 'paua.barCollapsed'
@@ -170,12 +172,15 @@ export function App() {
 	// Nothing on screen is moved for a view that is off until the settings
 	// that say so have been read: before then, every embed looks removed.
 	const [settingsRead, setSettingsRead] = useState(false)
+	// Settings › Admin's timeout (../shared/admin.ts), read with the rest.
+	const [adminIdleMs, setAdminIdleMs] = useState(DEFAULT_ADMIN_TIMEOUT_MIN * 60_000)
 	const readOff = () =>
 		void window.life?.settings().then((s) => {
 			setOff(s.off)
 			setEmbeds(s.embeds)
 			setNdiSources(s.ndiSources)
 			setCaptureInputs(s.captureInputs)
+			setAdminIdleMs(s.adminTimeoutMin * 60_000)
 			setSettingsRead(true)
 		})
 	useEffect(readOff, [])
@@ -502,7 +507,24 @@ export function App() {
 	const inputs = [pane?.lastInputAt ?? null, cue?.lastInputAt ?? null, ...embedReports.map((r) => r.lastInputAt)].filter(
 		(t): t is number => t !== null,
 	)
-	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs))
+	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs), adminIdleMs)
+	// Volunteer tapped (../shared/admin.ts): the passcode sheet, or straight in
+	// when none is set. Main decides either way; the screen follows. Outside
+	// the kiosk (a browser on the renderer alone) there is no main to ask.
+	const askAdmin = async () => {
+		if (sheet === 'passcode') return setSheet(null)
+		const api = window.life
+		if (api === undefined) return enter()
+		const state = await api.adminState()
+		if (state === undefined) return
+		if (state.hasPasscode) {
+			setLayoutsOpen(false)
+			setEditing(false)
+			return setSheet('passcode')
+		}
+		const r = await api.unlockAdmin(null)
+		if (r?.ok === true) enter()
+	}
 
 	// The mode is which MA user the pane is (src/renderer/mode.ts). Main does the
 	// login; the renderer only says which. Connections closes on any change of
@@ -756,7 +778,8 @@ export function App() {
 					consoleOn={consoleOn}
 					now={now}
 					mode={mode}
-					onEnter={enter}
+					onEnter={() => void askAdmin()}
+					asking={sheet === 'passcode'}
 					onLeave={leave}
 					connectionsOpen={connectionsOpen}
 					showfileOpen={showfileOpen}
@@ -856,6 +879,8 @@ export function App() {
 							onChanged={readOff}
 							onClose={() => setSheet(null)}
 						/>
+					) : sheet === 'passcode' && mode === 'volunteer' ? (
+						<PasscodeSheet now={now} onUnlocked={enter} onClose={() => setSheet(null)} />
 					) : showfileOpen ? (
 						<ShowfileSheet
 							showfile={showfile}

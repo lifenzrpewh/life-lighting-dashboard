@@ -23,6 +23,7 @@ import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'im
 import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'import' }
 import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
 import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
+import type { AdminState, UnlockResult } from '../shared/admin.js' with { 'resolution-mode': 'import' }
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
 import type { NdiState } from '../shared/ndi.js' with { 'resolution-mode': 'import' }
 import type { CaptureInput } from '../shared/capture.js' with { 'resolution-mode': 'import' }
@@ -202,10 +203,17 @@ const api = {
 	/** Stop wanting the pane, which closes its connection to the console. */
 	releaseMaPane: (): void => ipcRenderer.send('ma-pane:release'),
 	retryMaPane: (): void => ipcRenderer.send('ma-pane:retry'),
-	/** Which MA user the pane should be: volunteer or operator. */
+	/** The screen's mode as the renderer has it. Main takes only a step down
+	 *  to volunteer from here; into Admin is `unlockAdmin`. */
 	setMaPaneMode: (mode: Mode): void => ipcRenderer.send('ma-pane:mode', mode),
-	/** The kiosk's mode, for a pop-out to hide what only operator mode may use. */
+	/** The kiosk's mode, for a pop-out to hide what only Admin may use. */
 	mode: (): Promise<Mode> => ipcRenderer.invoke('mode:get'),
+	/** Whether Admin asks for a passcode, whether it is digits, and any wait
+	 *  still running (src/shared/admin.ts). Never the passcode. */
+	adminState: (): Promise<AdminState | undefined> => ipcRenderer.invoke('admin:state'),
+	/** Try the passcode (null when none is set). Main checks it and, if it is
+	 *  right, the kiosk is in Admin. */
+	unlockAdmin: (code: string | null): Promise<UnlockResult | undefined> => ipcRenderer.invoke('admin:unlock', code),
 
 	/** The views popped out of their slots into windows of their own
 	 *  (src/main/popout.ts). */

@@ -155,6 +155,7 @@ export function StatusBar({
 	mode,
 	onEnter,
 	onLeave,
+	asking,
 	connectionsOpen,
 	onMark,
 	guideOpen,
@@ -183,6 +184,8 @@ export function StatusBar({
 	mode: Mode
 	onEnter: () => void
 	onLeave: () => void
+	/** The passcode sheet is open. */
+	asking: boolean
 	connectionsOpen: boolean
 	/** "Mark this moment": a line in the log for a tester. Answers which mark,
 	 *  or null when it could not be written. */
@@ -267,7 +270,7 @@ export function StatusBar({
 				<MarkButton onMark={onMark} />
 				{operator && <IconButton icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} />}
 				{/* Boots into volunteer, always, and never remembers otherwise. */}
-				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
+				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} asking={asking} />
 				<IconButton icon={ChevronUp} label="Fold the bar away" onClick={() => onCollapse(true)} />
 			</div>
 

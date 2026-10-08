@@ -75,6 +75,12 @@ test('operator mode lasts 15 idle minutes, not one moment less', () => {
 	assert.ok(operatorExpired(t, t + OPERATOR_IDLE_MS))
 })
 
+test('Admin lasts as long as Settings says, when it says', () => {
+	const t = 1_000_000
+	assert.ok(!operatorExpired(t, t + 2 * 60_000 - 1, 2 * 60_000))
+	assert.ok(operatorExpired(t, t + 2 * 60_000, 2 * 60_000))
+})
+
 test('the web remote overlay reads as what MA itself says, in onPC 2.3.2.0 words', () => {
 	// Every string here is one MA's own remoteState.js writes.
 	const cases = [

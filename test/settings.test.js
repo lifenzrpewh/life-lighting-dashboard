@@ -73,6 +73,7 @@ test('a corrupt file costs only the bad values', () => {
 		windowed: false,
 		graphicsFolder: null,
 		localMediaFolder: null,
+		adminTimeoutMin: 15,
 	})
 	assert.deepEqual(fromDisk('garbage'), DEFAULT_SETTINGS)
 })

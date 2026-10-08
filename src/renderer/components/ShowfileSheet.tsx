@@ -27,8 +27,11 @@ import {
 	saveAsProblem,
 	type ShowList,
 } from '../../shared/showfile-write.js'
-import { HOLD_MS } from '../mode.js'
 import { Button, Card, SectionTitle, Sheet } from './ui.js'
+
+/** A Load is held for 3 s, so a brush of the screen never loads a show. The
+ *  mode lock had the same hold until 2026-10-08; it is a passcode now. */
+const HOLD_MS = 3_000
 
 type Pending = { kind: 'save' | 'load'; name: string; at: number }
 
@@ -58,7 +61,7 @@ export function ShowfileSheet({
 	const [saveFirst, setSaveFirst] = useState(true)
 
 	const canAct = operator && linkLive
-	const why = !operator ? 'Save As and Load are Admin’s: hold Volunteer (top right) for 3 seconds.' : !linkLive ? 'The console is not answering.' : null
+	const why = !operator ? 'Save As and Load are Admin’s: tap Volunteer (top right) and enter the passcode.' : !linkLive ? 'The console is not answering.' : null
 	const problem = saveAsProblem(offered, current?.base ?? null)
 
 	// The read-back: the console's own name for its show, through LifeBridge.

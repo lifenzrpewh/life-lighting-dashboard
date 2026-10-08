@@ -14,7 +14,7 @@
 // configured here (src/shared/settings.ts).
 
 import { useEffect, useState } from 'react'
-import { Cast, Monitor, Plus, Webcam } from 'lucide-react'
+import { Cast, Lock, Monitor, Plus, Webcam } from 'lucide-react'
 
 import type { ConnectionId, ConnectionStatus, RowId } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -24,6 +24,7 @@ import type { DeskState } from '../../shared/desk.js'
 import type { SettingsView } from '../../shared/settings.js'
 
 import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor } from './settings/connection-editors.js'
+import { AdminSettings } from './settings/admin.js'
 import { AboutFoot, ThisScreen } from './settings/computer.js'
 import { DetailHead, Empty, ListRow, OnOff, tonePill, toneText, type Save } from './settings/parts.js'
 import { AddCapture, AddEmbed, AddNdi, CaptureEditor, EmbedEditor, NdiEditor } from './settings/views.js'
@@ -31,9 +32,9 @@ import { Dot, Sheet } from './ui.js'
 import { sentence } from './vocabulary.js'
 
 /** What the right side shows: a connection, or one of the pages after them. */
-export type SettingsPage = RowId | 'add' | 'add-ndi' | 'add-capture' | 'computer'
+export type SettingsPage = RowId | 'add' | 'add-ndi' | 'add-capture' | 'admin' | 'computer'
 
-const PAGES: readonly string[] = ['add', 'add-ndi', 'add-capture', 'computer']
+const PAGES: readonly string[] = ['add', 'add-ndi', 'add-capture', 'admin', 'computer']
 
 /** Every connection's address as the list shows it, from the stored settings. */
 export function addressOf(view: SettingsView, id: RowId): string | null {
@@ -196,6 +197,17 @@ export function SettingsPanel({
 					/>
 					<span className="mx-3 my-2 h-px bg-booth-edge" />
 					<ListRow
+						selected={selected === 'admin'}
+						onClick={() => setPicked('admin')}
+						lead={<Lock size={18} className="text-booth-dim" aria-hidden />}
+						title="Admin"
+						sub={
+							<span className='text-booth-dim'>
+								{view.hasAdminPasscode ? 'Passcode set' : 'No passcode'} · back to volunteer after {view.adminTimeoutMin} min
+							</span>
+						}
+					/>
+					<ListRow
 						selected={selected === 'computer'}
 						onClick={() => setPicked('computer')}
 						lead={<Monitor size={18} className="text-booth-dim" aria-hidden />}
@@ -213,6 +225,8 @@ export function SettingsPanel({
 							<AddNdi all={view.ndiSources} save={save} />
 						) : selected === 'add-capture' ? (
 							<AddCapture all={view.captureInputs} save={save} />
+						) : selected === 'admin' ? (
+							<AdminSettings view={view} save={save} />
 						) : selected === 'computer' ? (
 							<>
 								<DetailHead title="This computer" />

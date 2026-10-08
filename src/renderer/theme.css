@@ -9,7 +9,7 @@
    the deep sea-green the overhaul first tried (the owner liked the original
    colours a bit more: "somewhere between", 2026-10-05). One iridescent
    accent, nacre, appears only where it means something: the tab showing,
-   operator mode, editing the layout. Everything else is quiet so the state
+   Admin (operator mode until 2026-10-08), editing the layout. Everything else is quiet so the state
    colours can speak. */
 @theme {
 	/* The ground and its layers, darkest to lightest. */
@@ -65,8 +65,9 @@
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-nacre-blue) 60%, transparent);
 }
 
-/* The mode button's hold, filling left to right so a held finger can see it
-   is being counted. components/ModeChip.tsx. */
+/* A hold, filling left to right so a held finger can see it is being
+   counted: Load in components/ShowfileSheet.tsx (the mode button's, until
+   its passcode, 2026-10-08). */
 @keyframes hold-fill {
 	from {
 		transform: scaleX(0);
