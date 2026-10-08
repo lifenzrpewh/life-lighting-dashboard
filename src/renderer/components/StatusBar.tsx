@@ -27,6 +27,9 @@
 // same bar at 34 px, every item in its place and doing all it does unfolded
 // (the owner, 2026-10-08: things must not move under the finger). Remembered
 // on this computer.
+// Instant, not animated: the pages main draws are placed from the windows
+// under the bar, and a sliding bar would drag them through a re-placement a
+// frame.
 //
 // THE TIME IS NEVER COVERED (the owner's bug, 2026-10-08: in Admin the clock
 // went behind the buttons). The zones are flex, the sides sharing what is left
@@ -186,7 +189,7 @@ export function StatusBar({
 
 	return (
 		<header
-			className={`relative flex shrink-0 items-center bg-booth-bg transition-[height] duration-200 ease-out ${
+			className={`relative flex shrink-0 items-center bg-booth-bg ${
 				compact ? 'h-[34px] gap-3 px-1.5 pb-1.5' : 'h-16 gap-4 px-2.5 pb-2'
 			}`}
 		>

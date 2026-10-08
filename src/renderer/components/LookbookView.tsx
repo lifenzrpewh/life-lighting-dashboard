@@ -114,13 +114,13 @@ function Card({
 	const steps = look.ready ? [] : lookSteps(look.item, m.runSheet ?? [], status, m.same, m.sizes)
 	const busy = look.codes.filter((c) => under(m.fetches[c.code]))
 	const failed = look.codes.find((c) => m.fetches[c.code]?.state === 'failed' || m.refused[c.code] !== undefined)
-	const ring = look.live ? 'ring-2 ring-state-live' : look.ready ? 'ring-1 ring-booth-edge' : 'ring-2 ring-warn/70'
+	const ring = look.live ? 'ring-4 ring-state-live' : look.ready ? '' : 'ring-4 ring-warn'
 	return (
 		<article className={`flex min-w-0 snap-start flex-col overflow-hidden rounded-win bg-booth-panel ${ring}`}>
 			<div className="relative w-full bg-black" style={{ aspectRatio: '5800 / 2037' }}>
 				<Picture url={main === null ? null : lookbookThumbUrl(main, 'large')} />
 				<span className="absolute top-3 left-3 rounded-ctl bg-black/70 px-2.5 py-1 text-lg tabular-nums">{order}</span>
-				{look.live && <span className="absolute top-3 left-16 rounded-ctl bg-state-live px-2.5 py-1 text-lg font-medium text-booth-bg">On screen</span>}
+				{look.live && <span className="absolute top-3 left-16 rounded-ctl bg-state-live px-2.5 py-1 text-lg font-extrabold text-black">On screen</span>}
 				{look.ready && (
 					<span className="absolute top-3 right-3 grid size-10 place-items-center rounded-full bg-black/70 text-state-live" aria-label="All in Arena">
 						<Check size={22} aria-hidden />
@@ -139,7 +139,7 @@ function Card({
 				)}
 				<div className="flex min-w-0 flex-1 flex-col gap-3">
 					<div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-						<h3 className="min-w-0 text-3xl font-medium">{item.title}</h3>
+						<h3 className="min-w-0 text-3xl font-extrabold tracking-tight">{item.title}</h3>
 						{item.label !== null && <span className="min-w-0 text-xl text-booth-dim">{item.label}</span>}
 					</div>
 					{look.column !== null && look.column.name !== '' && (

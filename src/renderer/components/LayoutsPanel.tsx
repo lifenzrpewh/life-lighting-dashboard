@@ -76,24 +76,24 @@ export function LayoutsPanel({
 		<div
 			role="dialog"
 			aria-label="Layouts"
-			className="absolute top-2 right-4 z-30 flex max-h-[calc(100%-1rem)] w-[min(44rem,calc(100%-2rem))] animate-rise flex-col overflow-hidden rounded-win bg-booth-panel shadow-2xl ring-1 ring-booth-edge"
+			className="absolute top-2 left-2 z-30 flex max-h-[calc(100%-1rem)] w-[min(44rem,calc(100%-2rem))] animate-drop flex-col overflow-hidden rounded-ctl bg-booth-raise shadow-2xl"
 		>
-			<div className="flex h-14 shrink-0 items-center gap-3 border-b border-booth-edge pr-2 pl-5">
-				<h2 className="text-lg font-medium">Layouts</h2>
+			<div className="flex h-14 shrink-0 items-center gap-3 pr-2 pl-5">
+				<h2 className="text-xl font-extrabold tracking-tight">Layouts</h2>
 				<p className="min-w-0 truncate text-sm text-booth-dim">Tap one to switch to it.</p>
 				<span className="ml-auto flex shrink-0 items-center gap-2">
 					<IconButton icon={X} label="Close" onClick={onClose} />
 				</span>
 			</div>
-			<div className="min-h-0 overflow-y-auto p-4">
+			<div className="min-h-0 overflow-y-auto px-4 pb-4">
 				<div className="grid grid-cols-2 items-start gap-3">
 					{saved.map((s) => {
 						const on = s.name === current
 						return (
 							<div
 								key={s.name}
-								className={`group relative flex flex-col gap-2 rounded-win bg-booth-bg p-2.5 transition-colors hover:bg-booth-strip ${
-									on ? 'accent-ring' : 'ring-1 ring-booth-edge ring-inset'
+								className={`group relative flex flex-col gap-2 rounded-win p-2.5 transition-colors ${
+									on ? 'bg-booth-hover accent-ring' : 'bg-booth-panel hover:bg-booth-hover'
 								}`}
 							>
 								<button
@@ -107,7 +107,7 @@ export function LayoutsPanel({
 								>
 									<Miniature layout={s.layout} nameOf={nameOf} />
 									<span className="flex items-baseline justify-between gap-3 px-0.5 pr-11">
-										<span className="truncate font-medium">{s.name}</span>
+										<span className="truncate font-bold">{s.name}</span>
 										<span className={`shrink-0 text-xs ${on ? 'text-booth-ink' : 'text-booth-dim'}`}>
 											{on ? 'On screen' : `${s.layout.windows.length} ${s.layout.windows.length === 1 ? 'window' : 'windows'}`}
 										</span>
@@ -130,7 +130,7 @@ export function LayoutsPanel({
 							</div>
 						)
 					})}
-					<div className="flex flex-col gap-2 rounded-win p-2.5 ring-1 ring-booth-edge ring-inset [border-style:dashed]">
+					<div className="flex flex-col gap-2 rounded-win bg-booth-panel p-2.5">
 						<Miniature layout={layout} nameOf={nameOf} />
 						<Field label="Save the layout on screen as" error={error ?? undefined} hint={note ?? 'The same name replaces that layout.'}>
 							<Input value={name} onChange={setName} placeholder="Sunday" />

@@ -380,10 +380,10 @@ function Tile({
 		: picked
 			? 'ring-2 ring-booth-ink'
 			: needsLook(mark)
-				? 'ring-2 ring-warn'
+				? 'outline-4 -outline-offset-4 outline-warn'
 				: slot.state === 'playing'
-					? 'ring-2 ring-state-live'
-					: 'ring-1 ring-booth-edge'
+					? 'outline-4 -outline-offset-4 outline-state-live'
+					: ''
 	const faded = dim || (!target && (mark === 'not-today' || mark === 'no-code'))
 	if (slot.state === 'empty') {
 		return (

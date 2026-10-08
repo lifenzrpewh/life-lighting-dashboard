@@ -198,7 +198,7 @@ export function FeedChooser({ options, onPick }: { options: FeedOptions; onPick:
 		<div className="flex min-h-0 min-w-0 flex-1 justify-center overflow-y-auto p-6">
 			<div className="flex w-full max-w-md flex-col gap-4">
 				<div className="flex flex-col gap-1 px-3">
-					<span className="text-base font-medium">What should this tab show?</span>
+					<span className="text-xl font-extrabold tracking-tight">What should this tab show?</span>
 					<span className="text-sm text-booth-dim">Each Video tab shows its own feed; the feed button in its strip changes it later.</span>
 				</div>
 				<FeedList options={options} current={null} onPick={onPick} />

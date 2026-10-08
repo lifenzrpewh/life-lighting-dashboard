@@ -208,7 +208,7 @@ export function AddNdi({ all, save }: { all: readonly NdiSource[]; save: Save })
 	})()
 	return (
 		<section className="flex flex-col gap-5">
-			<h3 className="text-lg font-medium">Add an NDI source</h3>
+			<h3 className="text-xl font-extrabold tracking-tight">Add an NDI source</h3>
 			<p className="max-w-prose text-sm text-booth-dim">
 				A camera, ProPresenter’s output, Arena’s or another computer’s screen: any NDI source on this network, for
 				the Video view.
@@ -288,7 +288,7 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 	}
 	return (
 		<section className="flex flex-col gap-5">
-			<h3 className="text-lg font-medium">Add a capture input</h3>
+			<h3 className="text-xl font-extrabold tracking-tight">Add a capture input</h3>
 			<p className="max-w-prose text-sm text-booth-dim">
 				Anything this computer sees as a camera, for the Video view: a Blackmagic card’s input (with Desktop Video
 				installed), an ATEM Mini’s USB output, OBS’s Virtual Camera (Start Virtual Camera in OBS), or a webcam.
