@@ -238,6 +238,9 @@ const api = {
 	},
 	/** Show this sender rather than the first. */
 	chooseVideo: (name: string): void => ipcRenderer.send('video:choose', name),
+	/** Let every video receiver go and open them again, without restarting
+	 *  the app. Anyone may. */
+	restartVideo: (): void => ipcRenderer.send('video:restart'),
 
 	/** Capture input uid=4096(LIFE+Ruarangi.Pewhairangi) gid=4096 groups=4096 as settings have it, for a pop-out, which cannot read
 	 *  settings: null when removed. */

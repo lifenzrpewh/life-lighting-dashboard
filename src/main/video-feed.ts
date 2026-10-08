@@ -21,24 +21,58 @@
 //   when something answers (../shared/layout.ts). With several, the first by
 //   name is shown until the page picks another.
 //
+// - Never "waiting" for ever (2026-10-08: a booth's view listed Arena and
+//   waited through restarts and reinstalls, with nothing in the log). A
+//   sender tried for NO_PICTURE_AFTER_MS with no frame reaching the page is
+//   said to have given none, with the likeliest reason
+//   (../shared/video-feed.ts, explainNoPicture), in the view and the log; and
+//   every new failure is a `[video]` line. Restart lets everything go and
+//   starts again, for anyone.
+//
+// WHY A BOOTH CAN WAIT FOR EVER (read from the addon's source, upstream
+// 7f7d589, packages/native/cpp/win/spout_bridge.cpp; ⚠️ not seen on that
+// machine): each TextureReceiver makes its own D3D11 device on the DEFAULT
+// adapter (`D3D11CreateDevice(nullptr, …)`), and opens the sender's texture
+// on it. Spout's handle is a legacy shared handle, which opens only on the
+// card that made it. On a computer with two graphics cards, Arena on the
+// discrete one and Pāua on the other (Windows' default for an app it does not
+// know), every open fails, and the addon says only "not connected (sender
+// disconnected or never appeared)", while the sender is still listed. Until
+// 2026-10-08 that went into `failure` and nowhere else.
+// Windows' own per-app setting is the fix (Settings › System › Display ›
+// Graphics › Pāua: High performance): it moves the addon's default adapter
+// and Chromium's together. Chromium's `force_high_performance_gpu` switch was
+// not added: it moves Chromium only, so it would put the page on one card and
+// the addon's textures on the other, breaking a machine that works.
+//
 // 🔬 The addon is 0.15.0, one maintainer, MIT, prebuilt (no install script).
 // `sharedTexture` is experimental in Electron 44. Both are why this is a
 // spike-grade module until it has run a service.
 
-import { sharedTexture, type WebContents } from 'electron'
+import { app, sharedTexture, type WebContents } from 'electron'
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { plainVideoFailure, type VideoFeedState } from '../shared/video-feed.js'
+import {
+	NO_PICTURE_AFTER_MS,
+	describeGpus,
+	explainNoPicture,
+	plainVideoFailure,
+	type Gpus,
+	type VideoAttempt,
+	type VideoFeedState,
+} from '../shared/video-feed.js'
 
 type Addon = typeof import('@napolab/texture-bridge')
 type Receiver = InstanceType<Addon['TextureReceiver']>
 
 /** How often the sender is asked for a new frame. Above any output rate a
  *  sender is likely to run at (Arena's composition here is 50 fps), so the
- *  picture is at most this late, and cheap: a check is a flag read. */
+ *  picture is at most this late, and cheap: between frames (MIN_FRAME_MS)
+ *  a poll asks nothing, and a receive with nothing new is a shared-memory
+ *  read that returns null. */
 const POLL_MS = 5
 /** At most this often a frame is sent to the page. 60 fps with LIFE's ring
  *  build of the addon (native/texture-bridge/life-ring.patch, the owner,
@@ -77,8 +111,14 @@ export type VideoFeed = {
 	watch(page: WebContents, on: boolean): void
 	/** Show this sender rather than the first. */
 	choose(name: string): void
+	/** Let every receiver go and start again, keeping who watches and the
+	 *  pick: the app need not restart for the addon to be fresh. */
+	restart(): void
 	stop(): void
 }
+
+/** A frame handed to the page and not taken in this long is said, once. */
+const STUCK_SEND_MS = 5_000
 
 /** LIFE's own Windows build of the addon, with the 16-bit patch
  *  (native/texture-bridge/): Arena with High Detail on is converted to BGRA8
@@ -102,8 +142,26 @@ function loadAddon(): Addon | string {
 	}
 }
 
+
+/** The graphics cards Chromium sees, and whether it composites on one. */
+async function readGpus(): Promise<{ gpus: Gpus | null; compositing: string }> {
+	let gpus: Gpus | null = null
+	try {
+		gpus = describeGpus(await app.getGPUInfo('basic'))
+	} catch {
+		gpus = null
+	}
+	let compositing = 'unknown'
+	try {
+		compositing = app.getGPUFeatureStatus().gpu_compositing
+	} catch {
+		// Said as unknown.
+	}
+	return { gpus, compositing }
+}
+
 export function startVideoFeed(): VideoFeed {
-	const addon = loadAddon()
+	let addon = loadAddon()
 	const ring = typeof addon !== 'string' && hasRing()
 	const MIN_FRAME_MS = 1000 / (ring ? 60 : 30)
 	if (typeof addon !== 'string') console.log(`[video] up to ${ring ? 60 : 30} fps${ring ? ' (ring build: no tearing on fades)' : ''}`)
@@ -117,9 +175,41 @@ export function startVideoFeed(): VideoFeed {
 	let inFlight = false
 	let lastSentAt = 0
 	let lastFrame: VideoFeedState['lastFrame'] = null
-	let failure: string | null = typeof addon === 'string' ? `the video addon did not load: ${addon}` : null
+	let failure: string | null = null
+	/** The last failure written to the log, so a failure repeated every
+	 *  tick is one line, and a new one is a line of its own. */
+	let failureLogged: string | null = null
+	/** Bumped by a restart: a frame sent before it settles without touching
+	 *  what came after. */
+	let generation = 0
+	/** What happened since the shown sender was first tried, and when that
+	 *  was; null while nothing is being received. */
+	let attempt: (VideoAttempt & { since: number; explained: boolean }) | null = null
+	let graphics: { gpus: Gpus | null; compositing: string } = { gpus: null, compositing: 'unknown' }
 	/** When a slow frame was last logged: at most one line every 10 s. */
 	let slowLoggedAt = 0
+
+	/** Set what went wrong, and say it in the log the first time. */
+	const fail = (why: string | null) => {
+		failure = why
+		if (why !== null && why !== failureLogged) console.log(`[video] ${why}`)
+		failureLogged = why
+	}
+	if (typeof addon === 'string') fail(`the video addon did not load: ${addon}`)
+
+	const lookAtGraphics = () => {
+		void readGpus().then((g) => {
+			graphics = g
+			console.log(
+				`[video] graphics: ${g.gpus === null ? 'cards not known' : `${g.gpus.count} card${g.gpus.count === 1 ? '' : 's'}: ${g.gpus.words}`}; compositing ${g.compositing}`,
+			)
+		})
+	}
+	// Not at once: at start the GPU process may not be up, and compositing read
+	// "disabled_software" there and "enabled" seconds later (this Mac,
+	// 2026-10-08). Before NO_PICTURE_AFTER_MS, so a reason has the cards.
+	const firstLook = setTimeout(lookAtGraphics, 5_000)
+
 	// Where a stall comes from (the owner, 2026-10-05: frozen and slow to catch
 	// up while Arena fades to black, which a stand-in fading the whole picture
 	// at 50 fps did not reproduce: 47 fps, ~65 ms late, no gap over 30 ms).
@@ -154,7 +244,7 @@ export function startVideoFeed(): VideoFeed {
 				.sort((a, b) => a.localeCompare(b))
 		} catch (e) {
 			senders = []
-			failure = `listing senders failed: ${(e as Error).message}`
+			fail(`listing senders failed: ${(e as Error).message}`)
 		}
 		connect()
 	}
@@ -162,8 +252,13 @@ export function startVideoFeed(): VideoFeed {
 	const release = () => {
 		if (poll !== null) clearInterval(poll)
 		poll = null
-		receiver?.native.stop()
+		try {
+			receiver?.native.stop()
+		} catch (e) {
+			console.log(`[video] letting "${receiver?.name}" go failed: ${(e as Error).message}`)
+		}
 		receiver = null
+		attempt = null
 	}
 
 	/** Hold a receiver for the sender being shown, while someone watches. */
@@ -174,17 +269,45 @@ export function startVideoFeed(): VideoFeed {
 		release()
 		try {
 			receiver = { name, native: new addon.TextureReceiver(name) }
-			failure = null
+			fail(null)
+			failureLogged = null
 			// This sender's own count; the last one's is not its frame rate.
 			counted = { second: 0, frames: 0, fps: 0 }
 			const now = performance.now()
 			health = { since: now, lastTick: now, busy: 0, quiet: 0, receive: 0, lastNew: now }
+			attempt = { sender: name, notConnected: 0, otherError: null, imported: 0, delivered: 0, stuckSend: false, since: now, explained: false }
 			console.log(`[video] receiving "${name}"`)
 		} catch (e) {
-			failure = `could not open "${name}": ${(e as Error).message}`
+			// Tried again at the next listing, every 2 s; said once.
+			fail(`could not open "${name}": ${(e as Error).message}`)
 			return
 		}
 		poll = setInterval(tick, POLL_MS)
+	}
+
+	/** No frame from the shown sender in NO_PICTURE_AFTER_MS: say why, once
+	 *  per sender tried, and keep saying it in the view until one comes. */
+	const checkNoPicture = (now: number) => {
+		if (attempt === null || attempt.delivered > 0) return
+		if (inFlight && now - lastSentAt > STUCK_SEND_MS) attempt.stuckSend = true
+		if (now - attempt.since < NO_PICTURE_AFTER_MS) return
+		const why = explainNoPicture(attempt, { listed: senders.includes(attempt.sender), gpus: graphics.gpus })
+		if (why === null) return
+		if (!attempt.explained) {
+			attempt.explained = true
+			let connected = 'unknown'
+			try {
+				connected = String(receiver?.native.isConnected() ?? false)
+			} catch {
+				// Said as unknown.
+			}
+			console.log(
+				`[video] no picture from "${attempt.sender}" in ${Math.round((now - attempt.since) / 1000)} s` +
+					` (addon connected: ${connected}; "not connected" ${attempt.notConnected} times; frames taken ${attempt.imported}, reached the page ${attempt.delivered}` +
+					`${attempt.stuckSend ? '; a frame sent to the page was never taken' : ''}${attempt.otherError === null ? '' : `; last error: ${attempt.otherError}`})`,
+			)
+		}
+		fail(why)
 	}
 
 	const tick = () => {
@@ -192,6 +315,7 @@ export function startVideoFeed(): VideoFeed {
 		health.busy = Math.max(health.busy, started - health.lastTick - POLL_MS)
 		health.lastTick = started
 		reportHealth(started)
+		checkNoPicture(started)
 		// Not asking the sender is not the sender being quiet.
 		if (typeof addon === 'string' || receiver === null || inFlight || started - lastSentAt < MIN_FRAME_MS) {
 			health.lastNew = started
@@ -199,28 +323,44 @@ export function startVideoFeed(): VideoFeed {
 		}
 		let frame: ReturnType<Receiver['receiveSharedTexture']>
 		try {
-			// ✅ 2026-10-03: without this check the addon hands back the same frame
-			// on every call (554 in 3 s from a 30 fps sender).
-			if (!receiver.native.hasNewFrame()) return
-			// Measured when the next frame comes, so a sender that has gone for
-			// good is the view's to say (stalled), not a line every 5 s.
-			health.quiet = Math.max(health.quiet, started - health.lastNew)
-			health.lastNew = started
+			// On Windows, no `hasNewFrame()` first (it was, until 2026-10-08). It
+			// reads a flag that only a receive updates (Spout's
+			// spoutFrameCount::IsFrameNew), so where Spout's frame counting is on
+			// (SpoutSettings › Frame count, a registry key) one poll that found no
+			// new frame left it false, and nothing ever asked again: the picture
+			// froze for good (⚠️ read from the source, not seen). Where counting is
+			// off it was always true (✅ 2026-10-03: 162 yeses a second from a 30
+			// fps sender), so it never saved anything. A receive with nothing new
+			// returns null itself; the frame cap above keeps the rate. Syphon's
+			// check is its own client's state and stays, so a Mac is unchanged.
+			if (process.platform !== 'win32' && !receiver.native.hasNewFrame()) return
 			frame = receiver.native.receiveSharedTexture()
 			health.receive = Math.max(health.receive, performance.now() - started)
 		} catch (e) {
 			// ✅ 2026-10-03: it throws, rather than returning null, while the
 			// sender is gone. The list notices the sender leaving. It also refuses
 			// a 16-bit picture here, which is said in plain words.
-			failure = plainVideoFailure((e as Error).message)
+			// "Not connected" while the sender is still listed is the texture not
+			// opening on this card: said after NO_PICTURE_AFTER_MS, with why,
+			// since a sender starting up says it too for a moment.
+			const message = (e as Error).message
+			if (attempt !== null) {
+				if (/not connected/i.test(message)) attempt.notConnected++
+				else attempt.otherError = message
+			}
+			if (!/not connected/i.test(message)) fail(plainVideoFailure(message))
 			return
 		}
 		if (frame === null) return
+		// Measured when the next frame comes, so a sender that has gone for
+		// good is the view's to say (stalled), not a line every 5 s.
+		health.quiet = Math.max(health.quiet, started - health.lastNew)
+		health.lastNew = started
 		const { handle, width, height, pixelFormat } = frame
 		const sender = receiver.name
 		const pages = [...watchers].filter((p) => !p.isDestroyed())
 		if (!isPixelFormat(pixelFormat) || pages.length === 0) {
-			if (!isPixelFormat(pixelFormat)) failure = `the sender's pixel format "${pixelFormat}" is not one Electron takes`
+			if (!isPixelFormat(pixelFormat)) fail(`the sender's pixel format "${pixelFormat}" is not one Electron takes`)
 			addon.closeNativeHandle(handle)
 			return
 		}
@@ -235,22 +375,28 @@ export function startVideoFeed(): VideoFeed {
 			})
 		} catch (e) {
 			addon.closeNativeHandle(handle)
-			failure = `importing a frame failed: ${(e as Error).message}`
+			fail(`importing a frame failed: ${(e as Error).message}`)
 			return
 		}
+		if (attempt !== null) attempt.imported++
 		inFlight = true
 		lastSentAt = performance.now()
+		const gen = generation
+		const tried = attempt
 		// async, so a send that throws rather than rejects is still settled:
 		// otherwise inFlight would stay set and the picture freeze for good.
 		void Promise.allSettled(pages.map(async (p) => sharedTexture.sendSharedTexture({ frame: p.mainFrame, importedSharedTexture: imported })))
 			.then((results) => {
+				// Sent before a restart: its texture is let go below, nothing else.
+				if (gen !== generation) return
 				const sent = results.some((r) => r.status === 'fulfilled')
 				if (!sent) {
 					const why = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')?.reason
-					failure = `sending a frame to the page failed: ${why instanceof Error ? why.message : String(why)}`
+					fail(`sending a frame to the page failed: ${why instanceof Error ? why.message : String(why)}`)
 					return
 				}
-				failure = null
+				fail(null)
+				if (tried !== null) tried.delivered++
 				const now = Date.now()
 				lastFrame = { at: now, width, height, sender }
 				const second = Math.floor(now / 1000)
@@ -258,6 +404,7 @@ export function startVideoFeed(): VideoFeed {
 			})
 			.finally(() => {
 				imported.release()
+				if (gen !== generation) return
 				inFlight = false
 				// A frame slow to reach the page is the picture "taking a second to
 				// update" (the owner, 2026-10-05): said in the log, to find which.
@@ -279,6 +426,7 @@ export function startVideoFeed(): VideoFeed {
 			lastFrame,
 			fps: Math.floor(Date.now() / 1000) - counted.second > 1 ? 0 : counted.fps,
 			failure,
+			watched: watchers.size > 0,
 		}),
 		watch(page, on) {
 			if (on) {
@@ -300,8 +448,30 @@ export function startVideoFeed(): VideoFeed {
 			chosen = name
 			connect()
 		},
+		restart() {
+			console.log(`[video] restart: letting ${receiver === null ? 'nothing' : `"${receiver.name}"`} go and starting again (${watchers.size} watching)`)
+			generation++
+			release()
+			// A frame still with the page settles on its own; a new one may go now.
+			inFlight = false
+			lastSentAt = 0
+			lastFrame = null
+			counted = { second: 0, frames: 0, fps: 0 }
+			fail(null)
+			failureLogged = null
+			// Node keeps a binary that loaded; one that failed is tried again.
+			if (typeof addon === 'string') {
+				addon = loadAddon()
+				if (typeof addon === 'string') fail(`the video addon did not load: ${addon}`)
+			}
+			senders = []
+			lookAtGraphics()
+			list()
+		},
 		stop() {
 			clearInterval(lister)
+			clearTimeout(firstLook)
+			generation++
 			release()
 		},
 	}

@@ -24,7 +24,7 @@ import { EMBEDS_MAX, embedIdOf, embedNameError, embedUrlOf, newEmbedId, type Emb
 import { NDI_SOURCES_MAX, ndiIdOf, ndiMachine, ndiNameError, ndiShortName, type NdiSource, type NdiState } from '../../shared/ndi.js'
 import type { DeskState } from '../../shared/desk.js'
 import { replyPortOf, type SettingsField, type SettingsPatch, type SettingsView } from '../../shared/settings.js'
-import { Cast, FolderOpen, Monitor, Plus, Save, Trash2, Webcam } from 'lucide-react'
+import { Cast, FolderOpen, Monitor, Plus, RotateCw, Save, Trash2, Webcam } from 'lucide-react'
 import { CAPTURE_INPUTS_MAX, captureIdOf, captureNameError, captureShortName, type CaptureInput } from '../../shared/capture.js'
 import { useCameras } from '../capture.js'
 
@@ -240,6 +240,7 @@ export function ConnectionsPanel({
 										multiview. Separate from Arena: it works with Arena’s web server off.
 									</p>
 								)}
+								{row.id === 'video' && <VideoInfo />}
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
 								{captureOf(row.id) !== null ? (
 									operator ? (
@@ -1149,6 +1150,27 @@ function ConsoleInfo({ paneSummary, desk, now }: { paneSummary: string; desk: De
 				</span>
 			)}
 		</div>
+	)
+}
+
+/** The video feed's Restart, for anyone, and what to do on a computer with
+ *  two graphics cards (src/main/video-feed.ts has why). */
+function VideoInfo() {
+	return (
+		<>
+			{window.life !== undefined && (
+				<div>
+					<Button size="sm" icon={RotateCw} onClick={() => window.life?.restartVideo()}>
+						Restart video
+					</Button>
+				</div>
+			)}
+			<p className="max-w-prose text-sm text-booth-dim">
+				A sender listed but no picture, on a computer with two graphics cards: the sender (Arena) and Pāua must draw on the
+				same one. In Windows Settings › System › Display › Graphics, set both Pāua and Arena to High performance, then
+				restart both. The log’s <span className="font-mono">[video] graphics</span> line says which cards Pāua sees.
+			</p>
+		</>
 	)
 }
 

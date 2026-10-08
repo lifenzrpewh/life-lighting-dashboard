@@ -640,6 +640,14 @@ app.whenReady().then(() => {
 	ipcMain.on('video:choose', (e, name: unknown) => {
 		if (fromOurs(e) && typeof name === 'string') videoFeed?.choose(name)
 	})
+	// Restart video: anyone, any mode, from the view or its Connections row. It
+	// fires nothing anywhere else; it only lets the receivers go and opens them
+	// again, which is what an app restart did for the feed.
+	ipcMain.on('video:restart', (e) => {
+		if (!fromOurs(e)) return
+		if (videoFeed === null) console.log('[video] restart asked while the video feed is turned off')
+		else videoFeed.restart()
+	})
 	// The page's half of where a stall comes from (src/main/video-feed.ts): only
 	// numbers are taken, so a page cannot write words of its own into the log.
 	ipcMain.on('video:page-health', (e, h: unknown) => {

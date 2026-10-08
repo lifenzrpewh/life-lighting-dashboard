@@ -11,10 +11,11 @@
 // words saying for how long, because a frozen multiview looks like a quiet one.
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, MonitorPlay } from 'lucide-react'
+import { ChevronDown, MonitorPlay, RotateCw } from 'lucide-react'
 
 import { currentFrame, videoFit, videoPicture, type VideoFeedState } from '../../shared/video-feed.js'
 import { Centered, Say } from './MaPane.js'
+import { Button, IconButton } from './ui.js'
 import { barButton } from './vocabulary.js'
 
 export function VideoView({
@@ -106,7 +107,11 @@ export function VideoView({
 					body: 'Turn on a Spout output in Arena (Output › Advanced Output, a screen sent to Spout), and it appears here.',
 				}
 			case 'waiting':
-				return { head: `Waiting for “${picture.sender}”`, body: picture.failure ?? 'No picture yet.' }
+				// After NO_PICTURE_AFTER_MS without a frame, main gives the reason
+				// as the failure: then it is no picture, not waiting.
+				return picture.failure === null
+					? { head: `Waiting for “${picture.sender}”`, body: 'No picture yet.' }
+					: { head: `No picture from “${picture.sender}”`, body: picture.failure }
 			case 'stalled':
 				return {
 					head: `No new picture for ${Math.round(picture.sinceMs / 1000)} s`,
@@ -127,7 +132,16 @@ export function VideoView({
 			/>
 			{said !== null && (
 				<div className="absolute inset-0 flex items-center justify-center">
-					<Say icon={MonitorPlay} head={said.head} body={said.body} />
+					<Say icon={MonitorPlay} head={said.head} body={said.body}>
+						{/* Anyone may: it only opens the feed again (src/main/video-feed.ts). */}
+						{window.life !== undefined && (
+							<div className="mt-6 flex justify-center">
+								<Button size="sm" icon={RotateCw} onClick={() => window.life?.restartVideo()}>
+									Restart video
+								</Button>
+							</div>
+						)}
+					</Say>
 				</div>
 			)}
 		</div>
@@ -162,6 +176,9 @@ export function VideoStrip({
 	const short = (name: string) => name.replace(/^Arena - /, '')
 	return (
 		<>
+			{window.life !== undefined && (
+				<IconButton icon={RotateCw} size="sm" label="Restart video: let the feed go and open it again" onClick={() => window.life?.restartVideo()} />
+			)}
 			{fit !== null && picture !== null && (
 				<span
 					className="hidden min-w-0 truncate text-xs text-booth-dim tabular-nums lg:inline"

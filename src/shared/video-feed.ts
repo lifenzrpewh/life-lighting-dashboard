@@ -18,6 +18,9 @@ export type VideoFeedState = {
 	fps: number
 	/** The newest thing that went wrong, until a frame gets through again. */
 	failure: string | null
+	/** Whether a page is showing the feed. Nobody watching, nothing is
+	 *  received, so no picture is not a fault. */
+	watched: boolean
 }
 
 /** A picture this long without a new frame is said to have stopped. Long
@@ -62,6 +65,75 @@ export function plainVideoFailure(message: string): string {
 		return 'The sender is sending 16-bit colour, which this view cannot show yet. In Arena that is High Detail (Composition settings); with it off, the picture shows here.'
 	}
 	return `The sender's picture is in a format this view cannot show yet (DXGI format ${format}).`
+}
+
+/** A sender tried this long with no frame reaching the page is said to have
+ *  given none, with the likeliest reason, rather than left "waiting". Long
+ *  enough for a sender starting up, short enough that nobody waits on it. */
+export const NO_PICTURE_AFTER_MS = 10_000
+
+/** What happened since the shown sender was first tried, counted by main
+ *  (src/main/video-feed.ts). */
+export type VideoAttempt = {
+	sender: string
+	/** The addon said its receiver is not connected: it could not open the
+	 *  sender's picture (or the sender is gone; `listed` tells which). */
+	notConnected: number
+	/** The newest other error from a receive, in the addon's words. */
+	otherError: string | null
+	/** Frames taken from the sender and handed to Electron. */
+	imported: number
+	/** Frames the page took. */
+	delivered: number
+	/** A frame handed to the page that it has not taken for seconds. */
+	stuckSend: boolean
+}
+
+/** Graphics cards as Chromium reports them (`app.getGPUInfo('basic')`). */
+export type Gpus = { count: number; words: string; software: boolean }
+
+const VENDORS: Record<number, string> = { 0x10de: 'NVIDIA', 0x8086: 'Intel', 0x1002: 'AMD', 0x1022: 'AMD', 0x1414: 'Microsoft (no graphics card)', 0x106b: 'Apple' }
+
+/** The cards Chromium sees, in a line for the log, and how many. Anything not
+ *  in the expected shape is said to be unknown, never guessed. */
+export function describeGpus(info: unknown): Gpus | null {
+	const devices = (info as { gpuDevice?: unknown } | null)?.gpuDevice
+	if (!Array.isArray(devices) || devices.length === 0) return null
+	let software = false
+	const each = devices.map((d: Record<string, unknown>) => {
+		const vendor = typeof d.vendorId === 'number' ? d.vendorId : null
+		const device = typeof d.deviceId === 'number' ? d.deviceId : null
+		const named = typeof d.deviceString === 'string' && d.deviceString !== '' ? d.deviceString : null
+		const maker = vendor === null ? 'unknown' : (VENDORS[vendor] ?? `vendor 0x${vendor.toString(16)}`)
+		const active = d.active === true
+		if (active && vendor === 0x1414) software = true
+		const hex = device === null ? '' : ` 0x${device.toString(16)}`
+		const driver = typeof d.driverVersion === 'string' && d.driverVersion !== '' ? `, driver ${d.driverVersion}` : ''
+		return `${named ?? `${maker}${hex}`}${driver}${active ? ' (Pāua draws with this one)' : ''}`
+	})
+	return { count: devices.length, words: each.join('; '), software }
+}
+
+/** Why a sender is listed but no picture has come, in words someone at the
+ *  booth can act on. Null while there is no reason to give (a frame came). */
+export function explainNoPicture(a: VideoAttempt, o: { listed: boolean; gpus: Gpus | null }): string | null {
+	if (a.delivered > 0) return null
+	const name = `“${a.sender}”`
+	if (a.stuckSend || a.imported > 0) {
+		return `Pictures from ${name} are taken but none reaches the screen. Pāua may be drawing on a different graphics card from the one the picture is on${
+			o.gpus !== null && o.gpus.count > 1 ? ` (this computer has ${o.gpus.count})` : ''
+		}. Try Restart video; if it stays, see the advice for two graphics cards in Connections › Video feed.`
+	}
+	if (a.notConnected > 0 && o.listed) {
+		if (o.gpus?.software === true) {
+			return `${name} is listed, but Pāua is drawing without a graphics card (Windows' basic display driver), so it cannot open the picture. Check the graphics driver, then restart Pāua.`
+		}
+		const cards = o.gpus !== null && o.gpus.count > 1 ? `This computer has ${o.gpus.count} graphics cards, ` : 'If this computer has two graphics cards, '
+		return `${name} is listed, but its picture cannot be opened here. ${cards}and the sender is probably drawing on the other one. In Windows Settings › System › Display › Graphics, set both Pāua and Arena to High performance, then restart both.`
+	}
+	if (a.otherError !== null) return plainVideoFailure(a.otherError)
+	if (!o.listed) return `${name} has gone from this computer's senders.`
+	return `${name} is listed and open, but has sent no picture in ${Math.round(NO_PICTURE_AFTER_MS / 1000)} s. Is its output running (in Arena, the screen sent to Spout)?`
 }
 
 export type Size = { width: number; height: number }

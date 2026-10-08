@@ -522,7 +522,7 @@ export function App() {
 		),
 		polledStatus('arena', 'Arena', arena ?? null, now, ARENA_STALE_AFTER_MS, (p) => `${p.name} ${arenaVersion(p)}`),
 		cueStatus(cue?.pane ?? null),
-		videoStatus(videoFeed ?? null),
+		videoStatus(videoFeed ?? null, now),
 	]
 		.map((row) => (off.includes(row.id as ConnectionId) ? turnedOff(row.id, row.name) : row))
 		.concat(embeds.map((e) => embedStatus(e, embedReport(e.id)?.pane ?? null)))

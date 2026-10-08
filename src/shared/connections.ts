@@ -20,7 +20,7 @@ import type { Channel, LinkState } from './reading.js'
 import { readingOf } from './reading.js'
 import { NDI_STALLED_AFTER_MS, ndiIdOf, ndiView, type NdiSource, type NdiState, type NdiView } from './ndi.js'
 import { CAPTURE_STALLED_AFTER_MS, captureIdOf, captureView, type CaptureInput, type CaptureState, type CaptureView } from './capture.js'
-import { currentFrame, type VideoFeedState } from './video-feed.js'
+import { currentFrame, videoPicture, type VideoFeedState } from './video-feed.js'
 
 /** LIVE, STALE, down, or not set up. Down covers UNKNOWN and UNREACHABLE: in a
  *  list of connections, both mean "not answering now". */
@@ -205,14 +205,22 @@ export function cueStatus(pane: CuePaneState | null): ConnectionStatus {
 }
 
 /** The video feed: a sender on this computer, and frames from it while a
- *  page watches. On with no sender is down: someone turned it on to see one. */
-export function videoStatus(feed: VideoFeedState | null): ConnectionStatus {
+ *  page watches. On with no sender is down: someone turned it on to see one.
+ *  Watched with no picture is not LIVE (it was, until 2026-10-08: a booth's
+ *  sender listed but never opened read LIVE here while the view waited). */
+export function videoStatus(feed: VideoFeedState | null, now: number): ConnectionStatus {
 	const base = { id: 'video' as const, name: 'Video feed' }
 	if (feed === null) return { ...base, tone: 'off', status: 'kiosk only', detail: null }
 	if (feed.showing === null) return { ...base, tone: 'down', status: 'no sender', detail: feed.failure }
+	if (!feed.watched) return { ...base, tone: 'live', status: 'found', detail: feed.showing }
+	const picture = videoPicture(feed, now)
 	const frame = currentFrame(feed)
-	const size = frame === null ? '' : `, ${frame.width}×${frame.height}`
-	return { ...base, tone: 'live', status: 'LIVE', detail: `${feed.showing}${size}` }
+	if (picture.state === 'showing' && frame !== null) {
+		return { ...base, tone: 'live', status: 'LIVE', detail: `${feed.showing}, ${frame.width}×${frame.height}` }
+	}
+	if (picture.state === 'stalled') return { ...base, tone: 'stale', status: 'stalled', detail: feed.failure ?? feed.showing }
+	if (feed.failure !== null) return { ...base, tone: 'down', status: 'no picture', detail: feed.failure }
+	return { ...base, tone: 'stale', status: 'waiting', detail: feed.showing }
 }
 
 function ageWords(ms: number): string {

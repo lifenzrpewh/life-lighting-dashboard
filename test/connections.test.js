@@ -77,9 +77,26 @@ test('every view belongs to a connection, and the video feed is its own, not Are
 })
 
 test('the video feed: no sender is down; a sender is live, named with its size', () => {
-	const feed = { senders: [], showing: null, lastFrame: null, fps: 0, failure: null }
-	assert.equal(videoStatus(null).tone, 'off')
-	assert.equal(videoStatus(feed).tone, 'down')
+	const feed = { senders: [], showing: null, lastFrame: null, fps: 0, failure: null, watched: true }
+	assert.equal(videoStatus(null, T0).tone, 'off')
+	assert.equal(videoStatus(feed, T0).tone, 'down')
 	const showing = { ...feed, senders: ['Arena'], showing: 'Arena', lastFrame: { at: T0, width: 1920, height: 1080, sender: 'Arena' } }
-	assert.deepEqual(videoStatus(showing), { id: 'video', name: 'Video feed', tone: 'live', status: 'LIVE', detail: 'Arena, 1920×1080' })
+	assert.deepEqual(videoStatus(showing, T0 + 100), { id: 'video', name: 'Video feed', tone: 'live', status: 'LIVE', detail: 'Arena, 1920×1080' })
+})
+
+test('the video feed: a sender listed but no picture is never LIVE', () => {
+	// 2026-10-08: a booth listed Arena, the view waited, and this row said LIVE.
+	const listed = { senders: ['Arena'], showing: 'Arena', lastFrame: null, fps: 0, failure: null, watched: true }
+	assert.deepEqual(videoStatus(listed, T0), { id: 'video', name: 'Video feed', tone: 'stale', status: 'waiting', detail: 'Arena' })
+	assert.deepEqual(videoStatus({ ...listed, failure: 'cannot be opened here' }, T0), {
+		id: 'video',
+		name: 'Video feed',
+		tone: 'down',
+		status: 'no picture',
+		detail: 'cannot be opened here',
+	})
+	const old = { ...listed, lastFrame: { at: T0, width: 1920, height: 1080, sender: 'Arena' } }
+	assert.equal(videoStatus(old, T0 + 60_000).status, 'stalled')
+	// Nobody watching receives nothing: found, not a fault.
+	assert.deepEqual(videoStatus({ ...listed, watched: false }, T0), { id: 'video', name: 'Video feed', tone: 'live', status: 'found', detail: 'Arena' })
 })
