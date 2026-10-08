@@ -208,14 +208,14 @@ export function AddNdi({ all, save }: { all: readonly NdiSource[]; save: Save })
 	})()
 	return (
 		<section className="flex flex-col gap-5">
-			<DetailHead title="Add an NDI source" />
+			<h3 className="text-lg font-medium">Add an NDI source</h3>
 			<p className="max-w-prose text-sm text-booth-dim">
-				A camera, ProPresenter’s output, Arena’s or another computer’s screen: any NDI source on this network becomes a view
-				of its own.
+				A camera, ProPresenter’s output, Arena’s or another computer’s screen: any NDI source on this network, for
+				the Video view.
 			</p>
 			{full && <p className="text-sm text-booth-dim">That is {NDI_SOURCES_MAX}, the most there can be. Remove one to add another.</p>}
 			{body}
-			{added !== null && <span className="text-sm text-state-live">Added {added}. A window's pencil, then its +, puts it on screen.</span>}
+			{added !== null && <span className="text-sm text-state-live">Added {added}. Any Video tab’s feed button offers it (a window’s pencil, then +, adds a Video tab).</span>}
 			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
 			<NdiNotice />
 		</section>
@@ -288,9 +288,9 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 	}
 	return (
 		<section className="flex flex-col gap-5">
-			<DetailHead title="Add a capture input" />
+			<h3 className="text-lg font-medium">Add a capture input</h3>
 			<p className="max-w-prose text-sm text-booth-dim">
-				Anything this computer sees as a camera becomes a view of its own: a Blackmagic card’s input (with Desktop Video
+				Anything this computer sees as a camera, for the Video view: a Blackmagic card’s input (with Desktop Video
 				installed), an ATEM Mini’s USB output, OBS’s Virtual Camera (Start Virtual Camera in OBS), or a webcam.
 			</p>
 			{full && <p className="text-sm text-booth-dim">That is {CAPTURE_INPUTS_MAX}, the most there can be. Remove one to add another.</p>}
@@ -318,7 +318,7 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 					))}
 				</ul>
 			)}
-			{added !== null && <span className="text-sm text-state-live">Added {added}. A window's pencil, then its +, puts it on screen.</span>}
+			{added !== null && <span className="text-sm text-state-live">Added {added}. Any Video tab’s feed button offers it (a window’s pencil, then +, adds a Video tab).</span>}
 			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
 		</section>
 	)

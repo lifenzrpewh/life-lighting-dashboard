@@ -30,15 +30,56 @@
 // answering keeps its tab, which says so in its own place.
 
 import { embedIdOf, type Embed, type EmbedView } from './embeds.js'
-import { ndiIdOf, type NdiSource, type NdiView } from './ndi.js'
-import { captureIdOf, type CaptureInput, type CaptureView } from './capture.js'
+import { isNdiId, ndiIdOf, ndiView, type NdiSource, type NdiView } from './ndi.js'
+import { captureIdOf, captureView, isCaptureId, type CaptureInput, type CaptureView } from './capture.js'
 
 /** The views that come with Pāua. */
 export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video' | 'timer'
 
 /** A built-in view, or an embed, NDI source or capture input someone added in
- *  Connections (./embeds.ts, ./ndi.ts, ./capture.ts). */
+ *  Settings (./embeds.ts, ./ndi.ts, ./capture.ts). Since 2026-10-08 a tab
+ *  never holds an NDI source's or capture input's view: it is a Video tab
+ *  with that feed (`VideoChoice`). Those views stay as what a Video tab
+ *  shows (`tabView`), which is how pop-outs, the engines and the Connections
+ *  rows know them. */
 export type ViewId = BuiltInView | EmbedView | NdiView | CaptureView
+
+/** What a Video tab shows (the owner's choice, 2026-10-08, item 8: one Video
+ *  view for every feed): this computer's Spout (Windows) or Syphon (macOS)
+ *  sender by name, null for the first there is (the old single Video view's
+ *  way); an NDI source added in Settings; or a capture input added there.
+ *  Spout and Syphon are one engine (../main/video-feed.ts); the kind only
+ *  names the group the pick came from. */
+export type VideoChoice = { kind: 'spout' | 'syphon'; name: string | null } | { kind: 'ndi'; id: string } | { kind: 'capture'; id: string }
+
+/** A Video tab's choice off storage, or null when it is not one. */
+export function videoChoiceFrom(v: unknown): VideoChoice | null {
+	if (typeof v !== 'object' || v === null) return null
+	const r = v as Record<string, unknown>
+	if (r['kind'] === 'spout' || r['kind'] === 'syphon') {
+		const name = r['name']
+		if (name === null) return { kind: r['kind'], name: null }
+		return typeof name === 'string' && name.trim() !== '' && name.length <= 256 ? { kind: r['kind'], name } : null
+	}
+	const id = r['id']
+	if (r['kind'] === 'ndi' && typeof id === 'string' && isNdiId(id)) return { kind: 'ndi', id }
+	if (r['kind'] === 'capture' && typeof id === 'string' && isCaptureId(id)) return { kind: 'capture', id }
+	return null
+}
+
+/** The view a tab shows: a Video tab's NDI source's or capture input's own
+ *  view, otherwise the tab's. A Spout or Syphon feed is the 'video' view. */
+export function tabView(tab: Tab): ViewId {
+	if (tab.view !== 'video' || tab.feed == null) return tab.view
+	if (tab.feed.kind === 'ndi') return ndiView(tab.feed.id)
+	if (tab.feed.kind === 'capture') return captureView(tab.feed.id)
+	return 'video'
+}
+
+/** Whether two choices are the same feed. */
+export function sameChoice(a: VideoChoice | null | undefined, b: VideoChoice | null | undefined): boolean {
+	return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
 export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video', 'timer']
@@ -100,7 +141,14 @@ export type Box = { x: number; y: number; w: number; h: number }
 /** A tab: the view it shows, and the name someone gave it in this layout
  *  (the owner, 2026-10-08: "Stage cam" rather than "Video"). No label is the
  *  view's own name; another layout's tab of the same view keeps its own. */
-export type Tab = { id: string; view: ViewId; label?: string }
+export type Tab = {
+	id: string
+	view: ViewId
+	label?: string
+	/** A Video tab's feed (2026-10-08); null until one is picked. Only on
+	 *  Video tabs. */
+	feed?: VideoChoice | null
+}
 
 /** The longest a tab's own name may be: a strip of tabs has little room. */
 export const TAB_LABEL_MAX = 24
@@ -113,9 +161,10 @@ export function tabLabelError(label: string): string | null {
 	return null
 }
 
-/** What a tab is called: its own name in this layout, or its view's. */
-export function tabTitle(tab: Tab, labelOf: (view: ViewId) => string): string {
-	return tab.label ?? labelOf(tab.view)
+/** What a tab is called: its own name in this layout, or `nameOf`'s, the
+ *  name it has without one (its view's, or a Video tab's feed's). */
+export function tabTitle(tab: Tab, nameOf: (tab: Tab) => string): string {
+	return tab.label ?? nameOf(tab)
 }
 
 export type GridWindow = Box & {
@@ -301,7 +350,7 @@ const replace = (layout: Layout, id: string, f: (w: GridWindow) => GridWindow): 
 export function addWindow(layout: Layout, view: ViewId | null, ids: { window: string; tab: string }): Layout {
 	const box = freeBox(layout)
 	if (box === null) return layout
-	const tabs = view === null ? [] : [{ id: ids.tab, view }]
+	const tabs: Tab[] = view === null ? [] : [view === 'video' ? { id: ids.tab, view, feed: null } : { id: ids.tab, view }]
 	return { ...layout, windows: [...layout.windows, { ...box, id: ids.window, tabs, active: tabs[0]?.id ?? null }] }
 }
 
@@ -318,10 +367,20 @@ export function placeWindow(layout: Layout, id: string, box: Box): Layout {
 	return replace(layout, id, (w) => ({ ...w, x: box.x, y: box.y, w: box.w, h: box.h }))
 }
 
-/** A new tab for `view` in a window, shown at once. */
+/** A new tab for `view` in a window, shown at once. A Video tab starts with
+ *  no feed: it asks which. */
 export function addTab(layout: Layout, windowId: string, view: ViewId, tabId: string): Layout {
 	if (!layout.windows.some((w) => w.id === windowId)) return layout
-	return replace(layout, windowId, (w) => ({ ...w, tabs: [...w.tabs, { id: tabId, view }], active: tabId }))
+	const tab: Tab = view === 'video' ? { id: tabId, view, feed: null } : { id: tabId, view }
+	return replace(layout, windowId, (w) => ({ ...w, tabs: [...w.tabs, tab], active: tabId }))
+}
+
+/** What a Video tab shows: a feed picked from its list. Anyone may: it is
+ *  the layout, as the old Video view's sender pick was everyone's. */
+export function setTabFeed(layout: Layout, windowId: string, tabId: string, feed: VideoChoice): Layout {
+	const tab = layout.windows.find((w) => w.id === windowId)?.tabs.find((t) => t.id === tabId)
+	if (tab === undefined || tab.view !== 'video' || sameChoice(tab.feed, feed)) return layout
+	return replace(layout, windowId, (w) => ({ ...w, tabs: w.tabs.map((t) => (t.id === tabId ? { ...t, feed } : t)) }))
 }
 
 /** Take a tab away. The window shows its neighbour, or nothing. */
@@ -391,23 +450,26 @@ export function makeHome(layout: Layout, view: ViewId, tabId: string): Layout {
  *  tab while that is visible, otherwise its first visible one. A tab hidden
  *  because its connection is off is passed over, not forgotten: on again, the
  *  window shows it again. */
-export function shownTab(win: GridWindow, visible: (view: ViewId) => boolean): Tab | null {
-	const tabs = win.tabs.filter((t) => visible(t.view))
+export function shownTab(win: GridWindow, visible: (tab: Tab) => boolean): Tab | null {
+	const tabs = win.tabs.filter(visible)
 	return tabs.find((t) => t.id === win.active) ?? tabs[0] ?? null
 }
 
 /** The tab `view`'s page is drawn in: the one someone moved it to, while that
  *  tab is showing, otherwise the first window's (in the layout's order) that
  *  shows it. Null when no window shows it. */
-export function homeOf(layout: Layout, view: ViewId, visible: (view: ViewId) => boolean): string | null {
+export function homeOf(layout: Layout, view: ViewId, visible: (tab: Tab) => boolean): string | null {
 	const showing = layout.windows.map((w) => shownTab(w, visible)).filter((t): t is Tab => t !== null && t.view === view)
 	const chosen = layout.homes[view]
 	return (showing.find((t) => t.id === chosen) ?? showing[0])?.id ?? null
 }
 
-/** Every view some window is showing now. */
-export function viewsShown(layout: Layout, visible: (view: ViewId) => boolean): ViewId[] {
-	return layout.windows.map((w) => shownTab(w, visible)?.view).filter((v): v is ViewId => v !== undefined)
+/** Every view some window is showing now (a Video tab's as `tabView`). */
+export function viewsShown(layout: Layout, visible: (tab: Tab) => boolean): ViewId[] {
+	return layout.windows
+		.map((w) => shownTab(w, visible))
+		.filter((t): t is Tab => t !== null)
+		.map(tabView)
 }
 
 // ─── Off storage ───────────────────────────────────────────────────────────
@@ -432,7 +494,19 @@ function windowFrom(v: unknown, scale: number): GridWindow | null {
 		// layout, since the view's own name stands in for it.
 		const label = tr['label']
 		const named = typeof label === 'string' && label.trim() !== '' && tabLabelError(label) === null
-		goodTabs.push(named ? { id: tr['id'], view: tr['view'], label: label.trim() } : { id: tr['id'], view: tr['view'] })
+		const tab: Tab = { id: tr['id'], view: tr['view'], ...(named ? { label: label.trim() } : {}) }
+		// One Video view for every feed (2026-10-08): an NDI source's or capture
+		// input's tab is a Video tab with that feed, keeping its id, so a layout
+		// saved before keeps its windows and tabs. A Video tab from before had
+		// no feed of its own: the first sender, as it showed then (its pick was
+		// held only while the app ran, never stored). A stored feed that will
+		// not do asks again rather than losing the layout.
+		const ndi = ndiIdOf(tab.view)
+		const capture = captureIdOf(tab.view)
+		if (ndi !== null) goodTabs.push({ ...tab, view: 'video', feed: { kind: 'ndi', id: ndi } })
+		else if (capture !== null) goodTabs.push({ ...tab, view: 'video', feed: { kind: 'capture', id: capture } })
+		else if (tab.view === 'video') goodTabs.push({ ...tab, feed: 'feed' in tr ? videoChoiceFrom(tr['feed']) : { kind: 'spout', name: null } })
+		else goodTabs.push(tab)
 	}
 	const activeId = typeof active === 'string' && goodTabs.some((t) => t.id === active) ? active : (goodTabs[0]?.id ?? null)
 	return { id, x: box.x, y: box.y, w: box.w, h: box.h, tabs: goodTabs, active: activeId }
@@ -546,7 +620,7 @@ export function sameArrangement(a: Layout, b: Layout): boolean {
 	const key = (l: Layout) =>
 		JSON.stringify(
 			l.windows
-				.map((w) => [w.x, w.y, w.w, w.h, w.tabs.map((t) => [t.view, t.label ?? null])])
+				.map((w) => [w.x, w.y, w.w, w.h, w.tabs.map((t) => [t.view, t.label ?? null, t.feed ?? null])])
 				.sort((p, q) => (p[1] as number) - (q[1] as number) || (p[0] as number) - (q[0] as number)),
 		)
 	return key(a) === key(b)

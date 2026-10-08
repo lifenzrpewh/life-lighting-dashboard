@@ -32,6 +32,7 @@ import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.j
 import { currentFrame, type VideoFeedState } from '../shared/video-feed.js'
 import type { TimerSources } from '../shared/timer.js'
 import { TimerView } from './components/TimerView.js'
+import { shortSender } from './components/FeedPicker.js'
 import { CueMessage } from './components/CuePane.js'
 import { Centered, MaMessage } from './components/MaPane.js'
 import { Button, IconButton, viewIcon } from './components/ui.js'
@@ -86,6 +87,8 @@ export function PopOut({ view }: { view: ViewId }) {
 			? (capture?.name ?? 'Capture')
 			: ndiId !== null
 			? (ndi?.feeds.find((f) => f.id === ndiId)?.name ?? 'NDI')
+			: view === 'video' && video?.showing != null
+				? shortSender(video.showing)
 			: embedId === null
 				? VIEW_LABEL[view as BuiltInView]
 				: (embed?.name ?? 'Embed')

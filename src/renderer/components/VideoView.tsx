@@ -1,6 +1,7 @@
 // The video feed as a view a slot can hold (src/main/video-feed.ts): Arena's
 // multiview, or whatever the machine's Spout/Syphon sender publishes, scaled
-// to fit.
+// to fit. Since 2026-10-08 it is one of the Video view's feeds: a Video tab
+// picks this computer's sender by name (./FeedPicker.tsx, ../App.tsx).
 //
 // Each frame arrives as a VideoFrame on the GPU and is drawn straight onto the
 // canvas; nothing here copies pixels. The canvas is the frame's own size and
@@ -10,8 +11,8 @@
 // nothing is drawn over it. When they stop, the last one stays, dimmed, under
 // words saying for how long, because a frozen multiview looks like a quiet one.
 
-import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, MonitorPlay, RotateCw } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { MonitorPlay, RotateCw } from 'lucide-react'
 
 import { currentFrame, videoFit, videoPicture, type VideoFeedState } from '../../shared/video-feed.js'
 import { Centered, Say } from './MaPane.js'
@@ -152,12 +153,9 @@ export function VideoView({
  *  device pixels per CSS pixel: what Arena's screen would need to match it. */
 export type VideoSpace = { width: number; height: number; dpr: number }
 
-/** The video view's own controls, in its strip: which sender, how big the
- *  picture is against the space it has, and Fit.
- *
- *  The sender list is drawn here, not by a native <select>: the system's own
- *  dropdown would not take a pick on the booth's touchscreen (the owner,
- *  2026-10-03), and every other control here is big rows a finger can hit. */
+/** The video view's own controls, in its strip: Restart, how big the picture
+ *  is against the space it has, and Fit. Which sender it shows is the tab's
+ *  own pick since 2026-10-08 (./FeedPicker.tsx), not a list here. */
 export function VideoStrip({
 	feed,
 	space,
@@ -168,12 +166,10 @@ export function VideoStrip({
 	/** Give the space the picture's shape; absent where nothing can be resized. */
 	onFit?: (() => void) | undefined
 }) {
-	const [open, setOpen] = useState(false)
 	if (feed === undefined || feed === null) return null
 	const picture = currentFrame(feed)
 	const device = space === null ? null : { width: space.width * space.dpr, height: space.height * space.dpr }
 	const fit = picture === null || device === null ? null : videoFit(picture, device)
-	const short = (name: string) => name.replace(/^Arena - /, '')
 	return (
 		<>
 			{window.life !== undefined && (
@@ -191,40 +187,6 @@ export function VideoStrip({
 				<button type="button" onClick={onFit} className={barButton} aria-label="Fit the space to the picture's shape">
 					Fit
 				</button>
-			)}
-			{feed.senders.length > 1 && (
-				<div className="relative shrink-0">
-					<button
-						type="button"
-						onClick={() => setOpen(!open)}
-						aria-expanded={open}
-						className={`${barButton} max-w-56 gap-2`}
-					>
-						<span className="truncate">{short(feed.showing ?? 'Source')}</span>
-						<ChevronDown size={16} className="shrink-0 text-booth-dim" aria-hidden />
-					</button>
-					{open && (
-						<ul className="absolute top-12 right-0 z-20 min-w-64 animate-rise overflow-hidden rounded-xl bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
-							{feed.senders.map((name) => (
-								<li key={name}>
-									<button
-										type="button"
-										onClick={() => {
-											window.life?.chooseVideo(name)
-											setOpen(false)
-										}}
-										className={`flex h-12 w-full items-center rounded-lg px-3 text-left text-sm hover:bg-booth-hover ${
-											name === feed.showing ? 'text-booth-ink' : 'text-booth-dim'
-										}`}
-									>
-										{name === feed.showing ? '● ' : ''}
-										{name}
-									</button>
-								</li>
-							))}
-						</ul>
-					)}
-				</div>
 			)}
 		</>
 	)

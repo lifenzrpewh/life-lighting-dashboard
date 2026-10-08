@@ -23,6 +23,9 @@ import {
 	renameTab,
 	tabLabelError,
 	tabTitle,
+	tabView,
+	setTabFeed,
+	videoChoiceFrom,
 	moveTab,
 	removeWindow,
 	sameArrangement,
@@ -121,7 +124,7 @@ test('tabs: add shows it, select switches, remove shows the neighbour', () => {
 
 test('a tab turned off is passed over, and comes back when it is on', () => {
 	const l = selectTab(addTab(DEFAULT_LAYOUT, 'w2', 'arena', 't3'), 'w2', 't3')
-	const arenaOff = (v) => v !== 'arena'
+	const arenaOff = (t) => t.view !== 'arena'
 	assert.equal(shownTab(l.windows[1], arenaOff).view, 'ma')
 	assert.equal(l.windows[1].active, 't3') // still remembered
 	assert.equal(shownTab(l.windows[1], all).view, 'arena')
@@ -137,7 +140,7 @@ test('the MA is drawn in one tab: the first showing it, unless moved', () => {
 	// The chosen tab not showing: the MA goes back to the one that is.
 	l = selectTab(addTab(l, 'w3', 'arena', 't4'), 'w3', 't4')
 	assert.equal(homeOf(l, 'ma', all), 't2')
-	assert.equal(homeOf(l, 'cue', (v) => v !== 'cue'), null)
+	assert.equal(homeOf(l, 'cue', (t) => t.view !== 'cue'), null)
 })
 
 test('a stored layout holds, or is the default', () => {
@@ -306,15 +309,15 @@ test('a tab is dragged within its window or to another, keeping its id, shown wh
 
 test('a tab named in its layout: kept through storage and a move, emptied back to its view', () => {
 	// 2026-10-08, the owner: "Stage cam" rather than "Video", in that layout only.
-	const two = addTab(DEFAULT_LAYOUT, 'w2', 'video', 't3')
+	const two = addTab(DEFAULT_LAYOUT, 'w2', 'arena', 't3')
 	const named = renameTab(two, 'w2', 't3', '  Stage cam ')
 	const tab = named.windows[1].tabs[1]
-	assert.deepEqual(tab, { id: 't3', view: 'video', label: 'Stage cam' })
-	assert.equal(tabTitle(tab, () => 'Video'), 'Stage cam')
-	assert.equal(tabTitle(two.windows[1].tabs[1], () => 'Video'), 'Video')
+	assert.deepEqual(tab, { id: 't3', view: 'arena', label: 'Stage cam' })
+	assert.equal(tabTitle(tab, () => 'Arena'), 'Stage cam')
+	assert.equal(tabTitle(two.windows[1].tabs[1], () => 'Arena'), 'Arena')
 	// Only that tab, only that layout.
 	assert.deepEqual(named.windows[0], two.windows[0])
-	assert.deepEqual(two.windows[1].tabs[1], { id: 't3', view: 'video' })
+	assert.deepEqual(two.windows[1].tabs[1], { id: 't3', view: 'arena' })
 	// Saved and read back, and carried by a drag to another window.
 	assert.deepEqual(layoutFrom(JSON.stringify(named)), named)
 	assert.deepEqual(savedLayoutsFrom(JSON.stringify([{ name: 'Sunday', layout: named }]))[0].layout, named)
@@ -322,7 +325,7 @@ test('a tab named in its layout: kept through storage and a move, emptied back t
 	// A renamed tab is a different arrangement; which tab shows is not.
 	assert.equal(sameArrangement(named, two), false)
 	// Empty gives the view's name back; a name that will not do changes nothing.
-	assert.deepEqual(renameTab(named, 'w2', 't3', ' ').windows[1].tabs[1], { id: 't3', view: 'video' })
+	assert.deepEqual(renameTab(named, 'w2', 't3', ' ').windows[1].tabs[1], { id: 't3', view: 'arena' })
 	assert.equal(renameTab(named, 'w2', 't3', 'x'.repeat(25)), named)
 	assert.equal(tabLabelError('x'.repeat(25)), 'At most 24 characters.')
 	assert.equal(renameTab(named, 'w2', 't3', 'Stage cam'), named)
@@ -336,4 +339,62 @@ test("a stored tab with no name, or one that will not do, is the view's name; th
 		const stored = { ...DEFAULT_LAYOUT, windows: [{ ...DEFAULT_LAYOUT.windows[0], tabs: [{ id: 't1', view: 'cue', label }] }, DEFAULT_LAYOUT.windows[1]] }
 		assert.deepEqual(layoutFrom(JSON.stringify(stored)), DEFAULT_LAYOUT, JSON.stringify(label))
 	}
+})
+
+test('one Video view for every feed: old NDI, capture and Video tabs become Video tabs with their feed', () => {
+	// 2026-10-08, the owner's choice (item 8). Each keeps its id, so its window,
+	// its place and any name stay; an NDI or capture tab's feed is the one it was.
+	const old = {
+		windows: [
+			{ ...DEFAULT_LAYOUT.windows[0], tabs: [{ id: 't1', view: 'ndi:abc123' }, { id: 't5', view: 'capture:def456', label: 'Stage cam' }], active: 't5' },
+			{ ...DEFAULT_LAYOUT.windows[1], tabs: [{ id: 't2', view: 'ma' }, { id: 't3', view: 'video' }] },
+		],
+		homes: {},
+		v: 2,
+	}
+	const l = layoutFrom(JSON.stringify(old))
+	assert.deepEqual(l.windows[0].tabs, [
+		{ id: 't1', view: 'video', feed: { kind: 'ndi', id: 'abc123' } },
+		{ id: 't5', view: 'video', label: 'Stage cam', feed: { kind: 'capture', id: 'def456' } },
+	])
+	assert.equal(l.windows[0].active, 't5')
+	// The old Video view showed the first sender; its pick was never stored.
+	assert.deepEqual(l.windows[1].tabs[1], { id: 't3', view: 'video', feed: { kind: 'spout', name: null } })
+	assert.deepEqual(l.windows[1].tabs[0], { id: 't2', view: 'ma' })
+	// A saved layout converts the same way.
+	assert.deepEqual(savedLayoutsFrom(JSON.stringify([{ name: 'Old', layout: old }]))[0].layout, l)
+	// And it holds once converted.
+	assert.deepEqual(layoutFrom(JSON.stringify(l)), l)
+	// What each shows, as pop-outs and the engines know it.
+	assert.deepEqual(l.windows[0].tabs.map(tabView), ['ndi:abc123', 'capture:def456'])
+	assert.equal(tabView(l.windows[1].tabs[1]), 'video')
+	assert.equal(tabView(l.windows[1].tabs[0]), 'ma')
+})
+
+test('a Video tab: added with no feed, given one, saved with it; two tabs, two feeds', () => {
+	let l = addTab(DEFAULT_LAYOUT, 'w2', 'video', 't3')
+	assert.deepEqual(l.windows[1].tabs[1], { id: 't3', view: 'video', feed: null })
+	// No feed yet is kept as such, not taken for an old tab's first sender.
+	assert.deepEqual(layoutFrom(JSON.stringify(l)).windows[1].tabs[1].feed, null)
+	l = setTabFeed(l, 'w2', 't3', { kind: 'spout', name: 'Arena - MULTIVIEW' })
+	l = addTab(l, 'w1', 'video', 't4')
+	l = setTabFeed(l, 'w1', 't4', { kind: 'ndi', id: 'cam1' })
+	assert.deepEqual(layoutFrom(JSON.stringify(l)), l)
+	assert.deepEqual([tabView(l.windows[1].tabs[1]), tabView(l.windows[0].tabs[1])], ['video', 'ndi:cam1'])
+	// The same pick changes nothing; a tab that is not Video takes none.
+	assert.equal(setTabFeed(l, 'w2', 't3', { kind: 'spout', name: 'Arena - MULTIVIEW' }), l)
+	assert.equal(setTabFeed(l, 'w2', 't2', { kind: 'ndi', id: 'cam1' }), l)
+	// Another feed is another arrangement.
+	assert.equal(sameArrangement(l, setTabFeed(l, 'w2', 't3', { kind: 'capture', id: 'x1' })), false)
+	// A window added with a Video tab asks too.
+	assert.equal(addWindow(DEFAULT_LAYOUT, 'video', { window: 'w9', tab: 't9' }), DEFAULT_LAYOUT) // no room
+})
+
+test('a stored feed that will not do asks again; the layout holds', () => {
+	for (const feed of [{ kind: 'ndi', id: '../x' }, { kind: 'laser' }, { kind: 'spout', name: '' }, 'arena', 3, null]) {
+		assert.equal(videoChoiceFrom(feed), null, JSON.stringify(feed))
+		const stored = { ...DEFAULT_LAYOUT, windows: [DEFAULT_LAYOUT.windows[0], { ...DEFAULT_LAYOUT.windows[1], tabs: [{ id: 't2', view: 'video', feed }] }] }
+		assert.deepEqual(layoutFrom(JSON.stringify(stored)).windows[1].tabs[0], { id: 't2', view: 'video', feed: null })
+	}
+	assert.deepEqual(videoChoiceFrom({ kind: 'syphon', name: null }), { kind: 'syphon', name: null })
 })

@@ -27,9 +27,10 @@ import {
 	sameArrangement,
 	saveLayout,
 	tabTitle,
+	tabView,
+	type Tab,
 	type Layout,
 	type SavedLayout,
-	type ViewId,
 } from '../../shared/layout.js'
 import { Field, Input } from './form.js'
 import { Button, IconButton, viewIcon } from './ui.js'
@@ -37,14 +38,14 @@ import { Button, IconButton, viewIcon } from './ui.js'
 export function LayoutsPanel({
 	layout,
 	saved,
-	labelOf,
+	nameOf,
 	onSwitch,
 	onSaved,
 	onClose,
 }: {
 	layout: Layout
 	saved: readonly SavedLayout[]
-	labelOf: (view: ViewId) => string
+	nameOf: (tab: Tab) => string
 	onSwitch: (layout: Layout) => void
 	onSaved: (saved: SavedLayout[]) => void
 	onClose: () => void
@@ -104,7 +105,7 @@ export function LayoutsPanel({
 									className="flex flex-col gap-2 text-left"
 									aria-label={`Switch to ${s.name}`}
 								>
-									<Miniature layout={s.layout} labelOf={labelOf} />
+									<Miniature layout={s.layout} nameOf={nameOf} />
 									<span className="flex items-baseline justify-between gap-3 px-0.5 pr-11">
 										<span className="truncate font-medium">{s.name}</span>
 										<span className={`shrink-0 text-xs ${on ? 'text-booth-ink' : 'text-booth-dim'}`}>
@@ -130,7 +131,7 @@ export function LayoutsPanel({
 						)
 					})}
 					<div className="flex flex-col gap-2 rounded-xl p-2.5 ring-1 ring-booth-edge ring-inset [border-style:dashed]">
-						<Miniature layout={layout} labelOf={labelOf} />
+						<Miniature layout={layout} nameOf={nameOf} />
 						<Field label="Save the layout on screen as" error={error ?? undefined} hint={note ?? 'The same name replaces that layout.'}>
 							<Input value={name} onChange={setName} placeholder="Sunday" />
 						</Field>
@@ -146,12 +147,12 @@ export function LayoutsPanel({
 
 /** A layout as a small picture: each window where it is, named by the view it
  *  shows. */
-function Miniature({ layout, labelOf }: { layout: Layout; labelOf: (view: ViewId) => string }) {
+function Miniature({ layout, nameOf }: { layout: Layout; nameOf: (tab: Tab) => string }) {
 	return (
 		<div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-booth-bg" aria-hidden>
 			{layout.windows.map((w) => {
 				const tab = w.tabs.find((t) => t.id === w.active) ?? w.tabs[0] ?? null
-				const ViewIcon = tab === null ? null : viewIcon(tab.view)
+				const ViewIcon = tab === null ? null : viewIcon(tabView(tab))
 				return (
 					<span
 						key={w.id}
@@ -164,7 +165,7 @@ function Miniature({ layout, labelOf }: { layout: Layout; labelOf: (view: ViewId
 						}}
 					>
 						{ViewIcon !== null && <ViewIcon size={16} strokeWidth={1.8} />}
-						<span className="max-w-full truncate">{tab === null ? 'Empty' : tabTitle(tab, labelOf)}</span>
+						<span className="max-w-full truncate">{tab === null ? 'Empty' : tabTitle(tab, nameOf)}</span>
 						{w.tabs.length > 1 && <span className="text-[10px] text-booth-faint">+{w.tabs.length - 1}</span>}
 					</span>
 				)

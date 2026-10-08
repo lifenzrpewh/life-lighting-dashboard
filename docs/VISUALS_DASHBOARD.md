@@ -1061,6 +1061,46 @@ it (usually one program at a time); an ATEM; OBS with its virtual camera started
 installed build; macOS (it would ask for camera access the first time). A card shows nothing
 until its signal matches the format in Desktop Video Setup; the view says so while it waits.
 
+## One Video view for every feed, and the Timer view (owner's asks, 2026-10-08)
+
+**Video (item 8, the owner chose one view).** Spout/Syphon, NDI sources and capture
+inputs are one **Video** view. Each Video tab carries its own feed in the layout
+(`src/shared/layout.ts`, `VideoChoice`: `{ kind: 'spout' | 'syphon', name }`, `{ kind:
+'ndi', id }`, `{ kind: 'capture', id }`), picked from a touch-sized list grouped by kind
+(`src/renderer/components/FeedPicker.tsx`): the feed button in the tab's strip, or the
+list in the body of a Video tab with nothing picked yet. Anyone picks; it is the layout.
+NDI sources and capture inputs are added in **Settings › Video sources**; this
+computer's senders need no adding. Each engine is as it was: a Video tab shows its
+feed's old view (`tabView`: `ndi:<id>`, `capture:<id>`, `video`), which is also what
+pops out, so pop-outs work per feed.
+
+Taken without asking:
+- **Old layouts** convert on reading: an NDI or capture tab becomes a Video tab with that
+  feed, keeping its id (and so its window and any name); an old Video tab gets "the first
+  sender" (`name: null`), as it showed then. The old view's sender pick was held only
+  while the app ran, never stored, so there was nothing more to carry over.
+- **One Spout/Syphon picture at a time**: the engine receives one sender. Video tabs on
+  screen asking for one sender get it at once; asking for two, the tab not shown says "One
+  Syphon picture at a time" and offers **Show "…" here**. Never another sender's picture
+  under a tab's name, and a sender not being sent is said as such. Spout tabs share one
+  pop-out (the engine's picture), which says which sender it holds.
+- A Video tab with no feed yet is always on screen (so it can be picked); one whose feed
+  is turned off or removed leaves, as the old NDI and capture tabs did.
+- Restart video stays the Spout/Syphon engine's; NDI and capture keep their own strips.
+
+**Timer (item 1).** The bar's countdown as a view (`TimerView.tsx`), drawn from the
+chip's own `timerFace`, so it follows `chooseTimer` and cannot disagree with the chip; no
+source picker. Scaled to its window by container units.
+
+✅ In the dev kiosk on the owner's Mac over CDP, 2026-10-08: two Syphon stand-ins
+(`spikes/spout-test-sender.cjs`), an old layout's Video tab read as "first sender", a tab
+picked to one and a second tab to the other, the one-at-a-time words and Show here both
+ways, a pop-out; the Timer against a stand-in OnTime. ⚠️ Not on Windows, with NDI or a
+capture input (none on that Mac), or by finger. One kiosk crash seen while doing it: a
+SIGSEGV in Syphon's own message-port callback (`Syphon MessageReturnCallback`) as the
+kiosk started receiving with two stand-ins just started; not seen again in the same run
+and not in Pāua's code. Watch for it on a Mac.
+
 ## Open questions
 
 - **Briefs:** where should a brief's link live? The candidates were the item in the

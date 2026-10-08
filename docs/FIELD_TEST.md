@@ -106,6 +106,9 @@ Tick what you saw; anything odd is worth a line.
 - [ ] As a volunteer: Layouts › save the layout on screen under a name, switch away and back, delete it with two taps
 - [ ] In Edit layout, a tab's ✎: name it ("Stage cam"), Done; save the layout, switch to another and back: the name comes with it and the other layout's tab of the same view keeps its own. Empty the name: the view's own name returns. By finger: the Windows touch keyboard comes up for it
 - [ ] Edit layout › + › Timer: the countdown fills the window, reads across the booth, matches the bar's chip, goes red past zero; in two windows at once; popped out
+- [ ] Installed over 0.2.5: old NDI and capture tabs are now Video tabs showing the same source, under the same name; an old Video tab shows the first sender as before
+- [ ] One Video view: + › Video asks what to show; pick an NDI source, a capture input or Arena's Spout output from its list; two Video tabs, two feeds (a camera and the multiview); name them ("Stage cam"); save the layout and come back to it. Settings › Video sources adds NDI sources and capture inputs
+- [ ] Two Video tabs asking for two different Spout senders: one shows, the other says "One Spout picture at a time" and Show here swaps them
 
 **Installing**
 - [ ] What Windows SmartScreen showed, word for word, and whether Run anyway worked

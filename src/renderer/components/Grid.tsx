@@ -42,6 +42,7 @@ import {
 	snapLine,
 	TAB_LABEL_MAX,
 	tabTitle,
+	tabView,
 	type Box,
 	type Edges,
 	type GridWindow,
@@ -78,9 +79,12 @@ function scaleOf(el: HTMLElement): { x: number; y: number } {
 export type GridProps = {
 	layout: Layout
 	editing: boolean
-	/** Whether a view's tab is on screen at all (its connection is on). */
-	visible: (view: ViewId) => boolean
+	/** Whether a tab is on screen at all (its connection is on). */
+	visible: (tab: Tab) => boolean
+	/** A view's name, for + . */
 	labelOf: (view: ViewId) => string
+	/** A tab's name without one of its own: its view's, or its feed's. */
+	nameOf: (tab: Tab) => string
 	/** What + offers, in its order. */
 	offer: readonly ViewId[]
 	/** What a window's shown tab has in its body. */
@@ -119,7 +123,7 @@ export function Grid(p: GridProps) {
 	const [adding, setAdding] = useState<string | null>(null)
 	// The tab being named (editing only), and what has been typed so far.
 	const [naming, setNaming] = useState<{ win: string; tab: string; text: string } | null>(null)
-	const titleOf = (t: Tab) => tabTitle(t, p.labelOf)
+	const titleOf = (t: Tab) => tabTitle(t, p.nameOf)
 	const endNaming = (keep: boolean) => {
 		if (naming !== null && keep) p.onRenameTab(naming.win, naming.tab, naming.text)
 		setNaming(null)
@@ -239,7 +243,7 @@ export function Grid(p: GridProps) {
 		<div ref={gridRef} className="relative min-h-0 flex-1 bg-booth-bg">
 			{shown.windows.map((win) => {
 				const tab = shownTab(win, p.visible)
-				const tabs = win.tabs.filter((t) => p.visible(t.view))
+				const tabs = win.tabs.filter(p.visible)
 				const moving = drag?.id === win.id ? drag : null
 				const box = moving?.box ?? win
 				const target = tabDrag?.to?.win === win.id && tabDrag.win !== win.id
@@ -264,7 +268,7 @@ export function Grid(p: GridProps) {
 							<div role="tablist" className="flex min-w-0 items-stretch overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
 								{tabs.map((t) => {
 									const on = t.id === tab?.id
-									const TabIcon = viewIcon(t.view)
+									const TabIcon = viewIcon(tabView(t))
 									return (
 										<span
 											key={t.id}
@@ -288,8 +292,8 @@ export function Grid(p: GridProps) {
 														autoFocus
 														value={naming.text}
 														maxLength={TAB_LABEL_MAX}
-														placeholder={p.labelOf(t.view)}
-														aria-label={`Name the ${titleOf(t)} tab; empty for ${p.labelOf(t.view)}`}
+														placeholder={p.nameOf(t)}
+														aria-label={`Name the ${titleOf(t)} tab; empty for ${p.nameOf(t)}`}
 														onChange={(e) => setNaming({ ...naming, text: e.target.value })}
 														onKeyDown={(e) => e.key === 'Escape' && endNaming(false)}
 														onBlur={() => endNaming(true)}

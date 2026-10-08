@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeftRight, Check, PictureInPicture2, Plus, RotateCw, SquareStack, Unplug } from 'lucide-react'
+import { ArrowLeftRight, Check, MonitorPlay, PictureInPicture2, Plus, RotateCw, SquareStack, Unplug } from 'lucide-react'
 
 import { embedIdOf, embedView, type Embed, type EmbedReport } from '../shared/embeds.js'
-import { ndiIdOf, ndiView, type NdiSource, type NdiState } from '../shared/ndi.js'
+import { ndiIdOf, type NdiSource, type NdiState } from '../shared/ndi.js'
 import { NdiStrip, NdiView } from './components/NdiView.js'
-import { captureIdOf, captureView, type CaptureInput } from '../shared/capture.js'
+import { captureIdOf, type CaptureInput } from '../shared/capture.js'
+import { FeedChooser, FeedMenu, SPOUT_KIND, feedName, shortSender, type FeedOptions } from './components/FeedPicker.js'
 import { CaptureStrip, CaptureView } from './components/CaptureView.js'
 import { captureStateOf, useCameras } from './capture.js'
 
@@ -42,6 +43,7 @@ import { TimerView } from './components/TimerView.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { Still } from './components/Still.js'
 import { Button, IconButton, Placeholder } from './components/ui.js'
+import { Say } from './components/MaPane.js'
 import {
 	VIEWS,
 	addTab,
@@ -57,10 +59,15 @@ import {
 	removeWindow,
 	sameArrangement,
 	selectTab,
+	setTabFeed,
+	shownTab,
+	tabTitle,
+	tabView,
 	viewLabel,
 	viewsShown,
 	type GridWindow,
 	type Tab,
+	type VideoChoice,
 	type ViewId,
 } from '../shared/layout.js'
 import { Grid } from './components/Grid.js'
@@ -577,28 +584,71 @@ export function App() {
 	// A tab whose connection is off is not on screen (../shared/layout.ts),
 	// and comes back when it is on. Until settings are read, nothing is off:
 	// every embed would otherwise look removed for a moment.
-	const visible = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds, ndiSources, captureInputs)
+	const visibleView = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds, ndiSources, captureInputs)
+	/** A tab is on screen while its view is (a Video tab's feed's view). A
+	 *  Video tab with no feed yet always is, so its feed can be picked. */
+	const visible = (t: Tab) => (t.view === 'video' && t.feed == null) || visibleView(tabView(t))
 	const embedViews = embeds.filter((e) => e.on).map((e) => embedView(e.id))
-	const ndiViews = ndiSources.filter((s) => s.on).map((s) => ndiView(s.id))
-	/** What a window's + offers: every view that may be on screen. */
-	const captureViews = captureInputs.filter((c) => c.on).map((c) => captureView(c.id))
-	const offer = [...VIEWS, ...embedViews, ...ndiViews, ...captureViews].filter(visible)
+	/** What a window's + offers: every view that may be on screen. Video is
+	 *  one, whatever feeds there are (2026-10-08): the tab picks its feed.
+	 *  Offered even with the Video feed's connection off, for NDI and capture. */
+	const offer = [...VIEWS, ...embedViews].filter((v) => v === 'video' || visibleView(v))
 	const maShown = viewsShown(layout, visible).includes('ma')
+
+	// One Video view for every feed (./components/FeedPicker.tsx). What each
+	// tab is called without a name of its own: its feed's.
+	const nameOf = (t: Tab) => (t.view === 'video' ? feedName(t.feed, ndiSources, captureInputs) : label(t.view))
+	const titleOf = (t: Tab) => tabTitle(t, nameOf)
+	const feedOptions: FeedOptions = {
+		senders: videoFeed == null ? null : videoFeed.senders,
+		videoOff: off.includes('video'),
+		spoutKind: SPOUT_KIND,
+		ndi: ndiSources,
+		capture: captureInputs,
+	}
+	// This computer's Spout or Syphon engine receives one sender at a time
+	// (src/main/video-feed.ts, kept as it is). The senders the Video tabs on
+	// screen ask for by name: while they ask for one, it is shown; while they
+	// ask for two, each tab not shown says so and offers to show its own.
+	const spoutWanted = [
+		...new Set(
+			layout.windows
+				.map((w) => shownTab(w, visible))
+				.flatMap((t) =>
+					t !== null && t.view === 'video' && (t.feed?.kind === 'spout' || t.feed?.kind === 'syphon') && t.feed.name !== null ? [t.feed.name] : [],
+				),
+		),
+	]
+	const spoutWantedKey = spoutWanted.join('\n')
+	const sendersKey = videoFeed?.senders.join('\n') ?? ''
+	useEffect(() => {
+		const want = spoutWanted.length === 1 ? spoutWanted[0] : undefined
+		if (want === undefined || videoFeed == null) return
+		if (videoFeed.showing !== want && videoFeed.senders.includes(want)) window.life?.chooseVideo(want)
+	}, [spoutWantedKey, videoFeed?.showing, sendersKey])
+	/** Whether the engine shows what this Spout or Syphon tab asks for. */
+	const spoutShowsMine = (feed: VideoChoice) =>
+		(feed.kind !== 'spout' && feed.kind !== 'syphon') || feed.name === null || videoFeed?.showing === feed.name
+	const pickFeed = (win: GridWindow, tab: Tab, feed: VideoChoice) => update((l) => setTabFeed(l, win.id, tab.id, feed))
 
 	/** A view's own buttons, in its window's strip. Reload reconnects a picture
 	 *  and fires nothing. A popped-out view's buttons are in its own window. */
-	const actionsOf = (view: ViewId) => {
-		if (popped.has(view)) return null
+	const actionsOf = (win: GridWindow, tab: Tab) => {
+		const view = tabView(tab)
+		// A Video tab's feed is its own pick, in its strip, out or not.
+		const menu = tab.view === 'video' ? <FeedMenu options={feedOptions} current={tab.feed} onPick={(f) => pickFeed(win, tab, f)} /> : null
+		if (popped.has(view)) return menu
 		const reload = (text: string, onClick: () => void) => <IconButton icon={RotateCw} size="sm" label={text} onClick={onClick} />
 		const out =
-			window.life === undefined ? null : (
-				<IconButton icon={PictureInPicture2} size="sm" label={`Pop ${label(view)} out into its own window`} onClick={() => popOut(view)} />
+			window.life === undefined || (tab.view === 'video' && tab.feed == null) ? null : (
+				<IconButton icon={PictureInPicture2} size="sm" label={`Pop ${titleOf(tab)} out into its own window`} onClick={() => popOut(view)} />
 			)
 		const captureId = captureIdOf(view)
 		if (captureId !== null) {
 			return (
 				<>
 					<CaptureStrip input={captureInputs.find((c) => c.id === captureId)} now={now} />
+					{menu}
 					{out}
 				</>
 			)
@@ -608,6 +658,7 @@ export function App() {
 			return (
 				<>
 					<NdiStrip id={ndiId} ndi={ndi} now={now} />
+					{menu}
 					{out}
 				</>
 			)
@@ -648,22 +699,32 @@ export function App() {
 			case 'video':
 				return (
 					<>
-						<VideoStrip feed={videoFeed} space={videoSpace} />
+						{/* The size readout only while this tab's own sender is the one shown. */}
+						{tab.feed != null && <VideoStrip feed={videoFeed} space={spoutShowsMine(tab.feed) ? videoSpace : null} />}
+						{menu}
 						{out}
 					</>
 				)
 		}
 	}
 
-	const bodyOf = (_win: GridWindow, tab: Tab) => {
-		const view = tab.view
+	const bodyOf = (win: GridWindow, tab: Tab) => {
+		const view = tabView(tab)
+		if (tab.view === 'video' && tab.feed == null) return <FeedChooser options={feedOptions} onPick={(f) => pickFeed(win, tab, f)} />
 		// The tab keeps the view's place while it is out (../shared/popout.ts).
 		if (popped.has(view)) {
+			// Every Spout or Syphon tab shares the one picture (and its window):
+			// say which sender is out, not this tab's name over another's picture.
+			const sender = videoFeed?.showing ?? null
+			const head =
+				view === 'video'
+					? `The ${SPOUT_KIND === 'syphon' ? 'Syphon' : 'Spout'} picture${sender === null ? '' : ` (“${shortSender(sender)}”)`} is in its own window`
+					: `${titleOf(tab)} is in its own window`
 			return (
 				<Centered>
 					<Placeholder
 						icon={PictureInPicture2}
-						head={`${label(view)} is in its own window`}
+						head={head}
 						body="Show brings that window to the front. Bring back puts it here again."
 					>
 						<div className="mt-6 flex justify-center gap-3">
@@ -739,12 +800,65 @@ export function App() {
 			case 'lookbook':
 				return <LookbookView status={arenaStatus} now={now} />
 			case 'video':
-				return <VideoView feed={videoFeed} now={now} onSpace={setVideoSpace} />
+				return spoutBody(tab.feed)
 			case 'timer':
 				return <TimerView sources={window.life === undefined ? null : timers} />
 		}
 	}
 
+
+	/** A Spout or Syphon tab: the picture while the engine shows its sender,
+	 *  otherwise why not, in words. Never another sender's picture under this
+	 *  tab's name. */
+	const spoutBody = (feed: VideoChoice | null | undefined) => {
+		const name = feed != null && (feed.kind === 'spout' || feed.kind === 'syphon') ? feed.name : null
+		const picture = <VideoView feed={videoFeed} now={now} onSpace={setVideoSpace} />
+		if (name === null || videoFeed == null) return picture
+		const word = SPOUT_KIND === 'syphon' ? 'Syphon' : 'Spout'
+		const restart =
+			window.life === undefined ? null : (
+				<div className="mt-6 flex justify-center">
+					<Button size="sm" icon={RotateCw} onClick={() => window.life?.restartVideo()}>
+						Restart video
+					</Button>
+				</div>
+			)
+		if (!videoFeed.senders.includes(name)) {
+			return (
+				<Centered>
+					<Say icon={MonitorPlay} head={`“${shortSender(name)}” is not being sent`} body={`It is not among this computer's ${word} senders now. It shows here when it is sent again; the feed button above picks another.`}>
+						{restart}
+					</Say>
+				</Centered>
+			)
+		}
+		if (videoFeed.showing !== name) {
+			// Asked for by this tab alone: it is on its way (the effect above).
+			if (spoutWanted.length <= 1) {
+				return (
+					<Centered>
+						<Say icon={MonitorPlay} head={`Opening “${shortSender(name)}”`} body="A moment." />
+					</Centered>
+				)
+			}
+			return (
+				<Centered>
+					<Say
+						icon={MonitorPlay}
+						head={`One ${word} picture at a time`}
+						body={`“${shortSender(videoFeed.showing ?? '')}” is showing in another tab. This tab shows “${shortSender(name)}”.`}
+					>
+						<div className="mt-6 flex justify-center">
+							<Button icon={MonitorPlay} onClick={() => window.life?.chooseVideo(name)}>
+								Show “{shortSender(name)}” here
+							</Button>
+						</div>
+					</Say>
+				</Centered>
+			)
+		}
+		return picture
+	}
 
 	/** A new id for a window or tab, unlike any in the layout now. */
 	const newId = (prefix: 'w' | 't') => freshId(layout, prefix)
@@ -902,12 +1016,13 @@ export function App() {
 								editing={editing}
 								visible={visible}
 								labelOf={label}
+								nameOf={nameOf}
 								offer={offer}
 								body={bodyOf}
 								boxRef={(_win, tab) =>
 									isNative(tab.view) && !editing && homeOf(layout, tab.view, visible) === tab.id ? boxRefOf(tab.view) : undefined
 								}
-								actions={(_win, tab) => actionsOf(tab.view)}
+								actions={actionsOf}
 								onSelect={(w, t) => update((l) => selectTab(l, w, t))}
 								onEdit={startEditing}
 								onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
@@ -935,7 +1050,7 @@ export function App() {
 										saved={saved}
 										onSwitch={(l) => update(() => l)}
 										onSaved={setSaved}
-										labelOf={label}
+										nameOf={nameOf}
 										onClose={() => setLayoutsOpen(false)}
 									/>
 								</>

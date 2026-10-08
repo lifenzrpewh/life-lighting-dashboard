@@ -5,7 +5,11 @@
 // Split from Connections on 2026-10-08 (the owner's choice): Connections is
 // now a list everyone reads, what is up and what is down, and this is where
 // each connection's fields live, with the views a booth adds itself (web
-// pages, NDI sources, capture inputs) and this computer's own choices. Admin
+// pages, NDI sources, capture inputs) and this computer's own choices.
+//
+// Video sources (2026-10-08, the owner's choice of one Video view for every
+// feed): NDI sources and capture inputs are added on one page, and a Video
+// tab's ▾ picks among them and this computer's Spout or Syphon senders. Admin
 // only: its button is not drawn in volunteer mode, main refuses a save outside
 // Admin, and the App closes it when the mode drops.
 //
@@ -14,7 +18,7 @@
 // configured here (src/shared/settings.ts).
 
 import { useEffect, useState } from 'react'
-import { Cast, Lock, Monitor, PanelTop, Plus, Webcam } from 'lucide-react'
+import { Lock, Monitor, MonitorPlay, PanelTop, Plus } from 'lucide-react'
 
 import type { ConnectionId, ConnectionStatus, RowId } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -34,9 +38,9 @@ import { Dot, Sheet } from './ui.js'
 import { sentence } from './vocabulary.js'
 
 /** What the right side shows: a connection, or one of the pages after them. */
-export type SettingsPage = RowId | 'add' | 'add-ndi' | 'add-capture' | 'admin' | 'bar' | 'computer'
+export type SettingsPage = RowId | 'add' | 'sources' | 'admin' | 'bar' | 'computer'
 
-const PAGES: readonly string[] = ['add', 'add-ndi', 'add-capture', 'admin', 'bar', 'computer']
+const PAGES: readonly string[] = ['add', 'sources', 'admin', 'bar', 'computer']
 
 /** Every connection's address as the list shows it, from the stored settings. */
 export function addressOf(view: SettingsView, id: RowId): string | null {
@@ -189,18 +193,11 @@ export function SettingsPanel({
 						sub={<span className="text-booth-dim">A Google Sheet or any page, as a view</span>}
 					/>
 					<ListRow
-						selected={selected === 'add-ndi'}
-						onClick={() => setPicked('add-ndi')}
-						lead={<Cast size={18} className="text-booth-dim" aria-hidden />}
-						title="Add an NDI source"
-						sub={<span className="text-booth-dim">A camera or another program's output, as a view</span>}
-					/>
-					<ListRow
-						selected={selected === 'add-capture'}
-						onClick={() => setPicked('add-capture')}
-						lead={<Webcam size={18} className="text-booth-dim" aria-hidden />}
-						title="Add a capture input"
-						sub={<span className="text-booth-dim">A Blackmagic card, ATEM, OBS Virtual Camera or webcam</span>}
+						selected={selected === 'sources'}
+						onClick={() => setPicked('sources')}
+						lead={<MonitorPlay size={18} className="text-booth-dim" aria-hidden />}
+						title="Video sources"
+						sub={<span className="text-booth-dim">NDI sources and capture inputs, for the Video view</span>}
 					/>
 					<span className="mx-3 my-2 h-px bg-booth-edge" />
 					<ListRow
@@ -235,10 +232,17 @@ export function SettingsPanel({
 					<div key={selected} className="flex max-w-4xl animate-rise flex-col gap-6 px-10 py-8 select-text">
 						{selected === 'add' ? (
 							<AddEmbed all={view.embeds} save={save} />
-						) : selected === 'add-ndi' ? (
-							<AddNdi all={view.ndiSources} save={save} />
-						) : selected === 'add-capture' ? (
-							<AddCapture all={view.captureInputs} save={save} />
+						) : selected === 'sources' ? (
+							<>
+								<DetailHead title="Video sources" />
+								<p className="max-w-prose text-sm text-booth-dim">
+									What a Video tab can show besides this computer’s own Spout or Syphon senders, which need no adding. Each added
+									source is offered by every Video tab’s feed button and gets a row in Connections.
+								</p>
+								<AddNdi all={view.ndiSources} save={save} />
+								<span className="h-px bg-booth-edge" />
+								<AddCapture all={view.captureInputs} save={save} />
+							</>
 						) : selected === 'admin' ? (
 							<AdminSettings view={view} save={save} />
 						) : selected === 'bar' ? (
