@@ -75,6 +75,7 @@ import { ShowfileSheet } from './components/ShowfileSheet.js'
 import { GuideSheet } from './components/GuideSheet.js'
 import { GUIDE } from '../shared/guide.js'
 import { OperatorContext, useMode } from './mode.js'
+import { useBarHidden } from './barItems.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
@@ -131,6 +132,8 @@ export function App() {
 			// Kept for this run only.
 		}
 	}
+	// What Admin has hidden on the bar, on this computer (./barItems.ts).
+	const [barHidden] = useBarHidden()
 	// The sheets that stand in the windows' place, one at a time: Connections
 	// (a list to read), Settings (Admin's), the showfile sheet (Save As, Load),
 	// the Creative Guide (../shared/guide.ts; its page is placed over the
@@ -798,13 +801,6 @@ export function App() {
 						if (layoutsOpen) setLayoutsOpen(false)
 						else openLayouts()
 					}}
-					editing={editing}
-					onEditLayout={() => {
-						if (editing) return setEditing(false)
-						setSheet(null)
-						setLayoutsOpen(false)
-						startEditing()
-					}}
 					onConnections={() => toggleSheet('connections')}
 					settingsOpen={settingsOpen}
 					onSettings={() => (settingsOpen ? setSheet(null) : openSettings(null))}
@@ -813,6 +809,7 @@ export function App() {
 					showfile={showfile}
 					showfileFailure={failureOf(sources.showfile)}
 					timers={timers}
+					hidden={barHidden}
 					collapsed={barCollapsed}
 					onCollapse={collapseBar}
 				/>

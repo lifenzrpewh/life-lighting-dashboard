@@ -16,6 +16,7 @@ export function ModeChip({
 	onEnter,
 	onLeave,
 	compact = false,
+	bare = false,
 	asking = false,
 }: {
 	mode: Mode
@@ -24,6 +25,8 @@ export function ModeChip({
 	onLeave: () => void
 	/** The folded bar's size: the same button, smaller. */
 	compact?: boolean
+	/** The bar is short of room: the lock alone, no word. */
+	bare?: boolean
 	/** The passcode sheet is open. */
 	asking?: boolean
 }) {
@@ -36,11 +39,11 @@ export function ModeChip({
 			aria-pressed={asking || undefined}
 			title={admin ? 'Tap to go back to volunteer' : 'Tap for Admin'}
 			className={`relative inline-flex shrink-0 items-center justify-center gap-2 overflow-hidden rounded-lg font-medium transition-colors active:scale-[0.97] ${
-				compact ? 'h-8 w-28 text-xs' : 'h-12 w-36 text-sm'
+				compact ? (bare ? 'size-8' : 'h-8 w-28 text-xs') : bare ? 'size-12' : 'h-12 w-36 text-sm'
 			} ${admin ? 'nacre-tint nacre-ring text-booth-ink' : asking ? 'bg-booth-hover text-booth-ink ring-1 ring-booth-dim/40 ring-inset' : 'bg-booth-raise text-booth-dim hover:text-booth-ink'}`}
 		>
 			{admin ? <LockOpen size={compact ? 15 : 18} strokeWidth={1.9} aria-hidden /> : <Lock size={compact ? 15 : 18} strokeWidth={1.9} aria-hidden />}
-			{admin ? 'Admin' : 'Volunteer'}
+			{!bare && (admin ? 'Admin' : 'Volunteer')}
 		</button>
 	)
 }
