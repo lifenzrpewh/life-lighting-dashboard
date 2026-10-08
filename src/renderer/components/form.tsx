@@ -48,7 +48,7 @@ export function Input({
 			disabled={disabled}
 			autoComplete={type === 'password' ? 'new-password' : 'off'}
 			spellCheck={false}
-			className={`h-12 w-full min-w-0 rounded-lg bg-booth-bg px-4 text-base ring-1 ring-booth-edge ring-inset outline-none transition-shadow placeholder:text-booth-faint focus:ring-2 focus:ring-nacre-blue/70 disabled:opacity-50 ${
+			className={`h-12 w-full min-w-0 rounded-ctl bg-booth-bg px-4 text-base ring-1 ring-booth-edge ring-inset outline-none transition-shadow placeholder:text-booth-faint focus:ring-2 focus:ring-accent-hi/70 disabled:opacity-50 ${
 				mono || inputMode === 'numeric' ? 'font-mono' : ''
 			}`}
 		/>
@@ -68,7 +68,7 @@ export function Select({
 		<select
 			value={value}
 			onChange={(e) => onChange(e.target.value)}
-			className="h-12 rounded-lg bg-booth-bg px-4 text-base ring-1 ring-booth-edge ring-inset outline-none focus:ring-2 focus:ring-nacre-blue/70"
+			className="h-12 rounded-ctl bg-booth-bg px-4 text-base ring-1 ring-booth-edge ring-inset outline-none focus:ring-2 focus:ring-accent-hi/70"
 		>
 			{options.map((o) => (
 				<option key={o.value} value={o.value}>
@@ -116,7 +116,7 @@ export function User(p: {
 }) {
 	const status = p.removing ? 'will be removed on Save' : p.hasPassword ? 'set' : 'none'
 	return (
-		<div className="grid grid-cols-2 gap-4 rounded-xl bg-booth-bg/50 p-4 ring-1 ring-booth-edge ring-inset">
+		<div className="grid grid-cols-2 gap-4 rounded-win bg-booth-bg/50 p-4 ring-1 ring-booth-edge ring-inset">
 			<Field label={`${p.label} user`} hint={p.hint} error={p.errors[0]}>
 				<Input value={p.user} onChange={p.onUser} />
 			</Field>
@@ -139,7 +139,7 @@ export function User(p: {
 						<button
 							type="button"
 							onClick={p.onRemove}
-							className="h-12 shrink-0 rounded-lg bg-booth-raise px-4 text-sm font-medium text-booth-ink hover:bg-booth-hover active:scale-[0.98]"
+							className="h-12 shrink-0 rounded-ctl bg-booth-raise px-4 text-sm font-medium text-booth-ink hover:bg-booth-hover active:scale-[0.98]"
 						>
 							{p.removing ? 'Keep' : 'Remove'}
 						</button>

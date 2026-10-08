@@ -18,6 +18,7 @@ import type { CuePaneReport } from '../shared/cue-pane.js'
 import type { MaPaneReport } from '../shared/ma-pane.js'
 import { VIEW_LABEL, type BuiltInView, type ViewId } from '../shared/layout.js'
 import { embedIdOf, type EmbedReport } from '../shared/embeds.js'
+import { GUIDE } from '../shared/guide.js'
 import { EmbedMessage, ZoomControl } from './components/EmbedPane.js'
 import { ndiIdOf, type NdiState } from '../shared/ndi.js'
 import { NdiStrip, NdiView } from './components/NdiView.js'
@@ -71,7 +72,9 @@ export function PopOut({ view }: { view: ViewId }) {
 	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' || view === 'holding' || view === 'lookbook' ? (api) => api.arenaStatus() : null, 250)
 	const video = usePolled<VideoFeedState | null>(view === 'video' ? (api) => api.videoFeed() : null, 500)
 	const timers = usePolled<TimerSources>(view === 'timer' ? (api) => api.timers() : null, 250)
-	const embedId = embedIdOf(view)
+	// The Guide is an embed of main's own (../shared/guide.ts): its page is
+	// moved and reloaded as an embed's is.
+	const embedId = view === 'guide' ? GUIDE.id : embedIdOf(view)
 	const embed = usePolled<EmbedReport | undefined>(
 		embedId === null ? null : (api) => api.embeds().then((all) => all.find((r) => r.id === embedId)),
 		1000,
@@ -89,7 +92,7 @@ export function PopOut({ view }: { view: ViewId }) {
 			? (ndi?.feeds.find((f) => f.id === ndiId)?.name ?? 'NDI')
 			: view === 'video' && video?.showing != null
 				? shortSender(video.showing)
-			: embedId === null
+			: embedId === null || view === 'guide'
 				? VIEW_LABEL[view as BuiltInView]
 				: (embed?.name ?? 'Embed')
 	const ViewIcon = viewIcon(view)
@@ -135,11 +138,10 @@ export function PopOut({ view }: { view: ViewId }) {
 	return (
 		<OperatorContext.Provider value={operator}>
 			<div className="flex h-full flex-col overflow-hidden bg-booth-panel">
-				<div className="flex h-14 shrink-0 items-stretch gap-2 border-b border-booth-edge bg-booth-strip pr-2 pl-1">
-					<h1 className="relative flex items-center gap-2 px-4 text-sm font-medium">
-						<ViewIcon size={17} strokeWidth={1.8} aria-hidden />
+				<div className="flex h-14 shrink-0 items-center gap-2 bg-booth-strip px-2">
+					<h1 className="flex h-10 items-center gap-2 rounded-ctl bg-accent px-4 text-sm font-bold text-accent-ink">
+						<ViewIcon size={17} strokeWidth={2} aria-hidden />
 						{label}
-						<span aria-hidden className="nacre-line absolute inset-x-3 -bottom-px h-[3px] rounded-t-full" />
 					</h1>
 					<span className="ml-auto flex items-center gap-2">
 					{captureId !== null && <CaptureStrip input={capture ?? undefined} now={now} />}
@@ -159,7 +161,7 @@ export function PopOut({ view }: { view: ViewId }) {
 					</Button>
 					</span>
 				</div>
-				<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-bg">
+				<div ref={native ? setBox : undefined} className="flex min-h-0 min-w-0 flex-1 bg-booth-panel">
 					{captureId !== null ? (
 						<CaptureView input={capture ?? undefined} cameras={cameras} now={now} />
 					) : ndiId !== null ? (

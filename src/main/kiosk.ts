@@ -83,6 +83,7 @@ import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
 import { createEmbeds, type EmbedPane, type Embeds } from './embeds.js'
 import { embedIdOf, isEmbedId, type EmbedReport } from '../shared/embeds.js'
+import { GUIDE } from '../shared/guide.js'
 import { createNdi, type Ndi } from './ndi.js'
 import { isNdiId, ndiIdOf, type NdiState } from '../shared/ndi.js'
 import { captureIdOf, isCaptureId, type CaptureInput } from '../shared/capture.js'
@@ -231,6 +232,7 @@ function createWindow(): void {
 function paneOf(view: ViewId): MaPane | CuePane | EmbedPane | undefined {
 	if (view === 'ma') return maPane ?? undefined
 	if (view === 'cue') return cuePane ?? undefined
+	if (view === 'guide') return embeds?.pane(GUIDE.id)
 	const id = embedIdOf(view)
 	return id === null ? undefined : embeds?.pane(id)
 }

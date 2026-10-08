@@ -3,66 +3,67 @@
 /* Dark only, deliberately. This screen lives in a dim booth beside a console at
    9am on a Sunday; there is no light mode because there is no lit room.
 
-   The look (2026-10-05, the owner's "smooth and professional, clean but not
-   too sterile"): named for the shell, so it borrows the shell. The neutrals
-   are a cool slate, halfway between the first look's near-neutral greys and
-   the deep sea-green the overhaul first tried (the owner liked the original
-   colours a bit more: "somewhere between", 2026-10-05). One iridescent
-   accent, nacre, appears only where it means something: the tab showing,
-   Admin (operator mode until 2026-10-08), editing the layout. Everything else is quiet so the state
-   colours can speak. */
+   The look (2026-10-08, the owner's, over nine rounds in the "Pāua palette"
+   playground: https://claude.ai/artifact/KpEQSRUpXMdCC4cJHjQQbQ). From the
+   software the owner likes (YouTube Music, Sonos, Soundtrack Your Brand):
+   heavy type in two levels, a title and a grey line under it; square art
+   beside square controls, harsher corners than the soft 8 to 12 px of the
+   2026-10-05 look ("soft" was the complaint); rows without boxes; one fill
+   for what is selected. The colours are the owner's pick of five palettes,
+   plum and blue (#331832 #694D75 #1B5299 #9FC2CC #F1ECCE), with the surfaces
+   and text desaturated to 40% and the selected blue to 70% ("still too much
+   colour" at full strength). Live green, warning amber and down red stay at
+   full strength: they are news, and nothing in the palette may be mistaken
+   for them. */
 @theme {
-	/* The ground and its layers, darkest to lightest. */
-	--color-booth-bg: #090b0c;
-	--color-booth-panel: #101417;
-	--color-booth-strip: #13181b;
-	--color-booth-raise: #191f25;
-	--color-booth-hover: #20282e;
-	--color-booth-edge: #232b31;
-	--color-booth-ink: #edf2f3;
-	--color-booth-dim: #8b959d;
-	--color-booth-faint: #5e686f;
+	/* The ground and its layers, darkest to lightest: plum at 40%. */
+	--color-booth-bg: #100d10;
+	--color-booth-panel: #191519;
+	--color-booth-strip: #191519;
+	--color-booth-raise: #272028;
+	--color-booth-hover: #362e38;
+	--color-booth-edge: #2b202b;
+	--color-booth-ink: #e7e5d9;
+	--color-booth-dim: #adbbbf;
+	--color-booth-faint: #7b737f;
 
-	/* Nacre: the accent. Teal to violet, as a pāua shell turns in the light.
-	   Used as a gradient on lines and tints, never as a fill behind text. */
-	--color-nacre-teal: #3fd2c7;
-	--color-nacre-blue: #6f8cff;
-	--color-nacre-violet: #a879ff;
+	/* Selected: the palette's blue at 70%, as a fill behind text (the tab
+	   showing, a pressed button, Admin's lock). `accent-hi` is the same blue
+	   lighter, for a line or ring on the dark, where the fill would vanish. */
+	--color-accent: #2e5486;
+	--color-accent-hi: #6e92c6;
+	--color-accent-ink: #e7e5d9;
 
 	/* The state vocabulary, one colour each, used identically everywhere. */
-	--color-state-live: #34d399;
-	--color-state-stale: #fbbf24;
-	--color-state-unknown: #6b7882;
-	--color-state-unreachable: #f87171;
+	--color-state-live: #2bd96b;
+	--color-state-stale: #ffb020;
+	--color-state-unknown: #7b737f;
+	--color-state-unreachable: #ff4e45;
 
 	/* Amber is reserved for "you must look at this": the unconfirmed-cook strip
 	   and ON BASE SHOW. Nothing decorative may use it. */
-	--color-warn: #f59e0b;
+	--color-warn: #ffb020;
 
 	/* A countdown past zero, counting up. Its own token, not the state red: a
 	   link going UNREACHABLE and a song running long are different news. */
-	--color-overtime: #ef4444;
+	--color-overtime: #ff4e45;
+
+	/* Corners: 2 px for a window, a card, a picture; 4 px for anything tapped
+	   that has words or an icon. Round only for a dot. */
+	--radius-win: 2px;
+	--radius-ctl: 4px;
 
 	/* Bundled with the app (../main.tsx), never fetched: this box may have no
-	   internet on a Sunday. Plex for the interface, Plex Mono for the things
-	   that are typed exactly: show names, media codes, addresses. */
-	--font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
-	--font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+	   internet on a Sunday. Archivo for everything, heavy for titles; what is
+	   typed exactly (show names, codes, addresses) is Archivo too, with
+	   figures that line up. */
+	--font-sans: 'Archivo Variable', 'Segoe UI', system-ui, sans-serif;
+	--font-mono: 'Archivo Variable', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* The nacre line and tint, for the few places the accent belongs. */
-@utility nacre-line {
-	background-image: linear-gradient(90deg, var(--color-nacre-teal), var(--color-nacre-blue) 55%, var(--color-nacre-violet));
-}
-@utility nacre-tint {
-	background-image: linear-gradient(
-		120deg,
-		color-mix(in srgb, var(--color-nacre-teal) 16%, transparent),
-		color-mix(in srgb, var(--color-nacre-violet) 20%, transparent)
-	);
-}
-@utility nacre-ring {
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-nacre-blue) 60%, transparent);
+/* The ring that marks the chosen one of several (a layout, a place to drop). */
+@utility accent-ring {
+	box-shadow: inset 0 0 0 2px var(--color-accent-hi);
 }
 
 /* A hold, filling left to right so a held finger can see it is being
@@ -90,10 +91,86 @@
 	}
 }
 @utility animate-rise {
-	animation: rise 160ms ease-out both;
+	animation: rise 220ms ease-out both;
 }
+
+/* Small motion where something changes (the owner, 2026-10-08: "good small
+   animations"): a press gives, a dropdown drops, the bar folds, a dot pops
+   when its state changes. Never on a reading's value itself. */
+@keyframes drop {
+	from {
+		opacity: 0;
+		transform: translateY(-6px) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+@utility animate-drop {
+	animation: drop 180ms ease-out both;
+	transform-origin: top;
+}
+@keyframes pop {
+	from {
+		transform: scale(0.3);
+	}
+	to {
+		transform: none;
+	}
+}
+@utility animate-pop {
+	animation: pop 450ms cubic-bezier(0.3, 1.8, 0.5, 1) both;
+}
+@keyframes slide-in {
+	from {
+		opacity: 0;
+		transform: translateX(-6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+@utility animate-slide-in {
+	animation: slide-in 300ms ease-out both;
+}
+@keyframes ping-ring {
+	from {
+		transform: scale(1);
+		opacity: 0.9;
+	}
+	to {
+		transform: scale(2.8);
+		opacity: 0;
+	}
+}
+@utility animate-ping-ring {
+	animation: ping-ring 1s ease-out both;
+}
+@keyframes over-pop {
+	0% {
+		transform: scale(1);
+	}
+	30% {
+		transform: scale(1.12);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+@utility animate-over-pop {
+	animation: over-pop 600ms ease-out;
+}
+/* Decoration only: the hold's fill is not here, because it tells a held
+   finger the hold is being counted. */
 @media (prefers-reduced-motion: reduce) {
-	.animate-rise {
+	.animate-rise,
+	.animate-drop,
+	.animate-pop,
+	.animate-slide-in,
+	.animate-ping-ring,
+	.animate-over-pop {
 		animation: none;
 	}
 }
@@ -106,6 +183,7 @@ body,
 	background: var(--color-booth-bg);
 	color: var(--color-booth-ink);
 	font-family: var(--font-sans);
+	font-variant-numeric: tabular-nums;
 	-webkit-font-smoothing: antialiased;
 	/* A touchscreen in a booth: no text selection, no rubber-banding, no
 	   accidental pinch-zoom leaving the board at 140% mid-service. */
@@ -125,6 +203,6 @@ body,
 
 /* Keyboard focus is shown; a tap is not. */
 :focus-visible {
-	outline: 2px solid var(--color-nacre-blue);
+	outline: 2px solid var(--color-accent-hi);
 	outline-offset: 2px;
 }

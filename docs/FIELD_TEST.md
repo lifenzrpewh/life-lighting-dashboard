@@ -88,6 +88,18 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**The plum look and the quieter bar** (on main after 0.2.6, branch `look-plum`; not yet in a build)
+- [ ] The colours: plum-grey surfaces, cream text, one blue for what is selected (the tab showing, a pressed button, Admin's lock). Live green, amber and down red as loud as before. Readable from the booth chair; nothing "soft"
+- [ ] Tap between tabs in a window: the blue fill slides to the one tapped
+- [ ] The bar on a good day: Layouts on the left and nothing else there; countdown and clock in the middle, each a big number over a grey line; on the right a pulse icon (Connections, its dot a badge) and the lock
+- [ ] The bar speaking up: load the base show, and an amber "On the base show: …" appears on the left, a tap opens Save As and Load; stop the console answering, and a red "Console not answering", a tap opens Connections; turn Arena off at the booth, and "Arena: no answer"
+- [ ] Connections › the Console row names the show (amber on the base show, `?` and why when unknown) and **Showfile** beside it opens Save As and Load
+- [ ] The fold handle (the short bar under the clock): tap it to fold, tap again to unfold; drag it up to fold, down to unfold. By finger: is it easy to find and to hit? Everything still works folded, captions beside their numbers
+- [ ] Admin: the lock turns blue and says Admin; Settings is the gear beside it
+- [ ] Settings › Top bar › Testing on: a flag appears on the bar; tap it, "Mark 1 written to the log" shows for 3 s, and the log has the line. Testing off: the flag is gone
+- [ ] Guide is a view now: Edit layout › + › Guide; the Notion page fills that window, − / + zoom, pop it out and back
+- [ ] The passcode keypad's round keys, by finger
+
 **Admin, Settings and the bar** (0.2.6)
 - [ ] Installed over 0.2.5: addresses, MA logins, the Cue Manager's sign-in and saved layouts still there; Admin opens with a tap (no passcode yet) and Settings › Admin says so
 - [ ] Settings › Admin › Set a passcode, by keypad (digits) and once by Keyboard (letters); tap Admin to leave, tap Volunteer: the passcode sheet opens on the keypad for digits, on the field for letters
@@ -98,9 +110,9 @@ Tick what you saw; anything odd is worth a line.
 - [ ] A popped-out Holding or Lookbook follows Admin and volunteer
 - [ ] Connections is a list to read as a volunteer (no fields); in Admin, a row opens Settings at that connection
 - [ ] ProPresenter's port starts at 1025
-- [ ] Fold the bar (⌃): every item stays where it was, smaller; the console card, Guide, Layouts, Connections, Mark, Settings and the lock all still work folded
+- [ ] Fold the bar (the handle since the plum look): every item stays where it was, smaller; Layouts, Connections, Mark, Settings and the lock all still work folded
 - [ ] In Admin, at the booth's own screen width: the clock and countdown are never covered; the buttons lose their words, not the clock
-- [ ] Settings › Top bar: hide Mark and the Guide; they leave the bar on this computer only and come back when shown
+- [ ] Settings › Top bar: hide the countdown or Layouts; they leave the bar on this computer only and come back when shown (Mark is Testing's, the Guide a view, since the plum look)
 - [ ] Video: with Arena's Spout output picked and no picture, after 10 s the view says why; **Restart video** (the view's ↻, beside the Video feed in Connections, as a volunteer too) brings it back without restarting Pāua. On a computer with two graphics cards, say which
 - [ ] As a volunteer: the pencil at the end of a window's strip puts the screen into Edit layout; move, resize, add a window, Done. No "Edit this layout" left in Layouts
 - [ ] As a volunteer: Layouts › save the layout on screen under a name, switch away and back, delete it with two taps
@@ -116,12 +128,12 @@ Tick what you saw; anything odd is worth a line.
 - [ ] The touch keyboard comes up when you tap into a Cue Manager note (booth touchscreen)
 
 **The console** (a real desk, not onPC)
-- [ ] The console card (top left) reads Live, and names the loaded show
+- [ ] Connections › Console reads Live, and names the loaded show (the console card on the bar until the plum look)
 - [ ] The MA view logs in and stays in; volunteer and operator users each see their own
 - [ ] Turn the console's Web Remote off and on: the MA view comes back by itself
 - [ ] Restart the console: the MA view and LIVE both come back by themselves
-- [ ] Save As from the console card: the new name comes back on the card
-- [ ] Load from the same sheet, with "save first" ticked: the show loads, the card follows
+- [ ] Save As from Connections › Console › Showfile: the new name comes back on the Console row
+- [ ] Load from the same sheet, with "save first" ticked: the show loads, the row follows
 
 **Arena** (with the show's own media)
 - [ ] The media check (Arena view › Media): pick this week's service; every code reads ✓, or says why not

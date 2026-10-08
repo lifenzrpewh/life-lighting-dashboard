@@ -34,7 +34,7 @@ import { isNdiId, ndiIdOf, ndiView, type NdiSource, type NdiView } from './ndi.j
 import { captureIdOf, captureView, isCaptureId, type CaptureInput, type CaptureView } from './capture.js'
 
 /** The views that come with Pāua. */
-export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video' | 'timer'
+export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video' | 'timer' | 'guide'
 
 /** A built-in view, or an embed, NDI source or capture input someone added in
  *  Settings (./embeds.ts, ./ndi.ts, ./capture.ts). Since 2026-10-08 a tab
@@ -82,7 +82,7 @@ export function sameChoice(a: VideoChoice | null | undefined, b: VideoChoice | n
 }
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
-export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video', 'timer']
+export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video', 'timer', 'guide']
 
 export const VIEW_LABEL: Record<BuiltInView, string> = {
 	cue: 'Run order',
@@ -97,6 +97,9 @@ export const VIEW_LABEL: Record<BuiltInView, string> = {
 	video: 'Video',
 	/** The countdown beside the clock, big (./components/TimerView.tsx, 2026-10-08). */
 	timer: 'Timer',
+	/** LIFE's Creative Guide (./guide.ts), a page of main's own: a view since
+	 *  2026-10-08, the owner's choice, so it sits in whichever window wants it. */
+	guide: 'Guide',
 }
 
 /** A built-in view, or any embed's or NDI source's view by its shape. Whether
@@ -118,9 +121,10 @@ export function viewLabel(view: ViewId, embeds: readonly Embed[], ndi: readonly 
 }
 
 /** The views main draws as pages of their own, over the box that holds them:
- *  the MA, the run order and every embed. A page is in one place at a time. */
+ *  the MA, the run order, the Guide and every embed. A page is in one place at
+ *  a time. */
 export function isNative(view: ViewId): boolean {
-	return view === 'ma' || view === 'cue' || embedIdOf(view) !== null
+	return view === 'ma' || view === 'cue' || view === 'guide' || embedIdOf(view) !== null
 }
 
 /** The screen in units, whatever its size in pixels. Fine enough that a drag

@@ -133,8 +133,8 @@ export function FeedList({
 									disabled={row.off && !on}
 									onClick={() => onPick(row.feed)}
 									aria-pressed={on}
-									className={`flex min-h-12 w-full shrink-0 items-center gap-3 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-booth-hover active:bg-booth-hover disabled:opacity-50 disabled:hover:bg-transparent ${
-										on ? 'text-booth-ink ring-1 ring-nacre-blue ring-inset' : 'text-booth-dim'
+									className={`flex min-h-12 w-full shrink-0 items-center gap-3 rounded-ctl px-3 py-1.5 text-left text-sm hover:bg-booth-hover active:bg-booth-hover disabled:opacity-50 disabled:hover:bg-transparent ${
+										on ? 'text-booth-ink ring-1 ring-accent-hi ring-inset' : 'text-booth-dim'
 									}`}
 								>
 									<g.icon size={18} strokeWidth={1.8} className="shrink-0" aria-hidden />
@@ -177,7 +177,7 @@ export function FeedMenu({
 				<ChevronDown size={16} className="shrink-0 text-booth-dim" aria-hidden />
 			</button>
 			{open && (
-				<div className="absolute top-12 right-0 z-20 max-h-[min(32rem,70vh)] w-80 animate-rise overflow-y-auto rounded-xl bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
+				<div className="absolute top-12 right-0 z-20 max-h-[min(32rem,70vh)] w-80 animate-rise overflow-y-auto rounded-win bg-booth-raise p-1.5 shadow-2xl ring-1 ring-booth-edge">
 					<FeedList
 						options={options}
 						current={current}
@@ -198,7 +198,7 @@ export function FeedChooser({ options, onPick }: { options: FeedOptions; onPick:
 		<div className="flex min-h-0 min-w-0 flex-1 justify-center overflow-y-auto p-6">
 			<div className="flex w-full max-w-md flex-col gap-4">
 				<div className="flex flex-col gap-1 px-3">
-					<span className="text-base font-medium">What should this tab show?</span>
+					<span className="text-xl font-extrabold tracking-tight">What should this tab show?</span>
 					<span className="text-sm text-booth-dim">Each Video tab shows its own feed; the feed button in its strip changes it later.</span>
 				</div>
 				<FeedList options={options} current={null} onPick={onPick} />

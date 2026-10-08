@@ -46,7 +46,7 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
 			<div className="max-h-[55%] shrink-0 overflow-y-auto border-b border-booth-edge px-4">
 				<div className="flex h-12 min-w-0 items-center gap-3 text-sm">
 					<span className={chipLabel}>Lookbook</span>
-					<button type="button" onClick={() => setDetails(!details)} className="min-w-0 truncate rounded-lg px-1 text-booth-dim hover:text-booth-ink">
+					<button type="button" onClick={() => setDetails(!details)} className="min-w-0 truncate rounded-ctl px-1 text-booth-dim hover:text-booth-ink">
 						{m.service !== null ? `${m.service.name}${m.byHand ? ' (picked)' : ''}` : 'Which service?'}
 					</button>
 					{m.runSheet !== null && (
@@ -57,7 +57,7 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						{operator && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
 						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Load all</SmallButton>}
-						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-lg bg-booth-raise hover:bg-booth-hover">
+						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-ctl bg-booth-raise hover:bg-booth-hover">
 							<RefreshCw size={16} aria-hidden />
 						</button>
 					</span>
@@ -114,13 +114,13 @@ function Card({
 	const steps = look.ready ? [] : lookSteps(look.item, m.runSheet ?? [], status, m.same, m.sizes)
 	const busy = look.codes.filter((c) => under(m.fetches[c.code]))
 	const failed = look.codes.find((c) => m.fetches[c.code]?.state === 'failed' || m.refused[c.code] !== undefined)
-	const ring = look.live ? 'ring-2 ring-state-live' : look.ready ? 'ring-1 ring-booth-edge' : 'ring-2 ring-warn/70'
+	const ring = look.live ? 'ring-4 ring-state-live' : look.ready ? '' : 'ring-4 ring-warn'
 	return (
-		<article className={`flex min-w-0 snap-start flex-col overflow-hidden rounded-xl bg-booth-panel ${ring}`}>
+		<article className={`flex min-w-0 snap-start flex-col overflow-hidden rounded-win bg-booth-panel ${ring}`}>
 			<div className="relative w-full bg-black" style={{ aspectRatio: '5800 / 2037' }}>
 				<Picture url={main === null ? null : lookbookThumbUrl(main, 'large')} />
-				<span className="absolute top-3 left-3 rounded-md bg-black/70 px-2.5 py-1 text-lg tabular-nums">{order}</span>
-				{look.live && <span className="absolute top-3 left-16 rounded-md bg-state-live px-2.5 py-1 text-lg font-medium text-booth-bg">On screen</span>}
+				<span className="absolute top-3 left-3 rounded-ctl bg-black/70 px-2.5 py-1 text-lg tabular-nums">{order}</span>
+				{look.live && <span className="absolute top-3 left-16 rounded-ctl bg-state-live px-2.5 py-1 text-lg font-extrabold text-black">On screen</span>}
 				{look.ready && (
 					<span className="absolute top-3 right-3 grid size-10 place-items-center rounded-full bg-black/70 text-state-live" aria-label="All in Arena">
 						<Check size={22} aria-hidden />
@@ -131,7 +131,7 @@ function Card({
 				{sideFile !== null && side !== undefined && (
 					<figure className="w-[38%] max-w-[720px] shrink-0">
 						{/* A lower third is white words on nothing: on grey, as the lookbook shows it. */}
-						<div className={`relative aspect-video w-full overflow-hidden rounded-lg ${side.type === 'T' ? 'bg-neutral-600' : 'bg-black'}`}>
+						<div className={`relative aspect-video w-full overflow-hidden rounded-ctl ${side.type === 'T' ? 'bg-neutral-600' : 'bg-black'}`}>
 							<Picture url={lookbookThumbUrl(sideFile, 'large')} />
 						</div>
 						<figcaption className="mt-1.5 truncate text-sm text-booth-dim">{side.type === 'A' ? 'A-screen' : 'Lower third'}</figcaption>
@@ -139,11 +139,11 @@ function Card({
 				)}
 				<div className="flex min-w-0 flex-1 flex-col gap-3">
 					<div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-						<h3 className="min-w-0 text-3xl font-medium">{item.title}</h3>
+						<h3 className="min-w-0 text-3xl font-extrabold tracking-tight">{item.title}</h3>
 						{item.label !== null && <span className="min-w-0 text-xl text-booth-dim">{item.label}</span>}
 					</div>
 					{look.column !== null && look.column.name !== '' && (
-						<span className="self-start rounded-md bg-booth-raise px-2 py-1 text-sm text-booth-dim">Column {look.column.name}</span>
+						<span className="self-start rounded-ctl bg-booth-raise px-2 py-1 text-sm text-booth-dim">Column {look.column.name}</span>
 					)}
 					<div className="flex flex-wrap gap-2">
 						{look.codes.map((c) => (
@@ -172,7 +172,7 @@ function CodeChip({ code, state, fetch }: { code: string; state: CodeState; fetc
 	const going = under(fetch)
 	const style: Record<CodeState, string> = {
 		ready: 'bg-booth-raise text-booth-ink',
-		place: 'border border-dashed border-nacre-blue/80 text-nacre-blue',
+		place: 'border border-dashed border-accent-hi/80 text-accent-hi',
 		look: 'bg-warn/15 text-warn',
 		missing: 'bg-warn/15 text-warn',
 		'no-place': 'border border-dashed border-booth-edge text-booth-dim',
@@ -189,7 +189,7 @@ function CodeChip({ code, state, fetch }: { code: string; state: CodeState; fetc
 		'not-arena': `Not Arena’s (${mediaCodeOf(code)?.type === 'T' ? 'a lower third' : 'another program’s'})`,
 	}
 	return (
-		<span title={title[state]} className={`inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 font-mono text-sm ${style[state]}`}>
+		<span title={title[state]} className={`inline-flex h-9 items-center gap-1.5 rounded-ctl px-2.5 font-mono text-sm ${style[state]}`}>
 			{state === 'missing' && <FileX size={12} aria-hidden />}
 			{state === 'place' && !going && '+'}
 			{code}

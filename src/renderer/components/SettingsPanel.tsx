@@ -86,6 +86,8 @@ export function SettingsPanel({
 	onClose,
 	barHidden,
 	onBarHidden,
+	testing,
+	onTesting,
 }: {
 	rows: readonly ConnectionStatus[]
 	/** The page to open on: a connection tapped in Connections, or null for
@@ -101,6 +103,9 @@ export function SettingsPanel({
 	/** The top bar's hidden items, on this computer (../barItems.ts). */
 	barHidden: ReadonlySet<BarItem>
 	onBarHidden: (item: BarItem, hidden: boolean) => void
+	/** Testing: Mark on the bar, on this computer (../barItems.ts). */
+	testing: boolean
+	onTesting: (on: boolean) => void
 }) {
 	const [view, setView] = useState<SettingsView | null>(null)
 	const [picked, setPicked] = useState<SettingsPage | null>(start)
@@ -168,7 +173,7 @@ export function SettingsPanel({
 					{rows.every((r) => r.tone === 'off') && (
 						// A fresh install: every row off, which reads as a broken screen
 						// unless something says it is only empty.
-						<p className="mb-2 rounded-lg bg-booth-raise px-4 py-3 text-sm">
+						<p className="mb-2 rounded-ctl bg-booth-raise px-4 py-3 text-sm">
 							Nothing is set up yet. Tap a connection to give it an address; start with the Console.
 						</p>
 					)}
@@ -216,7 +221,12 @@ export function SettingsPanel({
 						onClick={() => setPicked('bar')}
 						lead={<PanelTop size={18} className="text-booth-dim" aria-hidden />}
 						title="Top bar"
-						sub={<span className="text-booth-dim">{barHidden.size === 0 ? 'Everything shown' : `${barHidden.size} hidden`}</span>}
+						sub={
+							<span className="text-booth-dim">
+								{barHidden.size === 0 ? 'Everything shown' : `${barHidden.size} hidden`}
+								{testing && ' · testing'}
+							</span>
+						}
 					/>
 					<ListRow
 						selected={selected === 'computer'}
@@ -246,7 +256,7 @@ export function SettingsPanel({
 						) : selected === 'admin' ? (
 							<AdminSettings view={view} save={save} />
 						) : selected === 'bar' ? (
-							<TopBarSettings hidden={barHidden} onSet={onBarHidden} />
+							<TopBarSettings hidden={barHidden} onSet={onBarHidden} testing={testing} onTesting={onTesting} />
 						) : selected === 'computer' ? (
 							<>
 								<DetailHead title="This computer" />

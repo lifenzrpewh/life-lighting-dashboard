@@ -130,13 +130,13 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 			<div className="max-h-[55%] shrink-0 overflow-y-auto border-b border-booth-edge px-4">
 				<div className="flex h-12 min-w-0 items-center gap-3 text-sm">
 					{onBack !== undefined && (
-						<button type="button" onClick={onBack} className="-ml-2 flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2 text-booth-dim hover:bg-booth-hover" aria-label="Back to Arena">
+						<button type="button" onClick={onBack} className="-ml-2 flex h-10 shrink-0 items-center gap-1.5 rounded-ctl px-2 text-booth-dim hover:bg-booth-hover" aria-label="Back to Arena">
 							<ArrowLeft size={18} aria-hidden />
 							Arena
 						</button>
 					)}
 					<span className={chipLabel}>Holding</span>
-					<button type="button" onClick={() => setDetails(!details)} className="min-w-0 truncate rounded-lg px-1 text-booth-dim hover:text-booth-ink">
+					<button type="button" onClick={() => setDetails(!details)} className="min-w-0 truncate rounded-ctl px-1 text-booth-dim hover:text-booth-ink">
 						{m.service !== null ? `${m.service.name}${m.byHand ? ' (picked)' : ''}` : 'Which service?'}
 					</button>
 					<span className="shrink-0">
@@ -146,7 +146,7 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						{operator && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
 						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
-						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-lg bg-booth-raise hover:bg-booth-hover">
+						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-ctl bg-booth-raise hover:bg-booth-hover">
 							<RefreshCw size={16} aria-hidden />
 						</button>
 					</span>
@@ -169,7 +169,7 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					</div>
 				)}
 				{!named && m.runSheet !== null && (
-					<p className="mb-2 rounded-lg bg-booth-raise p-3 text-sm">
+					<p className="mb-2 rounded-ctl bg-booth-raise p-3 text-sm">
 						Name Arena&rsquo;s columns <b>{COLUMN_NAMES}</b> to place by column. Until then nothing is placed.
 					</p>
 				)}
@@ -254,13 +254,13 @@ function Activity({ fetches, refused, now, onTap }: { fetches: FetchStates; refu
 					key={code}
 					type="button"
 					onClick={() => onTap(code)}
-					className={`h-7 shrink-0 rounded-md px-2 text-xs tabular-nums ${f.state === 'failed' ? 'bg-warn/15 text-warn' : 'bg-booth-raise text-booth-dim'}`}
+					className={`h-7 shrink-0 rounded-ctl px-2 text-xs tabular-nums ${f.state === 'failed' ? 'bg-warn/15 text-warn' : 'bg-booth-raise text-booth-dim'}`}
 				>
 					<span className="font-mono">{code}</span> {fetchShort(f)}
 				</button>
 			))}
 			{refusals.map(([code]) => (
-				<button key={`r${code}`} type="button" onClick={() => onTap(code)} className="h-7 shrink-0 rounded-md bg-warn/15 px-2 text-xs text-warn">
+				<button key={`r${code}`} type="button" onClick={() => onTap(code)} className="h-7 shrink-0 rounded-ctl bg-warn/15 px-2 text-xs text-warn">
 					<span className="font-mono">{code}</span> refused
 				</button>
 			))}
@@ -308,7 +308,7 @@ function Tray({
 						disabled={!operator || what === null || busy}
 						onClick={() => onChoose(active ? null : what)}
 						title={u.detail}
-						className={`relative h-16 w-28 shrink-0 overflow-hidden rounded-lg text-left disabled:cursor-default ${active ? 'nacre-ring' : 'border border-dashed border-nacre-blue/70'} ${what === null ? 'opacity-50' : ''}`}
+						className={`relative h-16 w-28 shrink-0 overflow-hidden rounded-ctl text-left disabled:cursor-default ${active ? 'accent-ring' : 'border border-dashed border-accent-hi/70'} ${what === null ? 'opacity-50' : ''}`}
 					>
 						{file !== null && <Picture url={lookbookThumbUrl(file)} fill />}
 						<span className="absolute inset-x-0 bottom-0 flex flex-col bg-black/70 px-1.5 py-0.5 text-[11px] leading-tight">
@@ -344,12 +344,12 @@ function Ghost({ m, p, operator, onTap }: { m: MediaCheckState; p: Placement; op
 			onClick={onTap}
 			disabled={busy || !operator}
 			title={`${p.code} goes here${p.replaces === null ? '' : `, replacing ${p.replaces.name}`}`}
-			className={`relative block h-16 w-28 overflow-hidden rounded-lg border-2 border-dashed text-left disabled:cursor-default ${p.live ? 'border-state-live' : 'border-nacre-blue/80'}`}
+			className={`relative block h-16 w-28 overflow-hidden rounded-ctl border-2 border-dashed text-left disabled:cursor-default ${p.live ? 'border-state-live' : 'border-accent-hi/80'}`}
 		>
 			<span className="absolute inset-0 opacity-60">
 				<Picture url={lookbookThumbUrl(p.lookbookPath)} fill />
 			</span>
-			<span className="absolute top-1 right-1 rounded bg-black/75 px-1 text-[11px] text-nacre-blue">{busy ? fetchShort(m.fetches[p.code] as FetchStates[string]) : operator ? '+ place' : 'goes here'}</span>
+			<span className="absolute top-1 right-1 rounded bg-black/75 px-1 text-[11px] text-accent-hi">{busy ? fetchShort(m.fetches[p.code] as FetchStates[string]) : operator ? '+ place' : 'goes here'}</span>
 			<span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1.5 py-0.5 font-mono text-[11px]">{p.code}</span>
 		</button>
 	)
@@ -376,21 +376,21 @@ function Tile({
 	const url = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
 	const [failed, setFailed] = useState<string | null>(null)
 	const ring = target
-		? 'nacre-ring'
+		? 'accent-ring'
 		: picked
 			? 'ring-2 ring-booth-ink'
 			: needsLook(mark)
-				? 'ring-2 ring-warn'
+				? 'outline-4 -outline-offset-4 outline-warn'
 				: slot.state === 'playing'
-					? 'ring-2 ring-state-live'
-					: 'ring-1 ring-booth-edge'
+					? 'outline-4 -outline-offset-4 outline-state-live'
+					: ''
 	const faded = dim || (!target && (mark === 'not-today' || mark === 'no-code'))
 	if (slot.state === 'empty') {
 		return (
 			<button
 				type="button"
 				onClick={onTap}
-				className={`flex h-16 w-28 items-end rounded-lg border border-dashed border-booth-edge/70 p-1 text-left text-[11px] text-booth-faint ${target ? 'nacre-ring' : ''} ${dim ? 'opacity-40' : ''}`}
+				className={`flex h-16 w-28 items-end rounded-ctl border border-dashed border-booth-edge/70 p-1 text-left text-[11px] text-booth-faint ${target ? 'accent-ring' : ''} ${dim ? 'opacity-40' : ''}`}
 			>
 				{reservedNote}
 			</button>
@@ -401,7 +401,7 @@ function Tile({
 		<button
 			type="button"
 			onClick={onTap}
-			className={`relative block h-16 w-28 overflow-hidden rounded-lg bg-booth-raise text-left ${ring} ${faded ? 'opacity-45' : ''}`}
+			className={`relative block h-16 w-28 overflow-hidden rounded-ctl bg-booth-raise text-left ${ring} ${faded ? 'opacity-45' : ''}`}
 		>
 			{url !== null && failed !== url && <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className="absolute inset-0 size-full object-cover" />}
 			<span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1.5 py-0.5 text-[11px]">
@@ -429,7 +429,7 @@ function Legend({ operator }: { operator: boolean }) {
 				<FileX size={13} className="text-warn" /> file missing
 			</span>
 			<span className={item}>
-				<span className="h-3 w-4 rounded-sm border-2 border-dashed border-nacre-blue/80" /> {operator ? 'goes here: tap to place' : 'goes here'}
+				<span className="h-3 w-4 rounded-sm border-2 border-dashed border-accent-hi/80" /> {operator ? 'goes here: tap to place' : 'goes here'}
 			</span>
 			<span className={item}>
 				<span className="h-3 w-4 rounded-sm ring-2 ring-state-live" /> on screen
@@ -474,7 +474,7 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 	const arenaUrl = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
 	const answers = operator && code !== null && want !== null && file !== null && slot.file !== null && (needsLook(mark) || mark === 'confirmed')
 	return (
-		<div className="m-4 flex max-w-3xl flex-col gap-3 rounded-lg bg-booth-panel p-4 text-sm ring-1 ring-booth-edge ring-inset">
+		<div className="m-4 flex max-w-3xl flex-col gap-3 rounded-ctl bg-booth-panel p-4 text-sm ring-1 ring-booth-edge ring-inset">
 			<div className="flex items-center gap-3">
 				<span className="min-w-0 flex-1 truncate">
 					<span className="font-medium">
@@ -484,7 +484,7 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 					<span className={needsLook(mark) ? 'text-warn' : 'text-booth-dim'}> · {m.check === null ? 'not checked' : VERDICT[mark]}</span>
 					{slot.state === 'playing' && <span className="text-state-live"> · on screen</span>}
 				</span>
-				<button type="button" onClick={onClose} aria-label="Close" className="grid size-10 place-items-center rounded-lg hover:bg-booth-hover">
+				<button type="button" onClick={onClose} aria-label="Close" className="grid size-10 place-items-center rounded-ctl hover:bg-booth-hover">
 					<X size={18} aria-hidden />
 				</button>
 			</div>
@@ -535,6 +535,6 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 function Picture({ url, large = false, fill = false }: { url: string | null; large?: boolean; fill?: boolean }) {
 	const [failed, setFailed] = useState<string | null>(null)
 	const size = fill ? 'absolute inset-0 size-full' : large ? 'h-36 w-64' : 'h-12 w-20'
-	if (url === null || failed === url) return <span className={`${size} shrink-0 rounded-md bg-booth-raise`} />
-	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`${size} shrink-0 rounded-md bg-booth-raise ${fill ? 'object-cover' : 'object-contain'}`} />
+	if (url === null || failed === url) return <span className={`${size} shrink-0 rounded-ctl bg-booth-raise`} />
+	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`${size} shrink-0 rounded-ctl bg-booth-raise ${fill ? 'object-cover' : 'object-contain'}`} />
 }

@@ -1,164 +1,62 @@
 // Top band: READ-ONLY. Status where you look; actions where your hand rests.
-// Nothing in here fires, stores, or deletes anything. The mode lock, Guide,
-// Layouts, Connections, Settings (Admin) and the console card are the
-// controls, and none of them touches the show: the console card opens a
-// sheet, whose Save As and Load are Admin's and behind their own guards
-// (./ShowfileSheet.tsx).
+// Nothing in here fires, stores, or deletes anything. Layouts, the alerts,
+// Connections, Mark (while testing), Settings (Admin) and the lock are the
+// controls, and none of them touches the show.
 //
-// Kept to what a volunteer acts on during a service (the owner's call,
-// 2026-10-02): the console's link, the show, the countdown and the clock. Every
-// other connection's health is in Connections, and its dot is the alarm that
-// says to look there.
+// THE 2026-10-08 LOOK (the owner's, over nine rounds in the "Pāua palette"
+// playground, https://claude.ai/artifact/KpEQSRUpXMdCC4cJHjQQbQ). Three zones,
+// quiet while everything answers and loud when not:
+// - Left: Layouts, where you are, then an alert lane that is empty on a good
+//   day. It speaks only when something needs a look: the console on its base
+//   show (amber, solid, opens Save As and Load), the console not answering, or
+//   another connection down or behind (named when one, counted when more;
+//   opens Connections). The console card that stood here went: the show is on
+//   the console itself and on Connections' Console row ("they can see the
+//   showfile in the console itself", the owner), and the two moments it
+//   mattered are the alerts.
+// - Centre: the countdown and the clock, each a big number over a grey line
+//   (what it counts to; the date), a hairline between them. Folded, each line
+//   sits beside its number.
+// - Right: one tray of same-sized square tools: Connections (its dot a badge
+//   on it), Mark while Testing is on (Settings › Top bar), Settings in Admin,
+//   and the lock, which in Admin is the selected blue and says so.
 //
-// Three zones since 2026-10-05 (the owner: "starting to feel a bit messy"):
-// the console on the left, one card for whether it is there and which show it
-// is on; time in the true centre, biggest on the bar; the controls on the
-// right. Admin lays the nacre line along the bar's foot, so the mode is
-// visible from across the booth without being the loudest thing on it.
-//
-// ONE BAR, TWO HEIGHTS (the owner, 2026-10-08): folded is the same bar at 36 px
-// with smaller type and icons, every item in the same place and every button
-// doing all it does unfolded. It was a separate strip with its own
-// arrangement and fewer controls (2026-10-05, the owner: the bar "seems to
-// take A LOT of screen space"), so things moved under the finger. The fold is
-// remembered on this computer. Edit layout left the bar the same day; since
-// 2026-10-08 it is the pencil in any window's strip (./Grid.tsx).
+// FOLDING (the owner chose a handle over a More menu, which took two presses):
+// a handle on the bar's bottom edge, inside the bar since nothing may be drawn
+// over a page. Tap it, or drag it up to fold and down to unfold. Folded is the
+// same bar at 34 px, every item in its place and doing all it does unfolded
+// (the owner, 2026-10-08: things must not move under the finger). Remembered
+// on this computer.
+// Instant, not animated: the pages main draws are placed from the windows
+// under the bar, and a sliding bar would drag them through a re-placement a
+// frame.
 //
 // THE TIME IS NEVER COVERED (the owner's bug, 2026-10-08: in Admin the clock
-// went behind the buttons). The zones are flex, not a 1fr/auto/1fr grid,
-// whose right column let its buttons spill left over the centre once Admin
-// added one. The sides give way first: the console card truncates, and the
-// buttons drop their words for their icons when they would not fit their
-// half. Should even the icons not fit, the time moves off true centre rather
-// than under anything.
+// went behind the buttons). The zones are flex, the sides sharing what is left
+// beside the time: the layout's name truncates and the alert lane clips first.
+// Should even the tray not fit, the time moves off true centre rather than
+// under anything.
 //
-// Admin hides any item a booth does not use (Settings › Top bar,
-// ../barItems.ts), per computer. The lock, Settings and the chevron always stay.
+// Admin hides any reading a booth does not use (Settings › Top bar,
+// ../barItems.ts), per computer. The lock, Settings and the handle always stay.
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { BookOpen, ChevronDown, ChevronUp, Flag, PanelsTopLeft, Settings } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Activity, ChevronDown, Flag, Lock, LockOpen, PanelsTopLeft, Settings } from 'lucide-react'
 
-import type { LinkState, Reading, UnknownReason } from '../../shared/reading.js'
-import { matchReading } from '../../shared/reading.js'
-import type { Tone } from '../../shared/connections.js'
+import type { LinkState, Reading } from '../../shared/reading.js'
+import type { ConnectionStatus, Tone } from '../../shared/connections.js'
+import { worstTone } from '../../shared/connections.js'
 import type { Mode } from '../../shared/ma-pane.js'
 import type { Showfile } from '../../shared/showfile.js'
 import type { TimerSources } from '../../shared/timer.js'
 import type { BarItem } from '../barItems.js'
-import { ModeChip } from './ModeChip.js'
-import { TimerChip } from './TimerChip.js'
+import { TimerChip, timerFace } from './TimerChip.js'
 import { Dot, type Icon } from './ui.js'
-import { chip, formatAge, staleContent, stateClass, unknownWhy } from './vocabulary.js'
-
-/** A round trip in milliseconds, which is what `roundTripMs` holds. Tenths
- *  below 10 ms, because a console on this computer answers in well under one
- *  and "0 ms" would read as no measurement at all. */
-function formatRoundTrip(ms: number): string {
-	return ms < 10 ? `${ms.toFixed(1)} ms` : `${Math.round(ms)} ms`
-}
-
-/** The console in one card: whether it answers, and the show it has loaded.
- *  The show is in the four states. On the base show the card is amber and
- *  says so for as long as that is true: a state, not a dialog to dismiss
- *  (docs/PLAN.md, Phase 3). The verdict is SaveGuard's, made on the console;
- *  this only shows it. A tap opens the showfile sheet: Save As and Load,
- *  folded or not. */
-function ConsoleCard({
-	link,
-	detail,
-	showfile,
-	failure,
-	open,
-	compact,
-	onOpen,
-}: {
-	link: LinkState
-	/** The round trip is a number for Admin; a volunteer needs only whether
-	 *  the console is there. */
-	detail: boolean
-	showfile: Reading<Showfile>
-	failure: string | null
-	open: boolean
-	/** The folded bar: one line. */
-	compact: boolean
-	onOpen: () => void
-}) {
-	const live = link.state === 'live'
-	const linkWords = live ? (
-		<span className="text-state-live">
-			Live{detail && !compact && <span className="ml-1.5 text-booth-dim tabular-nums">{formatRoundTrip(link.roundTripMs)}</span>}
-		</span>
-	) : (
-		<span className="text-state-unreachable">Not answering</span>
-	)
-
-	type Body = { show: Showfile | null; ageMs: number | null; why: UnknownReason | null }
-	const body = matchReading<Showfile, Body>(showfile, {
-		live: (show) => ({ show, ageMs: null, why: null }),
-		stale: (show, ageMs) => ({ show, ageMs, why: null }),
-		unknown: (why) => ({ show: null, ageMs: null, why }),
-	})
-	const stale = body.ageMs !== null
-	const onBase = body.show?.onBase === true
-	// Amber belongs to ON BASE SHOW (theme.css). STALE keeps its own marks on
-	// top: the dashed outline, the dimmed name, the age at full strength.
-	const frame = onBase
-		? `border-warn bg-warn/12 ${stale ? 'border-dashed' : 'border-solid'}`
-		: body.why !== null
-			? stateClass.unknown
-			: stale
-				? stateClass.stale
-				: stateClass.live
-
-	const name =
-		body.show !== null ? (
-			body.show.name
-		) : (
-			<span className="text-booth-dim">
-				? {unknownWhy[body.why!]}
-				{/* What went wrong, when the console said: an out-of-date
-				    plugin is something the LD can fix, and "read failed"
-				    alone does not say how. */}
-				{body.why === 'error' && failure !== null && !compact && <span className="ml-2 font-sans text-xs">{failure}</span>}
-			</span>
-		)
-
-	return (
-		<button
-			type="button"
-			onClick={onOpen}
-			aria-label="The console and its show: Save As and Load"
-			aria-expanded={open}
-			className={`${chip} ${frame} max-w-[36rem] min-w-0 text-left transition-colors hover:bg-booth-hover ${open ? 'bg-booth-hover' : ''} ${
-				compact ? 'h-7 gap-2 pr-1.5 pl-2.5' : 'h-12 gap-3.5 pr-3 pl-4'
-			}`}
-		>
-			<Dot tone={live ? 'live' : 'down'} size={compact ? 'sm' : 'md'} />
-			{compact ? (
-				<span className="flex min-w-0 items-baseline gap-2 text-xs whitespace-nowrap">
-					{linkWords}
-					<span className={`min-w-0 truncate font-mono ${onBase ? 'text-warn' : ''} ${stale ? staleContent : ''}`}>{name}</span>
-					{onBase && <span className="shrink-0 font-semibold text-warn">· base</span>}
-				</span>
-			) : (
-				<span className="flex min-w-0 flex-col leading-tight">
-					<span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap">
-						<span className="text-booth-dim">Console ·</span>
-						{linkWords}
-						{onBase && <span className="font-semibold text-warn">· On base show</span>}
-					</span>
-					<span className={`truncate font-mono text-[15px] ${stale ? staleContent : ''}`}>{name}</span>
-				</span>
-			)}
-			{stale && <span className="shrink-0 text-xs whitespace-nowrap text-state-stale">{formatAge(body.ageMs!)}</span>}
-			<ChevronDown size={compact ? 14 : 18} className="shrink-0 text-booth-dim" aria-hidden />
-		</button>
-	)
-}
+import { sentence } from './vocabulary.js'
 
 /** Now, from the same clock the ages derive from: not a literal, and not the
- *  service's own date, which is a different fact and can disagree. Folded, the
- *  time alone. */
+ *  service's own date, which is a different fact and can disagree. The date
+ *  under the time; folded, beside it. */
 function Clock({ now, compact }: { now: number; compact: boolean }) {
 	const d = new Date(now)
 	const parts = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).formatToParts(d)
@@ -170,67 +68,44 @@ function Clock({ now, compact }: { now: number; compact: boolean }) {
 	const period = parts.find((p) => p.type === 'dayPeriod')?.value ?? null
 	const date = d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
 	return (
-		<span className="flex shrink-0 flex-col leading-none">
-			<span className="flex items-baseline gap-1.5">
-				<span className={`${compact ? 'text-base' : 'text-[24px]'} font-medium tracking-tight tabular-nums`}>{time}</span>
-				{period !== null && <span className={`${compact ? 'text-xs' : 'text-sm'} font-medium text-booth-dim`}>{period}</span>}
+		<span className={`flex shrink-0 px-2 ${compact ? 'flex-row-reverse items-baseline gap-2' : 'flex-col items-start gap-1.5'}`}>
+			<span className="flex items-baseline gap-1 leading-none">
+				<span className={`${compact ? 'text-base' : 'text-[26px]'} font-extrabold tracking-tight tabular-nums`}>{time}</span>
+				{period !== null && <span className={`${compact ? 'text-[11px]' : 'text-[13px]'} font-bold text-booth-dim`}>{period}</span>}
 			</span>
-			{!compact && <span className="mt-0.5 text-xs text-booth-dim">{date}</span>}
+			<span className={`leading-none font-medium whitespace-nowrap text-booth-dim ${compact ? 'text-xs' : 'text-[12.5px]'}`}>{date}</span>
 		</span>
 	)
 }
 
-/** A button on the bar: an icon and its word, the word dropped when the bar is
- *  short of room (`bare`), smaller when folded. Always labelled, for a screen
- *  reader and a tooltip. */
-function BarButton({
-	icon: IconC,
-	lead,
-	label,
-	words,
-	trail,
-	onClick,
-	pressed,
-	compact,
-	bare,
-	maxWords,
-}: {
-	icon?: Icon
-	/** Drawn before the words in place of an icon: the Connections dot. */
-	lead?: ReactNode
-	label: string
-	/** What the button says, when there is room. */
-	words: ReactNode
-	trail?: ReactNode
-	onClick: () => void
-	pressed: boolean
-	compact: boolean
-	bare: boolean
-	maxWords?: string
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			aria-pressed={pressed}
-			aria-label={label}
-			title={label}
-			className={`inline-flex shrink-0 items-center justify-center rounded-lg font-medium whitespace-nowrap transition-colors select-none active:scale-[0.98] ${
-				compact ? `h-8 text-xs ${bare ? 'min-w-9 px-2' : 'gap-1.5 px-2.5'}` : `h-12 text-base ${bare ? 'min-w-12 px-3' : 'gap-2.5 px-5'}`
-			} ${
-				pressed
-					? 'bg-booth-hover text-booth-ink ring-1 ring-booth-dim/40 ring-inset'
-					: compact
-						? 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
-						: 'bg-booth-raise text-booth-ink hover:bg-booth-hover'
-			}`}
-		>
-			{IconC !== undefined && <IconC size={compact ? 15 : 20} strokeWidth={1.8} aria-hidden className="shrink-0" />}
-			{lead}
-			{!bare && <span className={`truncate ${maxWords ?? ''}`}>{words}</span>}
-			{trail}
-		</button>
-	)
+/** Something that needs a look, said in words on the left of the bar. A tap
+ *  opens where it can be dealt with. */
+type Alert = { key: string; tone: Tone | 'warn'; words: string; open: 'showfile' | 'connections' }
+
+/** What the alert lane says now. Empty on a good day. */
+function alertsOf(link: LinkState, consoleOn: boolean, showfile: Reading<Showfile>, rows: readonly ConnectionStatus[]): Alert[] {
+	const alerts: Alert[] = []
+	const show = showfile.state === 'unknown' ? null : showfile.value
+	// SaveGuard's verdict, made on the console; this only says it (docs/PLAN.md,
+	// Phase 3): a state for as long as it is true, not a dialog to dismiss.
+	if (consoleOn && show?.onBase === true) alerts.push({ key: 'base', tone: 'warn', words: `On the base show: ${show.name}`, open: 'showfile' })
+	if (consoleOn && link.state === 'unreachable') alerts.push({ key: 'console', tone: 'down', words: 'Console not answering', open: 'connections' })
+	const others = rows.filter((r) => r.id !== 'console' && (r.tone === 'down' || r.tone === 'stale'))
+	if (others.length === 1) {
+		const r = others[0]!
+		alerts.push({ key: `row:${r.id}`, tone: r.tone, words: `${r.name}: ${sentence(r.status).toLowerCase()}`, open: 'connections' })
+	} else if (others.length > 1) {
+		alerts.push({ key: 'rows', tone: worstTone(others), words: `${others.length} connections need a look`, open: 'connections' })
+	}
+	return alerts
+}
+
+const alertTone: Record<Alert['tone'], string> = {
+	warn: 'bg-warn text-black',
+	down: 'bg-state-unreachable/15 text-state-unreachable',
+	stale: 'bg-state-stale/15 text-state-stale',
+	live: 'bg-state-live/15 text-state-live',
+	off: 'bg-booth-raise text-booth-dim',
 }
 
 export function StatusBar({
@@ -242,20 +117,17 @@ export function StatusBar({
 	onLeave,
 	asking,
 	connectionsOpen,
+	testing,
 	onMark,
-	guideOpen,
-	onGuide,
 	layoutName,
 	layoutsOpen,
 	onLayouts,
 	onConnections,
 	settingsOpen,
 	onSettings,
-	showfileOpen,
 	onShowfile,
-	connections,
+	rows,
 	showfile,
-	showfileFailure,
 	timers,
 	hidden,
 	collapsed,
@@ -271,12 +143,11 @@ export function StatusBar({
 	/** The passcode sheet is open. */
 	asking: boolean
 	connectionsOpen: boolean
+	/** Settings › Top bar › Testing (../barItems.ts): Mark is on the bar. */
+	testing: boolean
 	/** "Mark this moment": a line in the log for a tester. Answers which mark,
 	 *  or null when it could not be written. */
 	onMark: () => Promise<number | null>
-	/** The Creative Guide (../../shared/guide.ts), for everyone to read. */
-	guideOpen: boolean
-	onGuide: () => void
 	/** The saved layout on screen, if it is one (../../shared/layout.ts). */
 	layoutName: string | null
 	layoutsOpen: boolean
@@ -286,154 +157,138 @@ export function StatusBar({
 	/** Settings (./SettingsPanel.tsx): Admin only, not drawn otherwise. */
 	settingsOpen: boolean
 	onSettings: () => void
-	showfileOpen: boolean
-	/** Open the showfile sheet. */
+	/** Open the showfile sheet: the base-show alert's tap. */
 	onShowfile: () => void
-	/** The worst of the connections that are set up (src/shared/connections.ts). */
-	connections: Tone
+	/** Every connection's row (src/shared/connections.ts): the badge is the
+	 *  worst of those set up, and the alerts name what is down. */
+	rows: readonly ConnectionStatus[]
 	showfile: Reading<Showfile>
-	/** Why the last showfile read failed, in the console's words, if it did. */
-	showfileFailure: string | null
 	/** OnTime and ProPresenter, as main last heard them. */
 	timers: TimerSources | null
 	/** What Admin has hidden on this computer (../barItems.ts). */
 	hidden: ReadonlySet<BarItem>
-	/** The bar folded: 36 px, the same items in the same places. */
+	/** The bar folded: 34 px, the same items in the same places. */
 	collapsed: boolean
 	onCollapse: (collapsed: boolean) => void
 }) {
-	const operator = mode === 'operator'
+	const admin = mode === 'operator'
 	const compact = collapsed
 	const shows = (item: BarItem) => !hidden.has(item)
+	const alerts = alertsOf(link, consoleOn, showfile, rows)
+	// Only while either program is set up: otherwise the chip draws nothing,
+	// and nor may its divider.
+	const countdown = shows('countdown') && timers !== null && timerFace(timers, now) !== null ? <TimerChip sources={timers} compact={compact} /> : null
+	const clock = shows('clock') ? <Clock now={now} compact={compact} /> : null
 
-	// How many words the buttons keep: only as many as fit in their half of
-	// the bar beside the time. 0, all; 1, Guide and Connections are icons and
-	// the layout's name shorter; 2, every button an icon, the lock too.
-	// Measured, since what fits depends on the mode, the layout's name, what
-	// is hidden and the screen.
-	const bar = useRef<HTMLElement | null>(null)
-	const centre = useRef<HTMLDivElement | null>(null)
-	const right = useRef<HTMLDivElement | null>(null)
-	const [tight, setTight] = useState<0 | 1 | 2>(0)
-	const widths = useRef<number[]>([])
-	const measureKey = `${operator}|${compact}|${layoutName}|${[...hidden].join()}|${consoleOn}`
-	// What the buttons hold changed: try the words again, before paint.
-	useLayoutEffect(() => {
-		widths.current = []
-		setTight(0)
-	}, [measureKey])
-	useLayoutEffect(() => {
-		const measure = () => {
-			const b = bar.current
-			const c = centre.current
-			const r = right.current
-			if (b === null || c === null || r === null) return
-			const style = getComputedStyle(b)
-			const inner = b.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-			const gap = parseFloat(style.columnGap) || 0
-			const half = (inner - c.offsetWidth - 2 * gap) / 2
-			widths.current[tight] = r.scrollWidth
-			if (tight < 2 && r.scrollWidth > half + 0.5) setTight((tight + 1) as 1 | 2)
-			else if (tight > 0 && (widths.current[tight - 1] ?? Infinity) <= half) setTight((tight - 1) as 0 | 1)
-		}
-		measure()
-		const ro = new ResizeObserver(measure)
-		if (bar.current !== null) ro.observe(bar.current)
-		if (centre.current !== null) ro.observe(centre.current)
-		return () => ro.disconnect()
-	}, [tight, measureKey])
-	const bare = tight === 2
+	const [marked, setMarked] = useState<number | null>(null)
+	useEffect(() => {
+		if (marked === null) return
+		const t = setTimeout(() => setMarked(null), 3_000)
+		return () => clearTimeout(t)
+	}, [marked])
 
 	return (
 		<header
-			ref={bar}
-			className={`relative flex shrink-0 items-center overflow-hidden border-b border-booth-edge bg-booth-panel ${
-				compact ? 'h-9 gap-3 px-2' : 'h-[60px] gap-6 px-4'
+			className={`relative flex shrink-0 items-center bg-booth-bg ${
+				compact ? 'h-[34px] gap-3 px-1.5 pb-1.5' : 'h-16 gap-4 px-2.5 pb-2'
 			}`}
 		>
-			{/* The console: is it there, and which show it is on. Gives way first. */}
-			<div className="flex min-w-0 flex-1 basis-0 items-center">
-				{consoleOn && shows('console') && (
-					<ConsoleCard
-						link={link}
-						detail={operator}
-						showfile={showfile}
-						failure={showfileFailure}
-						open={showfileOpen}
-						compact={compact}
-						onOpen={onShowfile}
-					/>
+			{/* Where you are, and what needs a look. Gives way first. */}
+			<div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5">
+				{shows('layouts') && (
+					<button
+						type="button"
+						onClick={onLayouts}
+						aria-pressed={layoutsOpen}
+						aria-label={layoutName === null ? 'Layouts' : `Layouts: ${layoutName}`}
+						title={layoutName === null ? 'Layouts' : `Layouts: ${layoutName}`}
+						className={`inline-flex min-w-0 shrink-0 items-center rounded-ctl font-bold whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-95 ${
+							compact ? 'h-7 gap-1.5 px-2 text-[13px]' : 'h-[42px] gap-2 px-3 text-sm'
+						} ${layoutsOpen ? 'bg-accent text-accent-ink' : 'text-booth-ink hover:bg-booth-raise'}`}
+					>
+						<PanelsTopLeft size={compact ? 16 : 20} strokeWidth={2} aria-hidden className="shrink-0" />
+						<span className={`truncate ${compact ? 'max-w-40' : 'max-w-56'}`}>{layoutName ?? 'Layouts'}</span>
+						<ChevronDown size={compact ? 14 : 16} strokeWidth={2} aria-hidden className={`-ml-0.5 shrink-0 ${layoutsOpen ? '' : 'text-booth-faint'}`} />
+					</button>
 				)}
+				<span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+					{alerts.map((a) => (
+						<button
+							key={a.key}
+							type="button"
+							onClick={a.open === 'showfile' ? onShowfile : onConnections}
+							title={a.words}
+							className={`inline-flex min-w-0 shrink-0 animate-slide-in items-center gap-2 rounded-ctl font-bold whitespace-nowrap transition-[filter,transform] hover:brightness-115 active:scale-95 ${
+								compact ? 'h-6 px-2 text-xs' : 'h-9 px-3 text-[13.5px]'
+							} ${alertTone[a.tone]}`}
+						>
+							{a.tone === 'warn' ? <span aria-hidden className="size-2 shrink-0 rounded-full bg-black" /> : <Dot tone={a.tone} size="sm" />}
+							<span className="truncate">{a.words}</span>
+						</button>
+					))}
+				</span>
 			</div>
 
 			{/* The time: what comes next, and what it is now. Never shrinks. */}
-			<div ref={centre} className={`flex shrink-0 items-center ${compact ? 'gap-4' : 'gap-7'}`}>
-				{shows('countdown') && <TimerChip sources={timers} compact={compact} />}
-				{shows('clock') && <Clock now={now} compact={compact} />}
+			<div className={`flex shrink-0 items-center ${compact ? 'gap-3' : 'gap-4'}`}>
+				{countdown}
+				{countdown !== null && clock !== null && <span aria-hidden className={`w-px bg-booth-hover ${compact ? 'h-3.5' : 'h-[34px]'}`} />}
+				{clock}
 			</div>
 
-			{/* Controls, where the hand rests. None touches the show. Never
-			    narrower than its buttons: past its half, they lose their words. */}
-			<div ref={right} className={`flex flex-1 basis-0 items-center justify-end ${compact ? 'gap-1' : 'gap-2'}`}>
-				{shows('guide') && (
-					<BarButton icon={BookOpen} label="Guide" words="Guide" onClick={onGuide} pressed={guideOpen} compact={compact} bare={tight > 0} />
+			{/* Controls, where the hand rests. None touches the show. */}
+			<div className="flex min-w-0 flex-1 basis-0 items-center justify-end gap-1">
+				{marked !== null && (
+					<span
+						className={`inline-flex min-w-0 animate-slide-in items-center truncate rounded-ctl bg-state-live font-bold text-black ${
+							compact ? 'h-6 px-2 text-xs' : 'h-8 px-3 text-[13px]'
+						}`}
+					>
+						Mark {marked} written to the log
+					</span>
 				)}
-				{shows('layouts') && (
-					<BarButton
-						icon={PanelsTopLeft}
-						label={layoutName === null ? 'Layouts' : `Layouts: ${layoutName}`}
-						words={layoutName ?? 'Layouts'}
-						maxWords={tight > 0 ? 'max-w-28' : compact ? 'max-w-40' : 'max-w-56'}
-						trail={<ChevronDown size={compact ? 13 : 16} className="-mr-1 shrink-0 text-booth-dim" aria-hidden />}
-						onClick={onLayouts}
-						pressed={layoutsOpen}
-						compact={compact}
-						bare={bare}
-					/>
-				)}
-				{/* For everyone: a volunteer can see what is down and say so. The
-				    fields are in Settings, Admin's. */}
-				{shows('connections') && (
-					<BarButton
-						lead={<Dot tone={connections} size={compact ? 'sm' : 'md'} />}
-						label="Connections"
-						words="Connections"
-						onClick={onConnections}
-						pressed={connectionsOpen}
-						compact={compact}
-						bare={tight > 0}
-					/>
-				)}
-				{shows('mark') && <MarkButton onMark={onMark} compact={compact} />}
-				{operator && <SquareButton icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} compact={compact} />}
-				{/* Boots into volunteer, always, and never remembers otherwise. */}
-				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} compact={compact} bare={bare} asking={asking} />
-				<SquareButton
-					icon={compact ? ChevronDown : ChevronUp}
-					label={compact ? 'Show the bar at full height' : 'Fold the bar away'}
-					onClick={() => onCollapse(!compact)}
-					compact={compact}
-				/>
+				<span className="flex shrink-0 items-center gap-0.5">
+					{shows('connections') && (
+						<Tool icon={Activity} label="Connections" onClick={onConnections} pressed={connectionsOpen} compact={compact}>
+							<span
+								className={`absolute grid place-items-center rounded-full ${compact ? 'top-0.5 right-0.5 size-2.5' : 'top-1.5 right-1.5 size-3'} ${
+									connectionsOpen ? 'bg-accent' : 'bg-booth-bg group-hover:bg-booth-raise'
+								}`}
+							>
+								<Dot tone={worstTone(rows)} size="sm" />
+							</span>
+						</Tool>
+					)}
+					{testing && (
+						<Tool icon={Flag} label="Mark this moment in the log" onClick={() => void onMark().then(setMarked)} compact={compact} />
+					)}
+					{admin && <Tool icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} compact={compact} />}
+					{/* Boots into volunteer, always, and never remembers otherwise. */}
+					<LockButton admin={admin} asking={asking} onEnter={onEnter} onLeave={onLeave} compact={compact} />
+				</span>
 			</div>
 
-			{operator && <span aria-hidden className="nacre-line absolute inset-x-0 bottom-0 h-0.5" />}
+			<FoldHandle collapsed={collapsed} onCollapse={onCollapse} />
 		</header>
 	)
 }
 
-/** An icon alone, the size of the bar's other buttons. */
-function SquareButton({
+/** One of the tray's square tools: an icon, labelled for a screen reader and a
+ *  tooltip, the selected blue while what it opens is open. */
+function Tool({
 	icon: IconC,
 	label,
 	onClick,
 	pressed,
 	compact,
+	children,
 }: {
 	icon: Icon
 	label: string
 	onClick: () => void
 	pressed?: boolean
 	compact: boolean
+	children?: ReactNode
 }) {
 	return (
 		<button
@@ -442,40 +297,107 @@ function SquareButton({
 			aria-label={label}
 			title={label}
 			aria-pressed={pressed}
-			className={`inline-flex shrink-0 items-center justify-center rounded-lg transition-colors active:scale-[0.96] ${compact ? 'size-8' : 'size-12'} ${
-				pressed ? 'bg-booth-hover text-booth-ink ring-1 ring-booth-dim/40 ring-inset' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
-			}`}
+			className={`group relative inline-grid shrink-0 place-items-center rounded-ctl transition-[background-color,color,transform] duration-150 active:scale-90 ${
+				compact ? 'size-7' : 'size-[42px]'
+			} ${pressed ? 'bg-accent text-accent-ink' : 'text-booth-ink hover:bg-booth-raise'}`}
 		>
-			<IconC size={compact ? 16 : 20} strokeWidth={1.8} aria-hidden />
+			<IconC size={compact ? 16 : 20} strokeWidth={2} aria-hidden />
+			{children}
 		</button>
 	)
 }
 
-/** "Mark this moment" (the owner, 2026-10-04): a tester taps it when something
- *  happens, and the log has a line at that moment to find. It says which mark
- *  for a moment, so the tester can write the number down. A flag, not a word:
- *  it is for testers, and a volunteer can leave it be. */
-function MarkButton({ onMark, compact }: { onMark: () => Promise<number | null>; compact: boolean }) {
-	const [marked, setMarked] = useState<number | null>(null)
-	useEffect(() => {
-		if (marked === null) return
-		const t = setTimeout(() => setMarked(null), 3_000)
-		return () => clearTimeout(t)
-	}, [marked])
+/** The mode: a lock, for a volunteer; in Admin the selected blue, open, and
+ *  saying Admin, so the mode is seen from across the booth. Tap it as
+ *  volunteer and Admin asks for its passcode (./PasscodeSheet.tsx), or opens
+ *  at once when none is set; tap it in Admin to go back. Entering Admin
+ *  reveals, it never acts: it changes what is on screen and sends nothing. */
+function LockButton({
+	admin,
+	asking,
+	onEnter,
+	onLeave,
+	compact,
+}: {
+	admin: boolean
+	asking: boolean
+	onEnter: () => void
+	onLeave: () => void
+	compact: boolean
+}) {
+	const LockIcon = admin ? LockOpen : Lock
 	return (
 		<button
 			type="button"
-			onClick={() => void onMark().then(setMarked)}
-			aria-label="Mark this moment in the log"
-			title="Mark this moment in the log"
-			className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-lg transition-colors active:scale-[0.97] ${compact ? 'h-8' : 'h-12'} ${
-				marked !== null
-					? `bg-state-live/15 font-medium text-state-live ${compact ? 'px-2.5 text-xs' : 'px-4 text-sm'}`
-					: `${compact ? 'w-8' : 'w-12'} text-booth-dim hover:bg-booth-raise hover:text-booth-ink`
+			onClick={() => (admin ? onLeave() : onEnter())}
+			aria-label={admin ? 'Admin. Tap to go back to volunteer.' : 'Volunteer. Tap for Admin.'}
+			aria-pressed={asking || undefined}
+			title={admin ? 'Back to volunteer' : 'Admin'}
+			className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-ctl font-bold transition-[background-color,color,transform] duration-150 active:scale-90 ${
+				admin ? (compact ? 'h-7 px-2 text-[13px]' : 'h-[42px] px-3.5 text-sm') : compact ? 'size-7' : 'size-[42px]'
+			} ${admin || asking ? 'bg-accent text-accent-ink' : 'text-booth-ink hover:bg-booth-raise'}`}
+		>
+			<LockIcon key={String(admin)} size={compact ? 16 : 20} strokeWidth={2} aria-hidden className="animate-pop" />
+			{admin && 'Admin'}
+		</button>
+	)
+}
+
+/** The handle on the bar's bottom edge: a tap folds or unfolds, a drag up
+ *  folds and a drag down unfolds. Inside the bar: nothing is drawn over a
+ *  page. */
+function FoldHandle({ collapsed, onCollapse }: { collapsed: boolean; onCollapse: (collapsed: boolean) => void }) {
+	const from = useRef<number | null>(null)
+	/** A drag has folded or unfolded: the click that ends it is not a tap. */
+	const dragged = useRef(false)
+	const [held, setHeld] = useState(false)
+	const label = collapsed ? 'Show the full bar (or drag down)' : 'Fold the bar (or drag up)'
+	return (
+		<button
+			type="button"
+			aria-label={label}
+			title={label}
+			onPointerDown={(e) => {
+				e.currentTarget.setPointerCapture(e.pointerId)
+				from.current = e.clientY
+				dragged.current = false
+				setHeld(true)
+			}}
+			onPointerMove={(e) => {
+				if (from.current === null) return
+				const dy = e.clientY - from.current
+				if ((dy < -12 && !collapsed) || (dy > 12 && collapsed)) {
+					dragged.current = true
+					from.current = null
+					setHeld(false)
+					onCollapse(!collapsed)
+				}
+			}}
+			onPointerUp={() => {
+				from.current = null
+				setHeld(false)
+			}}
+			onPointerCancel={() => {
+				from.current = null
+				setHeld(false)
+			}}
+			onClick={() => {
+				if (dragged.current) {
+					dragged.current = false
+					return
+				}
+				onCollapse(!collapsed)
+			}}
+			className={`group absolute bottom-0 left-1/2 z-10 grid w-[84px] -translate-x-1/2 cursor-ns-resize touch-none place-items-center rounded-ctl ${
+				collapsed ? 'h-2' : 'h-4'
 			}`}
 		>
-			<Flag size={compact ? 15 : 19} strokeWidth={1.8} aria-hidden />
-			{marked !== null && `Mark ${marked}`}
+			<i
+				aria-hidden
+				className={`block rounded-full transition-[background-color,width] duration-150 ${collapsed ? 'h-[3px]' : 'h-1'} ${
+					held ? 'w-14 bg-booth-ink' : `bg-booth-faint group-hover:w-[52px] group-hover:bg-booth-dim ${collapsed ? 'w-8' : 'w-10'}`
+				}`}
+			/>
 		</button>
 	)
 }

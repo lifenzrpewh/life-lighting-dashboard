@@ -78,7 +78,7 @@ function Grid({ status, ageMs, failure }: { status: ArenaStatus; ageMs: number |
 											type="button"
 											disabled={stale || c.state === 'empty'}
 											onClick={() => fire({ kind: 'column', columnId: c.id }, key)}
-											className={`h-10 w-32 truncate rounded-lg px-2 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-30 ${
+											className={`h-10 w-32 truncate rounded-ctl px-2 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-30 ${
 												c.state === 'playing' ? 'bg-state-live/12 text-state-live ring-1 ring-state-live/70 ring-inset' : 'bg-booth-raise hover:bg-booth-hover'
 											} ${sent?.key === key ? 'bg-booth-hover' : ''}`}
 										>
@@ -125,7 +125,7 @@ function LayerControls({ layer, disabled, onClear }: { layer: ArenaLayer; disabl
 					disabled={disabled || layer.playing === null}
 					onClick={onClear}
 					aria-label={`Clear ${layer.name}`}
-					className="h-9 shrink-0 rounded-lg bg-booth-raise px-3 text-sm font-medium hover:bg-booth-hover active:scale-[0.98] disabled:opacity-30"
+					className="h-9 shrink-0 rounded-ctl bg-booth-raise px-3 text-sm font-medium hover:bg-booth-hover active:scale-[0.98] disabled:opacity-30"
 				>
 					Clear
 				</button>
@@ -173,7 +173,7 @@ function Fader({ layer, disabled }: { layer: ArenaLayer; disabled: boolean }) {
 				aria-valuemax={100}
 				aria-valuenow={pct}
 				aria-disabled={disabled}
-				className={`relative h-8 flex-1 touch-none rounded-lg bg-booth-raise ${disabled ? 'opacity-30' : ''}`}
+				className={`relative h-8 flex-1 touch-none rounded-ctl bg-booth-raise ${disabled ? 'opacity-30' : ''}`}
 				onPointerDown={(e) => {
 					if (disabled) return
 					e.currentTarget.setPointerCapture(e.pointerId)
@@ -194,7 +194,7 @@ function Fader({ layer, disabled }: { layer: ArenaLayer; disabled: boolean }) {
 				}}
 				onPointerCancel={() => setDragging(null)}
 			>
-				<span className="absolute inset-y-0 left-0 rounded-lg bg-booth-hover" style={{ width: `${pct}%` }} />
+				<span className="absolute inset-y-0 left-0 rounded-ctl bg-booth-hover" style={{ width: `${pct}%` }} />
 				<span className="absolute inset-y-1 w-1.5 -translate-x-1/2 rounded-full bg-booth-ink" style={{ left: `${pct}%` }} />
 			</div>
 			<span className="w-9 text-right text-xs tabular-nums text-booth-dim">{pct}%</span>
@@ -205,23 +205,23 @@ function Fader({ layer, disabled }: { layer: ArenaLayer; disabled: boolean }) {
 function Cell({ slot, disabled, sent, onFire }: { slot: ArenaSlot; disabled: boolean; sent: boolean; onFire: () => void }) {
 	const url = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
 	const [failed, setFailed] = useState<string | null>(null)
-	if (slot.state === 'empty') return <div className="h-20 w-32 rounded-lg border border-dashed border-booth-edge/70" />
+	if (slot.state === 'empty') return <div className="h-20 w-32 rounded-ctl border border-dashed border-booth-edge/70" />
 	// Green: on output. Amber: Arena cannot find its file, so firing it shows
 	// nothing. A cell just tapped is lit until Arena's push says what happened.
-	const ring = slot.state === 'playing' ? 'ring-2 ring-state-live' : slot.missingFile !== null ? 'ring-2 ring-warn' : 'ring-1 ring-booth-edge'
+	const ring = slot.state === 'playing' ? 'outline-4 -outline-offset-4 outline-state-live' : slot.missingFile !== null ? 'outline-4 -outline-offset-4 outline-warn' : ''
 	return (
 		<button
 			type="button"
 			disabled={disabled}
 			onClick={onFire}
-			className={`relative block h-20 w-32 overflow-hidden rounded-lg bg-booth-raise text-left transition-transform active:scale-[0.97] disabled:cursor-default ${ring} ${sent ? 'brightness-150' : ''}`}
+			className={`relative block h-20 w-32 overflow-hidden rounded-ctl bg-booth-raise text-left transition-transform active:scale-[0.97] disabled:cursor-default ${ring} ${sent ? 'brightness-150' : ''}`}
 		>
 			{url !== null && failed !== url && (
 				<img src={url} alt="" draggable={false} onError={() => setFailed(url)} className="absolute inset-0 size-full object-cover" />
 			)}
-			<span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/85 to-black/40 px-2 py-1 text-xs">{slot.name}</span>
+			<span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/85 to-black/40 px-2 py-1 text-xs font-bold">{slot.name}</span>
 			{slot.missingFile !== null && (
-				<span className="absolute top-1 left-1 rounded bg-black/75 px-1.5 text-[11px] font-medium text-warn">File missing</span>
+				<span className="absolute top-1 left-1 rounded-sm bg-warn px-1.5 text-[11px] font-extrabold text-black">File missing</span>
 			)}
 		</button>
 	)
