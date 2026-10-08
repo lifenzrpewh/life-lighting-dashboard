@@ -320,7 +320,7 @@ export function Grid(p: GridProps) {
 												? p.editing
 													? 'Tap + in its strip to put a view here, or remove the window.'
 													: 'In Admin, Layouts › Edit this layout puts a view here.'
-												: 'Turn them on again in Connections.'
+												: 'Turn them on again in Settings.'
 										}
 									/>
 								</div>

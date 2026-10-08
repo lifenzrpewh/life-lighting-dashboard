@@ -47,7 +47,7 @@ export function MaMessage({ pane, now }: { pane: MaPaneState | null; now: number
 			return (
 				<Say
 					head="No console address set"
-					body="There is nothing to connect to yet. Set the console's address in Connections, in Admin."
+					body="There is nothing to connect to yet. Set the console's address in Settings, in Admin."
 				/>
 			)
 		case 'idle':

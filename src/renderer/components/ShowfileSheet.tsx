@@ -131,7 +131,7 @@ export function ShowfileSheet({
 							</div>
 							<Budget used={offered.length} />
 							{problem !== null && <p className="text-sm text-warn">{problem}</p>}
-							{campus === null && <p className="text-sm text-booth-dim">Set this booth’s campus in Connections › Console and names begin with it.</p>}
+							{campus === null && <p className="text-sm text-booth-dim">Set this booth’s campus in Settings › Console and names begin with it.</p>}
 							<Button variant="primary" icon={Save} disabled={!canAct || problem !== null} onClick={saveAs} className="self-start">
 								Save as “{offered}”
 							</Button>

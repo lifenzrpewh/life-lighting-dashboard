@@ -23,7 +23,7 @@
 // "still appear in the collapsed view") and the chevron back.
 
 import { useEffect, useState } from 'react'
-import { BookOpen, Check, ChevronDown, ChevronUp, Flag, PanelsTopLeft, Pencil } from 'lucide-react'
+import { BookOpen, Check, ChevronDown, ChevronUp, Flag, PanelsTopLeft, Pencil, Settings } from 'lucide-react'
 
 import type { LinkState, Reading, UnknownReason } from '../../shared/reading.js'
 import { matchReading } from '../../shared/reading.js'
@@ -165,6 +165,8 @@ export function StatusBar({
 	editing,
 	onEditLayout,
 	onConnections,
+	settingsOpen,
+	onSettings,
 	showfileOpen,
 	onShowfile,
 	connections,
@@ -198,6 +200,9 @@ export function StatusBar({
 	editing: boolean
 	onEditLayout: () => void
 	onConnections: () => void
+	/** Settings (./SettingsPanel.tsx): Admin only, not drawn otherwise. */
+	settingsOpen: boolean
+	onSettings: () => void
 	showfileOpen: boolean
 	/** Open the showfile sheet. */
 	onShowfile: () => void
@@ -254,12 +259,13 @@ export function StatusBar({
 					</Button>
 				)}
 				{/* For everyone: a volunteer can see what is down and say so. The
-				    fields inside are Admin's. */}
+				    fields are in Settings, Admin's. */}
 				<Button onClick={onConnections} pressed={connectionsOpen} className={connectionsOpen ? open : ''}>
 					<Dot tone={connections} />
 					Connections
 				</Button>
 				<MarkButton onMark={onMark} />
+				{operator && <IconButton icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} />}
 				{/* Boots into volunteer, always, and never remembers otherwise. */}
 				<ModeChip mode={mode} onEnter={onEnter} onLeave={onLeave} />
 				<IconButton icon={ChevronUp} label="Fold the bar away" onClick={() => onCollapse(true)} />

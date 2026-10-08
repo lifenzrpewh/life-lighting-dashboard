@@ -47,7 +47,7 @@ export function CaptureView({ input, cameras, now }: { input: CaptureInput | und
 	if (input === undefined || !input.on) {
 		return (
 			<Centered>
-				<Say icon={Webcam} head="Turned off" body="This capture input is off in Connections." />
+				<Say icon={Webcam} head="Turned off" body="This capture input is off in Settings." />
 			</Centered>
 		)
 	}

@@ -1,4 +1,4 @@
-// The few form pieces the Connections tab is built from. Touch-sized: every
+// The few form pieces Settings is built from. Touch-sized: every
 // control is at least 48 px tall, because this is a booth screen, not a desk.
 
 import { useEffect, useState, type ReactNode } from 'react'

@@ -68,6 +68,7 @@ import { useLayout } from './layoutStore.js'
 import { usePopouts } from './popouts.js'
 import { PanePlacer } from './panePlacement.js'
 import { ConnectionsPanel } from './components/ConnectionsPanel.js'
+import { SettingsPanel, type SettingsPage } from './components/SettingsPanel.js'
 import { ShowfileSheet } from './components/ShowfileSheet.js'
 import { GuideSheet } from './components/GuideSheet.js'
 import { GUIDE } from '../shared/guide.js'
@@ -97,6 +98,9 @@ function failureOf<T>(channel: Channel<T>): string | null {
 	return latest !== null && !latest.ok && latest.reason === 'error' ? latest.detail : null
 }
 
+/** The sheets that stand in the windows' place. */
+type SheetId = 'guide' | 'connections' | 'settings' | 'showfile'
+
 /** Where this computer remembers the top bar folded. */
 const BAR_KEY = 'paua.barCollapsed'
 
@@ -125,23 +129,35 @@ export function App() {
 			// Kept for this run only.
 		}
 	}
-	const [connectionsOpen, setConnectionsOpen] = useState(false)
-	// The showfile sheet (Save As, Load) takes the right slot's place as
-	// Connections does; one at a time. The campus is read as it opens, for the
+	// The sheets that stand in the windows' place, one at a time: Connections
+	// (a list to read), Settings (Admin's), the showfile sheet (Save As, Load),
+	// the Creative Guide (../shared/guide.ts; its page is placed over the
+	// sheet's body). The campus is read as the showfile sheet opens, for the
 	// name Save As offers.
-	const [showfileOpen, setShowfileOpen] = useState(false)
+	const [sheet, setSheet] = useState<SheetId | null>(null)
+	const [settingsStart, setSettingsStart] = useState<SettingsPage | null>(null)
+	const connectionsOpen = sheet === 'connections'
+	const showfileOpen = sheet === 'showfile'
+	const guideOpen = sheet === 'guide'
+	const settingsOpen = sheet === 'settings'
 	const [campus, setCampus] = useState<string | null>(null)
-	// The Creative Guide (../shared/guide.ts), in the windows' place like the
-	// sheets above; one at a time. Its page is placed over the sheet's body.
-	const [guideOpen, setGuideOpen] = useState(false)
 	const [guideBox, setGuideBox] = useState<HTMLElement | null>(null)
-	const openShowfile = () => {
-		setGuideOpen(false)
+	/** Open a sheet, or close it if it is the one open. Layouts and Edit
+	 *  layout give way to it. */
+	const toggleSheet = (id: SheetId) => {
 		setLayoutsOpen(false)
-		setConnectionsOpen(false)
 		setEditing(false)
-		setShowfileOpen(!showfileOpen)
+		setSheet(sheet === id ? null : id)
+	}
+	const openShowfile = () => {
+		toggleSheet('showfile')
 		void window.life?.settings().then((s) => setCampus(s.campus))
+	}
+	const openSettings = (start: SettingsPage | null) => {
+		setLayoutsOpen(false)
+		setEditing(false)
+		setSettingsStart(start)
+		setSheet('settings')
 	}
 	// The connections turned off in Connections (../shared/settings.ts `off`):
 	// read on start and again whenever Connections saves.
@@ -494,7 +510,7 @@ export function App() {
 	// volunteer left looking at it after the drop would have no MA.
 	useEffect(() => {
 		window.life?.setMaPaneMode(mode)
-		setConnectionsOpen(false)
+		setSheet(null)
 		setEditing(false)
 	}, [mode])
 
@@ -752,17 +768,9 @@ export function App() {
 					layoutName={layoutName}
 					layoutsOpen={layoutsOpen}
 					guideOpen={guideOpen}
-					onGuide={() => {
-						setConnectionsOpen(false)
-						setShowfileOpen(false)
-						setLayoutsOpen(false)
-						setEditing(false)
-						setGuideOpen(!guideOpen)
-					}}
+					onGuide={() => toggleSheet('guide')}
 					onLayouts={() => {
-						setGuideOpen(false)
-						setConnectionsOpen(false)
-						setShowfileOpen(false)
+						setSheet(null)
 						setEditing(false)
 						if (layoutsOpen) setLayoutsOpen(false)
 						else openLayouts()
@@ -770,19 +778,13 @@ export function App() {
 					editing={editing}
 					onEditLayout={() => {
 						if (editing) return setEditing(false)
-						setGuideOpen(false)
-						setConnectionsOpen(false)
-						setShowfileOpen(false)
+						setSheet(null)
 						setLayoutsOpen(false)
 						startEditing()
 					}}
-					onConnections={() => {
-						setGuideOpen(false)
-						setLayoutsOpen(false)
-						setShowfileOpen(false)
-						setEditing(false)
-						setConnectionsOpen(!connectionsOpen)
-					}}
+					onConnections={() => toggleSheet('connections')}
+					settingsOpen={settingsOpen}
+					onSettings={() => (settingsOpen ? setSheet(null) : openSettings(null))}
 					onShowfile={openShowfile}
 					connections={worstTone(connections)}
 					showfile={showfile}
@@ -841,16 +843,18 @@ export function App() {
 				    stand in the grid's place; every page is hidden, not closed. */}
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
 					{guideOpen ? (
-						<GuideSheet report={embedReport(GUIDE.id)} now={now} boxRef={setGuideBox} onClose={() => setGuideOpen(false)} />
+						<GuideSheet report={embedReport(GUIDE.id)} now={now} boxRef={setGuideBox} onClose={() => setSheet(null)} />
 					) : connectionsOpen ? (
-						<ConnectionsPanel
+						<ConnectionsPanel rows={connections} operator={mode === 'operator'} onOpen={(id) => openSettings(id)} onClose={() => setSheet(null)} />
+					) : settingsOpen && mode === 'operator' ? (
+						<SettingsPanel
 							rows={connections}
-							operator={mode === 'operator'}
+							start={settingsStart}
 							paneSummary={paneSummary(pane, mode)}
 							desk={desk}
 							now={now}
 							onChanged={readOff}
-							onClose={() => setConnectionsOpen(false)}
+							onClose={() => setSheet(null)}
 						/>
 					) : showfileOpen ? (
 						<ShowfileSheet
@@ -859,7 +863,7 @@ export function App() {
 							operator={mode === 'operator'}
 							campus={campus}
 							now={now}
-							onClose={() => setShowfileOpen(false)}
+							onClose={() => setSheet(null)}
 						/>
 					) : (
 						<div className="relative flex min-h-0 min-w-0 flex-1 flex-col">

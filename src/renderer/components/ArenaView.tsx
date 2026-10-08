@@ -64,7 +64,7 @@ export function ArenaReading({
 	if (status === null) {
 		return (
 			<Centered>
-				<Say icon={Layers} head="No Arena set up" body="Set Arena's address in Connections, in Admin." />
+				<Say icon={Layers} head="No Arena set up" body="Set Arena's address in Settings, in Admin." />
 			</Centered>
 		)
 	}

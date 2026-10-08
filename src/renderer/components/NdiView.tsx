@@ -64,7 +64,7 @@ export function NdiView({ id, ndi, now }: { id: string; ndi: NdiState | null | u
 	const feed = ndi.feeds.find((f) => f.id === id)
 	const picture = feed === undefined ? null : ndiPicture(ndi, feed, now)
 	const said = (() => {
-		if (feed === undefined || picture === null) return { head: 'Turned off', body: 'This NDI source is off in Connections.' }
+		if (feed === undefined || picture === null) return { head: 'Turned off', body: 'This NDI source is off in Settings.' }
 		switch (picture.state) {
 			case 'no-runtime':
 				return { head: 'NDI is not on this computer', body: picture.detail }

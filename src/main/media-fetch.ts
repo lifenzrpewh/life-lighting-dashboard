@@ -68,7 +68,7 @@ export function createMediaFetch(opts: {
 
 	const run = async (req: FetchRequest) => {
 		const { local } = opts.folders()
-		if (local === null) return set(req.code, { state: 'failed', detail: 'set the local folder on the Arena row in Connections' })
+		if (local === null) return set(req.code, { state: 'failed', detail: 'set the local folder on the Arena page in Settings' })
 		set(req.code, { state: 'finding' })
 		const r = await resolve(req)
 		if (r.from === 'none') {

@@ -1,4 +1,4 @@
-// The Cue Manager's sign-out, in its Connections row (operator mode only).
+// The Cue Manager's sign-out, on its page in Settings (Admin only).
 //
 // The app signs itself in, in its own column: an emailed code, or its own QR,
 // which an admin approves as a booth device. All this panel can do is undo
