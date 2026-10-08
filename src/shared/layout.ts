@@ -95,7 +95,26 @@ export const MIN_H = 100
 /** A place on the screen, in units: left, top, width, height. */
 export type Box = { x: number; y: number; w: number; h: number }
 
-export type Tab = { id: string; view: ViewId }
+/** A tab: the view it shows, and the name someone gave it in this layout
+ *  (the owner, 2026-10-08: "Stage cam" rather than "Video"). No label is the
+ *  view's own name; another layout's tab of the same view keeps its own. */
+export type Tab = { id: string; view: ViewId; label?: string }
+
+/** The longest a tab's own name may be: a strip of tabs has little room. */
+export const TAB_LABEL_MAX = 24
+
+/** Why `label` will not do as a tab's name, or null. Empty is fine: it puts
+ *  the view's own name back. */
+export function tabLabelError(label: string): string | null {
+	if (label.trim().length > TAB_LABEL_MAX) return `At most ${TAB_LABEL_MAX} characters.`
+	if (/[\u0000-\u001f\u007f]/.test(label)) return 'Letters, numbers and punctuation only.'
+	return null
+}
+
+/** What a tab is called: its own name in this layout, or its view's. */
+export function tabTitle(tab: Tab, labelOf: (view: ViewId) => string): string {
+	return tab.label ?? labelOf(tab.view)
+}
 
 export type GridWindow = Box & {
 	id: string
@@ -335,6 +354,24 @@ export function moveTab(layout: Layout, fromWindow: string, tabId: string, toWin
 	return same(next, layout) ? layout : next
 }
 
+/** Name a tab in this layout, or give it its view's name back with an empty
+ *  `label`. A name that will not do (`tabLabelError`) changes nothing. */
+export function renameTab(layout: Layout, windowId: string, tabId: string, label: string): Layout {
+	if (tabLabelError(label) !== null) return layout
+	const name = label.trim()
+	const win = layout.windows.find((w) => w.id === windowId)
+	const tab = win?.tabs.find((t) => t.id === tabId)
+	if (tab === undefined || (tab.label ?? '') === name) return layout
+	return replace(layout, windowId, (w) => ({
+		...w,
+		tabs: w.tabs.map((t) => {
+			if (t.id !== tabId) return t
+			const { label: _old, ...rest } = t
+			return name === '' ? rest : { ...rest, label: name }
+		}),
+	}))
+}
+
 export function selectTab(layout: Layout, windowId: string, tabId: string): Layout {
 	const win = layout.windows.find((w) => w.id === windowId)
 	if (win === undefined || win.active === tabId || !win.tabs.some((t) => t.id === tabId)) return layout
@@ -389,7 +426,11 @@ function windowFrom(v: unknown, scale: number): GridWindow | null {
 		const tr = t as Record<string, unknown> | null
 		if (typeof tr !== 'object' || tr === null) return null
 		if (typeof tr['id'] !== 'string' || !ID.test(tr['id']) || !isViewId(tr['view'])) return null
-		goodTabs.push({ id: tr['id'], view: tr['view'] })
+		// A tab's own name (2026-10-08): one that will not do is let go, not the
+		// layout, since the view's own name stands in for it.
+		const label = tr['label']
+		const named = typeof label === 'string' && label.trim() !== '' && tabLabelError(label) === null
+		goodTabs.push(named ? { id: tr['id'], view: tr['view'], label: label.trim() } : { id: tr['id'], view: tr['view'] })
 	}
 	const activeId = typeof active === 'string' && goodTabs.some((t) => t.id === active) ? active : (goodTabs[0]?.id ?? null)
 	return { id, x: box.x, y: box.y, w: box.w, h: box.h, tabs: goodTabs, active: activeId }
@@ -497,13 +538,13 @@ export function deleteLayout(saved: readonly SavedLayout[], name: string): Saved
 }
 
 /** Whether two layouts are the same arrangement: the same windows in the same
- *  places with the same tabs. Which tab shows is not compared, so switching a
- *  tab still reads as the layout it came from. */
+ *  places with the same tabs, named the same. Which tab shows is not
+ *  compared, so switching a tab still reads as the layout it came from. */
 export function sameArrangement(a: Layout, b: Layout): boolean {
 	const key = (l: Layout) =>
 		JSON.stringify(
 			l.windows
-				.map((w) => [w.x, w.y, w.w, w.h, w.tabs.map((t) => t.view)])
+				.map((w) => [w.x, w.y, w.w, w.h, w.tabs.map((t) => [t.view, t.label ?? null])])
 				.sort((p, q) => (p[1] as number) - (q[1] as number) || (p[0] as number) - (q[0] as number)),
 		)
 	return key(a) === key(b)

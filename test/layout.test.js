@@ -20,6 +20,9 @@ import {
 	moveSeam,
 	placeWindow,
 	removeTab,
+	renameTab,
+	tabLabelError,
+	tabTitle,
 	moveTab,
 	removeWindow,
 	sameArrangement,
@@ -299,4 +302,38 @@ test('a tab is dragged within its window or to another, keeping its id, shown wh
 	assert.equal(moveTab(l, 'w1', 't4', 'w9', null), l)
 	assert.equal(moveTab(l, 'w1', 't4', 'w1', 't4'), l)
 	assert.equal(moveTab(l, 'w1', 't4', 'w1', null), l)
+})
+
+test('a tab named in its layout: kept through storage and a move, emptied back to its view', () => {
+	// 2026-10-08, the owner: "Stage cam" rather than "Video", in that layout only.
+	const two = addTab(DEFAULT_LAYOUT, 'w2', 'video', 't3')
+	const named = renameTab(two, 'w2', 't3', '  Stage cam ')
+	const tab = named.windows[1].tabs[1]
+	assert.deepEqual(tab, { id: 't3', view: 'video', label: 'Stage cam' })
+	assert.equal(tabTitle(tab, () => 'Video'), 'Stage cam')
+	assert.equal(tabTitle(two.windows[1].tabs[1], () => 'Video'), 'Video')
+	// Only that tab, only that layout.
+	assert.deepEqual(named.windows[0], two.windows[0])
+	assert.deepEqual(two.windows[1].tabs[1], { id: 't3', view: 'video' })
+	// Saved and read back, and carried by a drag to another window.
+	assert.deepEqual(layoutFrom(JSON.stringify(named)), named)
+	assert.deepEqual(savedLayoutsFrom(JSON.stringify([{ name: 'Sunday', layout: named }]))[0].layout, named)
+	assert.equal(moveTab(named, 'w2', 't3', 'w1', null).windows[0].tabs[1].label, 'Stage cam')
+	// A renamed tab is a different arrangement; which tab shows is not.
+	assert.equal(sameArrangement(named, two), false)
+	// Empty gives the view's name back; a name that will not do changes nothing.
+	assert.deepEqual(renameTab(named, 'w2', 't3', ' ').windows[1].tabs[1], { id: 't3', view: 'video' })
+	assert.equal(renameTab(named, 'w2', 't3', 'x'.repeat(25)), named)
+	assert.equal(tabLabelError('x'.repeat(25)), 'At most 24 characters.')
+	assert.equal(renameTab(named, 'w2', 't3', 'Stage cam'), named)
+	assert.equal(renameTab(named, 'w2', 'nope', 'X'), named)
+})
+
+test("a stored tab with no name, or one that will not do, is the view's name; the layout holds", () => {
+	// Layouts from before names come back untouched.
+	assert.deepEqual(layoutFrom(JSON.stringify(DEFAULT_LAYOUT)), DEFAULT_LAYOUT)
+	for (const label of [42, '', '   ', 'x'.repeat(25), 'a\u0007b']) {
+		const stored = { ...DEFAULT_LAYOUT, windows: [{ ...DEFAULT_LAYOUT.windows[0], tabs: [{ id: 't1', view: 'cue', label }] }, DEFAULT_LAYOUT.windows[1]] }
+		assert.deepEqual(layoutFrom(JSON.stringify(stored)), DEFAULT_LAYOUT, JSON.stringify(label))
+	}
 })

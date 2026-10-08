@@ -26,6 +26,7 @@ import {
 	layoutNameError,
 	sameArrangement,
 	saveLayout,
+	tabTitle,
 	type Layout,
 	type SavedLayout,
 	type ViewId,
@@ -163,7 +164,7 @@ function Miniature({ layout, labelOf }: { layout: Layout; labelOf: (view: ViewId
 						}}
 					>
 						{ViewIcon !== null && <ViewIcon size={16} strokeWidth={1.8} />}
-						<span className="max-w-full truncate">{tab === null ? 'Empty' : labelOf(tab.view)}</span>
+						<span className="max-w-full truncate">{tab === null ? 'Empty' : tabTitle(tab, labelOf)}</span>
 						{w.tabs.length > 1 && <span className="text-[10px] text-booth-faint">+{w.tabs.length - 1}</span>}
 					</span>
 				)

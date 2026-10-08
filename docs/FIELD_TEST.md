@@ -104,6 +104,7 @@ Tick what you saw; anything odd is worth a line.
 - [ ] Video: with Arena's Spout output picked and no picture, after 10 s the view says why; **Restart video** (the view's ↻, beside the Video feed in Connections, as a volunteer too) brings it back without restarting Pāua. On a computer with two graphics cards, say which
 - [ ] As a volunteer: the pencil at the end of a window's strip puts the screen into Edit layout; move, resize, add a window, Done. No "Edit this layout" left in Layouts
 - [ ] As a volunteer: Layouts › save the layout on screen under a name, switch away and back, delete it with two taps
+- [ ] In Edit layout, a tab's ✎: name it ("Stage cam"), Done; save the layout, switch to another and back: the name comes with it and the other layout's tab of the same view keeps its own. Empty the name: the view's own name returns. By finger: the Windows touch keyboard comes up for it
 
 **Installing**
 - [ ] What Windows SmartScreen showed, word for word, and whether Run anyway worked

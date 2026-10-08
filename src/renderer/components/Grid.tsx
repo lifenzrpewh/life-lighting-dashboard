@@ -18,7 +18,9 @@
 // strip's × removes the window. A tab is dragged along its strip to reorder
 // it, or onto another window to move it there (the owner, 2026-10-05: "don't
 // have to delete them to allow them to be reorganised"); a nacre bar shows
-// where it will land.
+// where it will land. A tab's pencil names it in this layout (2026-10-08,
+// the owner's ask: "Stage cam" rather than "Video"); emptied, it takes its
+// view's own name again.
 //
 // OUT OF EDITING, for everyone: tap a tab, and drag the edge two windows share
 // (a grip in the gap between them, the one place a page cannot cover) to give
@@ -26,7 +28,7 @@
 // pictures while it is dragged.
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { Move, PanelTop, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, Move, PanelTop, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 import {
 	HEIGHT,
@@ -38,6 +40,8 @@ import {
 	seams,
 	shownTab,
 	snapLine,
+	TAB_LABEL_MAX,
+	tabTitle,
 	type Box,
 	type Edges,
 	type GridWindow,
@@ -90,6 +94,8 @@ export type GridProps = {
 	onEdit: () => void
 	onAddTab: (windowId: string, view: ViewId) => void
 	onRemoveTab: (windowId: string, tabId: string) => void
+	/** A tab named in this layout; empty gives it its view's name back. */
+	onRenameTab: (windowId: string, tabId: string, label: string) => void
 	/** A tab dragged: to before `beforeTabId` in `toWindow`, or its end. */
 	onMoveTab: (fromWindow: string, tabId: string, toWindow: string, beforeTabId: string | null) => void
 	onRemoveWindow: (windowId: string) => void
@@ -111,6 +117,16 @@ export function Grid(p: GridProps) {
 	const latest = useRef(drag)
 	latest.current = drag
 	const [adding, setAdding] = useState<string | null>(null)
+	// The tab being named (editing only), and what has been typed so far.
+	const [naming, setNaming] = useState<{ win: string; tab: string; text: string } | null>(null)
+	const titleOf = (t: Tab) => tabTitle(t, p.labelOf)
+	const endNaming = (keep: boolean) => {
+		if (naming !== null && keep) p.onRenameTab(naming.win, naming.tab, naming.text)
+		setNaming(null)
+	}
+	useEffect(() => {
+		if (!p.editing) setNaming(null)
+	}, [p.editing])
 
 	// A tab being dragged (editing only): where it came from, where the pointer
 	// is, and where it would land. A press that never moves is a tap.
@@ -148,7 +164,7 @@ export function Grid(p: GridProps) {
 						if (s === null) return
 						if (!s.moved && Math.hypot(e.clientX - s.px, e.clientY - s.py) < 8) return
 						s.moved = true
-						setTabDrag({ win: s.win, tab: s.tab, label: p.labelOf(t.view), x: e.clientX, y: e.clientY, to: landing(e.clientX, e.clientY) })
+						setTabDrag({ win: s.win, tab: s.tab, label: titleOf(t), x: e.clientX, y: e.clientY, to: landing(e.clientX, e.clientY) })
 					},
 					onPointerUp: () => {
 						const d = tabLatest.current
@@ -259,27 +275,62 @@ export function Grid(p: GridProps) {
 											{tabDrag?.to?.win === win.id && tabDrag.to.before === t.id && (
 												<span aria-hidden className="nacre-line absolute inset-y-2 -left-0.5 w-1 rounded-full" />
 											)}
-											<button
-												type="button"
-												role="tab"
-												aria-selected={on}
-												onClick={() => !dragged() && p.onSelect(win.id, t.id)}
-												{...tabHandle(win, t)}
-												title={p.editing ? 'Drag to move this tab' : undefined}
-												className={`flex h-full shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${p.editing ? 'cursor-grab touch-none' : ''} ${
-													on ? 'text-booth-ink' : 'text-booth-dim hover:text-booth-ink'
-												}`}
-											>
-												<TabIcon size={17} strokeWidth={1.8} aria-hidden />
-												{p.labelOf(t.view)}
-											</button>
-											{p.editing && (
+											{naming?.tab === t.id ? (
+												<form
+													className="flex h-full shrink-0 items-center gap-1 pl-2"
+													onSubmit={(e) => {
+														e.preventDefault()
+														endNaming(true)
+													}}
+												>
+													<TabIcon size={17} strokeWidth={1.8} className="text-booth-dim" aria-hidden />
+													<input
+														autoFocus
+														value={naming.text}
+														maxLength={TAB_LABEL_MAX}
+														placeholder={p.labelOf(t.view)}
+														aria-label={`Name the ${titleOf(t)} tab; empty for ${p.labelOf(t.view)}`}
+														onChange={(e) => setNaming({ ...naming, text: e.target.value })}
+														onKeyDown={(e) => e.key === 'Escape' && endNaming(false)}
+														onBlur={() => endNaming(true)}
+														className="h-9 w-40 rounded-md bg-booth-bg px-2.5 text-sm font-medium text-booth-ink ring-1 ring-nacre-blue outline-none placeholder:text-booth-faint"
+													/>
+													<IconButton icon={Check} size="sm" label="Keep this name" onClick={() => endNaming(true)} />
+												</form>
+											) : (
+												<button
+													type="button"
+													role="tab"
+													aria-selected={on}
+													onClick={() => !dragged() && p.onSelect(win.id, t.id)}
+													{...tabHandle(win, t)}
+													title={p.editing ? 'Drag to move this tab' : undefined}
+													className={`flex h-full shrink-0 items-center gap-2 px-3.5 text-sm font-medium transition-colors ${p.editing ? 'cursor-grab touch-none' : ''} ${
+														on ? 'text-booth-ink' : 'text-booth-dim hover:text-booth-ink'
+													}`}
+												>
+													<TabIcon size={17} strokeWidth={1.8} aria-hidden />
+													{titleOf(t)}
+												</button>
+											)}
+											{p.editing && naming?.tab !== t.id && (
+												<button
+													type="button"
+													onClick={() => setNaming({ win: win.id, tab: t.id, text: t.label ?? '' })}
+													aria-label={`Name the ${titleOf(t)} tab`}
+													title={`Name the ${titleOf(t)} tab`}
+													className="-ml-2 grid size-8 shrink-0 place-items-center rounded-md text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
+												>
+													<Pencil size={14} aria-hidden />
+												</button>
+											)}
+											{p.editing && naming?.tab !== t.id && (
 												<button
 													type="button"
 													onClick={() => p.onRemoveTab(win.id, t.id)}
-													aria-label={`Remove the ${p.labelOf(t.view)} tab`}
-													title={`Remove the ${p.labelOf(t.view)} tab`}
-													className="-ml-2 mr-1 grid size-8 shrink-0 place-items-center rounded-md text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
+													aria-label={`Remove the ${titleOf(t)} tab`}
+													title={`Remove the ${titleOf(t)} tab`}
+													className="mr-1 grid size-8 shrink-0 place-items-center rounded-md text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
 												>
 													<X size={15} aria-hidden />
 												</button>

@@ -51,6 +51,7 @@ import {
 	makeHome,
 	placeWindow,
 	removeTab,
+	renameTab,
 	moveTab,
 	removeWindow,
 	sameArrangement,
@@ -834,7 +835,7 @@ export function App() {
 						<span className={`min-w-0 truncate text-sm ${noRoom ? 'text-state-stale' : 'text-booth-dim'}`}>
 							{noRoom
 								? 'No room for another window. Make one smaller first.'
-								: 'Drag a window to move it, an edge or corner to resize, a tab to reorder it or move it to another window. + adds a tab, × takes one away.'}
+								: 'Drag a window to move it, an edge or corner to resize, a tab to reorder it or move it to another window. + adds a tab, × takes one away, ✎ names one.'}
 						</span>
 						<span className="ml-auto flex shrink-0 items-center gap-2">
 							<Button
@@ -907,6 +908,7 @@ export function App() {
 								onEdit={startEditing}
 								onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
 								onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
+								onRenameTab={(w, t, name) => update((l) => renameTab(l, w, t, name))}
 								onMoveTab={(from, t, to, before) => update((l) => moveTab(l, from, t, to, before))}
 								onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
 								onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
