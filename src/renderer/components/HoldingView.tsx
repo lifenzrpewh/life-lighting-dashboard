@@ -9,8 +9,11 @@
 //   for a clip this service does not use; green when on screen, as in Clips.
 // - What belongs in a column and is not there yet stands in that column as a
 //   dashed tile with the lookbook's picture: tap it to place it.
-// - What has no column (a one-off) waits in the tray above the grid: tap it,
-//   then a lit slot on its layer, for this service (../../shared/holding.ts).
+// - What has no column (a one-off) goes into an empty clip past the named
+//   columns on its layer, drawn there dashed like any placement (the owner,
+//   2026-10-08: overflow). What does not fit even there waits in the tray
+//   above the grid, counted as "didn't fit": tap it, then a lit slot on its
+//   layer, for this service (../../shared/holding.ts).
 // - One line on top: the service, what needs a look, fetches under way,
 //   Update all and Check again. The service's details open from its name.
 // - A tap on a clip opens it: Arena's picture beside the lookbook's, and the
@@ -281,9 +284,17 @@ function Tray({
 	choosing: Choosing | null
 	onChoose: (what: Choosing | null) => void
 }) {
+	// More than the named columns and the empty clips past them could take (the
+	// owner, 2026-10-08): said plainly, placed by hand.
+	const didntFit = tray.filter((u) => u.didntFit === true).length
 	return (
 		<div className="mb-3 flex min-w-0 items-center gap-2 overflow-x-auto">
 			<span className="shrink-0 text-xs text-booth-dim">No column</span>
+			{didntFit > 0 && (
+				<span className="shrink-0 text-xs text-warn" title="No empty clip left past the named columns: choose a slot for each by hand">
+					{didntFit} didn&rsquo;t fit
+				</span>
+			)}
 			{tray.map((u) => {
 				const file = m.runSheet?.[u.item]?.files[u.code] ?? null
 				const what: Choosing | null =

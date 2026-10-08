@@ -169,6 +169,8 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 		setClear(false)
 	}
 	const oldWords = clears.map((c) => `${c.code} in ${c.columnName}`).join(', ')
+	// More than the named columns and the empty clips past them take (the owner, 2026-10-08).
+	const didntFit = unplaced.filter((u) => u.didntFit === true).length
 	return (
 		<div className="my-2 flex flex-col gap-2 rounded-lg bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
 			<p className="font-medium">{title}</p>
@@ -177,7 +179,7 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 					const src = sources?.[s.request.code]
 					return (
 						<li key={s.request.code} className="flex min-w-0 items-baseline gap-2">
-							<span className="min-w-0 flex-1 truncate">{s.what}</span>
+							<span className="min-w-0 flex-1 break-words">{s.what}</span>
 							<span className={`max-w-[40%] shrink-0 truncate ${src?.from === 'drive' ? 'text-booth-dim' : 'text-warn'}`} title={src?.from === 'none' ? src.detail : undefined}>
 								{src === undefined
 									? sources === null
@@ -192,6 +194,11 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 						</li>
 					)
 				})}
+				{didntFit > 0 && (
+					<li className="text-warn">
+						{didntFit} didn&rsquo;t fit: no empty clip left past the named columns. {didntFit === 1 ? 'It waits' : 'They wait'} in No column, to place by hand.
+					</li>
+				)}
 				{unplaced
 					.filter((u) => u.kind !== 'unnamed' && u.kind !== 'no-file')
 					.map((u) => (

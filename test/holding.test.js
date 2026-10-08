@@ -211,8 +211,18 @@ test('what has no place is said, never guessed', () => {
 	assert.ok(r.unplaced.every((u) => u.kind === 'unnamed'))
 	assert.match(r.unplaced[0].detail, /name them PRE, POST, WTL, NSL, BIBLES, WTG and PROMO/)
 
+	// No PROMO columns: the announcements overflow into HOLD FG's empty clips
+	// past WTG (the owner, 2026-10-08), and, with none empty, are said.
 	const noPromo = composition(NAMES.map((n) => (n === 'PROMO' ? 'Column #' : n)))
-	assert.equal(planPlacements(ITEMS, noPromo).unplaced.find((u) => u.code === 'CF594').kind, 'no-promo')
+	assert.deepEqual(
+		planPlacements(ITEMS, noPromo).placements.filter((x) => x.why === 'overflow').map((x) => [x.code, x.column]),
+		[['CF594', 11], ['CF562', 12]],
+	)
+	noPromo.layers[3].slots[10] = clip('CF001-Other.png')
+	noPromo.layers[3].slots[11] = clip('CF002-Other.png')
+	const full = planPlacements(ITEMS, noPromo).unplaced.find((u) => u.code === 'CF594')
+	assert.equal(full.kind, 'no-promo')
+	assert.equal(full.didntFit, true)
 
 	const playing = composition()
 	const fg = playing.layers[3]
@@ -377,4 +387,122 @@ test('a column named PREACH is the message background\'s home', () => {
 	assert.equal(p.columnName, 'PREACH')
 	assert.equal(p.layer, 'HOLD BG')
 	assert.equal(p.why, 'named')
+})
+
+// More than the named columns take (the owner, 2026-10-08): a one-off event's
+// run sheet, with spare columns past the last PROMO.
+/** The fixture with `n` more columns, Arena's `Column #`, empty on every layer. */
+const wide = (n) => {
+	const s = composition([...NAMES, ...Array(n).fill('Column #')])
+	for (const l of s.layers) if (l.slots.length === NAMES.length) for (let i = 0; i < n; i++) l.slots.push(empty())
+	return s
+}
+const oneOff = (label, ...codes) => item('Conference', label, codes, Object.fromEntries(codes.map((c) => [c, L(`${c}-Conf-${label.replace(/\W/g, '')}`)])))
+const EVENT = [
+	...ITEMS,
+	oneOff('Speaker Intro', 'CF701'),
+	oneOff('Worship Night', 'CF702', 'CB702'),
+	oneOff('Offering Story', 'CF703'),
+	oneOff('Baptisms', 'CF704'),
+]
+const overflow = (r) => r.placements.filter((p) => p.why === 'overflow').map((p) => [p.layer, p.code, p.column])
+
+test('overflow: a normal service that fits its named columns overflows nothing', () => {
+	assert.deepEqual(overflow(planPlacements(ITEMS, wide(4))), [])
+	// The one-off Preach BG already sits in HOLD BG column 3: placed by hand, left.
+	assert.equal(planPlacements(ITEMS, wide(4)).unplaced.length, 0)
+})
+
+test('overflow: the extras go in run-sheet order into the empty clips past the last named column', () => {
+	const r = planPlacements(EVENT, wide(5))
+	assert.deepEqual(overflow(r), [
+		['HOLD FG', 'CF701', 13],
+		['HOLD FG', 'CF702', 14],
+		['HOLD BG', 'CB702', 13],
+		['HOLD FG', 'CF703', 15],
+		['HOLD FG', 'CF704', 16],
+	])
+	assert.ok(r.placements.filter((p) => p.why === 'overflow').every((p) => p.replaces === null && p.live === false))
+	assert.equal(r.unplaced.length, 0)
+	// The confirmation names each clip.
+	const { steps } = updatePlan(EVENT, wide(5), new Set())
+	const cf703 = steps.find((x) => x.request.code === 'CF703')
+	assert.equal(cf703.what, 'CF703 into HOLD FG · column 15, an empty clip past the named columns')
+	assert.equal(cf703.request.clipIds.length, 1)
+})
+
+test('overflow: never a loaded clip, never one on screen, never before the last named column', () => {
+	const s = wide(5)
+	const fg = s.layers[3]
+	fg.slots[12] = clip('Logo.png') // loaded, no code
+	fg.slots[13] = { ...clip('CF500-LastEvent.png'), state: 'playing' }
+	const r = planPlacements(EVENT, s)
+	assert.deepEqual(overflow(r).filter((x) => x[0] === 'HOLD FG').map((x) => x[2]), [15, 16, 17])
+	assert.ok(!r.placements.some((p) => p.clipId === fg.slots[12].id || p.clipId === fg.slots[13].id))
+	// A COUNTDOWN past the PROMOs is a named column: overflow starts after it.
+	const t = composition([...NAMES, 'COUNTDOWN', 'Column #'])
+	for (const l of t.layers) if (l.slots.length === NAMES.length) l.slots.push(empty(), empty())
+	assert.deepEqual(overflow(planPlacements(EVENT, t)).map((x) => [x[0], x[2]]), [['HOLD FG', 14], ['HOLD BG', 14]])
+})
+
+test("overflow: what still doesn't fit is said and waits in the tray, never dropped", () => {
+	const r = planPlacements(EVENT, wide(2))
+	assert.deepEqual(overflow(r), [
+		['HOLD FG', 'CF701', 13],
+		['HOLD FG', 'CF702', 14],
+		['HOLD BG', 'CB702', 13],
+	])
+	const left = r.unplaced.filter((u) => u.didntFit)
+	assert.deepEqual(left.map((u) => u.code), ['CF703', 'CF704'])
+	assert.ok(left.every((u) => u.kind === 'no-column'))
+	assert.match(left[0].detail, /no column named Offering Story, and no empty clip left on HOLD FG after PROMO \(column 12\)/)
+	// Every one-off is somewhere: placed or said.
+	const said = new Set([...r.placements.map((p) => p.code), ...r.unplaced.map((u) => u.code)])
+	for (const c of ['CF701', 'CF702', 'CB702', 'CF703', 'CF704']) assert.ok(said.has(c), c)
+	// Not with unnamed columns: nothing placed, nothing overflowed.
+	const plain = composition(NAMES.map(() => 'Column #'))
+	assert.deepEqual(overflow(planPlacements(EVENT, plain)), [])
+})
+
+test('overflow: a code two one-offs share takes one clip, said once', () => {
+	const shared = [...ITEMS, oneOff('Session 1', 'CF801'), oneOff('Session 2', 'CF801')]
+	const r = planPlacements(shared, wide(3))
+	assert.deepEqual(r.placements.filter((p) => p.code === 'CF801').map((p) => [p.item, p.column]), [[9, 13], [10, 13]])
+	const step = updatePlan(shared, wide(3), new Set()).steps.find((x) => x.request.code === 'CF801')
+	assert.equal(step.what, 'CF801 into HOLD FG · column 13, an empty clip past the named columns')
+	// The Lookbook view: both moments need loading.
+	const looks = looksOf(shared, wide(3), new Set())
+	assert.equal(looks[9].codes[0].state, 'place')
+	assert.equal(looks[10].codes[0].state, 'place')
+})
+
+test('overflow backgrounds and the normal background never meet', () => {
+	const s = wide(3)
+	s.layers[1].slots[11] = empty() // the last PROMO's background: a gap
+	const r = planPlacements(EVENT, s)
+	const gaps = backgroundGaps(EVENT, s)
+	assert.deepEqual(gaps.map((g) => g.column), [12])
+	const cb702 = r.placements.find((p) => p.code === 'CB702')
+	assert.equal(cb702.column, 13)
+	assert.ok(!gaps.some((g) => g.clipId === cb702.clipId))
+	// Update all: the normal background's step does not reach past the last PROMO.
+	const { steps } = updatePlan(EVENT, s, new Set())
+	const cb095 = steps.find((x) => x.request.code === 'CB095')
+	assert.ok(!cb095.request.clipIds.includes(cb702.clipId))
+	assert.ok(steps.find((x) => x.request.code === 'CB702').request.clipIds.includes(cb702.clipId))
+})
+
+test('Clear old FGs: an overflow clip is this run sheet’s, never old; the last event’s leftovers are', () => {
+	const s = wide(3)
+	const fg = s.layers[3]
+	fg.slots[12] = clip('CF701-Conf-SpeakerIntro.png') // loaded by an earlier Update all
+	fg.slots[13] = clip('CF599-LastEvent-Old.png') // the last event's
+	const old = oldForegrounds(EVENT, s).map((c) => c.code)
+	assert.ok(!old.includes('CF701'))
+	assert.ok(old.includes('CF599'))
+	// CF701 counts as placed, so it is not overflowed again; the rest take what is still empty.
+	assert.deepEqual(overflow(planPlacements(EVENT, s)).filter((x) => x[0] === 'HOLD FG').map((x) => [x[1], x[2]]), [['CF702', 15]])
+	assert.deepEqual(planPlacements(EVENT, s).unplaced.filter((u) => u.didntFit).map((u) => u.code), ['CF703', 'CF704'])
+	// Before it is loaded, an overflow slot is empty: nothing to clear there either.
+	assert.ok(!oldForegrounds(EVENT, wide(3)).some((c) => c.column > 12))
 })
