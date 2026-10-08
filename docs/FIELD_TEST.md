@@ -88,7 +88,7 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
-**The plum look and the quieter bar** (on main after 0.2.6, branch `look-plum`; not yet in a build)
+**The plum look and the quieter bar** (1.0.0)
 - [ ] The colours: plum-grey surfaces, cream text, one blue for what is selected (the tab showing, a pressed button, Admin's lock). Live green, amber and down red as loud as before. Readable from the booth chair; nothing "soft"
 - [ ] Tap between tabs in a window: the blue fill slides to the one tapped
 - [ ] The bar on a good day: Layouts on the left and nothing else there; countdown and clock in the middle, each a big number over a grey line; on the right a pulse icon (Connections, its dot a badge) and the lock
