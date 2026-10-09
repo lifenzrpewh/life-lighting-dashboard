@@ -88,6 +88,13 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**The Cue Manager as a device** (the visuals app, live since 2026-10-09; nothing to install here)
+- [ ] Signed out, the Cue Manager's column shows only a QR ("Scan this with an admin's phone…"), no email form
+- [ ] Scan it with an admin's phone: "Set up this device", with **Existing** (this campus's devices, tap one) and **New** (name and campus). Assign one; the column signs in
+- [ ] Signed in as a person (from before): the column says "Pāua signs in as a device" and **Sign out and pair as a device** brings the QR
+- [ ] As the device: Account shows the role Device; an open song has no Listen section
+- [ ] Rename the device in the app's Admin › Devices on a phone; reload the column: the new name on its Account page
+
 **The plum look and the quieter bar** (1.0.0)
 - [ ] The colours: plum-grey surfaces, cream text, one blue for what is selected (the tab showing, a pressed button, Admin's lock). Live green, amber and down red as loud as before. Readable from the booth chair; nothing "soft"
 - [ ] Tap between tabs in a window: the blue fill slides to the one tapped
