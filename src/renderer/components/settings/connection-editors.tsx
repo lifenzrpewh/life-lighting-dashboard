@@ -301,8 +301,8 @@ export function CueInfo() {
 	return (
 		<>
 			<p className="text-sm text-booth-dim">
-				The run order is the Cue Manager itself. To sign this booth in, use “Sign in with a QR code” in its column; an
-				admin scans it and approves it as this campus’s booth device.
+				The run order is the Cue Manager itself. Here it signs in only as a device: its column shows a QR, and an
+				admin scans it and picks this booth’s device, or makes a new one. Clear it below to pair again.
 			</p>
 			<CueManagerSettings />
 		</>
