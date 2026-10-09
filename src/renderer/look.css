@@ -1,0 +1,68 @@
+/* life-look v1.0.0, copied by scripts/sync-look.mjs. Don't edit it here: change look.css in
+   github.com/lifenzrpewh/life-look, tag a new version, then run `npm run look:sync` in each app. */
+/* The LIFE look: the values every LIFE production app draws with (Pāua, the lighting
+   dashboard; the Cue Manager PWA, visuals-song-comms). The rules for using them are in
+   README.md. Each app maps these onto its own Tailwind tokens (its `@theme`), so the
+   names here are roles, not utilities.
+
+   The plum look (2026-10-08, the owner's, from nine rounds in the "Pāua palette"
+   playground): plum and blue (#331832 #694D75 #1B5299 #9FC2CC #F1ECCE), surfaces and text
+   desaturated to 40%, the selected blue to 70%. Live, stale and down stay at full
+   strength: they are news, and nothing in the palette may be mistaken for them.
+
+   Dark is the look. Light is the Cue Manager's for phones in daylight (cream, the palette's
+   #F1ECCE at 40%); Pāua is dark only. */
+:root {
+	/* ---- Dark ---- */
+	/* The ground and its layers, darkest to lightest. */
+	--look-dark-ground: #100d10;
+	--look-dark-panel: #191519;
+	--look-dark-raise: #272028;
+	--look-dark-hover: #362e38;
+	--look-dark-edge: #2b202b;
+	/* Text: the words, the grey line under a title, what is out of the way. */
+	--look-dark-ink: #e7e5d9;
+	--look-dark-dim: #adbbbf;
+	--look-dark-faint: #7b737f;
+	/* Selected: the blue as a fill behind text (the tab showing, the option chosen), with
+	   accent-ink on it. accent-hi is the same blue lighter, for a line, a ring, an icon or
+	   words on the ground, where the fill would vanish; accent-hi-hover brightens it. */
+	--look-dark-accent: #2e5486;
+	--look-dark-accent-hi: #6e92c6;
+	--look-dark-accent-hi-hover: #86a5d2;
+	--look-dark-accent-ink: #e7e5d9;
+	/* The state vocabulary, one colour each, the same everywhere. */
+	--look-dark-live: #2bd96b;
+	--look-dark-stale: #ffb020;
+	--look-dark-down: #ff4e45;
+
+	/* ---- Light ---- */
+	--look-light-ground: #f3f1ea;
+	--look-light-panel: #fbfaf6;
+	--look-light-raise: #ece9e1;
+	--look-light-hover: #e0dcd2;
+	--look-light-edge: #d9d3c8;
+	--look-light-ink: #191519;
+	--look-light-dim: #55626a;
+	--look-light-faint: #8a838e;
+	/* On a light ground the fill blue already reads as a line, so accent-hi is the fill. */
+	--look-light-accent: #2e5486;
+	--look-light-accent-hi: #2e5486;
+	--look-light-accent-hi-hover: #24446e;
+	--look-light-accent-ink: #f3f1ea;
+	/* Darkened for contrast on cream. */
+	--look-light-live: #138a43;
+	--look-light-stale: #a86800;
+	--look-light-down: #cf2f27;
+
+	/* ---- Both ---- */
+	/* Corners: a frame (a window, a card, a sheet, a picture) and a control (anything
+	   tapped with words or an icon). Round only for a dot, a switch, a play or keypad key. */
+	--look-radius-frame: 2px;
+	--look-radius-control: 4px;
+
+	/* Archivo for everything, heavy for titles. Bundled by each app
+	   (@fontsource-variable/archivo), never fetched: a booth may have no internet on a
+	   Sunday. */
+	--look-font: 'Archivo Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}

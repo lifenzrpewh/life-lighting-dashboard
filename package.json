@@ -19,6 +19,8 @@
 		"start": "npm run build:app && electron .",
 		"test": "npm run build && node --test \"test/*.test.js\" && npm run test:lua",
 		"test:lua": "node scripts/run-lua-harness.mjs",
+		"look:check": "node scripts/sync-look.mjs src/renderer/look.css --check",
+		"look:sync": "node scripts/sync-look.mjs src/renderer/look.css",
 		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.web.json"
 	},
 	"dependencies": {

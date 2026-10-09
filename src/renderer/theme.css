@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* The values, shared with the Cue Manager through life-look (theme below says how). */
+@import './look.css';
 
 /* Dark only, deliberately. This screen lives in a dim booth beside a console at
    9am on a Sunday; there is no light mode because there is no lit room.
@@ -14,51 +16,58 @@
    and text desaturated to 40% and the selected blue to 70% ("still too much
    colour" at full strength). Live green, warning amber and down red stay at
    full strength: they are news, and nothing in the palette may be mistaken
-   for them. */
+   for them.
+
+   The values themselves live in life-look (github.com/lifenzrpewh/life-look, private),
+   shared with the Cue Manager so the two read as one family (it is the Cue view here).
+   ./look.css is a committed copy: `npm run look:sync` pulls the latest tag, `npm run
+   look:check` says if it was edited here or is behind. Never edit it here, and never put
+   a palette hex in this file: change life-look, tag it, sync both apps. These tokens only
+   say which of the look's roles each of ours is. */
 @theme {
 	/* The ground and its layers, darkest to lightest: plum at 40%. */
-	--color-booth-bg: #100d10;
-	--color-booth-panel: #191519;
-	--color-booth-strip: #191519;
-	--color-booth-raise: #272028;
-	--color-booth-hover: #362e38;
-	--color-booth-edge: #2b202b;
-	--color-booth-ink: #e7e5d9;
-	--color-booth-dim: #adbbbf;
-	--color-booth-faint: #7b737f;
+	--color-booth-bg: var(--look-dark-ground);
+	--color-booth-panel: var(--look-dark-panel);
+	--color-booth-strip: var(--look-dark-panel);
+	--color-booth-raise: var(--look-dark-raise);
+	--color-booth-hover: var(--look-dark-hover);
+	--color-booth-edge: var(--look-dark-edge);
+	--color-booth-ink: var(--look-dark-ink);
+	--color-booth-dim: var(--look-dark-dim);
+	--color-booth-faint: var(--look-dark-faint);
 
 	/* Selected: the palette's blue at 70%, as a fill behind text (the tab
 	   showing, a pressed button, Admin's lock). `accent-hi` is the same blue
 	   lighter, for a line or ring on the dark, where the fill would vanish. */
-	--color-accent: #2e5486;
-	--color-accent-hi: #6e92c6;
-	--color-accent-ink: #e7e5d9;
+	--color-accent: var(--look-dark-accent);
+	--color-accent-hi: var(--look-dark-accent-hi);
+	--color-accent-ink: var(--look-dark-accent-ink);
 
 	/* The state vocabulary, one colour each, used identically everywhere. */
-	--color-state-live: #2bd96b;
-	--color-state-stale: #ffb020;
-	--color-state-unknown: #7b737f;
-	--color-state-unreachable: #ff4e45;
+	--color-state-live: var(--look-dark-live);
+	--color-state-stale: var(--look-dark-stale);
+	--color-state-unknown: var(--look-dark-faint);
+	--color-state-unreachable: var(--look-dark-down);
 
 	/* Amber is reserved for "you must look at this": the unconfirmed-cook strip
 	   and ON BASE SHOW. Nothing decorative may use it. */
-	--color-warn: #ffb020;
+	--color-warn: var(--look-dark-stale);
 
 	/* A countdown past zero, counting up. Its own token, not the state red: a
 	   link going UNREACHABLE and a song running long are different news. */
-	--color-overtime: #ff4e45;
+	--color-overtime: var(--look-dark-down);
 
 	/* Corners: 2 px for a window, a card, a picture; 4 px for anything tapped
 	   that has words or an icon. Round only for a dot. */
-	--radius-win: 2px;
-	--radius-ctl: 4px;
+	--radius-win: var(--look-radius-frame);
+	--radius-ctl: var(--look-radius-control);
 
 	/* Bundled with the app (../main.tsx), never fetched: this box may have no
 	   internet on a Sunday. Archivo for everything, heavy for titles; what is
 	   typed exactly (show names, codes, addresses) is Archivo too, with
 	   figures that line up. */
-	--font-sans: 'Archivo Variable', 'Segoe UI', system-ui, sans-serif;
-	--font-mono: 'Archivo Variable', 'Segoe UI', system-ui, sans-serif;
+	--font-sans: var(--look-font);
+	--font-mono: var(--look-font);
 }
 
 /* The ring that marks the chosen one of several (a layout, a place to drop). */
