@@ -357,7 +357,7 @@ on the Mac against the mock only (`docs/FIELD_TEST.md` § 0.2.6). Waiting on the
 `spikes/propresenter-playlist.mjs` run at a booth (ProPresenter's announcements: a presentation
 playlist, base items then announcements; the plan is a Smart Playlist folder plus a PUT of the
 playlist, announcements told by their lookbook code). visuals-song-comms branch `devices-wording`
-(Booth devices → Devices) is pushed, not merged.
+(Booth devices → Devices) was merged on 2026-10-09.
 
 **2026-10-06: v0.2.5 tagged** at the owner's ask, from a Mac session: operator-only buttons
 not drawn in volunteer mode, Layouts as a dropdown over the windows (and in the folded strip),
