@@ -88,6 +88,14 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**The video across a tab switch** (1.0.1, for the booth whose Spout picture died on a tab change in 1.0.0)
+- [ ] First, Settings › System › Display › Graphics: Paua.exe and Arena both on **High performance**; restart both
+- [ ] A Video tab on Arena's Spout output shows the picture
+- [ ] Switch to another tab in that window and back, a few times, quickly and after a minute: the picture comes back each time
+- [ ] Away for more than 2 minutes, then back: the picture comes back (the log says it opened the sender again)
+- [ ] Two Video tabs on the same sender in two windows: both move; switch one away and the other keeps moving
+- [ ] If it dies anyway: does **Restart video** bring it back? Send the `[video]` lines from `paua.log`
+
 **The Cue Manager as a device** (the visuals app, live since 2026-10-09; nothing to install here)
 - [ ] Signed out, the Cue Manager's column shows only a QR ("Scan this with an admin's phone…"), no email form
 - [ ] Scan it with an admin's phone: "Set up this device", with **Existing** (this campus's devices, tap one) and **New** (name and campus). Assign one; the column signs in

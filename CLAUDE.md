@@ -315,6 +315,12 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-11: v1.0.1 tagged** at the owner's ask, from a Mac session: the Spout receiver kept
+across a tab switch and the views watching counted (the video status row above), plus what
+merged into main since 1.0.0 (the Cue Manager signs in only as a device; the look's values
+shared with the Cue Manager). Checked on the Mac against a stand-in sender only; for the booth
+whose picture died on a tab change, `docs/FIELD_TEST.md` § The video across a tab switch.
+
 **2026-10-09, branch `life-look`, pushed, not merged:** the look's values (colours, corners,
 font) moved to **life-look** (github.com/lifenzrpewh/life-look, private), shared with the Cue
 Manager, which took the plum look the same day. `src/renderer/look.css` is a committed copy, not
