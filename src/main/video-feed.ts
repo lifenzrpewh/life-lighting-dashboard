@@ -15,8 +15,16 @@
 //   minted per frame; one dropped on the floor is a leaked NT HANDLE a frame.
 // - At most one frame in flight. A slow page skips frames, it never queues
 //   them, so the picture is late by at most one frame, never by a backlog.
-// - Nothing is received while no page is watching. The poll stops and the
-//   receiver is let go, so a dashboard not showing the feed costs nothing.
+// - Nothing is received while no page is watching. The poll stops at once,
+//   so a dashboard not showing the feed costs nothing; the receiver itself is
+//   held for HOLD_MS before it is let go, so a tab switched away and back
+//   picks up the same receiver rather than opening Spout again.
+//   (2026-10-11, the owner, on the booth that never showed a picture: 1.0.0
+//   "worked, until i changed tab then it died". A tab switch unmounts the
+//   view, and until then that closed the receiver and opened a new one, with
+//   a new D3D11 device, on the way back: the first open worked and a reopen
+//   did not. Why the reopen fails is ⚠️ not seen; not reopening is the fix
+//   that needs no answer to it.)
 // - Which senders exist is read from the machine, never set: a view is offered
 //   when something answers (../shared/layout.ts). With several, the first by
 //   name is shown until the page picks another.
@@ -98,6 +106,10 @@ const hasRing = (): boolean => {
 		return false
 	}
 }
+/** How long a receiver nobody watches is kept before it is let go: longer
+ *  than a look at another tab, short enough that a feed left for good is not
+ *  held all service. */
+const HOLD_MS = 120_000
 /** How often the machine's senders are listed. */
 const LIST_MS = 2_000
 
@@ -172,6 +184,8 @@ export function startVideoFeed(): VideoFeed {
 	let chosen: string | null = null
 	let receiver: { name: string; native: Receiver } | null = null
 	let poll: ReturnType<typeof setInterval> | null = null
+	/** Lets an unwatched receiver go, HOLD_MS after the last page stopped. */
+	let hold: ReturnType<typeof setTimeout> | null = null
 	let inFlight = false
 	let lastSentAt = 0
 	let lastFrame: VideoFeedState['lastFrame'] = null
@@ -249,9 +263,15 @@ export function startVideoFeed(): VideoFeed {
 		connect()
 	}
 
-	const release = () => {
+	const pause = () => {
 		if (poll !== null) clearInterval(poll)
 		poll = null
+	}
+
+	const release = () => {
+		pause()
+		if (hold !== null) clearTimeout(hold)
+		hold = null
 		try {
 			receiver?.native.stop()
 		} catch (e) {
@@ -261,11 +281,38 @@ export function startVideoFeed(): VideoFeed {
 		attempt = null
 	}
 
-	/** Hold a receiver for the sender being shown, while someone watches. */
+	/** Hold a receiver for the sender being shown, while someone watches,
+	 *  and for HOLD_MS after. */
 	const connect = () => {
 		const name = showing()
-		if (typeof addon === 'string' || watchers.size === 0 || name === null) return release()
-		if (receiver?.name === name) return
+		if (typeof addon === 'string' || name === null) return release()
+		if (watchers.size === 0) {
+			// Kept, not polled: the same receiver if a page comes back in time.
+			if (receiver === null || receiver.name !== name) return release()
+			if (poll !== null) console.log(`[video] nobody watching: "${receiver.name}" kept for ${HOLD_MS / 1000} s`)
+			pause()
+			hold ??= setTimeout(() => {
+				hold = null
+				if (watchers.size === 0) {
+					console.log(`[video] nobody watched for ${HOLD_MS / 1000} s: letting "${receiver?.name}" go`)
+					release()
+				}
+			}, HOLD_MS)
+			return
+		}
+		if (hold !== null) clearTimeout(hold)
+		hold = null
+		if (receiver?.name === name) {
+			if (poll === null) {
+				// Watched again: the receiver that worked, not a new one.
+				const now = performance.now()
+				health = { since: now, lastTick: now, busy: 0, quiet: 0, receive: 0, lastNew: now }
+				if (attempt !== null && attempt.delivered === 0) attempt = { ...attempt, since: now, explained: false }
+				console.log(`[video] watching "${name}" again (same receiver)`)
+				poll = setInterval(tick, POLL_MS)
+			}
+			return
+		}
 		release()
 		try {
 			receiver = { name, native: new addon.TextureReceiver(name) }

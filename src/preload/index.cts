@@ -29,8 +29,13 @@ import type { NdiState } from '../shared/ndi.js' with { 'resolution-mode': 'impo
 import type { CaptureInput } from '../shared/capture.js' with { 'resolution-mode': 'import' }
 import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
 
-/** The page's frame callback, while it shows the video feed. */
-let onVideoFrame: ((frame: VideoFrame) => void) | null = null
+/** Every view on this page showing the video feed, each drawing every frame.
+ *  Main is told the page watches while there is one, and stops when the last
+ *  goes. (Until 2026-10-11 it was one callback and an on/off per view: the
+ *  view mounted last took every frame, and any one closing, a tab switched
+ *  away, told main the page had stopped watching while another still showed
+ *  the feed.) */
+const videoDraws = new Set<(frame: VideoFrame) => void>()
 
 // The video feed's frames arrive here as GPU textures from main
 // (src/main/video-feed.ts) and go to the page as VideoFrames, which cross the
@@ -50,13 +55,13 @@ let pageHealth = { frameGap: 0, drewNothing: 0, draw: 0, lastFrame: 0, lastPaint
 setInterval(() => {
 	const h = pageHealth
 	pageHealth = { ...h, frameGap: 0, drewNothing: 0, draw: 0 }
-	if (onVideoFrame === null || document.hidden) return
+	if (videoDraws.size === 0 || document.hidden) return
 	if (h.frameGap >= 250 || h.drewNothing >= 250 || h.draw >= 40) {
 		ipcRenderer.send('video:page-health', { frameGap: h.frameGap, drewNothing: h.drewNothing, draw: h.draw })
 	}
 }, 5_000)
 const paint = (t: number) => {
-	if (onVideoFrame !== null && !document.hidden && pageHealth.lastPaint > 0) pageHealth.drewNothing = Math.max(pageHealth.drewNothing, t - pageHealth.lastPaint)
+	if (videoDraws.size > 0 && !document.hidden && pageHealth.lastPaint > 0) pageHealth.drewNothing = Math.max(pageHealth.drewNothing, t - pageHealth.lastPaint)
 	pageHealth.lastPaint = document.hidden ? 0 : t
 	requestAnimationFrame(paint)
 }
@@ -74,7 +79,13 @@ try {
 		if (pageHealth.lastFrame > 0 && !document.hidden) pageHealth.frameGap = Math.max(pageHealth.frameGap, at - pageHealth.lastFrame)
 		pageHealth.lastFrame = at
 		try {
-			onVideoFrame?.(frame)
+			for (const draw of videoDraws) {
+				try {
+					draw(frame)
+				} catch (e) {
+					console.error('[video] a view failed to draw a frame:', e)
+				}
+			}
 			pageHealth.draw = Math.max(pageHealth.draw, performance.now() - at)
 		} finally {
 			frame.close()
@@ -237,11 +248,13 @@ const api = {
 	/** Show the feed: frames go to `draw` until the returned function is
 	 *  called. Draw at once; the frame is closed when `draw` returns. */
 	watchVideo: (draw: (frame: VideoFrame) => void): (() => void) => {
-		onVideoFrame = draw
-		ipcRenderer.send('video:watch', true)
+		// Wrapped, so the same function given twice is two watchers.
+		const watcher = (frame: VideoFrame) => draw(frame)
+		videoDraws.add(watcher)
+		if (videoDraws.size === 1) ipcRenderer.send('video:watch', true)
 		return () => {
-			if (onVideoFrame === draw) onVideoFrame = null
-			ipcRenderer.send('video:watch', false)
+			if (!videoDraws.delete(watcher)) return
+			if (videoDraws.size === 0) ipcRenderer.send('video:watch', false)
 		}
 	},
 	/** Show this sender rather than the first. */
