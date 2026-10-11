@@ -64,7 +64,7 @@ import { createCuePane, type CuePane } from './cue-pane.js'
 import { openSettings, type SettingsStore } from './settings.js'
 import type { DeskState } from '../shared/desk.js'
 import type { TimerSources } from '../shared/timer.js'
-import { startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.js'
+import { localAddresses, startChannelB, OSC_PREFIX, type ChannelBHandle } from './bridge/osc-in.js'
 import { startLink, type LinkHandle } from './bridge/link.js'
 import { startTimers, type TimersHandle } from './timers.js'
 import { startArena, type ArenaHandle } from './arena.js'
@@ -304,18 +304,23 @@ function startOsc(store: SettingsStore): void {
 		},
 	})
 	// onPC on this computer holds the reply port on every address, so listen on
-	// loopback exactly, beside it (./bridge/osc-in.ts, at the bind).
-	const beside = s.consoleHost !== null && isLoopback(s.consoleHost) ? '127.0.0.1' : undefined
+	// each of this computer's addresses exactly, beside it: loopback for onPC on
+	// loopback, the network card's for onPC in a session (./bridge/osc-in.ts, at
+	// the bind). Beside a console elsewhere, the same once the port is found taken.
+	const here = localAddresses()
 	channelB = startChannelB({
 		port: replyPort,
-		beside,
+		beside: isLoopback(s.consoleHost) ? here : undefined,
+		besideIfTaken: here,
+		onBeside: (addresses) =>
+			console.log(`[kiosk] port ${replyPort} is taken here (onPC?): listening on ${addresses.join(', ')} beside it`),
 		onMessage: (message) => consoleLink?.offer(message),
 		onBindError: (error) => {
 			console.error(`[kiosk] could not listen on ${replyPort}: ${error.message}`)
 			if (error.code === 'EADDRINUSE') {
 				console.error('[kiosk]   Something on this computer holds that port, usually grandMA3 onPC.')
 				console.error('[kiosk]   Commands still go out; nothing can come back, so the link stays unreachable.')
-				console.error('[kiosk]   If onPC is on this computer, set the console address to 127.0.0.1.')
+				console.error('[kiosk]   Something holds it on this computer\'s own addresses too; close it, or change the reply port.')
 			}
 		},
 	})

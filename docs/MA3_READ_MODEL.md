@@ -328,7 +328,18 @@ console last spoke (`src/bridge/ping.ts`). onPC on the dashboard's own computer:
    `127.0.0.1:8004` **exactly**, beside onPC, with the reuse option (and only
    with it), and then receives everything sent there. The kiosk does this
    whenever the console address is loopback (`src/main/bridge/osc-in.ts`).
-   ⚠️ macOS only; Windows has its own rules for this and is untried.
+   ✅ Windows too, on loopback (2026-10-05).
+4. ⚠️ **In a session, the reply goes to the network card, not loopback**
+   (2026-10-11). onPC in a session runs on the station's network interface, and
+   the OSC rows are the session's show, so row 3 sends wherever the console's
+   show says: this computer's network address. A listener on 127.0.0.1 alone
+   never hears it (onPC's own `*:8004` takes it), and the link reads "not
+   answering" with the OSC set right (the owner, onPC in session). So the kiosk
+   listens beside onPC on **every** IPv4 address of this computer, and, with a
+   console elsewhere, falls back to the same when the port turns out taken
+   (onPC in its session on this computer). Measured on this Mac against a
+   stand-in holding `*:port`: loopback and the Wi-Fi address both heard, the
+   stand-in nothing. ⚠️ Not yet against onPC in a session, or on Windows.
 
 The working layout: a row receiving commands on **8003** (Receive, Receive
 Command; Send off, or onPC feeds its own output back in), and **row 3**, the row

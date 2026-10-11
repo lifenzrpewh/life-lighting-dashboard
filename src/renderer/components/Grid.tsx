@@ -18,9 +18,14 @@
 // strip's × removes the window. A tab is dragged along its strip to reorder
 // it, or onto another window to move it there (the owner, 2026-10-05: "don't
 // have to delete them to allow them to be reorganised"); a blue bar shows
-// where it will land. A tab's pencil names it in this layout (2026-10-08,
-// the owner's ask: "Stage cam" rather than "Video"); emptied, it takes its
-// view's own name again.
+// where it will land.
+//
+// NAMING, in or out of editing: a double tap on a tab names it in this layout
+// (2026-10-08, the owner's ask: "Stage cam" rather than "Video"; a double tap
+// rather than a pencil on each tab since 2026-10-11, the owner: the pencils
+// were unneeded and crowded the strip); emptied, it takes its view's own name
+// again. The double tap is counted from two clicks, not `dblclick`, so a
+// finger on the booth screen gets it whatever the touch emulation does.
 //
 // OUT OF EDITING, for everyone: tap a tab, and drag the edge two windows share
 // (a grip in the gap between them, the one place a page cannot cover) to give
@@ -29,6 +34,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Check, Move, PanelTop, Pencil, Plus, Trash2, X } from 'lucide-react'
+
+/** Two taps on one tab this close together, in ms, are a double tap. */
+const DOUBLE_TAP = 450
 
 import {
 	HEIGHT,
@@ -121,16 +129,28 @@ export function Grid(p: GridProps) {
 	const latest = useRef(drag)
 	latest.current = drag
 	const [adding, setAdding] = useState<string | null>(null)
-	// The tab being named (editing only), and what has been typed so far.
+	// The tab being named, and what has been typed so far.
 	const [naming, setNaming] = useState<{ win: string; tab: string; text: string } | null>(null)
+	// The last tap on a tab, for a double tap.
+	const lastTap = useRef<{ tab: string; at: number } | null>(null)
 	const titleOf = (t: Tab) => tabTitle(t, p.nameOf)
 	const endNaming = (keep: boolean) => {
 		if (naming !== null && keep) p.onRenameTab(naming.win, naming.tab, naming.text)
 		setNaming(null)
 	}
-	useEffect(() => {
-		if (!p.editing) setNaming(null)
-	}, [p.editing])
+	useEffect(() => setNaming(null), [p.editing])
+	/** A tap on a tab shows it; a second soon after on the same tab names it. */
+	const tapTab = (win: GridWindow, t: Tab) => {
+		const now = Date.now()
+		const last = lastTap.current
+		if (last !== null && last.tab === t.id && now - last.at < DOUBLE_TAP) {
+			lastTap.current = null
+			setNaming({ win: win.id, tab: t.id, text: t.label ?? '' })
+			return
+		}
+		lastTap.current = { tab: t.id, at: now }
+		p.onSelect(win.id, t.id)
+	}
 
 	// A tab being dragged (editing only): where it came from, where the pointer
 	// is, and where it would land. A press that never moves is a tap.
@@ -275,20 +295,21 @@ export function Grid(p: GridProps) {
 											key={t.id}
 											data-win={win.id}
 											data-tab={t.id}
-											className={`relative flex shrink-0 items-center ${tabDrag?.tab === t.id ? 'opacity-40' : ''}`}
+											data-tab-button={on ? 'on' : undefined}
+											className={`relative flex h-10 shrink-0 items-center rounded-ctl ${tabDrag?.tab === t.id ? 'opacity-40' : ''}`}
 										>
 											{tabDrag?.to?.win === win.id && tabDrag.to.before === t.id && (
 												<span aria-hidden className="absolute inset-y-2 -left-1 w-1 rounded-full bg-accent-hi" />
 											)}
 											{naming?.tab === t.id ? (
 												<form
-													className="flex h-full shrink-0 items-center gap-1 pl-2"
+													className="flex h-full shrink-0 items-center gap-1.5 pr-1 pl-3"
 													onSubmit={(e) => {
 														e.preventDefault()
 														endNaming(true)
 													}}
 												>
-													<TabIcon size={17} strokeWidth={1.8} className="text-booth-dim" aria-hidden />
+													<TabIcon size={17} strokeWidth={2} className={on ? 'text-accent-ink' : 'text-booth-dim'} aria-hidden />
 													<input
 														autoFocus
 														value={naming.text}
@@ -298,7 +319,7 @@ export function Grid(p: GridProps) {
 														onChange={(e) => setNaming({ ...naming, text: e.target.value })}
 														onKeyDown={(e) => e.key === 'Escape' && endNaming(false)}
 														onBlur={() => endNaming(true)}
-														className="h-9 w-40 rounded-ctl bg-booth-bg px-2.5 text-sm font-medium text-booth-ink ring-1 ring-accent-hi outline-none placeholder:text-booth-faint"
+														className="h-8 w-40 rounded-ctl bg-booth-bg px-2.5 text-sm font-medium text-booth-ink ring-1 ring-accent-hi outline-none placeholder:text-booth-faint"
 													/>
 													<IconButton icon={Check} size="sm" label="Keep this name" onClick={() => endNaming(true)} />
 												</form>
@@ -307,11 +328,10 @@ export function Grid(p: GridProps) {
 													type="button"
 													role="tab"
 													aria-selected={on}
-													onClick={() => !dragged() && p.onSelect(win.id, t.id)}
+													onClick={() => !dragged() && tapTab(win, t)}
 													{...tabHandle(win, t)}
-													title={p.editing ? 'Drag to move this tab' : undefined}
-													data-tab-button={on ? 'on' : undefined}
-													className={`relative flex h-10 shrink-0 items-center gap-2 rounded-ctl px-4 text-sm font-bold transition-[color,background-color,transform] duration-150 active:scale-95 ${p.editing ? 'cursor-grab touch-none' : ''} ${
+													title={p.editing ? 'Drag to move this tab; double-tap to name it' : 'Double-tap to name this tab'}
+													className={`relative flex h-10 shrink-0 items-center gap-2 rounded-ctl text-sm font-bold transition-[color,background-color,transform] duration-150 active:scale-95 ${p.editing ? 'cursor-grab touch-none pr-1.5 pl-4' : 'px-4'} ${
 														on ? 'text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
 													}`}
 												>
@@ -322,21 +342,12 @@ export function Grid(p: GridProps) {
 											{p.editing && naming?.tab !== t.id && (
 												<button
 													type="button"
-													onClick={() => setNaming({ win: win.id, tab: t.id, text: t.label ?? '' })}
-													aria-label={`Name the ${titleOf(t)} tab`}
-													title={`Name the ${titleOf(t)} tab`}
-													className="-ml-2 grid size-8 shrink-0 place-items-center rounded-ctl text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
-												>
-													<Pencil size={14} aria-hidden />
-												</button>
-											)}
-											{p.editing && naming?.tab !== t.id && (
-												<button
-													type="button"
 													onClick={() => p.onRemoveTab(win.id, t.id)}
 													aria-label={`Remove the ${titleOf(t)} tab`}
 													title={`Remove the ${titleOf(t)} tab`}
-													className="mr-1 grid size-8 shrink-0 place-items-center rounded-ctl text-booth-dim hover:bg-booth-raise hover:text-booth-ink"
+													className={`relative mr-1 grid size-8 shrink-0 place-items-center rounded-ctl ${
+														on ? 'text-accent-ink/75 hover:bg-black/15 hover:text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
+													}`}
 												>
 													<X size={15} aria-hidden />
 												</button>
@@ -523,7 +534,7 @@ function TabFill({ on, tabs }: { on: string | null; /** What the strip holds: pl
 		last.current = on
 		const ro = new ResizeObserver(() => place(false))
 		ro.observe(list)
-		for (const b of list.querySelectorAll('[role="tab"]')) ro.observe(b)
+		for (const b of list.querySelectorAll('[data-tab]')) ro.observe(b)
 		return () => ro.disconnect()
 	}, [on, tabs])
 	return <span ref={ref} aria-hidden className="pointer-events-none absolute top-[calc(50%-20px)] left-0 h-10 rounded-ctl bg-accent opacity-0" />
