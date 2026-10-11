@@ -29,7 +29,8 @@ import type { SettingsView } from '../../shared/settings.js'
 
 import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor, VideoInfo } from './settings/connection-editors.js'
 import { AdminSettings } from './settings/admin.js'
-import { AboutFoot, ThisScreen } from './settings/computer.js'
+import { AboutFoot, ThisScreen, UpdatesCard } from './settings/computer.js'
+import type { UpdateState } from '../../shared/updates.js'
 import { TopBarSettings } from './settings/top-bar.js'
 import type { BarItem } from '../barItems.js'
 import { DetailHead, Empty, ListRow, OnOff, tonePill, toneText, type Save } from './settings/parts.js'
@@ -88,6 +89,7 @@ export function SettingsPanel({
 	onBarHidden,
 	testing,
 	onTesting,
+	updates,
 }: {
 	rows: readonly ConnectionStatus[]
 	/** The page to open on: a connection tapped in Connections, or null for
@@ -106,6 +108,8 @@ export function SettingsPanel({
 	/** Testing: Mark on the bar, on this computer (../barItems.ts). */
 	testing: boolean
 	onTesting: (on: boolean) => void
+	/** What the updater last knew, for This computer. */
+	updates: UpdateState | null
 }) {
 	const [view, setView] = useState<SettingsView | null>(null)
 	const [picked, setPicked] = useState<SettingsPage | null>(start)
@@ -233,7 +237,13 @@ export function SettingsPanel({
 						onClick={() => setPicked('computer')}
 						lead={<Monitor size={18} className="text-booth-dim" aria-hidden />}
 						title="This computer"
-						sub={<span className="text-booth-dim">Full screen or window</span>}
+						sub={
+							updates?.state === 'available' ? (
+								<span className="font-bold text-booth-ink">Pāua {updates.version} is out</span>
+							) : (
+								<span className="text-booth-dim">Screen and updates</span>
+							)
+						}
 					/>
 					<AboutFoot />
 				</nav>
@@ -261,6 +271,7 @@ export function SettingsPanel({
 							<>
 								<DetailHead title="This computer" />
 								<ThisScreen windowed={view.windowed} save={save} />
+								<UpdatesCard updates={updates} />
 							</>
 						) : row === null ? null : (
 							<>

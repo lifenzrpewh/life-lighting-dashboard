@@ -23,6 +23,7 @@ import type { DeskState } from '../shared/desk.js' with { 'resolution-mode': 'im
 import type { ViewId } from '../shared/layout.js' with { 'resolution-mode': 'import' }
 import type { VideoFeedState } from '../shared/video-feed.js' with { 'resolution-mode': 'import' }
 import type { About } from '../shared/about.js' with { 'resolution-mode': 'import' }
+import type { UpdateState } from '../shared/updates.js' with { 'resolution-mode': 'import' }
 import type { AdminState, UnlockResult } from '../shared/admin.js' with { 'resolution-mode': 'import' }
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
 import type { NdiState } from '../shared/ndi.js' with { 'resolution-mode': 'import' }
@@ -293,6 +294,13 @@ const api = {
 
 	/** Which build this is, and where its log is. */
 	about: (): Promise<About> => ipcRenderer.invoke('app:about'),
+	/** What the updater last knew (../shared/updates.ts). */
+	updateState: (): Promise<UpdateState | undefined> => ipcRenderer.invoke('updates:state'),
+	/** Ask for a new version now. */
+	checkUpdates: (): void => ipcRenderer.send('updates:check'),
+	/** Download and install the version found: Admin only, and Pāua closes
+	 *  and opens again. */
+	installUpdate: (): void => ipcRenderer.send('updates:install'),
 	/** Clear an old foreground: empty clip `clipId`, which must still hold
 	 *  `code`. Operator mode only; main checks it is an old foreground. */
 	emptyClip: (clipId: number, code: string): Promise<ArenaCommandResult> => ipcRenderer.invoke('media:empty', clipId, code),

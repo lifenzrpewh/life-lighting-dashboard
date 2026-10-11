@@ -88,6 +88,15 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**Updates** (from the first build after 1.0.1; needs the public `lifenzrpewh/paua-releases` repo and the `RELEASES_TOKEN` secret, and that version's draft published there)
+- [ ] About a minute after the start, the bar says **Pāua <new> is out** (a download icon, quiet blue)
+- [ ] As a volunteer, tapping it asks for the Admin passcode; in Admin it opens Settings › This computer
+- [ ] **Check for updates** says "is the newest" when nothing is newer, and "Could not check: …" with the network unplugged (never "newest")
+- [ ] **Update to <new>** asks once more; **Install now** shows the download counting up, then "Installing"; Pāua closes and opens again by itself on the new version (the foot of Settings says it)
+- [ ] Settings, MA logins, the Cue Manager sign-in and saved layouts all survive it
+- [ ] What Windows showed, if anything (SmartScreen, a UAC prompt): write it down
+- [ ] The watchdog: after the update, kill Paua.exe in Task Manager; it comes back in 5 s
+
 **The video across a tab switch** (1.0.1, for the booth whose Spout picture died on a tab change in 1.0.0)
 - [ ] First, Settings › System › Display › Graphics: Paua.exe and Arena both on **High performance**; restart both
 - [ ] A Video tab on Arena's Spout output shows the picture

@@ -12,6 +12,7 @@ import { captureStateOf, useCameras } from './capture.js'
 import type { Channel, LinkState } from '../shared/reading.js'
 import { readingOf, unread } from '../shared/reading.js'
 import type { DeskState } from '../shared/desk.js'
+import { useUpdates } from './useUpdates.js'
 import { SHOW_STALE_AFTER_MS, type Showfile } from '../shared/showfile.js'
 import type { MaPaneReport, PaneRect } from '../shared/ma-pane.js'
 import type { CuePaneReport } from '../shared/cue-pane.js'
@@ -498,6 +499,7 @@ export function App() {
 	// real fader traffic arrive while the mock exercises the failure modes is the
 	// whole point of having both on screen at once.
 	const [desk, setDesk] = useState<DeskState | null>(null)
+	const updates = useUpdates()
 	useEffect(() => {
 		const api = window.life
 		if (api === undefined) return
@@ -947,6 +949,8 @@ export function App() {
 					hidden={barHidden}
 					collapsed={barCollapsed}
 					onCollapse={collapseBar}
+					updates={updates}
+					onUpdates={() => (mode === 'operator' ? openSettings('computer') : void askAdmin())}
 				/>
 
 				{/* Above the windows, never over them: a native view cannot be overlaid.
@@ -1020,6 +1024,7 @@ export function App() {
 							onBarHidden={setBarHidden}
 							testing={testing}
 							onTesting={setTesting}
+							updates={updates}
 						/>
 					) : sheet === 'passcode' && mode === 'volunteer' ? (
 						<PasscodeSheet now={now} onUnlocked={enter} onClose={() => setSheet(null)} />
