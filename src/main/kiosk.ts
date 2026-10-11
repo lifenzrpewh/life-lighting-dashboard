@@ -77,6 +77,7 @@ import { createPopouts, type Popouts } from './popout.js'
 import { createMediaFetch } from './media-fetch.js'
 import { createMediaSame } from './media-same.js'
 import { sameMarkFrom } from '../shared/media-check.js'
+import { presetFromFile } from '../shared/holding-map.js'
 import { fetchRequestFrom, isFolderPath, type FetchRequest, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
@@ -508,6 +509,33 @@ app.whenReady().then(() => {
 		}
 		const r = owner === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(owner, opts)
 		return r.canceled ? null : (r.filePaths[0] ?? null)
+	})
+	// A Holding preset to or from a file (../shared/holding-map.ts), to carry
+	// one campus's map to another computer. Admin only. Main only checks it is
+	// a preset; the page checks the map inside it whole before taking it.
+	ipcMain.handle('holding:export', async (e, name: unknown, text: unknown): Promise<boolean> => {
+		if (operatorOnly(e) !== null || typeof name !== 'string' || typeof text !== 'string' || text.length > 256_000) return false
+		const parsed = presetFromFile(text)
+		if (!parsed.ok) return false
+		const owner = BrowserWindow.fromWebContents(e.sender)
+		const safe = parsed.preset.name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').trim() || 'Holding'
+		const opts = { title: 'Save the Holding preset', defaultPath: `${safe}.paua-holding.json`, filters: [{ name: 'Pāua Holding preset', extensions: ['json'] }] }
+		const r = owner === null ? await dialog.showSaveDialog(opts) : await dialog.showSaveDialog(owner, opts)
+		if (r.canceled || r.filePath === undefined) return false
+		await fs.promises.writeFile(r.filePath, text, 'utf8')
+		console.log(`[holding] preset "${parsed.preset.name}" saved to ${r.filePath}`)
+		return true
+	})
+	ipcMain.handle('holding:import', async (e): Promise<string | null> => {
+		if (operatorOnly(e) !== null) return null
+		const owner = BrowserWindow.fromWebContents(e.sender)
+		const opts = { title: 'Open a Holding preset', properties: ['openFile' as const], filters: [{ name: 'Pāua Holding preset', extensions: ['json'] }] }
+		const r = owner === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(owner, opts)
+		const file = r.canceled ? undefined : r.filePaths[0]
+		if (file === undefined) return null
+		const stat = await fs.promises.stat(file)
+		if (stat.size > 256_000) return ''
+		return fs.promises.readFile(file, 'utf8')
 	})
 	// "It is the same file", for a name that may differ (./media-same.ts):
 	// everyone sees the marks, operator mode makes and undoes them.

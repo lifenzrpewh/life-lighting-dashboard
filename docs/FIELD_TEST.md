@@ -88,6 +88,14 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**The Holding map** (Settings › Holding, 1.1.0)
+- [ ] With Arena's composition open, every named HOLDING column is a row (PROMO 1 to 6 as their own rows); unnamed columns are not
+- [ ] Set a column's words (say WTG takes "Alpha"): Holding shows Alpha's foreground placed in WTG
+- [ ] A cell set to **Leave alone**: Update all and Clear old FGs leave that slot be
+- [ ] A **Fixed code**: Holding offers it there; Update all loads the drive's file for it
+- [ ] **Save as a preset**, **Reset to defaults** (Holding back to the usual), **Use** (back again)
+- [ ] **To a file** on one computer, **Import** on another: the same map in use there
+
 **Updates** (from the first build after 1.0.1; needs the public `lifenzrpewh/paua-releases` repo and the `RELEASES_TOKEN` secret, and that version's draft published there)
 - [ ] About a minute after the start, the bar says **Pāua <new> is out** (a download icon, quiet blue)
 - [ ] As a volunteer, tapping it asks for the Admin passcode; in Admin it opens Settings › This computer

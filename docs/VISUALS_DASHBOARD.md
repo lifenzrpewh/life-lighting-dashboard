@@ -946,6 +946,32 @@ both load through the same confirmation.
 - ✅ In the kiosk over CDP, against the live composition and Central PM 4 Oct: seven cards with
   their pictures, six ticked, End amber with +CB095 for POST. Load not pressed. ⚠️ Nothing by finger.
 
+## The Holding map (owner's ask, 2026-10-11)
+
+Settings › Holding: the owner wanted each campus able to tweak the Holding rules, "powerful and
+flexible and as agnostic as possible", as a matrix with presets and a reset. The rules in
+`src/shared/holding.ts` became the **default**; `src/shared/holding-map.ts` holds what a campus
+says otherwise, and an empty map is the old behaviour exactly (a test holds it to that).
+
+- **Rows** are Arena's named HOLDING columns, read live (unnamed ones left out; PROMO ×4 one row).
+- **Takes from the run sheet**: words; an item answers when one is its whole label or appears in
+  its title or label. Unset is the column's default; empty takes nothing. Columns with the same
+  words share the items out, as PROMO always did.
+- **Each layer's cell**: Default, Item only (no normal background), Normal BG (HOLD BG only, over
+  the item), Leave alone (nothing placed, filled, updated or cleared), or a Fixed code (placed even
+  when the run sheet does not name it; never an old foreground; its file is the run sheet's when it
+  has one, else the drive's newest file for that code).
+- **Code families**, the two letters (campus, type): to a layer or none. The owner confirmed the
+  reading (CF Central foregrounds, NB North backgrounds). Default: the type letter decides.
+- **Presets**: up to 12 per computer (`paua.holdingPresets`), Use, Delete, Reset to defaults;
+  **To a file** and **Import** carry one to another computer (the owner: "sure, not a bad idea").
+  The file is checked whole before anything is taken.
+
+Kept in this computer's storage (`paua.holdingMap`), shared with pop-outs. Checked on the Mac in the
+kiosk over CDP against `spikes/arena-stand-in.mjs` (the OH2026 composition with Central's names on
+HOLDING): edits, a fixed code typed in lower case, Save, Reset, Use. ⚠️ Not yet against a real
+composition, by finger, or with a fixed code fetched from a drive.
+
 ## Clear old FGs (owner's ask, 2026-10-05)
 
 "A clear old FGs button when updating all, and note when an old FG is in and ask if they

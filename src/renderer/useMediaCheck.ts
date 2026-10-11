@@ -12,6 +12,8 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ArenaStatus } from '../shared/arena.js'
+import { useHoldingMap } from './holdingMapStore.js'
+import { layerOfCode } from '../shared/holding-map.js'
 import { backgroundGaps, codesOn, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
@@ -196,14 +198,16 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 			alive = false
 		}
 	}, [sizeKey])
-	const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same, sizes)
+	// The Holding map on this computer (Settings › Holding): what each column takes.
+	const map = useHoldingMap()
+	const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same, sizes, (code) => layerOfCode(map, code) !== null)
 	// Each item's codes into its column, by Arena's column names (../shared/holding.ts).
 	const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
-		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status)
-	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes)
+		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status, map)
+	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes, map)
 	// HOLD BG's gaps, for the normal background (the owner, 2026-10-06): in
 	// Update all, and drawn where they go. Not counted as something to look at.
-	const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status)
+	const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status, map)
 	// To look at, by code, as the Holding view marks them: a code with any clip
 	// whose file may differ, differs or is missing (one of CB095's eighteen is
 	// enough), one not where its item belongs, or one with no place (a code the
@@ -281,13 +285,15 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	}
 	// Old foregrounds (../shared/holding.ts): never one Update all is about to load into.
 	const loading = new Set(plannedUpdate.steps.flatMap((s) => s.request.clipIds))
-	const oldFgs: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, loading)
+	const oldFgs: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, loading, map)
 	const askUpdateAll = () =>
 		ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced, oldFgs)
-	const allOld: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status)
+	const allOld: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, new Set(), map)
 	const askClearOld = () => ask(`Clear old foregrounds: ${allOld.length}`, [], [], allOld)
 
 	return {
+		/** The Holding map these were planned by. */
+		map,
 		// Which service, and how it was chosen.
 		byHand,
 		follow,

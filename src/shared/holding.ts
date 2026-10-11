@@ -65,10 +65,18 @@
 //   marked `live`: the confirmation asks about it apart (the owner,
 //   2026-10-05).
 // - Nothing found is said, not filled in with a guess.
+//
+// THE HOLDING MAP (./holding-map.ts, 2026-10-11): every rule above is the
+// DEFAULT. A campus may say, per column, which run-sheet items it takes, and
+// per layer of it: the item only, the normal background, leave it alone, or a
+// fixed code; and which layer each code family goes to. Every function here
+// takes the map last, and an empty one (the default) is exactly the rules
+// above.
 
 import type { ArenaLayer, ArenaSlot, ArenaStatus } from './arena.js'
-import { ARENA_TYPES, fileStem, lookbookStem, mediaCodeOf, sameFile, sameKey, type FileSizes, type LookbookItem } from './media-check.js'
+import { fileStem, lookbookStem, mediaCodeOf, sameFile, sameKey, type FileSizes, type LookbookItem } from './media-check.js'
 import type { FetchRequest } from './media-fetch.js'
+import { DEFAULT_MAP, LAYER_KEYS, cellOf, layerOfCode, takesItem, takesOf, type HoldingMap, type LayerKey } from './holding-map.js'
 
 /** Each type's layer, by name. The A-screen layer was PRE & POST until the
  *  owner renamed it A SCREEN BG (2026-10-05); a campus not yet renamed still
@@ -79,6 +87,17 @@ export const TYPE_LAYER: Record<string, RegExp> = {
 	A: /^(?:a\s*screens?\s*bg|pre\s*(?:&|and)?\s*post)$/i,
 }
 const TYPE_LAYER_NAME: Record<string, string> = { B: 'HOLD BG', F: 'HOLD FG', A: 'A SCREEN BG' }
+
+/** Which of the three a layer is, by its name, or null (PLAYBACK). */
+export function layerKeyOf(layer: ArenaLayer): LayerKey | null {
+	return LAYER_KEYS.find((k) => TYPE_LAYER[k]?.test(layer.name.trim()) === true) ?? null
+}
+
+/** A slot's cell in the map: by its column's name over its layer. */
+function slotCell(layer: ArenaLayer, column: number, status: ArenaStatus, map: HoldingMap) {
+	const key = layerKeyOf(layer)
+	return key === null ? ({ kind: 'auto' } as const) : cellOf(map, columnNamesOf(layer, status)[column - 1] ?? '', key)
+}
 
 /** The names a campus gives its columns, for the screen. */
 export const COLUMN_NAMES = 'PRE, POST, WTL, NSL, BIBLES, WTG and PROMO'
@@ -111,7 +130,11 @@ export function holdingLayers(status: ArenaStatus): ArenaLayer[] {
 /** A column a person cannot pick either: one named for something the
  *  lookbook does not fill (COUNTDOWN, a video background), or, in a
  *  composition whose columns are not named yet, HOLD BG's 3 and 4. */
-export function reserved(layer: ArenaLayer, column: number, status: ArenaStatus): boolean {
+export function reserved(layer: ArenaLayer, column: number, status: ArenaStatus, map: HoldingMap = DEFAULT_MAP): boolean {
+	// The map first: left alone is reserved; told what to hold, it is not.
+	const cell = slotCell(layer, column, status, map)
+	if (cell.kind === 'leave') return true
+	if (cell.kind !== 'auto') return false
 	const name = columnNamesOf(layer, status)[column - 1] ?? ''
 	if (/count\s*down|video|broadcast/i.test(name)) return true
 	return unnamed(name) && TYPE_LAYER['B']?.test(layer.name.trim()) === true && (column === 3 || column === 4)
@@ -228,7 +251,7 @@ export type Placement = {
 	 *  hand; `fill`, the normal background into a gap (`backgroundGaps`);
 	 *  `overflow`, an empty clip after the layer's last named column, for a code
 	 *  with no column of its own (`overflowSlots`). */
-	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill' | 'overflow'
+	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill' | 'overflow' | 'fixed'
 	/** The slot is playing: loading changes what is on screen. */
 	live: boolean
 }
@@ -256,10 +279,12 @@ function lastNamed(layer: ArenaLayer, status: ArenaStatus): number {
  *  after its last named column, left to right, each with its column counted
  *  from 1. Never a loaded clip or one on screen, never a reserved column, and
  *  none while the layer's columns are not named. */
-export function overflowSlots(layer: ArenaLayer, status: ArenaStatus): { slot: ArenaSlot; column: number }[] {
+export function overflowSlots(layer: ArenaLayer, status: ArenaStatus, map: HoldingMap = DEFAULT_MAP): { slot: ArenaSlot; column: number }[] {
 	const last = lastNamed(layer, status)
 	if (last < 0) return []
-	return layer.slots.flatMap((slot, i) => (i > last && slot.state === 'empty' && !reserved(layer, i + 1, status) ? [{ slot, column: i + 1 }] : []))
+	return layer.slots.flatMap((slot, i) =>
+		i > last && slot.state === 'empty' && !reserved(layer, i + 1, status, map) && slotCell(layer, i + 1, status, map).kind === 'auto' ? [{ slot, column: i + 1 }] : [],
+	)
 }
 
 /** The types that overflow: foregrounds and backgrounds (the owner's rule names
@@ -289,14 +314,49 @@ function namedColumn(item: LookbookItem, names: string[]): number | null {
 	return null
 }
 
-/** The Arena codes an item calls for, each with the lookbook's file name. */
-function arenaCodes(item: LookbookItem): { code: string; type: string; want: string | null; path: string | null }[] {
-	const out: { code: string; type: string; want: string | null; path: string | null }[] = []
+/** The Arena codes an item calls for, each with the layer it goes to (its
+ *  family's in the map, else its type letter's) and the lookbook's file name. */
+function arenaCodes(item: LookbookItem, map: HoldingMap = DEFAULT_MAP): { code: string; type: LayerKey; want: string | null; path: string | null }[] {
+	const out: { code: string; type: LayerKey; want: string | null; path: string | null }[] = []
 	for (const raw of item.codes) {
 		const c = mediaCodeOf(raw)
-		if (c === null || !ARENA_TYPES.includes(c.type) || out.some((o) => o.code === c.code)) continue
+		const type = c === null ? null : layerOfCode(map, c.code)
+		if (c === null || type === null || out.some((o) => o.code === c.code)) continue
 		const file = item.files[c.code]
-		out.push({ code: c.code, type: c.type, want: file === undefined ? null : lookbookStem(file), path: file ?? null })
+		out.push({ code: c.code, type, want: file === undefined ? null : lookbookStem(file), path: file ?? null })
+	}
+	return out
+}
+
+/** The map's fixed codes (`fixed` cells): each slot that does not hold its
+ *  code yet, to be placed. The file is the run sheet's for that code when it
+ *  has one, else the drive's newest by code (../main/media-fetch.ts). */
+export function fixedPlacements(items: LookbookItem[], status: ArenaStatus, map: HoldingMap = DEFAULT_MAP): Placement[] {
+	const out: Placement[] = []
+	for (const layer of status.layers) {
+		const key = layerKeyOf(layer)
+		if (key === null) continue
+		const names = columnNamesOf(layer, status)
+		layer.slots.forEach((slot, i) => {
+			const cell = cellOf(map, names[i] ?? '', key)
+			if (cell.kind !== 'fixed' || slotCode(slot) === cell.code) return
+			const file = items.map((it) => it.files[cell.code]).find((f) => f !== undefined)
+			out.push({
+				item: -1,
+				title: `Always ${cell.code} here`,
+				label: null,
+				code: cell.code,
+				want: file === undefined ? cell.code : lookbookStem(file),
+				lookbookPath: file ?? '',
+				layer: layer.name,
+				column: i + 1,
+				columnName: names[i] ?? '',
+				clipId: slot.id,
+				replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
+				why: 'fixed',
+				live: slot.state === 'playing',
+			})
+		})
 	}
 	return out
 }
@@ -307,6 +367,7 @@ function arenaCodes(item: LookbookItem): { code: string; type: string; want: str
 export function planPlacements(
 	items: LookbookItem[],
 	status: ArenaStatus,
+	map: HoldingMap = DEFAULT_MAP,
 ): {
 	placements: Placement[]
 	unplaced: Unplaced[]
@@ -326,27 +387,38 @@ export function planPlacements(
 	const home = layerOf('F') ?? layerOf('B') ?? layerOf('A')
 	const names = home === undefined ? status.columns.map((c) => c.name) : columnNamesOf(home, status)
 	const anyNamed = names.some((n) => !unnamed(n))
-	const promoColumns = names.flatMap((n, i) => (norm(n).startsWith('PROMO') ? [i] : []))
+	// Columns whose items the map sets are out of the default rules' sight.
+	const custom = names.flatMap((n, i) => {
+		const takes = takesOf(map, n)
+		return takes === undefined || unnamed(n) ? [] : [{ column: i, takes }]
+	})
+	const autoNames = names.map((n, i) => (custom.some((c) => c.column === i) ? '' : n))
+	const promoColumns = autoNames.flatMap((n, i) => (norm(n).startsWith('PROMO') ? [i] : []))
 
-	// Which column each item goes in. PROMO items first find the column that
-	// already holds their piece, so no other item takes it.
+	// Which column each item goes in. Items several columns take (the PROMO
+	// columns, or columns the map gives the same words) first find the column
+	// that already holds their piece, so no other item takes it.
 	const columnOf = new Map<number, { column: number; why: Placement['why'] } | { none: Unplaced['kind']; detail: string }>()
 	const takenPromo = new Set<number>()
-	const promoItems: number[] = []
+	const poolOf = new Map<number, { columns: number[]; promo: boolean }>()
 	for (const [i, item] of items.entries()) {
-		if (arenaCodes(item).length === 0) continue
+		if (arenaCodes(item, map).length === 0) continue
 		if (!anyNamed) {
 			columnOf.set(i, { none: 'unnamed', detail: `Arena's columns aren't named yet: name them ${COLUMN_NAMES}` })
 			continue
 		}
-		const named = namedColumn(item, names)
-		if (named !== null) columnOf.set(i, { column: named, why: 'named' })
-		else if (isPromo(item)) promoItems.push(i)
+		const mine = custom.filter((c) => takesItem(c.takes, item)).map((c) => c.column)
+		const named = mine.length === 0 ? namedColumn(item, autoNames) : null
+		if (mine.length === 1) columnOf.set(i, { column: mine[0] as number, why: 'named' })
+		else if (mine.length > 1) poolOf.set(i, { columns: mine, promo: false })
+		else if (named !== null) columnOf.set(i, { column: named, why: 'named' })
+		else if (isPromo(item)) poolOf.set(i, { columns: promoColumns, promo: true })
 		else columnOf.set(i, { none: 'no-column', detail: `no column named ${item.label ?? item.title}` })
 	}
+	const promoItems = [...poolOf.keys()]
 	// The item's piece: its foreground, or its background when it has none.
 	const keyOf = (item: LookbookItem) => {
-		const codes = arenaCodes(item)
+		const codes = arenaCodes(item, map)
 		return codes.find((c) => c.type === 'F') ?? codes.find((c) => c.type === 'B') ?? codes[0]
 	}
 	const slotAt = (type: string, column: number) => layerOf(type)?.slots[column]
@@ -356,8 +428,8 @@ export function planPlacements(
 			const key = keyOf(items[i] as LookbookItem)
 			if (key === undefined) continue
 			let best: { column: number; score: number } | null = null
-			for (const column of promoColumns) {
-				if (takenPromo.has(column)) continue
+			for (const column of poolOf.get(i)?.columns ?? []) {
+				if (takenPromo.has(column) || cellOf(map, names[column] ?? '', key.type).kind === 'leave') continue
 				const score = pass(key, column)
 				if (score !== null && (best === null || score > best.score)) best = { column, score }
 			}
@@ -385,7 +457,14 @@ export function planPlacements(
 	}, 'promo-free')
 	choose((key, column) => (slotAt(key.type, column)?.state === 'empty' ? -column : null), 'promo-empty')
 	for (const i of promoItems) {
-		if (!columnOf.has(i)) columnOf.set(i, { none: 'no-promo', detail: promoColumns.length === 0 ? 'no PROMO columns in Arena' : 'every PROMO column is in use today' })
+		if (columnOf.has(i)) continue
+		const pool = poolOf.get(i)
+		columnOf.set(
+			i,
+			pool?.promo !== false
+				? { none: 'no-promo', detail: promoColumns.length === 0 ? 'no PROMO columns in Arena' : 'every PROMO column is in use today' }
+				: { none: 'no-promo', detail: 'every column taking it is in use today' },
+		)
 	}
 
 	const placements: Placement[] = []
@@ -395,7 +474,7 @@ export function planPlacements(
 	const spare = new Map<string, { slot: ArenaSlot; column: number }[]>()
 	const spareOf = (type: string, layer: ArenaLayer) => {
 		let q = spare.get(type)
-		if (q === undefined) spare.set(type, (q = overflowSlots(layer, status)))
+		if (q === undefined) spare.set(type, (q = overflowSlots(layer, status, map)))
 		return q
 	}
 	const overflowed = new Map<string, Placement>()
@@ -403,7 +482,7 @@ export function planPlacements(
 		const where = columnOf.get(i)
 		if (where === undefined) continue
 		const base = { item: i, title: item.title, label: item.label }
-		for (const c of arenaCodes(item)) {
+		for (const c of arenaCodes(item, map)) {
 			if ('none' in where) {
 				// A one-off already on its layer was placed by hand: done.
 				const oneOff = where.none === 'no-column' || where.none === 'no-promo'
@@ -454,6 +533,10 @@ export function planPlacements(
 				unplaced.push({ ...base, code: c.code, want: null, kind: 'no-file', detail: 'the lookbook has no file' })
 				continue
 			}
+			// The map's word on this cell: left alone, the normal background's,
+			// or a fixed code's (placed by `fixedPlacements`): not the item's.
+			const cell = cellOf(map, names[where.column] ?? '', c.type)
+			if (cell.kind === 'leave' || cell.kind === 'fixed' || (cell.kind === 'normal' && c.type === 'B')) continue
 			const layer = layerOf(c.type)
 			const slot = layer?.slots[where.column]
 			if (layer === undefined || slot === undefined) {
@@ -476,6 +559,7 @@ export function planPlacements(
 			})
 		}
 	}
+	placements.push(...fixedPlacements(items, status, map))
 	const columns = new Map<number, number>()
 	for (const [i, where] of columnOf) if (!('none' in where)) columns.set(i, where.column)
 	return { placements, unplaced, columns, names }
@@ -485,11 +569,11 @@ export function planPlacements(
  *  commonest B code among the items that are not Doors Open, Pre & Post,
  *  Preach or an announcement, the earliest on a tie. Null when none of them
  *  has one the lookbook has a file for: said, not guessed from the others. */
-export function normalBackground(items: LookbookItem[]): { code: string; want: string; path: string } | null {
+export function normalBackground(items: LookbookItem[], map: HoldingMap = DEFAULT_MAP): { code: string; want: string; path: string } | null {
 	const counts = new Map<string, { code: string; want: string; path: string; n: number }>()
 	for (const item of items) {
 		if (isPre(item) || isPost(item) || isPrePost(item) || isPreach(item) || isPromo(item)) continue
-		for (const c of arenaCodes(item)) {
+		for (const c of arenaCodes(item, map)) {
 			if (c.type !== 'B' || c.want === null || c.path === null) continue
 			const seen = counts.get(c.code)
 			if (seen === undefined) counts.set(c.code, { code: c.code, want: c.want, path: c.path, n: 1 })
@@ -508,16 +592,16 @@ export function normalBackground(items: LookbookItem[]): { code: string; want: s
  *  that is empty or holds a code this service does not use. Never a column
  *  named for something else, a clip on screen or one with no code. Nothing
  *  while the columns have no PROMO, since then where to stop is unknown. */
-export function backgroundGaps(items: LookbookItem[], status: ArenaStatus): Placement[] {
-	const normal = normalBackground(items)
+export function backgroundGaps(items: LookbookItem[], status: ArenaStatus, map: HoldingMap = DEFAULT_MAP): Placement[] {
+	const normal = normalBackground(items, map)
 	const layer = status.layers.find((l) => TYPE_LAYER['B']?.test(l.name.trim()))
 	if (normal === null || layer === undefined) return []
 	const names = columnNamesOf(layer, status)
 	const today = codesOn(items)
 	// A clip a run-sheet item takes (its own column, or overflow) is the
 	// item's: overflow comes first, though by the rules the two never meet.
-	const taken = new Set(planPlacements(items, status).placements.map((p) => p.clipId))
-	return fillColumns(items, status).flatMap((column): Placement[] => {
+	const taken = new Set(planPlacements(items, status, map).placements.map((p) => p.clipId))
+	return fillColumns(items, status, map).flatMap((column): Placement[] => {
 		const slot = layer.slots[column - 1]
 		if (slot === undefined || slot.state === 'playing' || taken.has(slot.id)) return []
 		const code = slotCode(slot)
@@ -552,16 +636,21 @@ const videoBackground = (name: string) => /video|broadcast/i.test(name)
  *  unnamed 3 and 4 are filled (the owner, 2026-10-06: "yes they should"),
  *  though nothing else is placed there. A one-off background may be
  *  chosen into one that holds the normal background, as into a free slot. */
-export function fillColumns(items: LookbookItem[], status: ArenaStatus): number[] {
+export function fillColumns(items: LookbookItem[], status: ArenaStatus, map: HoldingMap = DEFAULT_MAP): number[] {
 	const layer = status.layers.find((l) => TYPE_LAYER['B']?.test(l.name.trim()))
-	if (layer === undefined || normalBackground(items) === null) return []
-	const last = columnNamesOf(layer, status).reduce((at, n, i) => (norm(n).startsWith('PROMO') ? i : at), -1)
-	const { columns } = planPlacements(items, status)
+	if (layer === undefined || normalBackground(items, map) === null) return []
+	const names = columnNamesOf(layer, status)
+	const last = names.reduce((at, n, i) => (norm(n).startsWith('PROMO') ? i : at), -1)
+	const { columns } = planPlacements(items, status, map)
 	const claimed = new Set<number>()
-	for (const [i, column] of columns) if (arenaCodes(items[i] as LookbookItem).some((c) => c.type === 'B')) claimed.add(column)
+	for (const [i, column] of columns) if (arenaCodes(items[i] as LookbookItem, map).some((c) => c.type === 'B')) claimed.add(column)
 	const out: number[] = []
-	for (let column = 0; column <= last && column < layer.slots.length; column++) {
-		if (!claimed.has(column) && !videoBackground(columnNamesOf(layer, status)[column] ?? '')) out.push(column + 1)
+	for (let column = 0; column < layer.slots.length; column++) {
+		// The map's word first: normal anywhere it says so, nothing where it
+		// says the item only, a fixed code or leave alone.
+		const cell = cellOf(map, names[column] ?? '', 'B')
+		if (cell.kind === 'normal') out.push(column + 1)
+		else if (cell.kind === 'auto' && column <= last && !claimed.has(column) && !videoBackground(names[column] ?? '')) out.push(column + 1)
 	}
 	return out
 }
@@ -576,11 +665,14 @@ export function clipsToUpdate(
 	status: ArenaStatus,
 	marks: ReadonlySet<string>,
 	sizes?: FileSizes,
+	map: HoldingMap = DEFAULT_MAP,
 ): number[] {
 	const out: number[] = []
 	for (const layer of status.layers) {
-		for (const slot of layer.slots) {
+		for (const [i, slot] of layer.slots.entries()) {
 			if (slotCode(slot) !== code) continue
+			// Left alone means left alone: not even a newer file.
+			if (slotCell(layer, i + 1, status, map).kind === 'leave') continue
 			if (slot.missingFile !== null) {
 				out.push(slot.id)
 				continue
@@ -597,7 +689,7 @@ export function clipsToUpdate(
 /** Where a placement goes, said: `HOLD FG · POST (column 2), replacing CF445`. */
 export function placementWords(p: Placement): string {
 	const column = unnamed(p.columnName) ? `column ${p.column}` : `${p.columnName} (column ${p.column})`
-	const extra = p.why === 'overflow' ? ', an empty clip past the named columns' : ''
+	const extra = p.why === 'overflow' ? ', an empty clip past the named columns' : p.why === 'fixed' ? ', its fixed code' : ''
 	return `${p.layer} · ${column}${extra}${p.replaces === null ? '' : `, replacing ${p.replaces.code ?? p.replaces.name}`}`
 }
 
@@ -613,17 +705,22 @@ export function updatePlan(
 	status: ArenaStatus,
 	marks: ReadonlySet<string>,
 	sizes?: FileSizes,
+	map: HoldingMap = DEFAULT_MAP,
 ): { steps: UpdateStep[]; unplaced: Unplaced[] } {
-	const { placements, unplaced } = planPlacements(items, status)
+	const { placements, unplaced } = planPlacements(items, status, map)
 	const byCode = new Map<string, { want: string; path: string | null; update: number[]; place: Placement[] }>()
 	for (const item of items) {
-		for (const c of arenaCodes(item)) {
+		for (const c of arenaCodes(item, map)) {
 			if (c.want === null || byCode.has(c.code)) continue
-			byCode.set(c.code, { want: c.want, path: c.path, update: clipsToUpdate(c.code, c.want, c.path ?? '', status, marks, sizes), place: [] })
+			byCode.set(c.code, { want: c.want, path: c.path, update: clipsToUpdate(c.code, c.want, c.path ?? '', status, marks, sizes, map), place: [] })
 		}
 	}
-	for (const p of placements) byCode.get(p.code)?.place.push(p)
-	const fill = backgroundGaps(items, status)
+	for (const p of placements) {
+		// A fixed code the run sheet does not name has its own step.
+		if (!byCode.has(p.code)) byCode.set(p.code, { want: p.want, path: p.lookbookPath === '' ? null : p.lookbookPath, update: [], place: [] })
+		byCode.get(p.code)?.place.push(p)
+	}
+	const fill = backgroundGaps(items, status, map)
 	const steps: UpdateStep[] = []
 	for (const [code, { want, path, update, place }] of byCode) {
 		const step = stepFor(code, want, path, update, place, fill.filter((p) => p.code === code))
@@ -658,14 +755,21 @@ export type OldClip = { clipId: number; code: string; layer: string; column: num
  *  mistake. Not one on screen, not one in a column named for something else
  *  (COUNTDOWN), not one without a code (not the lookbook's), and not one
  *  `excluding` names (an update is about to load into it). */
-export function oldForegrounds(items: LookbookItem[], status: ArenaStatus, excluding: ReadonlySet<number> = new Set()): OldClip[] {
+export function oldForegrounds(
+	items: LookbookItem[],
+	status: ArenaStatus,
+	excluding: ReadonlySet<number> = new Set(),
+	map: HoldingMap = DEFAULT_MAP,
+): OldClip[] {
 	const layer = status.layers.find((l) => TYPE_LAYER['F']?.test(l.name.trim()))
 	if (layer === undefined || items.length === 0) return []
 	const today = codesOn(items)
 	const names = columnNamesOf(layer, status)
 	return layer.slots.flatMap((slot, i) => {
 		const code = slotCode(slot)
-		if (slot.state !== 'loaded' || code === null || today.has(code) || excluding.has(slot.id) || reserved(layer, i + 1, status)) return []
+		if (slot.state !== 'loaded' || code === null || today.has(code) || excluding.has(slot.id) || reserved(layer, i + 1, status, map)) return []
+		// A fixed code is meant to be there, run sheet or not.
+		if (slotCell(layer, i + 1, status, map).kind === 'fixed') return []
 		return [{ clipId: slot.id, code, layer: layer.name, column: i + 1, columnName: unnamed(names[i] ?? '') ? `column ${i + 1}` : (names[i] ?? '') }]
 	})
 }
@@ -693,8 +797,8 @@ export type Look = {
 }
 
 /** Every run-sheet item as a look: what each of its codes is in Arena. */
-export function looksOf(items: LookbookItem[], status: ArenaStatus, marks: ReadonlySet<string>, sizes?: FileSizes): Look[] {
-	const { placements, unplaced, columns, names } = planPlacements(items, status)
+export function looksOf(items: LookbookItem[], status: ArenaStatus, marks: ReadonlySet<string>, sizes?: FileSizes, map: HoldingMap = DEFAULT_MAP): Look[] {
+	const { placements, unplaced, columns, names } = planPlacements(items, status, map)
 	const today = codesOn(items)
 	// A code's worst mark over every clip carrying it: one of CB095's eighteen
 	// with an old file is enough to look at.
@@ -710,7 +814,7 @@ export function looksOf(items: LookbookItem[], status: ArenaStatus, marks: Reado
 	return items.map((item, i) => {
 		const column = columns.get(i)
 		const codes = arenaCodesAll(item).map(({ code, type }) => {
-			const state: CodeState = !ARENA_TYPES.includes(type)
+			const state: CodeState = layerOfCode(map, code) === null
 				? 'not-arena'
 				: item.files[code] === undefined
 					? 'no-file'
@@ -753,14 +857,21 @@ function arenaCodesAll(item: LookbookItem): { code: string; type: string }[] {
  *  old file and into its column. A code it shares with other items (a
  *  background) is updated everywhere it is old, since a code is one piece,
  *  but placed only in this item's column. */
-export function lookSteps(index: number, items: LookbookItem[], status: ArenaStatus, marks: ReadonlySet<string>, sizes?: FileSizes): UpdateStep[] {
+export function lookSteps(
+	index: number,
+	items: LookbookItem[],
+	status: ArenaStatus,
+	marks: ReadonlySet<string>,
+	sizes?: FileSizes,
+	map: HoldingMap = DEFAULT_MAP,
+): UpdateStep[] {
 	const item = items[index]
 	if (item === undefined) return []
-	const { placements } = planPlacements(items, status)
+	const { placements } = planPlacements(items, status, map)
 	const steps: UpdateStep[] = []
-	for (const c of arenaCodes(item)) {
+	for (const c of arenaCodes(item, map)) {
 		if (c.want === null) continue
-		const update = clipsToUpdate(c.code, c.want, c.path ?? '', status, marks, sizes)
+		const update = clipsToUpdate(c.code, c.want, c.path ?? '', status, marks, sizes, map)
 		const step = stepFor(c.code, c.want, c.path, update, placements.filter((p) => p.item === index && p.code === c.code))
 		if (step !== null) steps.push(step)
 	}
