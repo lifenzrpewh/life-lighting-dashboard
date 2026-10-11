@@ -100,9 +100,10 @@ Working config: OSC row 3 `OSCData 3` · port **8003** · prefix `life` · desti
 `10.11.60.40`, dashboard on `10.11.60.215`. All three channels, on a fresh
 checkout with nothing carried over from the Mac.
 
-**127.0.0.1 in row 3 on a real desk is a feedback loop** (2026-10-11): the console sends its own
-OSC back into itself, and the desk lags from the moment Pāua links up. `docs/MA3_READ_MODEL.md`
-§ The link ping, item 5.
+**Row 3 must not send where the console hears itself** (2026-10-11): the desk lagged with row 3 on
+8003 sending to the broadcast `10.11.60.255`, from the moment Pāua linked up; fine later the same
+day with the rows changed and Pāua on 1.1.0, cause not pinned down. Send to the Pāua computer's own
+address. `docs/MA3_READ_MODEL.md` § The link ping, item 5.
 
 **The destination is per-machine, not a constant.** The `10.11.60.182` above is
 one station’s address, and reading it as configuration is why the first run here
@@ -333,8 +334,9 @@ hand once; updates come by themselves after that. All checked on the Mac only
 the packaged `app-update.yml` points there). The visuals app's PRs #1 and #2 (copy between cue
 fields, devices following the current service, the run sheet noticing Planning Center, dragging a
 song onto a song) are **merged but not deployed**: deploying is from the Print Server
-(visuals-song-comms `CLAUDE.md` § Deployment). Waiting on the owner: a desk test of the lag on the
-real MA3 Light (the OSC page photo, and whether it stops with Pāua closed), and `RELEASES_TOKEN`.
+(visuals-song-comms `CLAUDE.md` § Deployment). The owner set `RELEASES_TOKEN` the same day, so the next
+tag drafts its release on `paua-releases` itself (⚠️ not yet seen run). The desk's lag: fine since
+(above, row 3).
 
 **2026-10-11, merged:** auto-update (status row above). `lifenzrpewh/paua-releases` exists (made
 2026-10-11). Waiting on the owner: a fine-grained token that may write its contents, saved as the

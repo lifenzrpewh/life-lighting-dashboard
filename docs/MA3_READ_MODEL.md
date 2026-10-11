@@ -341,17 +341,17 @@ console last spoke (`src/bridge/ping.ts`). onPC on the dashboard's own computer:
    stand-in holding `*:port`: loopback and the Wi-Fi address both heard, the
    stand-in nothing. ⚠️ Not yet against onPC in a session, or on Windows.
 
-5. ⚠️ **127.0.0.1 on a real console is the console itself: a feedback loop**
-   (2026-10-11, the owner's photo of the desk's OSC page, 10.11.60.40). Row 3
-   sent to `127.0.0.1:8003` with prefix `life`, the loopback setting from testing
-   against onPC on one computer, and row 4 to `127.0.0.1:8005`, also `life`. On
-   the desk that sends every OSC message the console makes (executor feedback,
-   LifeBridge's replies) back into its own input on the port it listens to. The
-   desk lagged "like crazy" from the moment Pāua linked up and stopped when Pāua
-   closed: Pāua's asks and the plugin's replies start the traffic that then
-   loops. Row 3's destination must be the address of the computer Pāua runs on;
-   127.0.0.1 is only ever right for onPC and Pāua on the same computer.
-   ⚠️ The fix not yet watched on the desk.
+5. ⚠️ **A row sending where the console itself hears it: likely a feedback loop**
+   (2026-10-11, the desk at 10.11.60.40). While it lagged "like crazy" (from the
+   moment Pāua linked up, stopping when Pāua closed), the desk had ONE row on
+   8003 sending to the subnet's broadcast, `10.11.60.255`, which the console's
+   own 8003 listener also receives. Later the same day, after rows sending to
+   `127.0.0.1` (the console itself) were set up and Pāua went to 1.1.0, the
+   owner found it fine. What fixed it is not pinned down. The likely cause:
+   anything the console sends to an address it answers on itself (its broadcast,
+   127.0.0.1, its own IP) comes back in on the port it listens to and loops. Row
+   3's destination should be the address of the computer Pāua runs on, never a
+   broadcast, and 127.0.0.1 only for onPC and Pāua on one computer.
 
 The working layout: a row receiving commands on **8003** (Receive, Receive
 Command; Send off, or onPC feeds its own output back in), and **row 3**, the row
