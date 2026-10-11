@@ -38,6 +38,7 @@ import {
 	codesOn,
 	fillColumns,
 	holdingLayers,
+	layerKeyOf,
 	normalBackground,
 	reserved,
 	slotCode,
@@ -49,6 +50,7 @@ import {
 } from '../../shared/holding.js'
 import { lookbookStem, lookbookThumbUrl, TYPE_NAMES, mediaCodeOf } from '../../shared/media-check.js'
 import type { FetchStates } from '../../shared/media-fetch.js'
+import { layerOfCode } from '../../shared/holding-map.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
 import { useOperator } from '../mode.js'
@@ -86,8 +88,8 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	for (const p of [...m.placements, ...m.fills]) if (!ghosts.has(`${p.layer}:${p.column}`)) ghosts.set(`${p.layer}:${p.column}`, p)
 	// HOLD BG's columns for the normal background: a one-off background may
 	// be chosen into one that holds it.
-	const fillable = new Set(fillColumns(items, status))
-	const normal = normalBackground(items)?.code ?? null
+	const fillable = new Set(fillColumns(items, status, m.map))
+	const normal = normalBackground(items, m.map)?.code ?? null
 	// What has no column: the tray. Columns not named yet are said once, above.
 	const tray = m.unplaced.filter((u) => u.kind !== 'unnamed')
 
@@ -95,12 +97,12 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	 *  reserved column, and empty or not on this run sheet. One on screen may
 	 *  be picked; the confirmation asks about it apart. */
 	const freeFor = (what: Choosing, layer: ArenaLayer, slot: ArenaSlot, column: number) => {
-		const type = mediaCodeOf(what.code)?.type ?? ''
-		if (TYPE_LAYER[type]?.test(layer.name.trim()) !== true) return false
+		const type = layerOfCode(m.map, what.code)
+		if (type === null || layerKeyOf(layer) !== type) return false
 		const mark = slotMark(slot, items, today, m.same, m.sizes)
 		const filler = TYPE_LAYER['B']?.test(layer.name.trim()) === true && fillable.has(column) && slot.state !== 'playing'
 		if (filler && normal !== null && slotCode(slot) === normal) return true
-		return !reserved(layer, column, status) && (mark === 'empty' || mark === 'not-today')
+		return !reserved(layer, column, status, m.map) && (mark === 'empty' || mark === 'not-today')
 	}
 
 	const tapSlot = (layer: ArenaLayer, slot: ArenaSlot, column: number) => {
@@ -219,7 +221,7 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 													slot={slot}
 													mark={mark}
 													reservedNote={
-														reserved(layer, i + 1, status) ? (unnamedColumn(columnName) ? (i + 1 === 3 ? 'Countdown' : 'Broadcast BG') : columnName) : null
+														reserved(layer, i + 1, status, m.map) ? (unnamedColumn(columnName) ? (i + 1 === 3 ? 'Countdown' : 'Broadcast BG') : columnName) : null
 													}
 													picked={picked?.kind === 'clip' && picked.id === slot.id}
 													target={target}
@@ -511,7 +513,7 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 							onClick={() =>
 								m.ask('Use the lookbook’s', [
 									updateStep(
-										{ code, want, clipIds: clipsToUpdate(code, want, file, status, m.same, m.sizes), lookbookPath: file, allowLookbook: false, allowLive: [] },
+										{ code, want, clipIds: clipsToUpdate(code, want, file, status, m.same, m.sizes, m.map), lookbookPath: file, allowLookbook: false, allowLive: [] },
 										status,
 									),
 								])

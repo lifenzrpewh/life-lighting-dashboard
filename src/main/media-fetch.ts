@@ -56,6 +56,13 @@ export function createMediaFetch(opts: {
 		if (graphics === null) return lookbook('no graphics folder is set')
 		const find = await findByCode(graphics, req.code)
 		if (!find.ok) return lookbook(find.detail)
+		if (size === null && req.want.toUpperCase() === req.code) {
+			// A fixed code the run sheet does not name (../shared/holding.ts
+			// `fixedPlacements`): no lookbook file to match, so the drive's newest
+			// for that code, named at the confirmation.
+			const newest = [...find.found].sort((a, b) => b.mtimeMs - a.mtimeMs)[0]
+			return newest !== undefined ? { from: 'drive', found: newest } : { from: 'none', detail: `${req.code} is not on the drive` }
+		}
 		if (size === null) {
 			// Nothing to match by size: only a file of the lookbook's own name.
 			const named = find.found.find((f) => path.basename(f.path, path.extname(f.path)).toLowerCase() === req.want.toLowerCase())

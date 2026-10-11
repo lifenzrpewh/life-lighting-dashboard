@@ -289,7 +289,15 @@ export function sameFile(arenaFile: string, lookbookPath: string, stem: string, 
  *  checked; an item with none of them is left out. `same` holds the keys
  *  (`sameKey`) an operator has marked the same; `sizes`, when read, tell a
  *  file by its size rather than its name (`sameFile`). */
-export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: ReadonlySet<string> = new Set(), sizes?: FileSizes): MediaCheck {
+export function checkMedia(
+	items: LookbookItem[],
+	status: ArenaStatus,
+	same: ReadonlySet<string> = new Set(),
+	sizes?: FileSizes,
+	/** Whether a code is Arena's: the Holding map's code families
+	 *  (./holding-map.ts `layerOfCode`); by type letter when not given. */
+	isArena: (code: string) => boolean = (code) => ARENA_TYPES.includes(mediaCodeOf(code)?.type ?? ''),
+): MediaCheck {
 	const loaded = loadedCodes(status)
 	const counts: MediaCheck['counts'] = { ok: 0, 'not-loaded': 0, 'not-on-disk': 0, 'other-version': 0, 'same-by-hand': 0, 'no-lookbook-file': 0 }
 	const seen = new Set<string>()
@@ -298,7 +306,7 @@ export function checkMedia(items: LookbookItem[], status: ArenaStatus, same: Rea
 		const codes: CodeCheck[] = []
 		for (const raw of item.codes) {
 			const parsed = mediaCodeOf(raw)
-			if (parsed === null || !ARENA_TYPES.includes(parsed.type)) continue
+			if (parsed === null || !isArena(parsed.code)) continue
 			const file = item.files[parsed.code]
 			const result = checkCode(parsed.code, file === undefined ? null : { stem: lookbookStem(file), path: file }, loaded.get(parsed.code) ?? [], same, sizes)
 			codes.push(result)

@@ -1025,6 +1025,7 @@ export function App() {
 							testing={testing}
 							onTesting={setTesting}
 							updates={updates}
+							arena={arenaStatus?.lastOk?.value ?? null}
 						/>
 					) : sheet === 'passcode' && mode === 'volunteer' ? (
 						<PasscodeSheet now={now} onUnlocked={enter} onClose={() => setSheet(null)} />

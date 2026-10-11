@@ -39,7 +39,7 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
 	const operator = useOperator()
 	const [details, setDetails] = useState(false)
 	const items = m.runSheet ?? []
-	const looks = looksOf(items, status, m.same, m.sizes).filter((l) => (items[l.item]?.codes.length ?? 0) > 0)
+	const looks = looksOf(items, status, m.same, m.sizes, m.map).filter((l) => (items[l.item]?.codes.length ?? 0) > 0)
 	const ready = looks.filter((l) => l.ready).length
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
@@ -111,7 +111,7 @@ function Card({
 	const main = item.preview ?? item.files[fileOf('F')?.code ?? ''] ?? item.files[fileOf('B')?.code ?? ''] ?? null
 	const side = fileOf('A') ?? fileOf('T')
 	const sideFile = side === undefined ? null : (item.files[side.code] ?? null)
-	const steps = look.ready ? [] : lookSteps(look.item, m.runSheet ?? [], status, m.same, m.sizes)
+	const steps = look.ready ? [] : lookSteps(look.item, m.runSheet ?? [], status, m.same, m.sizes, m.map)
 	const busy = look.codes.filter((c) => under(m.fetches[c.code]))
 	const failed = look.codes.find((c) => m.fetches[c.code]?.state === 'failed' || m.refused[c.code] !== undefined)
 	const ring = look.live ? 'ring-4 ring-state-live' : look.ready ? '' : 'ring-4 ring-warn'

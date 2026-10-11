@@ -18,7 +18,7 @@
 // configured here (src/shared/settings.ts).
 
 import { useEffect, useState } from 'react'
-import { Lock, Monitor, MonitorPlay, PanelTop, Plus } from 'lucide-react'
+import { Grid3x3, Lock, Monitor, MonitorPlay, PanelTop, Plus } from 'lucide-react'
 
 import type { ConnectionId, ConnectionStatus, RowId } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -30,6 +30,10 @@ import type { SettingsView } from '../../shared/settings.js'
 import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor, VideoInfo } from './settings/connection-editors.js'
 import { AdminSettings } from './settings/admin.js'
 import { AboutFoot, ThisScreen, UpdatesCard } from './settings/computer.js'
+import { HoldingSettings } from './settings/holding.js'
+import type { ArenaStatus } from '../../shared/arena.js'
+import { isDefault } from '../../shared/holding-map.js'
+import { useHoldingMapState } from '../holdingMapStore.js'
 import type { UpdateState } from '../../shared/updates.js'
 import { TopBarSettings } from './settings/top-bar.js'
 import type { BarItem } from '../barItems.js'
@@ -39,9 +43,9 @@ import { Dot, Sheet } from './ui.js'
 import { sentence } from './vocabulary.js'
 
 /** What the right side shows: a connection, or one of the pages after them. */
-export type SettingsPage = RowId | 'add' | 'sources' | 'admin' | 'bar' | 'computer'
+export type SettingsPage = RowId | 'add' | 'sources' | 'admin' | 'bar' | 'computer' | 'holding'
 
-const PAGES: readonly string[] = ['add', 'sources', 'admin', 'bar', 'computer']
+const PAGES: readonly string[] = ['add', 'sources', 'admin', 'bar', 'computer', 'holding']
 
 /** Every connection's address as the list shows it, from the stored settings. */
 export function addressOf(view: SettingsView, id: RowId): string | null {
@@ -90,6 +94,7 @@ export function SettingsPanel({
 	testing,
 	onTesting,
 	updates,
+	arena,
 }: {
 	rows: readonly ConnectionStatus[]
 	/** The page to open on: a connection tapped in Connections, or null for
@@ -110,9 +115,12 @@ export function SettingsPanel({
 	onTesting: (on: boolean) => void
 	/** What the updater last knew, for This computer. */
 	updates: UpdateState | null
+	/** Arena's composition, for Holding's columns, when it is answering. */
+	arena: ArenaStatus | null
 }) {
 	const [view, setView] = useState<SettingsView | null>(null)
 	const [picked, setPicked] = useState<SettingsPage | null>(start)
+	const holding = useHoldingMapState()
 	const load = () => window.life?.settings().then(setView)
 	useEffect(() => void load(), [])
 
@@ -165,6 +173,7 @@ export function SettingsPanel({
 
 	// Opens on the first connection that is down, since that is usually why
 	// someone came; otherwise on the first.
+	const holdingSub = holding.preset !== null ? `Preset: ${holding.preset}` : isDefault(holding.map) ? 'The default rules' : 'Changed from the defaults'
 	const fallback = rows.find((r) => r.tone === 'down')?.id ?? rows[0]?.id ?? 'computer'
 	const known = (p: SettingsPage) => PAGES.includes(p) || rows.some((r) => r.id === p)
 	const selected: SettingsPage = picked === null || !known(picked) ? fallback : picked
@@ -233,6 +242,13 @@ export function SettingsPanel({
 						}
 					/>
 					<ListRow
+						selected={selected === 'holding'}
+						onClick={() => setPicked('holding')}
+						lead={<Grid3x3 size={18} className="text-booth-dim" aria-hidden />}
+						title="Holding"
+						sub={<span className="text-booth-dim">{holdingSub}</span>}
+					/>
+					<ListRow
 						selected={selected === 'computer'}
 						onClick={() => setPicked('computer')}
 						lead={<Monitor size={18} className="text-booth-dim" aria-hidden />}
@@ -267,6 +283,8 @@ export function SettingsPanel({
 							<AdminSettings view={view} save={save} />
 						) : selected === 'bar' ? (
 							<TopBarSettings hidden={barHidden} onSet={onBarHidden} testing={testing} onTesting={onTesting} />
+						) : selected === 'holding' ? (
+							<HoldingSettings status={arena} />
 						) : selected === 'computer' ? (
 							<>
 								<DetailHead title="This computer" />

@@ -294,6 +294,11 @@ const api = {
 
 	/** Which build this is, and where its log is. */
 	about: (): Promise<About> => ipcRenderer.invoke('app:about'),
+	/** Save a Holding preset's file where the person picks. Admin only. */
+	exportHolding: (name: string, text: string): Promise<boolean> => ipcRenderer.invoke('holding:export', name, text),
+	/** A Holding preset file's text from where the person picks, null if
+	 *  cancelled, '' if too big. Admin only. */
+	importHolding: (): Promise<string | null> => ipcRenderer.invoke('holding:import'),
 	/** What the updater last knew (../shared/updates.ts). */
 	updateState: (): Promise<UpdateState | undefined> => ipcRenderer.invoke('updates:state'),
 	/** Ask for a new version now. */
