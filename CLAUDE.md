@@ -322,6 +322,13 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-11: v1.2.0 tagged** at the owner's ask, from a Mac session: the bar's alerts put away by
+a × (all but the base show's), no countdown box when there is nothing to count, and Settings ›
+Holding › **Add a column** (status rows: the plum look, the Timer view, the Holding map). Checked on
+the Mac over CDP only (`docs/FIELD_TEST.md` § Alerts, the timer, Add a column). The first release to
+reach booths as an update from 1.1.0, and the first whose build should draft its release on
+`paua-releases` through `RELEASES_TOKEN` (⚠️ watch that it does; publishing it is the owner's).
+
 **2026-10-11: v1.1.0 tagged** at the owner's ask ("I just want all these features in a new
 release"), from a Mac session, with PRs #3, #4 and #5 merged: tabs named by a double tap; the reply
 listener beside onPC on every address (onPC in session); **updates** (the bar's nudge, Settings ›

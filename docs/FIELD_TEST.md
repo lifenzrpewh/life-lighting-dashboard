@@ -88,6 +88,15 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.2.0** (2026-10-11): comes as an update on 1.1.0 (the bar's "Pāua 1.2.0 is out", then Settings › This computer › Update). Then the section below.
+
+**Alerts, the timer, Add a column** (1.2.0)
+- [ ] An alert on the bar (say "Video feed: no sender") has a ×; a tap puts it away, and the Connections dot still shows the fault
+- [ ] It comes back when it clears and returns, or says something different; "On the base show" has no ×
+- [ ] With OnTime or ProPresenter set up but closed, or nothing counting, the bar shows no countdown box at all (no dotted `?`); a Timer tab says "No countdown running" and why
+- [ ] Settings › Holding › Add a column: a name Arena does not have becomes a row, its "Takes" editor open; set something and it stays after closing Settings; its × removes it
+- [ ] Name a HOLDING column in Arena the same: the row shows its column number and Holding follows it
+
 **1.1.0** (2026-10-11): install it by hand over 1.0.x, once (it is the first with the updater). Then the sections below: Updates, the Holding map, and the double tap on a tab (§ Edit layout). The onPC-in-session fix: with onPC on this computer in a session, Connections' Console row goes LIVE.
 
 **The Holding map** (Settings › Holding, 1.1.0)
