@@ -9,7 +9,7 @@
 // that could disagree would be read as one.
 //
 // READ-ONLY: it starts, stops and sends nothing. A countdown that cannot be
-// read is said in words with its `?`, never a number.
+// read is said in words, never a number.
 
 import { Timer } from 'lucide-react'
 
@@ -32,6 +32,17 @@ export function TimerView({ sources }: { sources: TimerSources | null | undefine
 		return (
 			<Centered>
 				<Say icon={Timer} head="No countdown set up" body="OnTime or ProPresenter, in Settings, gives this view its countdown." />
+			</Centered>
+		)
+	}
+	// Nothing to count: said quietly, the way the bar now says nothing at all
+	// (the owner, 2026-10-11), rather than a big `?`. Which program, and why,
+	// stays in the words.
+	if (face.idle) {
+		const why = face.unknown ? `${face.source}: ${face.caption.replace(/^\? /, '')}` : `${face.source}: ${face.caption.toLowerCase()}`
+		return (
+			<Centered>
+				<Say icon={Timer} head="No countdown running" body={`${why}.`} />
 			</Centered>
 		)
 	}

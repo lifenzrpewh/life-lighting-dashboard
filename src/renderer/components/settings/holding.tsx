@@ -4,9 +4,16 @@
 // the code families above; presets, Reset to defaults, and a file to carry a
 // preset to another computer. Nothing here writes to Arena: it changes what
 // Holding, Lookbook and Update all suggest, and those still ask first.
+//
+// ADD A COLUMN (the owner, 2026-10-11): a row for a name Arena does not have
+// yet, so something can be assigned to it now. It takes effect once a column
+// in the HOLDING group is named the same (by key, so `Alpha 1` is ALPHA1). A
+// new row is kept once something in it is set: a column on its defaults says
+// nothing the map has to hold. A row not in Arena can be removed, which drops
+// what the map says about it.
 
 import { useState, type ReactNode } from 'react'
-import { Download, RotateCcw, Save, Trash2, Upload } from 'lucide-react'
+import { Download, Plus, RotateCcw, Save, Trash2, Upload, X } from 'lucide-react'
 
 import type { ArenaStatus } from '../../../shared/arena.js'
 import { columnNamesOf, slotCode, TYPE_LAYER } from '../../../shared/holding.js'
@@ -73,7 +80,11 @@ const cellTone: Record<CellKind, string> = {
 
 /** The named columns, each once by key (PROMO ×4 is one row), with their
  *  column numbers, from the layer items are placed by. */
-function columnRows(status: ArenaStatus | null, map: HoldingMap): { rows: { key: string; name: string; numbers: number[]; here: boolean }[]; lastPromo: number } {
+function columnRows(
+	status: ArenaStatus | null,
+	map: HoldingMap,
+	added: readonly string[],
+): { rows: { key: string; name: string; numbers: number[]; here: boolean }[]; lastPromo: number } {
 	const rows: { key: string; name: string; numbers: number[]; here: boolean }[] = []
 	let lastPromo = 0
 	if (status !== null) {
@@ -90,7 +101,13 @@ function columnRows(status: ArenaStatus | null, map: HoldingMap): { rows: { key:
 		})
 	}
 	// What the map says about columns this composition does not have: kept, said.
-	for (const key of Object.keys(map.columns)) if (!rows.some((r) => r.key === key)) rows.push({ key, name: key, numbers: [], here: false })
+	for (const key of Object.keys(map.columns))
+		if (!rows.some((r) => r.key === key)) rows.push({ key, name: added.find((n) => columnKey(n) === key) ?? key, numbers: [], here: false })
+	// Added here, nothing set yet: on screen until something is.
+	for (const name of added) {
+		const key = columnKey(name)
+		if (!rows.some((r) => r.key === key)) rows.push({ key, name, numbers: [], here: false })
+	}
 	return { rows, lastPromo }
 }
 
@@ -112,7 +129,9 @@ const sameMap = (a: HoldingMap, b: HoldingMap) => JSON.stringify(a) === JSON.str
 export function HoldingSettings({ status }: { status: ArenaStatus | null }) {
 	const { map, preset, presets } = useHoldingMapState()
 	const [open, setOpen] = useState<{ key: string; name: string; what: 'takes' | LayerKey } | null>(null)
-	const { rows, lastPromo } = columnRows(status, map)
+	/** Columns added here this visit, by name as typed. */
+	const [added, setAdded] = useState<string[]>([])
+	const { rows, lastPromo } = columnRows(status, map, added)
 	const set = holdingMapActions.setMap
 	const presetMap = presets.find((p) => p.name === preset)?.map
 	const title =
@@ -135,7 +154,9 @@ export function HoldingSettings({ status }: { status: ArenaStatus | null }) {
 				<SectionTitle>Columns</SectionTitle>
 				{status === null && <p className="text-sm text-booth-dim">Arena isn&rsquo;t answering, so its columns can&rsquo;t be read. What is set is kept.</p>}
 				{rows.length === 0 && status !== null && (
-					<p className="text-sm text-booth-dim">The HOLDING group&rsquo;s columns have no names yet. Name them in Arena (PRE, POST, WTL, NSL, BIBLES, WTG, PROMO) and they show here.</p>
+					<p className="text-sm text-booth-dim">
+						The HOLDING group&rsquo;s columns have no names yet. Name them in Arena (PRE, POST, WTL, NSL, BIBLES, WTG, PROMO) and they show here, or add one below.
+					</p>
 				)}
 				{rows.length > 0 && (
 					<div className="overflow-x-auto">
@@ -165,8 +186,37 @@ export function HoldingSettings({ status }: { status: ArenaStatus | null }) {
 									return (
 										<tr key={r.key} className="border-t border-booth-edge">
 											<td className="py-1.5 pr-2">
-												<span className="font-bold text-booth-ink">{r.name}</span>
-												<span className="ml-1.5 text-xs text-booth-faint">{r.here ? r.numbers.join(', ') : 'not in Arena now'}</span>
+												<span className="flex min-w-0 items-center gap-1">
+													<span className="min-w-0 flex-1 truncate">
+														<span className="font-bold text-booth-ink">{r.name}</span>
+														{r.here ? (
+															<span className="ml-1.5 text-xs text-booth-faint">{r.numbers.join(', ')}</span>
+														) : map.columns[r.key] === undefined ? (
+															<span className="ml-1.5 text-xs text-booth-faint" title="Added here: kept once something in its row is set">
+																new
+															</span>
+														) : (
+															<span className="ml-1.5 text-xs text-booth-faint" title="No HOLDING column in Arena has this name now">
+																not in Arena
+															</span>
+														)}
+													</span>
+													{!r.here && (
+														<button
+															type="button"
+															aria-label={`Remove ${r.name}`}
+															title={`Remove ${r.name}`}
+															onClick={() => {
+																set(withRule(map, r.name, () => ({})))
+																setAdded((a) => a.filter((n) => columnKey(n) !== r.key))
+																if (open?.key === r.key) setOpen(null)
+															}}
+															className="grid size-8 shrink-0 place-items-center rounded-ctl text-booth-faint transition-[background-color,color] hover:bg-booth-raise hover:text-booth-ink active:scale-90"
+														>
+															<X size={16} strokeWidth={2.2} aria-hidden />
+														</button>
+													)}
+												</span>
 											</td>
 											<td className="py-1.5 pr-2">
 												<CellButton pressed={isOpen('takes')} tone={takes === undefined ? 'auto' : 'item'} onClick={() => setOpen(isOpen('takes') ? null : { key: r.key, name: r.name, what: 'takes' })}>
@@ -196,9 +246,62 @@ export function HoldingSettings({ status }: { status: ArenaStatus | null }) {
 					) : (
 						<CellEditor key={`${open.key}:${open.what}`} name={open.name} layer={open.what} map={map} onSet={set} onDone={() => setOpen(null)} />
 					))}
+				<AddColumn
+					taken={rows.map((r) => r.key)}
+					onAdd={(name) => {
+						setAdded((a) => [...a, name])
+						setOpen({ key: columnKey(name), name, what: 'takes' })
+					}}
+				/>
 			</Card>
 			<Families status={status} map={map} />
 		</>
+	)
+}
+
+/** A column Arena does not have yet: named here, assigned now, in effect once
+ *  a HOLDING column in Arena is named the same. */
+function AddColumn({ taken, onAdd }: { taken: readonly string[]; onAdd: (name: string) => void }) {
+	const [name, setName] = useState('')
+	const trimmed = name.trim()
+	const key = columnKey(trimmed)
+	const why =
+		trimmed === ''
+			? null
+			: key === ''
+				? 'A column name needs a letter or a digit.'
+				: key.length > 40
+					? 'That name is too long.'
+					: /^COLUMN\d*$/.test(key)
+						? 'Arena’s own “Column #” names are not read as names.'
+						: taken.includes(key)
+							? 'That column is in the table already.'
+							: null
+	const add = () => {
+		if (trimmed === '' || why !== null) return
+		onAdd(trimmed)
+		setName('')
+	}
+	return (
+		<div className="mt-1 flex flex-col gap-1.5 border-t border-booth-edge pt-3">
+			{/* A form, so Enter on the keyboard adds it too. */}
+			<form
+				className="flex flex-wrap items-center gap-2"
+				onSubmit={(e) => {
+					e.preventDefault()
+					add()
+				}}
+			>
+				<div className="w-56">
+					<Input value={name} onChange={setName} placeholder="ALPHA" />
+				</div>
+				<Button icon={Plus} disabled={trimmed === '' || why !== null} onClick={add}>
+					Add a column
+				</Button>
+				{why !== null && <span className="text-sm text-state-unreachable">{why}</span>}
+			</form>
+			<span className="text-xs text-booth-faint">For a column Arena doesn&rsquo;t have yet: it takes effect once a column in the HOLDING group is named the same.</span>
+		</div>
 	)
 }
 

@@ -10,7 +10,8 @@
 //   day. It speaks only when something needs a look: the console on its base
 //   show (amber, solid, opens Save As and Load), the console not answering, or
 //   another connection down or behind (named when one, counted when more;
-//   opens Connections). The console card that stood here went: the show is on
+//   opens Connections). Each but the base show's has a × that puts it away
+//   until it changes or clears and comes back (the owner, 2026-10-11). The console card that stood here went: the show is on
 //   the console itself and on Connections' Console row ("they can see the
 //   showfile in the console itself", the owner), and the two moments it
 //   mattered are the alerts.
@@ -41,7 +42,7 @@
 // ../barItems.ts), per computer. The lock, Settings and the handle always stay.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Activity, ChevronDown, Download, Flag, Lock, LockOpen, PanelsTopLeft, Settings } from 'lucide-react'
+import { Activity, ChevronDown, Download, Flag, Lock, LockOpen, PanelsTopLeft, Settings, X } from 'lucide-react'
 
 import type { LinkState, Reading } from '../../shared/reading.js'
 import type { ConnectionStatus, Tone } from '../../shared/connections.js'
@@ -80,29 +81,43 @@ function Clock({ now, compact }: { now: number; compact: boolean }) {
 }
 
 /** Something that needs a look, said in words on the left of the bar. A tap
- *  opens where it can be dealt with. */
-type Alert = { key: string; tone: Tone | 'warn' | 'news'; words: string; open: 'showfile' | 'connections' | 'updates' }
+ *  opens where it can be dealt with; its × puts it away (the owner,
+ *  2026-10-11), all but the base show's. */
+type Alert = { key: string; tone: Tone | 'warn' | 'news'; words: string; open: 'showfile' | 'connections' | 'updates'; dismissable: boolean }
+
+/** One alert as it stands: a dismissal holds for these words only, so an
+ *  alert that changes, or clears and comes back, is said again. */
+const alertId = (a: Alert) => `${a.key}\n${a.words}`
 
 /** What the alert lane says now. Empty on a good day. */
 function alertsOf(link: LinkState, consoleOn: boolean, showfile: Reading<Showfile>, rows: readonly ConnectionStatus[], updates: UpdateState | null): Alert[] {
 	const alerts: Alert[] = []
 	const show = showfile.state === 'unknown' ? null : showfile.value
 	// SaveGuard's verdict, made on the console; this only says it (docs/PLAN.md,
-	// Phase 3): a state for as long as it is true, not a dialog to dismiss.
-	if (consoleOn && show?.onBase === true) alerts.push({ key: 'base', tone: 'warn', words: `On the base show: ${show.name}`, open: 'showfile' })
-	if (consoleOn && link.state === 'unreachable') alerts.push({ key: 'console', tone: 'down', words: 'Console not answering', open: 'connections' })
+	// Phase 3): a state for as long as it is true, not a dialog to dismiss. The
+	// one alert with no ×: a show saved over the base is the mistake it is for.
+	if (consoleOn && show?.onBase === true)
+		alerts.push({ key: 'base', tone: 'warn', words: `On the base show: ${show.name}`, open: 'showfile', dismissable: false })
+	if (consoleOn && link.state === 'unreachable')
+		alerts.push({ key: 'console', tone: 'down', words: 'Console not answering', open: 'connections', dismissable: true })
 	const others = rows.filter((r) => r.id !== 'console' && (r.tone === 'down' || r.tone === 'stale'))
 	if (others.length === 1) {
 		const r = others[0]!
-		alerts.push({ key: `row:${r.id}`, tone: r.tone, words: `${r.name}: ${sentence(r.status).toLowerCase()}`, open: 'connections' })
+		alerts.push({ key: `row:${r.id}`, tone: r.tone, words: `${r.name}: ${sentence(r.status).toLowerCase()}`, open: 'connections', dismissable: true })
 	} else if (others.length > 1) {
-		alerts.push({ key: 'rows', tone: worstTone(others), words: `${others.length} connections need a look`, open: 'connections' })
+		alerts.push({ key: 'rows', tone: worstTone(others), words: `${others.length} connections need a look`, open: 'connections', dismissable: true })
 	}
 	// Last, and quiet: news, not a fault. A tap opens Settings › This computer
 	// (Admin's passcode first), where Update asks once more.
-	if (updates?.state === 'available') alerts.push({ key: 'update', tone: 'news', words: `Pāua ${updates.version} is out`, open: 'updates' })
+	if (updates?.state === 'available') alerts.push({ key: 'update', tone: 'news', words: `Pāua ${updates.version} is out`, open: 'updates', dismissable: true })
 	if (updates?.state === 'downloading' || updates?.state === 'installing')
-		alerts.push({ key: 'update', tone: 'news', words: updates.state === 'installing' ? `Installing Pāua ${updates.version}` : `Downloading Pāua ${updates.version}`, open: 'updates' })
+		alerts.push({
+			key: 'update',
+			tone: 'news',
+			words: updates.state === 'installing' ? `Installing Pāua ${updates.version}` : `Downloading Pāua ${updates.version}`,
+			open: 'updates',
+			dismissable: true,
+		})
 	return alerts
 }
 
@@ -187,10 +202,24 @@ export function StatusBar({
 	const admin = mode === 'operator'
 	const compact = collapsed
 	const shows = (item: BarItem) => !hidden.has(item)
-	const alerts = alertsOf(link, consoleOn, showfile, rows, updates)
-	// Only while either program is set up: otherwise the chip draws nothing,
-	// and nor may its divider.
-	const countdown = shows('countdown') && timers !== null && timerFace(timers, now) !== null ? <TimerChip sources={timers} compact={compact} /> : null
+	const said = alertsOf(link, consoleOn, showfile, rows, updates)
+	// Put away by their ×, until they change or clear. In memory only: a
+	// restart says everything again. Connections' badge still shows the worst,
+	// so a fault put away here is never a fault unsaid.
+	const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set())
+	const saidIds = said.map(alertId).join('\n\n')
+	useEffect(() => {
+		const ids = new Set(saidIds.split('\n\n'))
+		setDismissed((d) => {
+			const kept = [...d].filter((id) => ids.has(id))
+			return kept.length === d.size ? d : new Set(kept)
+		})
+	}, [saidIds])
+	const alerts = said.filter((a) => !dismissed.has(alertId(a)))
+	// Only while there is something to count: otherwise the chip draws nothing
+	// (not set up, not answering, nothing running), and nor may its divider.
+	const face = timers === null ? null : timerFace(timers, now)
+	const countdown = shows('countdown') && face !== null && !face.idle ? <TimerChip sources={timers} compact={compact} /> : null
 	const clock = shows('clock') ? <Clock now={now} compact={compact} /> : null
 
 	const [marked, setMarked] = useState<number | null>(null)
@@ -226,24 +255,43 @@ export function StatusBar({
 				)}
 				<span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
 					{alerts.map((a) => (
-						<button
+						<span
 							key={a.key}
-							type="button"
-							onClick={a.open === 'showfile' ? onShowfile : a.open === 'updates' ? onUpdates : onConnections}
-							title={a.words}
-							className={`inline-flex min-w-0 shrink-0 animate-slide-in items-center gap-2 rounded-ctl font-bold whitespace-nowrap transition-[filter,transform] hover:brightness-115 active:scale-95 ${
-								compact ? 'h-6 px-2 text-xs' : 'h-9 px-3 text-[13.5px]'
+							className={`inline-flex min-w-0 shrink-0 animate-slide-in items-stretch overflow-hidden rounded-ctl font-bold whitespace-nowrap ${
+								compact ? 'h-6 text-xs' : 'h-9 text-[13.5px]'
 							} ${alertTone[a.tone]}`}
 						>
-							{a.tone === 'warn' ? (
-								<span aria-hidden className="size-2 shrink-0 rounded-full bg-black" />
-							) : a.tone === 'news' ? (
-								<Download size={compact ? 13 : 15} strokeWidth={2.2} aria-hidden className="shrink-0" />
-							) : (
-								<Dot tone={a.tone} size="sm" />
+							<button
+								type="button"
+								onClick={a.open === 'showfile' ? onShowfile : a.open === 'updates' ? onUpdates : onConnections}
+								title={a.words}
+								className={`inline-flex min-w-0 items-center gap-2 transition-[filter,transform] hover:brightness-115 active:scale-95 ${
+									compact ? 'pl-2' : 'pl-3'
+								} ${a.dismissable ? (compact ? 'pr-1' : 'pr-1.5') : compact ? 'pr-2' : 'pr-3'}`}
+							>
+								{a.tone === 'warn' ? (
+									<span aria-hidden className="size-2 shrink-0 rounded-full bg-black" />
+								) : a.tone === 'news' ? (
+									<Download size={compact ? 13 : 15} strokeWidth={2.2} aria-hidden className="shrink-0" />
+								) : (
+									<Dot tone={a.tone} size="sm" />
+								)}
+								<span className="truncate">{a.words}</span>
+							</button>
+							{a.dismissable && (
+								<button
+									type="button"
+									onClick={() => setDismissed((d) => new Set(d).add(alertId(a)))}
+									aria-label={`Put away: ${a.words}`}
+									title="Put away until it changes"
+									className={`grid shrink-0 place-items-center opacity-70 transition-[opacity,background-color] hover:bg-black/15 hover:opacity-100 active:bg-black/25 ${
+										compact ? 'w-6' : 'w-9'
+									}`}
+								>
+									<X size={compact ? 13 : 16} strokeWidth={2.4} aria-hidden />
+								</button>
 							)}
-							<span className="truncate">{a.words}</span>
-						</button>
+						</span>
 					))}
 				</span>
 			</div>

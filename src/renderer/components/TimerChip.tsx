@@ -42,7 +42,7 @@ export function TimerChip({ sources, compact = false }: { sources: TimerSources 
 	const now = useNow()
 	if (sources === null) return null
 	const face = timerFace(sources, now)
-	if (face === null) return null
+	if (face === null || face.idle) return null
 	return <BarFace face={face} compact={compact} />
 }
 
@@ -65,18 +65,26 @@ export type TimerFace = {
 	unknown: boolean
 	/** What OnTime is, when it is not answering. */
 	note: OnTimeAside
+	/** Nothing to count: the program is not answering, or answers with no
+	 *  event or timer running and no stage message. The bar then draws no
+	 *  chip at all (the owner, 2026-10-11: not a dotted box with a `?` when
+	 *  there are no timers), and the Timer view says so in words. Connections
+	 *  still says a program that is down. A named timer that is missing is
+	 *  not idle: the booth asked for it, so it is said. */
+	idle: boolean
 }
 
-/** The face for `sources` at `now`, or null when neither program is set up. */
+/** The face for `sources` at `now`, or null when neither program is set up.
+ *  A face may be `idle`: set up, with nothing to count. */
 export function timerFace(sources: TimerSources, now: number): TimerFace | null {
 	const view = chooseTimer(sources, now)
-	const blank = { ms: null, number: false, text: null, over: false, extra: null, ageMs: null, unknown: false, note: null }
+	const blank = { ms: null, number: false, text: null, over: false, extra: null, ageMs: null, unknown: false, note: null, idle: false }
 	switch (view.kind) {
 		case 'none':
 			return null
 		case 'ontime': {
 			const ontime = (value: OnTimeNow, live: boolean, ageMs: number | null): TimerFace => {
-				if (!onTimeRunning(value)) return { ...blank, source: 'OnTime', caption: 'No event running', ageMs }
+				if (!onTimeRunning(value)) return { ...blank, source: 'OnTime', caption: 'No event running', ageMs, idle: true }
 				const remaining = onTimeRemaining(value, view.readAt ?? now, now, live)
 				// What the countdown is counting to: the next event, by name. At the end of
 				// the rundown there is none, and it counts to the end of this one.
@@ -100,7 +108,7 @@ export function timerFace(sources: TimerSources, now: number): TimerFace | null 
 			return matchReading(view.reading, {
 				live: (v) => ontime(v, true, null),
 				stale: (v, ageMs) => ontime(v, false, ageMs),
-				unknown: (why) => ({ ...blank, source: 'OnTime', caption: `? ${unknownWhy[why]}`, unknown: true }),
+				unknown: (why) => ({ ...blank, source: 'OnTime', caption: `? ${unknownWhy[why]}`, unknown: true, idle: true }),
 			})
 		}
 		case 'propresenter': {
@@ -117,12 +125,20 @@ export function timerFace(sources: TimerSources, now: number): TimerFace | null 
 				// would read as "nothing running" when it is "renamed or deleted".
 				const caption =
 					shown.kind === 'missing' ? `No timer “${shown.name}” in ProPresenter` : value.message === null ? 'No timer running' : null
-				return { ...blank, source: 'ProPresenter', caption: caption ?? 'Stage message', text: value.message, ageMs, note: view.ontimeAside }
+				return {
+					...blank,
+					source: 'ProPresenter',
+					caption: caption ?? 'Stage message',
+					text: value.message,
+					ageMs,
+					note: view.ontimeAside,
+					idle: shown.kind !== 'missing' && value.message === null,
+				}
 			}
 			return matchReading(view.reading, {
 				live: (v) => pro(v, null),
 				stale: (v, ageMs) => pro(v, ageMs),
-				unknown: (why) => ({ ...blank, source: 'ProPresenter', caption: `? ${unknownWhy[why]}`, unknown: true, note: view.ontimeAside }),
+				unknown: (why) => ({ ...blank, source: 'ProPresenter', caption: `? ${unknownWhy[why]}`, unknown: true, note: view.ontimeAside, idle: true }),
 			})
 		}
 	}
