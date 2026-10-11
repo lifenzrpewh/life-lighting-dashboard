@@ -13,6 +13,7 @@
 // it with; see `linkFromRequests` in src/shared/reading.ts.
 
 import dgram from 'node:dgram'
+import os from 'node:os'
 
 import { decodeOsc, type OscMessage } from '../../bridge/osc.js'
 import { readExecutorUpdate } from '../../bridge/channel-b.js'
@@ -31,6 +32,17 @@ export const OSC_PREFIX = 'life'
  *  rate on the desk, 2026-09-21. */
 export const DRAIN_HZ = 10
 
+/** Every IPv4 address of this computer, loopback first: where a reply may be
+ *  sent to it. An address that arrives later (a cable plugged in after the
+ *  start) is listened on from the next restart of the link. */
+export function localAddresses(): string[] {
+	const found = Object.values(os.networkInterfaces())
+		.flat()
+		.filter((a): a is os.NetworkInterfaceInfo => a !== undefined && a.family === 'IPv4' && !a.internal)
+		.map((a) => a.address)
+	return ['127.0.0.1', ...new Set(found)]
+}
+
 export type ChannelBHandle = {
 	/** Everything main knows from channel B, ready to hand to the renderer. */
 	deskState: () => DeskState
@@ -39,9 +51,13 @@ export type ChannelBHandle = {
 
 export type ChannelBOptions = {
 	port: number
-	/** Listen on this address exactly, beside a program that holds the port on
-	 *  every address. For onPC on this computer: see the bind below. */
-	beside?: string
+	/** Listen on these addresses exactly, beside a program that holds the port
+	 *  on every address. For onPC on this computer: see the bind below. */
+	beside?: readonly string[]
+	/** Listen on every address, and if something on this computer already holds
+	 *  the port, on these exactly instead (onPC in a session, beside a console
+	 *  elsewhere: see the bind below). Ignored with `beside`. */
+	besideIfTaken?: readonly string[]
 	prefix?: string
 	drainHz?: number
 	/** Called with the settled updates of one frame. Never called with an empty
@@ -54,6 +70,8 @@ export type ChannelBOptions = {
 	/** Bind failure. EADDRINUSE usually means grandMA3 onPC is running on this
 	 *  computer and holds the port; see the bind below for why that is loud. */
 	onBindError?: (error: NodeJS.ErrnoException) => void
+	/** The port was taken, and `besideIfTaken` is being tried: for the log. */
+	onBeside?: (addresses: readonly string[]) => void
 }
 
 export function startChannelB(options: ChannelBOptions): ChannelBHandle {
@@ -69,7 +87,9 @@ export function startChannelB(options: ChannelBOptions): ChannelBHandle {
 	let packets = 0
 	let rejected = 0
 	let lastHeardAt: number | null = null
-	let listening = false
+	// One socket on every address, or one per address beside onPC.
+	let sockets: dgram.Socket[] = []
+	const bound = new Set<dgram.Socket>()
 
 	// No `reuseAddr`, on purpose. On macOS libuv implements it as SO_REUSEPORT,
 	// and measured on this project's Mac (2026-09-30): when both sockets set it,
@@ -87,14 +107,18 @@ export function startChannelB(options: ChannelBOptions): ChannelBHandle {
 	// because the more specific address wins. The silent failure reuse allows
 	// is covered here by the link itself: if the echoes do not arrive, the link
 	// stays unreachable, whatever this socket believes.
-	// ⚠️ macOS only so far. Windows has its own rules for this; untried.
-	const socket = dgram.createSocket({ type: 'udp4', reuseAddr: options.beside !== undefined })
-
-	socket.on('listening', () => {
-		listening = true
-	})
-
-	socket.on('message', (buf) => {
+	// ✅ Windows too, on 127.0.0.1 beside onPC's 0.0.0.0 (2026-10-05).
+	//
+	// Beside EVERY address of this computer, not loopback alone (2026-10-11).
+	// onPC in a session runs on the network card, and the OSC rows are the
+	// session's show, so the reply row sends to this computer's network address,
+	// not to loopback. A socket on 127.0.0.1 alone never hears it: onPC's own
+	// socket on every address takes it, and the link said "not answering" with
+	// the OSC set right (the owner, 2026-10-11, onPC in session). The same holds
+	// beside a console elsewhere while onPC runs here in its session: the port is
+	// taken, so the socket on every address fails, and these take over.
+	// ⚠️ The NIC address beside onPC not yet watched on either platform.
+	const onMessage = (buf: Buffer) => {
 		packets += 1
 		const at = Date.now()
 		lastHeardAt = at
@@ -119,17 +143,49 @@ export function startChannelB(options: ChannelBOptions): ChannelBHandle {
 		}
 
 		coalescer.absorb(read.update.path, { ...read.update, at })
-	})
+	}
 
-	socket.on('error', (error: NodeJS.ErrnoException) => {
+	const close = (socket: dgram.Socket) => {
+		bound.delete(socket)
+		// close() throws if the socket never bound. Nothing useful can be done
+		// about that during teardown, and letting it propagate would mask the
+		// bind error that actually matters.
+		try {
+			socket.close()
+		} catch {
+			/* already closed, or never bound */
+		}
+	}
+
+	const listen = (address: string | undefined, reuseAddr: boolean, onError: (error: NodeJS.ErrnoException) => void) => {
+		const socket = dgram.createSocket({ type: 'udp4', reuseAddr })
+		socket.on('listening', () => bound.add(socket))
+		socket.on('message', onMessage)
 		// A bind that failed must not leave the app looking like a desk that went
-		// quiet. `listening` stays false and the caller is told, so the two can be
-		// told apart on screen.
-		listening = false
-		options.onBindError?.(error)
-	})
+		// quiet. The socket stops counting as listening and the caller is told, so
+		// the two can be told apart on screen.
+		socket.on('error', (error: NodeJS.ErrnoException) => {
+			close(socket)
+			onError(error)
+		})
+		socket.bind(port, address)
+		sockets.push(socket)
+	}
 
-	socket.bind(port, options.beside)
+	const report = (error: NodeJS.ErrnoException) => options.onBindError?.(error)
+	const besideAll = (addresses: readonly string[]) => {
+		for (const address of addresses) listen(address, true, report)
+	}
+
+	if (options.beside !== undefined) besideAll(options.beside)
+	else
+		listen(undefined, false, (error) => {
+			const fallback = options.besideIfTaken
+			if (error.code === 'EADDRINUSE' && fallback !== undefined && fallback.length > 0) {
+				options.onBeside?.(fallback)
+				besideAll(fallback)
+			} else report(error)
+		})
 
 	const timer = setInterval(() => {
 		const drained = coalescer.drain()
@@ -147,19 +203,13 @@ export function startChannelB(options: ChannelBOptions): ChannelBHandle {
 			lastHeardAt,
 			packets,
 			rejected,
-			listening,
+			listening: bound.size > 0,
 			port,
 		}),
 		stop: () => {
 			clearInterval(timer)
-			// close() throws if the socket never bound. Nothing useful can be done
-			// about that during teardown, and letting it propagate would mask the
-			// bind error that actually matters.
-			try {
-				socket.close()
-			} catch {
-				/* already closed, or never bound */
-			}
+			for (const socket of sockets) close(socket)
+			sockets = []
 		},
 	}
 }
