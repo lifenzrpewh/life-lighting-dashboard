@@ -341,6 +341,18 @@ console last spoke (`src/bridge/ping.ts`). onPC on the dashboard's own computer:
    stand-in holding `*:port`: loopback and the Wi-Fi address both heard, the
    stand-in nothing. ⚠️ Not yet against onPC in a session, or on Windows.
 
+5. ⚠️ **127.0.0.1 on a real console is the console itself: a feedback loop**
+   (2026-10-11, the owner's photo of the desk's OSC page, 10.11.60.40). Row 3
+   sent to `127.0.0.1:8003` with prefix `life`, the loopback setting from testing
+   against onPC on one computer, and row 4 to `127.0.0.1:8005`, also `life`. On
+   the desk that sends every OSC message the console makes (executor feedback,
+   LifeBridge's replies) back into its own input on the port it listens to. The
+   desk lagged "like crazy" from the moment Pāua linked up and stopped when Pāua
+   closed: Pāua's asks and the plugin's replies start the traffic that then
+   loops. Row 3's destination must be the address of the computer Pāua runs on;
+   127.0.0.1 is only ever right for onPC and Pāua on the same computer.
+   ⚠️ The fix not yet watched on the desk.
+
 The working layout: a row receiving commands on **8003** (Receive, Receive
 Command; Send off, or onPC feeds its own output back in), and **row 3**, the row
 the plugin sends through, to `127.0.0.1` on **8004**. Settings: console

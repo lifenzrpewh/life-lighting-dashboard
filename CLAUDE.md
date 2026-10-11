@@ -100,6 +100,10 @@ Working config: OSC row 3 `OSCData 3` · port **8003** · prefix `life` · desti
 `10.11.60.40`, dashboard on `10.11.60.215`. All three channels, on a fresh
 checkout with nothing carried over from the Mac.
 
+**127.0.0.1 in row 3 on a real desk is a feedback loop** (2026-10-11): the console sends its own
+OSC back into itself, and the desk lags from the moment Pāua links up. `docs/MA3_READ_MODEL.md`
+§ The link ping, item 5.
+
 **The destination is per-machine, not a constant.** The `10.11.60.182` above is
 one station’s address, and reading it as configuration is why the first run here
 came back silent: channel A worked, B and C had nowhere to go. Whatever machine
