@@ -317,11 +317,21 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**2026-10-11, branch `updates`:** auto-update (status row above). Waiting on the owner: create the
-public, empty `lifenzrpewh/paua-releases` (with a README, so it has a branch for tags) and a
-fine-grained token that may write its contents, saved as the `RELEASES_TOKEN` secret here. Then the
+**2026-10-11: v1.1.0 tagged** at the owner's ask ("I just want all these features in a new
+release"), from a Mac session, with PRs #3, #4 and #5 merged: tabs named by a double tap; the reply
+listener beside onPC on every address (onPC in session); **updates** (the bar's nudge, Settings ›
+This computer); the **Holding map** (Settings › Holding). The public `lifenzrpewh/paua-releases`
+repo was made the same day and 1.1.0 copied into it by hand from this Mac (no `RELEASES_TOKEN`
+yet, so the build cannot). 1.1.0 is the first build with the updater: booths on 1.0.x install it by
+hand once; updates come by themselves after that. All checked on the Mac only
+(`docs/FIELD_TEST.md`).
+
+**2026-10-11, merged:** auto-update (status row above). `lifenzrpewh/paua-releases` exists (made
+2026-10-11). Waiting on the owner: a fine-grained token that may write its contents, saved as the
+`RELEASES_TOKEN` secret here, so each tag's build drafts its release there itself. Then the
 next tag's build drafts its release there too. ⚠️ Whether `--publish never` writes `latest.yml` on
 the runner: check the first build's artifacts.
+
 **2026-10-11, on main, not in a build:** tabs are named by a **double tap** (in or out of Edit
 layout; the per-tab ✎ gone, the × inside the tab's pill). The **reply listener sits beside onPC
 on every address** of this computer, not loopback only: onPC in a session replies to the network

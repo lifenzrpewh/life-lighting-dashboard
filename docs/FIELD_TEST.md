@@ -88,6 +88,8 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.1.0** (2026-10-11): install it by hand over 1.0.x, once (it is the first with the updater). Then the sections below: Updates, the Holding map, and the double tap on a tab (§ Edit layout). The onPC-in-session fix: with onPC on this computer in a session, Connections' Console row goes LIVE.
+
 **The Holding map** (Settings › Holding, 1.1.0)
 - [ ] With Arena's composition open, every named HOLDING column is a row (PROMO 1 to 6 as their own rows); unnamed columns are not
 - [ ] Set a column's words (say WTG takes "Alpha"): Holding shows Alpha's foreground placed in WTG
