@@ -325,6 +325,12 @@ repo was made the same day and 1.1.0 copied into it by hand from this Mac (no `R
 yet, so the build cannot). 1.1.0 is the first build with the updater: booths on 1.0.x install it by
 hand once; updates come by themselves after that. All checked on the Mac only
 (`docs/FIELD_TEST.md`).
+**Published** the same evening, here and on `paua-releases` (its `latest.yml` answers publicly;
+the packaged `app-update.yml` points there). The visuals app's PRs #1 and #2 (copy between cue
+fields, devices following the current service, the run sheet noticing Planning Center, dragging a
+song onto a song) are **merged but not deployed**: deploying is from the Print Server
+(visuals-song-comms `CLAUDE.md` § Deployment). Waiting on the owner: a desk test of the lag on the
+real MA3 Light (the OSC page photo, and whether it stops with Pāua closed), and `RELEASES_TOKEN`.
 
 **2026-10-11, merged:** auto-update (status row above). `lifenzrpewh/paua-releases` exists (made
 2026-10-11). Waiting on the owner: a fine-grained token that may write its contents, saved as the
