@@ -1,9 +1,12 @@
-// This computer: full screen or a window, and which build this is and where
-// it logs. In Settings, so Admin only.
+// This computer: full screen or a window, updates, and which build this is
+// and where it logs. In Settings, so Admin only.
 
 import { useEffect, useState } from 'react'
 
+import { Download, RefreshCw } from 'lucide-react'
+
 import type { About } from '../../../shared/about.js'
+import { updateWords, type UpdateState } from '../../../shared/updates.js'
 
 import { Button, Card, SectionTitle, Segmented } from '../ui.js'
 import type { Save } from './parts.js'
@@ -46,5 +49,58 @@ export function AboutFoot() {
 				Show the log
 			</Button>
 		</div>
+	)
+}
+
+/** Updates (../../../shared/updates.ts): the version here, Check for updates,
+ *  and Update when one is out. Update asks once more, because it closes Pāua
+ *  for a minute: never during a service. */
+export function UpdatesCard({ updates }: { updates: UpdateState | null }) {
+	const [asking, setAsking] = useState(false)
+	const [version, setVersion] = useState<string | null>(null)
+	useEffect(() => void window.life?.about().then((a) => setVersion(a?.version ?? null)), [])
+	if (updates === null) return null
+	const busy = updates.state === 'checking' || updates.state === 'downloading' || updates.state === 'installing'
+	return (
+		<Card>
+			<SectionTitle>Updates</SectionTitle>
+			<p className={`text-sm ${updates.state === 'failed' ? 'text-state-unreachable' : updates.state === 'available' ? 'font-bold text-booth-ink' : 'text-booth-dim'}`}>
+				{updateWords(updates, version ?? '?')}
+			</p>
+			{updates.state === 'downloading' && (
+				<div className="h-2 overflow-hidden rounded-full bg-booth-raise">
+					<div className="h-full bg-accent transition-[width]" style={{ width: `${Math.max(2, updates.percent)}%` }} />
+				</div>
+			)}
+			{updates.state === 'unsupported' ? null : asking && updates.state === 'available' ? (
+				<div className="flex flex-wrap items-center gap-3">
+					<span className="text-sm text-booth-ink">Pāua closes, installs {updates.version} and opens again, in about a minute. Not during a service.</span>
+					<Button
+						variant="primary"
+						icon={Download}
+						onClick={() => {
+							setAsking(false)
+							window.life?.installUpdate()
+						}}
+					>
+						Install now
+					</Button>
+					<Button variant="ghost" onClick={() => setAsking(false)}>
+						Not now
+					</Button>
+				</div>
+			) : (
+				<div className="flex flex-wrap items-center gap-3">
+					{updates.state === 'available' && (
+						<Button variant="primary" icon={Download} onClick={() => setAsking(true)}>
+							Update to {updates.version}
+						</Button>
+					)}
+					<Button icon={RefreshCw} disabled={busy} onClick={() => window.life?.checkUpdates()}>
+						Check for updates
+					</Button>
+				</div>
+			)}
+		</Card>
 	)
 }

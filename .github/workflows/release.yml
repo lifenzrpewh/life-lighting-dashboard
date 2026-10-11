@@ -2,6 +2,9 @@
 # (Apple Silicon only, the owner's call 2026-10-04), from one commit.
 #
 # Run it from the Actions tab (Run workflow), or push a tag `v<version>`.
+# A tag also drafts the release in the public lifenzrpewh/paua-releases repo
+# that installed copies update from (src/shared/updates.ts): publishing THAT
+# draft is what offers the version to the booths.
 # The files are the run's artifacts, downloaded from its page; a tag also
 # makes a DRAFT GitHub Release holding them, published by hand when the time
 # comes (GitHub as the place testers download from is the end goal).
@@ -63,7 +66,12 @@ jobs:
       - uses: actions/upload-artifact@v6
         with:
           name: Paua-windows
-          path: release/*.exe
+          # latest.yml and the blockmap are the updater's: which version, and
+          # the installer's SHA-512 (src/main/updates.ts).
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
           if-no-files-found: error
       - uses: actions/upload-artifact@v6
         if: always()
@@ -121,6 +129,20 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" files/* --repo "${{ github.repository }}" \
             --draft --title "Pāua ${{ github.ref_name }}" --notes "Field-test build. How to install and what to check: docs/FIELD_TEST.md."
+      # The updater's copy (src/shared/updates.ts): a draft in the public
+      # paua-releases repo, so the booths see it only once the owner publishes
+      # it there. RELEASES_TOKEN is a token that may write to that repo; with
+      # none set, this says so and the private draft above still stands.
+      - name: Draft the same in paua-releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No RELEASES_TOKEN secret: skipped. Booths will not see this version until it is set and the build runs again."
+            exit 0
+          fi
+          gh release create "${{ github.ref_name }}" files/* --repo lifenzrpewh/paua-releases \
+            --draft --title "Pāua ${{ github.ref_name }}" --notes "Pāua ${{ github.ref_name }}. Publishing this draft offers it to every booth: Settings › This computer › Update."
 
   report:
     needs: [windows, mac]

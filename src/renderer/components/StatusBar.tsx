@@ -41,7 +41,7 @@
 // ../barItems.ts), per computer. The lock, Settings and the handle always stay.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Activity, ChevronDown, Flag, Lock, LockOpen, PanelsTopLeft, Settings } from 'lucide-react'
+import { Activity, ChevronDown, Download, Flag, Lock, LockOpen, PanelsTopLeft, Settings } from 'lucide-react'
 
 import type { LinkState, Reading } from '../../shared/reading.js'
 import type { ConnectionStatus, Tone } from '../../shared/connections.js'
@@ -49,6 +49,7 @@ import { worstTone } from '../../shared/connections.js'
 import type { Mode } from '../../shared/ma-pane.js'
 import type { Showfile } from '../../shared/showfile.js'
 import type { TimerSources } from '../../shared/timer.js'
+import type { UpdateState } from '../../shared/updates.js'
 import type { BarItem } from '../barItems.js'
 import { TimerChip, timerFace } from './TimerChip.js'
 import { Dot, type Icon } from './ui.js'
@@ -80,10 +81,10 @@ function Clock({ now, compact }: { now: number; compact: boolean }) {
 
 /** Something that needs a look, said in words on the left of the bar. A tap
  *  opens where it can be dealt with. */
-type Alert = { key: string; tone: Tone | 'warn'; words: string; open: 'showfile' | 'connections' }
+type Alert = { key: string; tone: Tone | 'warn' | 'news'; words: string; open: 'showfile' | 'connections' | 'updates' }
 
 /** What the alert lane says now. Empty on a good day. */
-function alertsOf(link: LinkState, consoleOn: boolean, showfile: Reading<Showfile>, rows: readonly ConnectionStatus[]): Alert[] {
+function alertsOf(link: LinkState, consoleOn: boolean, showfile: Reading<Showfile>, rows: readonly ConnectionStatus[], updates: UpdateState | null): Alert[] {
 	const alerts: Alert[] = []
 	const show = showfile.state === 'unknown' ? null : showfile.value
 	// SaveGuard's verdict, made on the console; this only says it (docs/PLAN.md,
@@ -97,6 +98,11 @@ function alertsOf(link: LinkState, consoleOn: boolean, showfile: Reading<Showfil
 	} else if (others.length > 1) {
 		alerts.push({ key: 'rows', tone: worstTone(others), words: `${others.length} connections need a look`, open: 'connections' })
 	}
+	// Last, and quiet: news, not a fault. A tap opens Settings › This computer
+	// (Admin's passcode first), where Update asks once more.
+	if (updates?.state === 'available') alerts.push({ key: 'update', tone: 'news', words: `Pāua ${updates.version} is out`, open: 'updates' })
+	if (updates?.state === 'downloading' || updates?.state === 'installing')
+		alerts.push({ key: 'update', tone: 'news', words: updates.state === 'installing' ? `Installing Pāua ${updates.version}` : `Downloading Pāua ${updates.version}`, open: 'updates' })
 	return alerts
 }
 
@@ -106,6 +112,7 @@ const alertTone: Record<Alert['tone'], string> = {
 	stale: 'bg-state-stale/15 text-state-stale',
 	live: 'bg-state-live/15 text-state-live',
 	off: 'bg-booth-raise text-booth-dim',
+	news: 'bg-accent/25 text-booth-ink',
 }
 
 export function StatusBar({
@@ -132,6 +139,8 @@ export function StatusBar({
 	hidden,
 	collapsed,
 	onCollapse,
+	updates,
+	onUpdates,
 }: {
 	link: LinkState
 	/** False when the console is turned off in Settings: no link, no show. */
@@ -170,11 +179,15 @@ export function StatusBar({
 	/** The bar folded: 34 px, the same items in the same places. */
 	collapsed: boolean
 	onCollapse: (collapsed: boolean) => void
+	/** What the updater last knew: a new version is said in the alert lane. */
+	updates: UpdateState | null
+	/** The update alert's tap. */
+	onUpdates: () => void
 }) {
 	const admin = mode === 'operator'
 	const compact = collapsed
 	const shows = (item: BarItem) => !hidden.has(item)
-	const alerts = alertsOf(link, consoleOn, showfile, rows)
+	const alerts = alertsOf(link, consoleOn, showfile, rows, updates)
 	// Only while either program is set up: otherwise the chip draws nothing,
 	// and nor may its divider.
 	const countdown = shows('countdown') && timers !== null && timerFace(timers, now) !== null ? <TimerChip sources={timers} compact={compact} /> : null
@@ -216,13 +229,19 @@ export function StatusBar({
 						<button
 							key={a.key}
 							type="button"
-							onClick={a.open === 'showfile' ? onShowfile : onConnections}
+							onClick={a.open === 'showfile' ? onShowfile : a.open === 'updates' ? onUpdates : onConnections}
 							title={a.words}
 							className={`inline-flex min-w-0 shrink-0 animate-slide-in items-center gap-2 rounded-ctl font-bold whitespace-nowrap transition-[filter,transform] hover:brightness-115 active:scale-95 ${
 								compact ? 'h-6 px-2 text-xs' : 'h-9 px-3 text-[13.5px]'
 							} ${alertTone[a.tone]}`}
 						>
-							{a.tone === 'warn' ? <span aria-hidden className="size-2 shrink-0 rounded-full bg-black" /> : <Dot tone={a.tone} size="sm" />}
+							{a.tone === 'warn' ? (
+								<span aria-hidden className="size-2 shrink-0 rounded-full bg-black" />
+							) : a.tone === 'news' ? (
+								<Download size={compact ? 13 : 15} strokeWidth={2.2} aria-hidden className="shrink-0" />
+							) : (
+								<Dot tone={a.tone} size="sm" />
+							)}
 							<span className="truncate">{a.words}</span>
 						</button>
 					))}

@@ -84,6 +84,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/log-file.ts` · `src/main/log.ts` | **The app's own log**, `paua.log` in the data folder, timed, two 5 MB files at most; the kiosk page's errors and a crashed GPU or page process go in too. Version and path at the foot of Connections. Watched writing on the Windows box, 2026-10-04. |
 | ✅ `src/main/entry.ts` · `src/main/supervisor.ts` · `src/bridge/supervise.ts` | **The installed app's watchdog**: Paua.exe in Node mode runs the app and restarts it 5 s after a crash, gives up after 5 in 2 minutes, leaves a clean quit alone. A checkout is left to kiosk.cmd. Watched on the packaged build on the Windows box, 2026-10-04. |
 | ✅ `.github/workflows/release.yml` · `docs/FIELD_TEST.md` | **Field-test builds**: a tag `v<version>` builds `Paua-Setup-<v>.exe` and `Paua-<v>-arm64.dmg` (ad-hoc signed, Syphon.framework left as upstream signed it) and drafts a release; logs pushed to `release-build-log`. v0.1.0 built green 2026-10-04. ⚠️ Neither file installed anywhere yet; the Mac build never opened on a Mac. |
+| ⚠️ `src/shared/updates.ts` · `src/main/updates.ts` · `settings/computer.tsx` (`UpdatesCard`) | **Updates** (2026-10-11, the owner's ask and choice of host): electron-updater reads the newest **published** release of the public `lifenzrpewh/paua-releases` (this repo is private; a token in the app could be taken out of it). Checked a minute after the start and every 4 h; **never installed by itself**: the bar's alert lane says "Pāua X is out", Settings › This computer has Check for updates and Update (Admin, asked twice), which downloads, installs silently and reopens. Windows only (the Mac build is ad-hoc signed; told to download by hand). The release build drafts the same release there when the `RELEASES_TOKEN` secret is set; publishing that draft is the rollout. `PAUA_FAKE_UPDATE=<version>` on a checkout pretends one is out (the screens watched that way on the Mac, 2026-10-11). ⚠️ The repo and secret not yet made; no real update installed; the watchdog's part not watched. `docs/FIELD_TEST.md` § Updates. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
@@ -315,6 +316,12 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-11, branch `updates`:** auto-update (status row above). Waiting on the owner: create the
+public, empty `lifenzrpewh/paua-releases` (with a README, so it has a branch for tags) and a
+fine-grained token that may write its contents, saved as the `RELEASES_TOKEN` secret here. Then the
+next tag's build drafts its release there too. ⚠️ Whether `--publish never` writes `latest.yml` on
+the runner: check the first build's artifacts.
+
 **2026-10-11: v1.0.1 tagged** at the owner's ask, from a Mac session: the Spout receiver kept
 across a tab switch and the views watching counted (the video status row above), plus what
 merged into main since 1.0.0 (the Cue Manager signs in only as a device; the look's values
@@ -541,7 +548,7 @@ Later, not tonight:
 - **Capture inputs**: built 2026-10-05, in v0.2.4; next, a real Blackmagic card (and
   whether it opens while Arena holds the same card), OBS with its virtual camera started, then
   a build.
-- Start at login; self-update once hosting is decided.
+- Start at login. Self-update: built 2026-10-11 (status row, Updates).
 - **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
   view** ("?"). Then, interested: a big countdown view, connection history (an hour's

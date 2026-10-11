@@ -90,6 +90,8 @@ import { captureIdOf, isCaptureId, type CaptureInput } from '../shared/capture.j
 import { settleDataDir } from '../bridge/data-dir.js'
 import { logPage, startLog } from './log.js'
 import type { About } from '../shared/about.js'
+import type { UpdateState } from '../shared/updates.js'
+import { startUpdates, type Updates } from './updates.js'
 import { NO_LOCKOUT, lockoutWait, tryUnlock, type AdminState, type Lockout, type UnlockResult } from '../shared/admin.js'
 
 // Pāua's data folder, %APPDATA%paua, moved in whole from the name before the
@@ -143,6 +145,7 @@ let timers: TimersHandle | null = null
 let arena: ArenaHandle | null = null
 let videoFeed: VideoFeed | null = null
 let ndi: Ndi | null = null
+let updates: Updates | null = null
 const BOOTED_AT = Date.now()
 
 // Must precede ready: Electron fixes scheme privileges at startup.
@@ -741,6 +744,22 @@ app.whenReady().then(() => {
 		if (fromKiosk(e) && mode === 'operator' && logPath !== '') shell.showItemInFolder(logPath)
 	})
 
+	// Updates (../shared/updates.ts): anyone may see that one is out and ask
+	// again; only Admin installs, since installing closes Pāua for a minute.
+	updates = startUpdates({
+		onChange: (u) => {
+			if (u.state === 'available') console.log(`[updates] Pāua ${u.version} is out (this is ${app.getVersion()})`)
+			if (u.state === 'failed') console.error(`[updates] could not check: ${u.detail}`)
+		},
+	})
+	ipcMain.handle('updates:state', (e): UpdateState | undefined => (fromOurs(e) ? updates?.state() : undefined))
+	ipcMain.on('updates:check', (e) => {
+		if (fromKiosk(e)) updates?.check()
+	})
+	ipcMain.on('updates:install', (e) => {
+		if (fromKiosk(e) && mode === 'operator') updates?.install()
+	})
+
 	// Windowed mode, as it changes: no restart needed.
 	store.onChange(() => {
 		const full = fullScreenFor(store.current().windowed)
@@ -807,4 +826,5 @@ app.on('will-quit', () => {
 	arena?.stop()
 	videoFeed?.stop()
 	ndi?.stop()
+	updates?.stop()
 })
