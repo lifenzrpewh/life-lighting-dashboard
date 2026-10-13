@@ -19,6 +19,12 @@
 // - A tap on a clip opens it: Arena's picture beside the lookbook's, and the
 //   two answers, "Use the lookbook's" and "Arena's is right".
 //
+// The plan beside the grid (the owner, 2026-10-13: "we don't really know what
+// it's doing sometimes"): every moment of the run sheet, each code, and what
+// Update all does with it or why it does nothing (`explainPlan`). A tap on a
+// line opens its clip. Under the top line, the latest run's result stays until
+// the next: loaded, failed (tap for why), already there.
+//
 // Inspect only: a tap never fires a clip (Clips is for playing). Every change
 // asks first (Confirm) and is the operator's: main refuses outside operator
 // mode, and in volunteer mode the buttons that change anything are not drawn
@@ -28,7 +34,7 @@
 // it holds something, since it is rarely used.
 
 import { useState } from 'react'
-import { ArrowLeft, FileX, RefreshCw, X } from 'lucide-react'
+import { ArrowLeft, FileX, ListChecks, RefreshCw, X } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaLayer, type ArenaSlot, type ArenaStatus } from '../../shared/arena.js'
 import {
@@ -45,11 +51,12 @@ import {
 	slotMark,
 	TYPE_LAYER,
 	type Placement,
+	type PlanLine,
 	type SlotMark,
 	type Unplaced,
 } from '../../shared/holding.js'
 import { lookbookStem, lookbookThumbUrl, TYPE_NAMES, mediaCodeOf } from '../../shared/media-check.js'
-import type { FetchStates } from '../../shared/media-fetch.js'
+import { runCounts, type FetchRun, type FetchStates } from '../../shared/media-fetch.js'
 import { layerOfCode } from '../../shared/holding-map.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
@@ -66,6 +73,16 @@ export function HoldingView({ status, now }: { status: Channel<ArenaStatus> | nu
 type Choosing = { item: number; title: string; label: string | null; code: string; want: string; lookbookPath: string }
 type Picked = { kind: 'clip'; id: number } | { kind: 'choose'; what: Choosing } | null
 
+/** Whether the plan is open beside the grid: open unless this computer closed it. */
+const PLAN_KEY = 'paua.holding.planClosed'
+function planOpenAtFirst(): boolean {
+	try {
+		return localStorage.getItem(PLAN_KEY) !== '1'
+	} catch {
+		return true
+	}
+}
+
 const unnamedColumn = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
 const needsLook = (mark: SlotMark | null) => mark === 'may-differ' || mark === 'different' || mark === 'missing'
 
@@ -76,6 +93,15 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	const [picked, setPicked] = useState<Picked>(null)
 	const [details, setDetails] = useState(false)
 	const [fetchNote, setFetchNote] = useState<string | null>(null)
+	const [planOpen, setPlanOpen] = useState(planOpenAtFirst)
+	const togglePlan = () => {
+		setPlanOpen(!planOpen)
+		try {
+			localStorage.setItem(PLAN_KEY, planOpen ? '1' : '0')
+		} catch {
+			// Kept for this view only.
+		}
+	}
 	const items = m.runSheet ?? []
 	const today = codesOn(items)
 	const layers = holdingLayers(status).filter((l) => !/^playback$/i.test(l.name.trim()) || l.slots.some((s) => s.state !== 'empty'))
@@ -148,6 +174,16 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						{operator && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
 						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
+						<button
+							type="button"
+							onClick={togglePlan}
+							aria-pressed={planOpen}
+							title={planOpen ? 'Hide the plan' : 'Show the plan'}
+							className={`flex h-10 items-center gap-1.5 rounded-ctl px-3 text-sm ${planOpen ? 'bg-accent text-accent-ink' : 'bg-booth-raise hover:bg-booth-hover'}`}
+						>
+							<ListChecks size={16} aria-hidden />
+							Plan
+						</button>
 						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-ctl bg-booth-raise hover:bg-booth-hover">
 							<RefreshCw size={16} aria-hidden />
 						</button>
@@ -159,6 +195,7 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 						<FetchWords fetch={m.fetches[fetchNote]} refused={m.refused[fetchNote]} />
 					</p>
 				)}
+				{m.lastRun !== null && <RunLine run={m.lastRun} fetches={m.fetches} />}
 				{ageMs !== null && <p className="pb-2 text-xs text-state-stale">{formatAge(ageMs)} · Arena is not answering; this may not be what it has</p>}
 				{(details || m.service === null) && (
 					<div className="border-t border-booth-edge/60">
@@ -180,7 +217,8 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					<Tray m={m} tray={tray} operator={operator} choosing={choosing} onChoose={(what) => setPicked(what === null ? null : { kind: 'choose', what })} />
 				)}
 			</div>
-			<div className={`min-h-0 flex-1 overflow-auto ${ageMs !== null ? staleContent : ''}`}>
+			<div className="flex min-h-0 flex-1">
+			<div className={`min-h-0 min-w-0 flex-1 overflow-auto ${ageMs !== null ? staleContent : ''}`}>
 				{choosing !== null && (
 					<p className="sticky top-0 left-0 z-20 bg-booth-bg px-4 py-2 text-sm">
 						Tap a lit slot for <span className="font-mono">{choosing.code}</span> ({choosing.label ?? choosing.title}), for this service
@@ -239,6 +277,117 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 				<Legend operator={operator} />
 				{picked?.kind === 'clip' && <Inspect m={m} status={status} operator={operator} clipId={picked.id} onClose={() => setPicked(null)} />}
 			</div>
+			{planOpen && m.runSheet !== null && <PlanPanel lines={m.planLines} picked={picked?.kind === 'clip' ? picked.id : null} onPick={(id) => setPicked({ kind: 'clip', id })} />}
+			</div>
+		</div>
+	)
+}
+
+const TONE: Record<PlanLine['notes'][number]['tone'], string> = {
+	do: 'bg-accent-hi',
+	ok: 'bg-state-live',
+	warn: 'bg-warn',
+	quiet: 'bg-booth-faint',
+}
+
+/** The plan, beside the grid: each moment, each code, what happens to it and
+ *  why. Blue: Update all loads it; green: nothing to do, and why; amber: no
+ *  place or no file; grey: not Arena's. */
+function PlanPanel({ lines, picked, onPick }: { lines: PlanLine[]; picked: number | null; onPick: (clipId: number) => void }) {
+	const counts = { do: 0, ok: 0, warn: 0, quiet: 0 }
+	for (const l of lines) for (const n of l.notes) counts[n.tone] += 1
+	return (
+		<aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-booth-edge px-3 pb-4 text-xs">
+			<p className="sticky top-0 z-10 flex flex-wrap gap-x-3 bg-booth-bg py-2 text-booth-dim">
+				<span className="font-medium text-booth-ink">Plan</span>
+				{counts.do > 0 && <span>{counts.do} to load</span>}
+				{counts.warn > 0 && <span className="text-warn">{counts.warn} with no place</span>}
+				<span>{counts.ok} right</span>
+			</p>
+			{lines.length === 0 && <p className="text-booth-dim">Nothing on this run sheet for Arena.</p>}
+			{lines.map((l) => (
+				<div key={`${l.item}:${l.title}`} className="border-t border-booth-edge/60 py-1.5">
+					<p className="truncate font-medium">
+						{l.label ?? l.title}
+						{l.label !== null && l.label !== l.title && <span className="font-normal text-booth-dim"> · {l.title}</span>}
+					</p>
+					{l.notes.map((n) => {
+						const row = (
+							<>
+								<span className={`mt-1 size-2 shrink-0 rounded-full ${TONE[n.tone]}`} />
+								<span className="w-11 shrink-0 font-mono">{n.code}</span>
+								<span className={`min-w-0 flex-1 ${n.tone === 'warn' ? 'text-warn' : n.tone === 'do' ? '' : 'text-booth-dim'}`}>{n.words}</span>
+							</>
+						)
+						return n.clipId === null ? (
+							<p key={n.code} className="flex gap-2 py-0.5">
+								{row}
+							</p>
+						) : (
+							<button
+								key={n.code}
+								type="button"
+								onClick={() => onPick(n.clipId as number)}
+								className={`flex w-full gap-2 rounded-ctl py-0.5 text-left hover:bg-booth-hover ${picked === n.clipId ? 'bg-booth-raise' : ''}`}
+							>
+								{row}
+							</button>
+						)
+					})}
+				</div>
+			))}
+		</aside>
+	)
+}
+
+/** The latest run's result, kept until the next (the owner, 2026-10-13):
+ *  loaded, failed, already there; a tap lists each code and why. */
+function RunLine({ run, fetches }: { run: FetchRun; fetches: FetchStates }) {
+	const [open, setOpen] = useState(false)
+	const n = runCounts(run, fetches)
+	const time = new Date(run.at).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })
+	const done = run.codes.length - n.going
+	const bad = n.failed > 0
+	return (
+		<div className="pb-2 text-xs">
+			<button type="button" onClick={() => setOpen(!open)} className={`flex min-h-8 w-full flex-wrap items-center gap-x-3 rounded-ctl px-2 text-left ${bad ? 'bg-warn/10' : 'bg-booth-raise'}`}>
+				<span className="text-booth-dim">
+					{run.label.replace(/:.*$/, '')}, {time}
+				</span>
+				{n.going > 0 ? (
+					<span>
+						{done} of {run.codes.length} done…
+					</span>
+				) : (
+					<>
+						<span>{n.loaded} loaded</span>
+						{n.doubted > 0 && <span className="text-warn">{n.doubted} after Arena said no</span>}
+						{n.failed > 0 && <span className="font-medium text-warn">{n.failed} failed</span>}
+						{n.copied > 0 && <span>{n.copied} copied only</span>}
+						{run.already > 0 && <span className="text-booth-dim">{run.already} already there</span>}
+					</>
+				)}
+				<span className="ml-auto text-booth-dim">{open ? 'Hide' : 'Each code'}</span>
+			</button>
+			{open && (
+				<ul className="mt-1 flex flex-col gap-0.5 px-2">
+					{run.codes.map((code) => {
+						const f = fetches[code]
+						return (
+							<li key={code} className="flex items-baseline gap-2">
+								<span className="w-11 shrink-0 font-mono">{code}</span>
+								{f === undefined || f.at < run.at ? <span className="text-booth-dim">waiting</span> : <FetchWords fetch={f} refused={undefined} />}
+							</li>
+						)
+					})}
+					{Object.entries(run.refused).map(([code, why]) => (
+						<li key={`r${code}`} className="flex items-baseline gap-2">
+							<span className="w-11 shrink-0 font-mono">{code}</span>
+							<span className="text-warn">not sent: {why}</span>
+						</li>
+					))}
+				</ul>
+			)}
 		</div>
 	)
 }

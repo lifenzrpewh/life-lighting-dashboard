@@ -28,7 +28,7 @@ import type { AdminState, UnlockResult } from '../shared/admin.js' with { 'resol
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
 import type { NdiState } from '../shared/ndi.js' with { 'resolution-mode': 'import' }
 import type { CaptureInput } from '../shared/capture.js' with { 'resolution-mode': 'import' }
-import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
+import type { FetchRequest, FetchRun, FetchStates, MediaSource, RunRequest } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
 
 /** Every view on this page showing the video feed, each drawing every frame.
  *  Main is told the page watches while there is one, and stops when the last
@@ -165,6 +165,10 @@ const api = {
 	 *  and the media check says when Arena has it. */
 	fetchMedia: (request: FetchRequest): Promise<{ ok: true } | { ok: false; detail: string }> => ipcRenderer.invoke('media:fetch', request),
 	mediaFetches: (): Promise<FetchStates> => ipcRenderer.invoke('media:fetch-state'),
+	/** A confirmation's fetches as one run, its plan and result in the log:
+	 *  operator mode only. `lastMediaRun` is the latest, for the result line. */
+	runMedia: (run: RunRequest): Promise<FetchRun | { ok: false; detail: string }> => ipcRenderer.invoke('media:run', run),
+	lastMediaRun: (): Promise<FetchRun | null> => ipcRenderer.invoke('media:last-run'),
 	/** Where each request's file would come from (the drive, or the lookbook),
 	 *  for the confirmation to say and ask about before anything is sent. */
 	mediaSources: (requests: FetchRequest[]): Promise<Record<string, MediaSource>> => ipcRenderer.invoke('media:sources', requests),

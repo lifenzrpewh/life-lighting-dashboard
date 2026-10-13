@@ -74,7 +74,7 @@
 // above.
 
 import type { ArenaLayer, ArenaSlot, ArenaStatus } from './arena.js'
-import { fileStem, lookbookStem, mediaCodeOf, sameFile, sameKey, type FileSizes, type LookbookItem } from './media-check.js'
+import { TYPE_NAMES, fileStem, lookbookStem, mediaCodeOf, sameFile, sameKey, type FileSizes, type LookbookItem } from './media-check.js'
 import type { FetchRequest } from './media-fetch.js'
 import { DEFAULT_MAP, LAYER_KEYS, cellOf, layerOfCode, takesItem, takesOf, type HoldingMap, type LayerKey } from './holding-map.js'
 
@@ -270,6 +270,21 @@ export type Unplaced = {
 	didntFit?: true
 }
 
+/** A code that needs nothing, and why (the owner, 2026-10-13: "I think we
+ *  don't really know what it's doing"): in its column already, a one-off
+ *  already on its layer, or a cell the Holding map gives to something else.
+ *  Kept so the plan can say it, not left silent. */
+export type Settled = {
+	item: number
+	code: string
+	layer: string
+	/** Counted from 1. */
+	column: number
+	columnName: string
+	clipId: number | null
+	why: 'in-column' | 'on-layer' | 'leave' | 'fixed' | 'normal'
+}
+
 /** The layer's last named column, counted from 0, or -1 when none is named. */
 function lastNamed(layer: ArenaLayer, status: ArenaStatus): number {
 	return columnNamesOf(layer, status).reduce((at, n, i) => (unnamed(n) ? at : i), -1)
@@ -375,6 +390,8 @@ export function planPlacements(
 	columns: Map<number, number>
 	/** The column names the items were placed by. */
 	names: string[]
+	/** What needs nothing, and why. */
+	settled: Settled[]
 } {
 	const today = codesOn(items)
 	const layerOf = (type: string) => {
@@ -469,6 +486,19 @@ export function planPlacements(
 
 	const placements: Placement[] = []
 	const unplaced: Unplaced[] = []
+	const settled: Settled[] = []
+	const settle = (item: number, code: string, layer: ArenaLayer | undefined, type: string, column: number, why: Settled['why']) => {
+		const names = layer === undefined ? [] : columnNamesOf(layer, status)
+		settled.push({
+			item,
+			code,
+			layer: layer?.name ?? TYPE_LAYER_NAME[type] ?? type,
+			column: column + 1,
+			columnName: names[column] ?? '',
+			clipId: layer?.slots[column]?.id ?? null,
+			why,
+		})
+	}
 	// Overflow: each layer's spare clips, handed out in run-sheet order, and
 	// which clip each code already took (a code two one-offs share takes one).
 	const spare = new Map<string, { slot: ArenaSlot; column: number }[]>()
@@ -487,7 +517,11 @@ export function planPlacements(
 				// A one-off already on its layer was placed by hand: done.
 				const oneOff = where.none === 'no-column' || where.none === 'no-promo'
 				const layer = layerOf(c.type)
-				if (oneOff && layer?.slots.some((s) => slotCode(s) === c.code) === true) continue
+				const onLayer = oneOff ? (layer?.slots.findIndex((s) => slotCode(s) === c.code) ?? -1) : -1
+				if (onLayer >= 0) {
+					settle(i, c.code, layer, c.type, onLayer, 'on-layer')
+					continue
+				}
 				if (oneOff && OVERFLOWS.has(c.type) && c.want !== null && layer !== undefined) {
 					const key = `${c.type}:${c.code}`
 					const taken = overflowed.get(key)
@@ -536,14 +570,20 @@ export function planPlacements(
 			// The map's word on this cell: left alone, the normal background's,
 			// or a fixed code's (placed by `fixedPlacements`): not the item's.
 			const cell = cellOf(map, names[where.column] ?? '', c.type)
-			if (cell.kind === 'leave' || cell.kind === 'fixed' || (cell.kind === 'normal' && c.type === 'B')) continue
 			const layer = layerOf(c.type)
+			if (cell.kind === 'leave' || cell.kind === 'fixed' || (cell.kind === 'normal' && c.type === 'B')) {
+				settle(i, c.code, layer, c.type, where.column, cell.kind)
+				continue
+			}
 			const slot = layer?.slots[where.column]
 			if (layer === undefined || slot === undefined) {
 				unplaced.push({ ...base, code: c.code, want: c.want, kind: 'no-layer', detail: `no ${TYPE_LAYER_NAME[c.type] ?? 'such'} layer in this composition` })
 				continue
 			}
-			if (slotCode(slot) === c.code) continue
+			if (slotCode(slot) === c.code) {
+				settle(i, c.code, layer, c.type, where.column, 'in-column')
+				continue
+			}
 			placements.push({
 				...base,
 				code: c.code,
@@ -562,7 +602,7 @@ export function planPlacements(
 	placements.push(...fixedPlacements(items, status, map))
 	const columns = new Map<number, number>()
 	for (const [i, where] of columnOf) if (!('none' in where)) columns.set(i, where.column)
-	return { placements, unplaced, columns, names }
+	return { placements, unplaced, columns, names, settled }
 }
 
 /** The background the rest of the service uses (the owner, 2026-10-06): the
@@ -876,4 +916,88 @@ export function lookSteps(
 		if (step !== null) steps.push(step)
 	}
 	return steps
+}
+
+/** One code of one moment, as the plan says it: what will happen to it, or why
+ *  nothing will. `do`: Update all would load it somewhere; `ok`: nothing to
+ *  do, and why; `warn`: it has no place, or no file; `quiet`: not Arena's. */
+export type PlanNote = { code: string; tone: 'do' | 'ok' | 'warn' | 'quiet'; words: string; clipId: number | null }
+
+/** One moment of the run sheet in the plan, or (`item` -1) a step no moment
+ *  owns: the normal background's gaps, a fixed code. */
+export type PlanLine = { item: number; title: string; label: string | null; notes: PlanNote[] }
+
+/** Where a column is, said: `PROMO 2 (column 10)`, or `column 13`. */
+function columnWords(name: string, column: number): string {
+	return unnamed(name) ? `column ${column}` : `${name} (column ${column})`
+}
+
+/** The plan, in words (the owner, 2026-10-13): every moment of the run sheet,
+ *  each of its codes, and what Update all would do with it or why it would do
+ *  nothing. The same rules as `updatePlan`, read back, never a second guess. */
+export function explainPlan(
+	items: LookbookItem[],
+	status: ArenaStatus,
+	marks: ReadonlySet<string>,
+	sizes?: FileSizes,
+	map: HoldingMap = DEFAULT_MAP,
+): PlanLine[] {
+	const { placements, unplaced, settled } = planPlacements(items, status, map)
+	const today = codesOn(items)
+	const confirmed = new Set<string>()
+	for (const layer of status.layers) {
+		for (const slot of layer.slots) {
+			const code = slotCode(slot)
+			if (code !== null && today.has(code) && slotMark(slot, items, today, marks, sizes) === 'confirmed') confirmed.add(code)
+		}
+	}
+	const lines: PlanLine[] = items.map((item, i) => {
+		const notes = arenaCodesAll(item).map(({ code, type }): PlanNote => {
+			if (layerOfCode(map, code) === null) return { code, tone: 'quiet', words: `not Arena\u2019s (${TYPE_NAMES[type] ?? 'another program'})`, clipId: null }
+			const file = item.files[code]
+			if (file === undefined) return { code, tone: 'warn', words: 'the lookbook has no file for it', clipId: null }
+			const lost = unplaced.find((u) => u.item === i && u.code === code)
+			if (lost !== undefined) return { code, tone: 'warn', words: lost.didntFit === true ? `didn't fit: ${lost.detail}` : `no place: ${lost.detail}`, clipId: null }
+			const update = clipsToUpdate(code, lookbookStem(file), file, status, marks, sizes, map)
+			const old = update.length === 0 ? null : update.length === 1 ? 'its clip with another file gets the lookbook’s' : `its ${update.length} clips with another file get the lookbook’s`
+			const placed = placements.filter((p) => p.item === i && p.code === code)
+			if (placed.length > 0) {
+				const words = [`into ${placed.map(placementWords).join('; ')}`, ...(old === null ? [] : [old])].join('; ')
+				return { code, tone: 'do', words, clipId: placed[0]?.clipId ?? null }
+			}
+			const s = settled.find((x) => x.item === i && x.code === code)
+			const where = s === undefined ? '' : `${s.layer} · ${columnWords(s.columnName, s.column)}`
+			const settledWords =
+				s === undefined
+					? 'nothing to place'
+					: s.why === 'in-column'
+						? `in ${where}`
+						: s.why === 'on-layer'
+							? `no column of its own; already in ${where}`
+							: s.why === 'leave'
+								? `${where} is Leave alone (Settings › Holding)`
+								: s.why === 'fixed'
+									? `${where} holds a fixed code (Settings › Holding)`
+									: `${where} takes the normal background (Settings › Holding)`
+			if (old !== null) return { code, tone: 'do', words: `${settledWords}; ${old}`, clipId: update[0] ?? null }
+			const sure = confirmed.has(code) ? '; confirmed the same by hand' : ''
+			return { code, tone: 'ok', words: `${settledWords}${sure}`, clipId: s?.clipId ?? null }
+		})
+		return { item: i, title: item.title, label: item.label, notes }
+	})
+	const fill = backgroundGaps(items, status, map)
+	const first = fill[0]
+	if (first !== undefined) {
+		const gaps = fill.map((p) => (unnamed(p.columnName) ? `${p.column}` : p.columnName))
+		lines.push({
+			item: -1,
+			title: 'The normal background',
+			label: null,
+			notes: [{ code: first.code, tone: 'do', words: `into the gaps in ${first.layer}: ${gaps.join(', ')}`, clipId: first.clipId }],
+		})
+	}
+	for (const p of placements.filter((x) => x.why === 'fixed')) {
+		lines.push({ item: -1, title: p.title, label: null, notes: [{ code: p.code, tone: 'do', words: `into ${placementWords(p)}`, clipId: p.clipId }] })
+	}
+	return lines
 }

@@ -586,6 +586,8 @@ Later, not tonight:
   whether it opens while Arena holds the same card), OBS with its virtual camera started, then
   a build.
 - Start at login. Self-update: built 2026-10-11 (status row, Updates).
+- **Show mode** (the owner, 2026-10-13, logged for later): a "fullscreen" that takes away the
+  windows' tops (tab strips) and locks the screen to whatever mode it is in, to use the space.
 - **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
   view** ("?"). Then, interested: a big countdown view, connection history (an hour's

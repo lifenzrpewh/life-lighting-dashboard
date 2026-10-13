@@ -13,12 +13,17 @@ import path from 'node:path'
 
 import { copyInto, downloadInto, findByCode, pickBySize, type Found } from '../bridge/media-files.js'
 import type { ArenaCommandResult } from '../shared/arena.js'
-import { megabytes, type FetchRequest, type FetchState, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
+import { megabytes, runCounts, type FetchRequest, type FetchRun, type FetchState, type FetchStates, type MediaSource, type RunRequest } from '../shared/media-fetch.js'
 
 export type MediaFetch = {
 	/** Queue a fetch. Refused, with why, when one for that code is under way. */
 	ask(request: FetchRequest): { ok: true } | { ok: false; detail: string }
 	states(): FetchStates
+	/** Queue a confirmation's requests as one run, its plan in the log; what
+	 *  main would not queue is in the run's `refused`. */
+	run(request: RunRequest): FetchRun
+	/** The latest run, ended or not, or null before the first. */
+	lastRun(): FetchRun | null
 	/** Where each request's file would come from, before anything is sent. */
 	sources(requests: FetchRequest[]): Promise<Record<string, MediaSource>>
 }
@@ -34,6 +39,8 @@ export function createMediaFetch(opts: {
 	const states: FetchStates = {}
 	const queue: FetchRequest[] = []
 	let running = false
+	let last: FetchRun | null = null
+	let runs = 0
 
 	const set = (code: string, state: FetchState) => {
 		states[code] = { ...state, at: Date.now() }
@@ -142,7 +149,24 @@ export function createMediaFetch(opts: {
 			}
 		} finally {
 			running = false
+			endRun()
 		}
+	}
+
+	/** The latest run's result, once every code of it has ended: in the log,
+	 *  each failure with why, so a booth's paua.log says what happened. */
+	const endRun = () => {
+		if (last === null || last.ended !== null || last.codes.some(busy)) return
+		last.ended = Date.now()
+		const n = runCounts(last, states)
+		const parts = [`${n.loaded} loaded`, ...(n.doubted > 0 ? [`${n.doubted} of them after Arena said no`] : []), ...(n.failed > 0 ? [`${n.failed} failed`] : []), ...(n.copied > 0 ? [`${n.copied} copied only`] : []), ...(last.already > 0 ? [`${last.already} already there`] : [])]
+		console.log(`[holding] ${last.label} done: ${parts.join(', ')}`)
+		for (const code of last.codes) {
+			const st = states[code]
+			if (st?.state === 'failed') console.log(`[holding]   ${code} failed: ${st.detail}`)
+			if (st?.state === 'sent' && st.doubted !== undefined) console.log(`[holding]   ${code}: Arena said "${st.doubted}", but the clip has ${st.file}`)
+		}
+		for (const [code, why] of Object.entries(last.refused)) console.log(`[holding]   ${code} not queued: ${why}`)
 	}
 
 	return {
@@ -154,6 +178,27 @@ export function createMediaFetch(opts: {
 			return { ok: true }
 		},
 		states: () => ({ ...states }),
+		run({ label, requests, plan, already }) {
+			const refused: Record<string, string> = {}
+			const codes: string[] = []
+			console.log(`[holding] ${label}`)
+			for (const line of plan) console.log(`[holding]   ${line}`)
+			const run: FetchRun = { id: ++runs, label, at: Date.now(), codes, already, refused, ended: null }
+			last = run
+			for (const req of requests) {
+				if (busy(req.code)) {
+					refused[req.code] = `${req.code} is already being fetched`
+					continue
+				}
+				codes.push(req.code)
+				queue.push(req)
+				set(req.code, { state: 'finding' })
+			}
+			if (codes.length === 0) endRun()
+			else void next()
+			return { ...run, codes: [...codes], refused: { ...refused } }
+		},
+		lastRun: () => (last === null ? null : { ...last, codes: [...last.codes], refused: { ...last.refused } }),
 		async sources(requests) {
 			const out: Record<string, MediaSource> = {}
 			for (const req of requests.slice(0, 50)) {

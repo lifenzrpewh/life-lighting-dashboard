@@ -6,6 +6,7 @@ import {
 	backgroundGaps,
 	clipsToUpdate,
 	codesOn,
+	explainPlan,
 	holdingLayers,
 	likeness,
 	lookSteps,
@@ -505,4 +506,43 @@ test('Clear old FGs: an overflow clip is this run sheet’s, never old; the last
 	assert.deepEqual(planPlacements(EVENT, s).unplaced.filter((u) => u.didntFit).map((u) => u.code), ['CF703', 'CF704'])
 	// Before it is loaded, an overflow slot is empty: nothing to clear there either.
 	assert.ok(!oldForegrounds(EVENT, wide(3)).some((c) => c.column > 12))
+})
+
+// The plan in words (the owner, 2026-10-13: "we don't really know what it's doing").
+const noteOf = (lines, label, code) => lines.find((l) => (l.label ?? l.title) === label)?.notes.find((n) => n.code === code)
+
+test('the plan says, for every code, what Update all does with it or why it does nothing', () => {
+	const s = composition()
+	const lines = explainPlan(ITEMS, s, new Set())
+	assert.equal(lines.filter((l) => l.item >= 0).length, ITEMS.length)
+	// In its column already: said where.
+	const welcome = noteOf(lines, 'WTL', 'CF445')
+	assert.equal(welcome.tone, 'ok')
+	assert.equal(welcome.words, 'in HOLD FG · WTL (column 5)')
+	assert.equal(welcome.clipId, s.layers[3].slots[4].id)
+	// To place: where, and what it replaces.
+	const nsl = noteOf(lines, 'NSL', 'CF465')
+	assert.equal(nsl.tone, 'do')
+	assert.match(nsl.words, /^into HOLD FG · NSL \(column 6\), replacing CF446$/)
+	// In its column, but another file: Update all freshens it.
+	const bg = noteOf(lines, 'Walk In', 'CB095')
+	assert.equal(bg.tone, 'do')
+	assert.match(bg.words, /^in HOLD BG · PRE \(column 1\); its 7 clips with another file get the lookbook’s$/)
+	// Confirmed the same: said so, nothing to do.
+	const marks = new Set([sameKey('CB095', s.layers[1].slots[0].file, 'CB095-Sunday-RelationshipSeries-v5')])
+	const sure = noteOf(explainPlan(ITEMS, s, marks), 'Walk In', 'CB095')
+	assert.equal(sure.tone, 'ok')
+	assert.match(sure.words, /confirmed the same by hand$/)
+	// A lower third is not Arena's.
+	assert.deepEqual(noteOf(lines, 'WTL', 'CT108'), { code: 'CT108', tone: 'quiet', words: 'not Arena’s (lower third)', clipId: null })
+	// A one-off already on its layer: no column of its own, and where it is.
+	assert.match(noteOf(lines, 'Preach BG', 'CB105').words, /^no column of its own; already in HOLD BG · COUNTDOWN \(column 3\)/)
+	// With nowhere to go: said, amber.
+	const lost = noteOf(explainPlan(ITEMS, withoutPreach(), new Set()), 'Preach BG', 'CB105')
+	assert.equal(lost.tone, 'warn')
+	assert.match(lost.words, /no column named Preach BG/)
+	// The normal background's gaps are a line of their own.
+	const gaps = explainPlan(ITEMS, withoutPreach(), marks).find((l) => l.item === -1)
+	assert.equal(gaps.title, 'The normal background')
+	assert.match(gaps.notes[0].words, /^into the gaps in HOLD BG: COUNTDOWN, PROMO$/)
 })

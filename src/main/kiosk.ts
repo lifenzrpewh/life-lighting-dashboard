@@ -78,7 +78,7 @@ import { createMediaFetch } from './media-fetch.js'
 import { createMediaSame } from './media-same.js'
 import { sameMarkFrom } from '../shared/media-check.js'
 import { presetFromFile } from '../shared/holding-map.js'
-import { fetchRequestFrom, isFolderPath, type FetchRequest, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
+import { fetchRequestFrom, isFolderPath, runRequestFrom, type FetchRequest, type FetchRun, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
@@ -497,6 +497,16 @@ app.whenReady().then(() => {
 		return arena?.empty(clipId, code) ?? { ok: false, detail: 'no Arena is set up' }
 	})
 	ipcMain.handle('media:fetch-state', (e): FetchStates => (fromOurs(e) ? mediaFetch.states() : {}))
+	// A confirmation's fetches as one run (./media-fetch.ts): its plan and its
+	// result in the log, the latest kept for the Holding view's result line.
+	ipcMain.handle('media:run', (e, raw: unknown): FetchRun | { ok: false; detail: string } => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
+		const run = runRequestFrom(raw)
+		if (run === null) return { ok: false, detail: 'not a run' }
+		return mediaFetch.run(run)
+	})
+	ipcMain.handle('media:last-run', (e): FetchRun | null => (fromOurs(e) ? mediaFetch.lastRun() : null))
 	// Browse for a folder (the Arena row's two folders): Windows' own picker,
 	// over the window that asked. Only the path comes back; Save keeps it.
 	ipcMain.handle('folder:choose', async (e, start: unknown): Promise<string | null> => {

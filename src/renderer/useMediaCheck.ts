@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ArenaStatus } from '../shared/arena.js'
 import { useHoldingMap } from './holdingMapStore.js'
 import { layerOfCode } from '../shared/holding-map.js'
-import { backgroundGaps, codesOn, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { backgroundGaps, codesOn, explainPlan, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type PlanLine, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	nzDate,
@@ -26,7 +26,7 @@ import {
 	type MediaCheck,
 	type SameMark,
 } from '../shared/media-check.js'
-import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js'
+import type { FetchRequest, FetchRun, FetchStates, MediaSource } from '../shared/media-fetch.js'
 
 export type Load<T> = { kind: 'idle' } | { kind: 'reading' } | { kind: 'read'; read: LookbookRead<T> }
 
@@ -70,10 +70,15 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	// tap it refused, by code.
 	const [fetches, setFetches] = useState<FetchStates>({})
 	const [refused, setRefused] = useState<Record<string, string>>({})
+	// The latest run (a confirmation's fetches together), as main keeps it.
+	const [lastRun, setLastRun] = useState<FetchRun | null>(null)
 	useEffect(() => {
 		if (!watchFetches || life === undefined) return
 		let alive = true
-		const poll = () => void life.mediaFetches().then((f) => alive && setFetches(f))
+		const poll = () => {
+			void life.mediaFetches().then((f) => alive && setFetches(f))
+			void life.lastMediaRun().then((r) => alive && setLastRun(r))
+		}
 		poll()
 		const id = setInterval(poll, 500)
 		return () => {
@@ -92,12 +97,6 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		void life?.markSame(mark).then((r) => {
 			if (!r.ok) setRefused((x) => ({ ...x, [mark.code]: r.detail }))
 			readSame()
-		})
-	}
-	const fetchCode = (req: FetchRequest) => {
-		clearRefusal(req.code)
-		void life?.fetchMedia(req).then((r) => {
-			if (!r.ok) setRefused((x) => ({ ...x, [req.code]: r.detail }))
 		})
 	}
 
@@ -208,6 +207,8 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	// HOLD BG's gaps, for the normal background (the owner, 2026-10-06): in
 	// Update all, and drawn where they go. Not counted as something to look at.
 	const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status, map)
+	// The plan in words: every moment's codes and what Update all does with each, or why not.
+	const planLines: PlanLine[] = runSheet === null ? [] : explainPlan(runSheet, status, same, sizes, map)
 	// To look at, by code, as the Holding view marks them: a code with any clip
 	// whose file may differ, differs or is missing (one of CB095's eighteen is
 	// enough), one not where its item belongs, or one with no place (a code the
@@ -272,7 +273,19 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		return out
 	}
 	const confirm = (answers: { lookbook: boolean; live: boolean; clear: boolean }) => {
-		for (const req of toSend(answers)) fetchCode(req)
+		const requests = toSend(answers)
+		if (requests.length > 0 && asking !== null && life !== undefined) {
+			const sent = new Set(requests.map((r) => r.code))
+			// The log gets what was sent, each with where it goes, and the codes that needed nothing.
+			const lines = asking.steps.filter((s) => sent.has(s.request.code)).map((s) => s.what)
+			const settled = planLines.flatMap((l) => l.notes.filter((n) => n.tone === 'ok').map((n) => n.code))
+			const already = asking.title.startsWith('Update all') ? new Set(settled).size : 0
+			for (const r of requests) clearRefusal(r.code)
+			void life.runMedia({ label: asking.title, requests, plan: lines, already }).then((r) => {
+				if ('ok' in r) for (const req of requests) setRefused((x) => ({ ...x, [req.code]: r.detail }))
+				else setLastRun(r)
+			})
+		}
 		if (answers.clear) {
 			for (const c of asking?.clears ?? []) {
 				clearRefusal(c.code)
@@ -313,12 +326,15 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		placements,
 		unplaced,
 		fills,
+		/** The plan in words (`explainPlan`). */
+		planLines,
 		plannedUpdate,
 		same,
 		sizes,
 		// Actions, and how they are going.
 		fetches,
 		refused,
+		lastRun,
 		markSame,
 		asking,
 		ask,
