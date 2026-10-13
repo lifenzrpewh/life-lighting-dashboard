@@ -31,6 +31,10 @@
 // (a grip in the gap between them, the one place a page cannot cover) to give
 // one more room and the other less, as the old divider did. Pages stand in as
 // pictures while it is dragged.
+//
+// BARE (Show mode, ../showMode.ts): no strips and no edge grips. Each window
+// is its shown tab's body alone, so a page takes the strip's room, and nothing
+// on the windows can be changed.
 
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Check, Move, PanelTop, Pencil, Plus, Trash2, X } from 'lucide-react'
@@ -87,6 +91,8 @@ function scaleOf(el: HTMLElement): { x: number; y: number } {
 export type GridProps = {
 	layout: Layout
 	editing: boolean
+	/** Show mode: no strips, no edge grips, nothing to change. */
+	bare?: boolean
 	/** Whether a tab is on screen at all (its connection is on). */
 	visible: (tab: Tab) => boolean
 	/** A view's name, for + . */
@@ -284,104 +290,106 @@ export function Grid(p: GridProps) {
 						style={place(box)}
 						className={`absolute z-10 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-win bg-booth-panel ${ring}`}
 					>
-						<div className="flex h-14 shrink-0 items-center gap-1 bg-booth-strip px-2">
-							<div role="tablist" className="relative flex h-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
-								<TabFill on={tab?.id ?? null} tabs={`${p.editing}|${naming?.tab ?? ''}|${tabs.map((t) => `${t.id}:${titleOf(t)}`).join('|')}`} />
-								{tabs.map((t) => {
-									const on = t.id === tab?.id
-									const TabIcon = viewIcon(tabView(t))
-									return (
-										<span
-											key={t.id}
-											data-win={win.id}
-											data-tab={t.id}
-											data-tab-button={on ? 'on' : undefined}
-											className={`relative flex h-10 shrink-0 items-center rounded-ctl ${tabDrag?.tab === t.id ? 'opacity-40' : ''}`}
-										>
-											{tabDrag?.to?.win === win.id && tabDrag.to.before === t.id && (
-												<span aria-hidden className="absolute inset-y-2 -left-1 w-1 rounded-full bg-accent-hi" />
-											)}
-											{naming?.tab === t.id ? (
-												<form
-													className="flex h-full shrink-0 items-center gap-1.5 pr-1 pl-3"
-													onSubmit={(e) => {
-														e.preventDefault()
-														endNaming(true)
-													}}
-												>
-													<TabIcon size={17} strokeWidth={2} className={on ? 'text-accent-ink' : 'text-booth-dim'} aria-hidden />
-													<input
-														autoFocus
-														value={naming.text}
-														maxLength={TAB_LABEL_MAX}
-														placeholder={p.nameOf(t)}
-														aria-label={`Name the ${titleOf(t)} tab; empty for ${p.nameOf(t)}`}
-														onChange={(e) => setNaming({ ...naming, text: e.target.value })}
-														onKeyDown={(e) => e.key === 'Escape' && endNaming(false)}
-														onBlur={() => endNaming(true)}
-														className="h-8 w-40 rounded-ctl bg-booth-bg px-2.5 text-sm font-medium text-booth-ink ring-1 ring-accent-hi outline-none placeholder:text-booth-faint"
-													/>
-													<IconButton icon={Check} size="sm" label="Keep this name" onClick={() => endNaming(true)} />
-												</form>
-											) : (
-												<button
-													type="button"
-													role="tab"
-													aria-selected={on}
-													onClick={() => !dragged() && tapTab(win, t)}
-													{...tabHandle(win, t)}
-													title={p.editing ? 'Drag to move this tab; double-tap to name it' : 'Double-tap to name this tab'}
-													className={`relative flex h-10 shrink-0 items-center gap-2 rounded-ctl text-sm font-bold transition-[color,background-color,transform] duration-150 active:scale-95 ${p.editing ? 'cursor-grab touch-none pr-1.5 pl-4' : 'px-4'} ${
-														on ? 'text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
-													}`}
-												>
-													<TabIcon size={17} strokeWidth={2} aria-hidden />
-													{titleOf(t)}
-												</button>
-											)}
-											{p.editing && naming?.tab !== t.id && (
-												<button
-													type="button"
-													onClick={() => p.onRemoveTab(win.id, t.id)}
-													aria-label={`Remove the ${titleOf(t)} tab`}
-													title={`Remove the ${titleOf(t)} tab`}
-													className={`relative mr-1 grid size-8 shrink-0 place-items-center rounded-ctl ${
-														on ? 'text-accent-ink/75 hover:bg-black/15 hover:text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
-													}`}
-												>
-													<X size={15} aria-hidden />
-												</button>
-											)}
-										</span>
-									)
-								})}
-								{tabDrag?.to?.win === win.id && tabDrag.to.before === null && (
-									<span aria-hidden className="my-2 h-8 w-1 shrink-0 rounded-full bg-accent-hi" />
-								)}
-								{tabs.length === 0 && !p.editing && <span className="flex items-center px-3.5 text-sm text-booth-dim">Empty</span>}
-							</div>
-							{p.editing && (
-								<span className="flex items-center">
-									<IconButton
-										icon={Plus}
-										size="sm"
-										label="Add a tab"
-										pressed={adding === win.id}
-										onClick={() => setAdding(adding === win.id ? null : win.id)}
-									/>
-								</span>
-							)}
-							<span className="ml-auto" />
-							<span className="flex items-center gap-1">
-								{!p.editing && tab !== null && p.actions(win, tab)}
-								{!p.editing && <IconButton icon={Pencil} size="sm" label="Edit the layout: move, resize and add windows and tabs" onClick={p.onEdit} />}
+						{!p.bare && (
+							<div className="flex h-14 shrink-0 items-center gap-1 bg-booth-strip px-2">
+								<div role="tablist" className="relative flex h-full min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+									<TabFill on={tab?.id ?? null} tabs={`${p.editing}|${naming?.tab ?? ''}|${tabs.map((t) => `${t.id}:${titleOf(t)}`).join('|')}`} />
+									{tabs.map((t) => {
+										const on = t.id === tab?.id
+										const TabIcon = viewIcon(tabView(t))
+										return (
+											<span
+												key={t.id}
+												data-win={win.id}
+												data-tab={t.id}
+												data-tab-button={on ? 'on' : undefined}
+												className={`relative flex h-10 shrink-0 items-center rounded-ctl ${tabDrag?.tab === t.id ? 'opacity-40' : ''}`}
+											>
+												{tabDrag?.to?.win === win.id && tabDrag.to.before === t.id && (
+													<span aria-hidden className="absolute inset-y-2 -left-1 w-1 rounded-full bg-accent-hi" />
+												)}
+												{naming?.tab === t.id ? (
+													<form
+														className="flex h-full shrink-0 items-center gap-1.5 pr-1 pl-3"
+														onSubmit={(e) => {
+															e.preventDefault()
+															endNaming(true)
+														}}
+													>
+														<TabIcon size={17} strokeWidth={2} className={on ? 'text-accent-ink' : 'text-booth-dim'} aria-hidden />
+														<input
+															autoFocus
+															value={naming.text}
+															maxLength={TAB_LABEL_MAX}
+															placeholder={p.nameOf(t)}
+															aria-label={`Name the ${titleOf(t)} tab; empty for ${p.nameOf(t)}`}
+															onChange={(e) => setNaming({ ...naming, text: e.target.value })}
+															onKeyDown={(e) => e.key === 'Escape' && endNaming(false)}
+															onBlur={() => endNaming(true)}
+															className="h-8 w-40 rounded-ctl bg-booth-bg px-2.5 text-sm font-medium text-booth-ink ring-1 ring-accent-hi outline-none placeholder:text-booth-faint"
+														/>
+														<IconButton icon={Check} size="sm" label="Keep this name" onClick={() => endNaming(true)} />
+													</form>
+												) : (
+													<button
+														type="button"
+														role="tab"
+														aria-selected={on}
+														onClick={() => !dragged() && tapTab(win, t)}
+														{...tabHandle(win, t)}
+														title={p.editing ? 'Drag to move this tab; double-tap to name it' : 'Double-tap to name this tab'}
+														className={`relative flex h-10 shrink-0 items-center gap-2 rounded-ctl text-sm font-bold transition-[color,background-color,transform] duration-150 active:scale-95 ${p.editing ? 'cursor-grab touch-none pr-1.5 pl-4' : 'px-4'} ${
+															on ? 'text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
+														}`}
+													>
+														<TabIcon size={17} strokeWidth={2} aria-hidden />
+														{titleOf(t)}
+													</button>
+												)}
+												{p.editing && naming?.tab !== t.id && (
+													<button
+														type="button"
+														onClick={() => p.onRemoveTab(win.id, t.id)}
+														aria-label={`Remove the ${titleOf(t)} tab`}
+														title={`Remove the ${titleOf(t)} tab`}
+														className={`relative mr-1 grid size-8 shrink-0 place-items-center rounded-ctl ${
+															on ? 'text-accent-ink/75 hover:bg-black/15 hover:text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'
+														}`}
+													>
+														<X size={15} aria-hidden />
+													</button>
+												)}
+											</span>
+										)
+									})}
+									{tabDrag?.to?.win === win.id && tabDrag.to.before === null && (
+										<span aria-hidden className="my-2 h-8 w-1 shrink-0 rounded-full bg-accent-hi" />
+									)}
+									{tabs.length === 0 && !p.editing && <span className="flex items-center px-3.5 text-sm text-booth-dim">Empty</span>}
+								</div>
 								{p.editing && (
-									<Button size="sm" variant="ghost" icon={Trash2} onClick={() => p.onRemoveWindow(win.id)}>
-										Remove window
-									</Button>
+									<span className="flex items-center">
+										<IconButton
+											icon={Plus}
+											size="sm"
+											label="Add a tab"
+											pressed={adding === win.id}
+											onClick={() => setAdding(adding === win.id ? null : win.id)}
+										/>
+									</span>
 								)}
-							</span>
-						</div>
+								<span className="ml-auto" />
+								<span className="flex items-center gap-1">
+									{!p.editing && tab !== null && p.actions(win, tab)}
+									{!p.editing && <IconButton icon={Pencil} size="sm" label="Edit the layout: move, resize and add windows and tabs" onClick={p.onEdit} />}
+									{p.editing && (
+										<Button size="sm" variant="ghost" icon={Trash2} onClick={() => p.onRemoveWindow(win.id)}>
+											Remove window
+										</Button>
+									)}
+								</span>
+							</div>
+						)}
 						<div ref={tab === null ? undefined : p.boxRef(win, tab)} className="relative flex min-h-0 min-w-0 flex-1 bg-booth-panel">
 							{tab === null ? (
 								<div className="flex flex-1 items-center justify-center">
@@ -392,7 +400,9 @@ export function Grid(p: GridProps) {
 											win.tabs.length === 0
 												? p.editing
 													? 'Tap + in its strip to put a view here, or remove the window.'
-													: 'The pencil in its strip edits the layout; then + puts a view here.'
+													: p.bare
+												? 'Show mode is on. Leave it to change the layout.'
+												: 'The pencil in its strip edits the layout; then + puts a view here.'
 												: 'Turn them on again in Settings.'
 										}
 									/>
@@ -441,6 +451,7 @@ export function Grid(p: GridProps) {
 				</span>
 			)}
 			{!p.editing &&
+				!p.bare &&
 				seams(p.layout).map((seam) => {
 					const upright = seam.axis === 'x'
 					const [total, cross] = upright ? [WIDTH, HEIGHT] : [HEIGHT, WIDTH]

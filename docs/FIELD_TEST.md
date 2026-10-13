@@ -88,6 +88,15 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**Show mode** (the next build after 1.2.0)
+- [ ] The tray's Show mode button (four corners): the tab strips and the grips between windows go, and each page fills its window's full height
+- [ ] Layouts, Settings and the lock are gone; the lock's place says **Show mode** (or **Show mode · Admin**)
+- [ ] Tapping an alert opens nothing; its × still puts it away; Connections opens and reads, but its rows open nothing
+- [ ] In Admin, leave it alone past the Admin timeout: it stays Admin
+- [ ] Tap **Show mode**: "Leave Show mode" asks the Admin passcode (or leaves at once with none set); a wrong one is refused and it stays; the right one brings the strips back, in Admin
+- [ ] Quit and reopen Pāua in Show mode: it comes back in Show mode, as volunteer
+- [ ] Settings › Top bar › Show mode hides the way in; the way out still shows while it is on
+
 **1.2.0** (2026-10-11): comes as an update on 1.1.0 (the bar's "Pāua 1.2.0 is out", then Settings › This computer › Update). Then the section below.
 
 **Alerts, the timer, Add a column** (1.2.0)

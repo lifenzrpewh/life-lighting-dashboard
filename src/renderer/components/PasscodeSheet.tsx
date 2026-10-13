@@ -155,7 +155,19 @@ export function PasscodeEntry({
 	)
 }
 
-export function PasscodeSheet({ now, onUnlocked, onClose }: { now: number; onUnlocked: () => void; onClose: () => void }) {
+/** `leaving`: the way out of Show mode (../showMode.ts), which is Admin's way
+ *  in, said as what it is for. */
+export function PasscodeSheet({
+	now,
+	onUnlocked,
+	onClose,
+	leaving = false,
+}: {
+	now: number
+	onUnlocked: () => void
+	onClose: () => void
+	leaving?: boolean
+}) {
 	// Main's word on how to ask: digits or not, and any wait still running.
 	const [numeric, setNumeric] = useState<boolean | null>(null)
 	const [said, setSaid] = useState<{ words: string; tone: 'wrong' | 'wait' } | null>(null)
@@ -179,7 +191,15 @@ export function PasscodeSheet({ now, onUnlocked, onClose }: { now: number; onUnl
 	}
 
 	return (
-		<Sheet title="Admin" description="For changing settings, layouts and the show. Enter the passcode." onClose={onClose}>
+		<Sheet
+			title={leaving ? 'Leave Show mode' : 'Admin'}
+			description={
+				leaving
+					? 'Show mode holds the layout and the mode. Enter the Admin passcode to leave it; the screen is then in Admin.'
+					: 'For changing settings, layouts and the show. Enter the passcode.'
+			}
+			onClose={onClose}
+		>
 			<div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-6">
 				<div className="flex w-full max-w-sm flex-col items-center gap-6">
 					<p
