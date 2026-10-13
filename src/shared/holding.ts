@@ -45,6 +45,12 @@
 // screen; what still does not fit is said ("didn't fit") and waits in the No
 // column tray to be placed by hand. Capacity is whatever Arena reports, never a
 // count assumed. Normal services are unchanged: a named column still wins.
+// A ONE-OFF TAKES ONE COLUMN ACROSS ITS LAYERS (the owner, 2026-10-13: the
+// column is fired, so its FG and BG come up together): its foreground finds the
+// column, and its background goes into the same column on HOLD BG wherever else
+// its code sits, or the normal background when it has none of its own. HOLD BG
+// clips there that this service does not use are replaced ("replace old ones");
+// never one on screen, never an item's own column (`placeOneOff`).
 // Overflow and the normal background's gaps never meet: the gaps stop at the
 // last PROMO, overflow starts after the last named column (and `backgroundGaps`
 // leaves any clip a placement takes, to be sure). An overflow clip, once
@@ -294,11 +300,25 @@ function lastNamed(layer: ArenaLayer, status: ArenaStatus): number {
  *  after its last named column, left to right, each with its column counted
  *  from 1. Never a loaded clip or one on screen, never a reserved column, and
  *  none while the layer's columns are not named. */
-export function overflowSlots(layer: ArenaLayer, status: ArenaStatus, map: HoldingMap = DEFAULT_MAP): { slot: ArenaSlot; column: number }[] {
+export function overflowSlots(
+	layer: ArenaLayer,
+	status: ArenaStatus,
+	map: HoldingMap = DEFAULT_MAP,
+	/** Given, a loaded clip whose code is not in it (not this service's) is
+	 *  spare too, never one on screen or with no code: HOLD BG's (the owner,
+	 *  2026-10-13: "replace old ones"). */
+	today?: ReadonlySet<string>,
+): { slot: ArenaSlot; column: number }[] {
 	const last = lastNamed(layer, status)
 	if (last < 0) return []
+	const spare = (slot: ArenaSlot) => {
+		if (slot.state === 'empty') return true
+		if (today === undefined || slot.state === 'playing') return false
+		const code = slotCode(slot)
+		return code !== null && !today.has(code)
+	}
 	return layer.slots.flatMap((slot, i) =>
-		i > last && slot.state === 'empty' && !reserved(layer, i + 1, status, map) && slotCell(layer, i + 1, status, map).kind === 'auto' ? [{ slot, column: i + 1 }] : [],
+		i > last && spare(slot) && !reserved(layer, i + 1, status, map) && slotCell(layer, i + 1, status, map).kind === 'auto' ? [{ slot, column: i + 1 }] : [],
 	)
 }
 
@@ -501,18 +521,131 @@ export function planPlacements(
 	}
 	// Overflow: each layer's spare clips, handed out in run-sheet order, and
 	// which clip each code already took (a code two one-offs share takes one).
+	// `claimed`: every clip an overflow placement took, by its code, so no two
+	// one-offs land in one clip.
+	const claimed = new Map<number, string>()
 	const spare = new Map<string, { slot: ArenaSlot; column: number }[]>()
 	const spareOf = (type: string, layer: ArenaLayer) => {
 		let q = spare.get(type)
-		if (q === undefined) spare.set(type, (q = overflowSlots(layer, status, map)))
+		if (q === undefined) spare.set(type, (q = overflowSlots(layer, status, map, type === 'B' ? today : undefined)))
 		return q
 	}
 	const overflowed = new Map<string, Placement>()
+	const normal = normalBackground(items, map)
+	// Columns an item has by name: a one-off's background never replaces theirs.
+	const namedColumns = new Set([...columnOf.values()].flatMap((w) => ('none' in w ? [] : [w.column])))
+	const fgLayer = layerOf('F')
+	const bgLayer = layerOf('B')
+	const overflowPlacement = (base: { item: number; title: string; label: string | null }, c: { code: string; want: string; path: string | null }, layer: ArenaLayer, column: number): Placement => {
+		const slot = layer.slots[column] as ArenaSlot
+		claimed.set(slot.id, c.code)
+		return {
+			...base,
+			code: c.code,
+			want: c.want,
+			lookbookPath: c.path ?? '',
+			layer: layer.name,
+			column: column + 1,
+			columnName: columnNamesOf(layer, status)[column] ?? '',
+			clipId: slot.id,
+			replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
+			why: 'overflow',
+			live: false,
+		}
+	}
+	/** Whether HOLD BG's clip in `column` (from 0) can take a one-off's
+	 *  background `code`: it holds it already, or another one-off just put it
+	 *  there; it is free (empty, or a code this service does not use, the owner,
+	 *  2026-10-13: "replace old ones"; or the normal background, outside any
+	 *  item's own column); or not (null). Never a clip on screen, a reserved
+	 *  column or one the map gives to something else. */
+	const bgTakes = (column: number, code: string): 'there' | 'shared' | 'free' | null => {
+		const slot = bgLayer?.slots[column]
+		if (bgLayer === undefined || slot === undefined) return null
+		if (claimed.has(slot.id)) return claimed.get(slot.id) === code ? 'shared' : null
+		if (slotCode(slot) === code) return 'there'
+		if (slot.state === 'playing' || reserved(bgLayer, column + 1, status, map) || slotCell(bgLayer, column + 1, status, map).kind !== 'auto') return null
+		if (slot.state === 'empty') return 'free'
+		const held = slotCode(slot)
+		if (held === null) return null
+		if (!today.has(held)) return 'free'
+		return normal !== null && held === normal.code && !namedColumns.has(column) ? 'free' : null
+	}
+	/** A ONE-OFF IS ONE COLUMN, ACROSS ITS LAYERS (the owner, 2026-10-13: the
+	 *  column is fired, so FG and BG come up together; a one-off's background
+	 *  that went elsewhere, or nowhere because its code sat in other columns,
+	 *  did not follow). The foreground finds the column: where it already is on
+	 *  HOLD FG (placed by hand or an earlier run), where another one-off sharing
+	 *  it went, else the first empty clip past the last named column whose HOLD
+	 *  BG clip can take the background too (else the first that takes the
+	 *  foreground alone, the background then said). The background goes in the
+	 *  same column, wherever else its code is; with none of its own, the normal
+	 *  background (the owner, 2026-10-13). Returns the codes it dealt with. */
+	const placeOneOff = (
+		i: number,
+		base: { item: number; title: string; label: string | null },
+		where: { none: Unplaced['kind']; detail: string },
+		codes: ReturnType<typeof arenaCodes>,
+		fg: { code: string; want: string; path: string | null },
+	): Set<string> => {
+		const own = codes.find((c) => c.type === 'B' && c.want !== null)
+		const bg = own !== undefined ? { code: own.code, want: own.want as string, path: own.path, normal: false } : normal === null ? undefined : { ...normal, normal: true }
+		const done = new Set([fg.code, ...(own === undefined ? [] : [own.code])])
+		if (fgLayer === undefined) return new Set()
+		let column: number
+		const on = fgLayer.slots.findIndex((s) => slotCode(s) === fg.code)
+		const prior = overflowed.get(`F:${fg.code}`)
+		if (on >= 0) {
+			column = on
+			settle(i, fg.code, fgLayer, 'F', on, 'on-layer')
+		} else if (prior !== undefined) {
+			column = prior.column - 1
+			placements.push({ ...prior, ...base })
+		} else {
+			const last = Math.max(lastNamed(fgLayer, status), bgLayer === undefined ? -1 : lastNamed(bgLayer, status))
+			const fits = lastNamed(fgLayer, status) < 0 ? [] : fgLayer.slots.flatMap((slot, c) =>
+				c > last && slot.state === 'empty' && !claimed.has(slot.id) && !reserved(fgLayer, c + 1, status, map) && slotCell(fgLayer, c + 1, status, map).kind === 'auto' ? [c] : [],
+			)
+			const pick = fits.find((c) => bg === undefined || bgTakes(c, bg.code) !== null) ?? fits[0]
+			if (pick === undefined) {
+				const lastName = columnNamesOf(fgLayer, status)[last] ?? ''
+				const detail = `${where.detail}, and no empty clip left on ${fgLayer.name} after ${lastName} (column ${last + 1})`
+				unplaced.push({ ...base, code: fg.code, want: fg.want, kind: where.none, detail, didntFit: true })
+				if (own !== undefined) unplaced.push({ ...base, code: own.code, want: own.want, kind: where.none, detail: `goes with ${fg.code}, which didn't fit`, didntFit: true })
+				return done
+			}
+			column = pick
+			const p = overflowPlacement(base, fg, fgLayer, column)
+			overflowed.set(`F:${fg.code}`, p)
+			placements.push(p)
+		}
+		if (bg === undefined || bgLayer === undefined) return done
+		const takes = bgTakes(column, bg.code)
+		if (takes === 'there') {
+			if (!bg.normal) settle(i, bg.code, bgLayer, 'B', column, 'in-column')
+		} else if (takes === 'shared') {
+			const first = placements.find((p) => p.clipId === bgLayer.slots[column]?.id)
+			if (first !== undefined) placements.push({ ...first, ...base })
+		} else if (takes === 'free') {
+			placements.push(overflowPlacement(base, bg, bgLayer, column))
+		} else if (!bg.normal) {
+			const slot = bgLayer.slots[column]
+			const held = slot === undefined ? null : slotCode(slot)
+			const why = slot === undefined ? 'there is no clip there' : slot.state === 'playing' ? 'that clip is on screen' : held === null ? `it holds ${slot.name}, which is not the lookbook's` : `it holds ${held}, which this service uses`
+			unplaced.push({ ...base, code: bg.code, want: bg.want, kind: where.none, detail: `${fg.code} is in column ${column + 1}, but ${bgLayer.name} there can't take its background: ${why}` })
+		}
+		return done
+	}
 	for (const [i, item] of items.entries()) {
 		const where = columnOf.get(i)
 		if (where === undefined) continue
 		const base = { item: i, title: item.title, label: item.label }
-		for (const c of arenaCodes(item, map)) {
+		const codes = arenaCodes(item, map)
+		const oneOffItem = 'none' in where && (where.none === 'no-column' || where.none === 'no-promo')
+		const fg = oneOffItem ? codes.find((c) => c.type === 'F' && c.want !== null) : undefined
+		const dealt = fg !== undefined && 'none' in where ? placeOneOff(i, base, where, codes, { code: fg.code, want: fg.want as string, path: fg.path }) : new Set<string>()
+		for (const c of codes) {
+			if (dealt.has(c.code)) continue
 			if ('none' in where) {
 				// A one-off already on its layer was placed by hand: done.
 				const oneOff = where.none === 'no-column' || where.none === 'no-promo'
@@ -529,21 +662,11 @@ export function planPlacements(
 						placements.push({ ...taken, ...base })
 						continue
 					}
-					const next = spareOf(c.type, layer).shift()
+					const queue = spareOf(c.type, layer)
+					let next = queue.shift()
+					while (next !== undefined && claimed.has(next.slot.id)) next = queue.shift()
 					if (next !== undefined) {
-						const p: Placement = {
-							...base,
-							code: c.code,
-							want: c.want,
-							lookbookPath: c.path ?? '',
-							layer: layer.name,
-							column: next.column,
-							columnName: columnNamesOf(layer, status)[next.column - 1] ?? '',
-							clipId: next.slot.id,
-							replaces: null,
-							why: 'overflow',
-							live: false,
-						}
+						const p = overflowPlacement(base, { code: c.code, want: c.want, path: c.path }, layer, next.column - 1)
 						overflowed.set(key, p)
 						placements.push(p)
 						continue
@@ -555,7 +678,7 @@ export function planPlacements(
 						code: c.code,
 						want: c.want,
 						kind: where.none,
-						detail: `${where.detail}, and no empty clip left on ${layer.name} after ${lastName} (column ${last + 1})`,
+						detail: `${where.detail}, and no ${c.type === 'B' ? 'free' : 'empty'} clip left on ${layer.name} after ${lastName} (column ${last + 1})`,
 						didntFit: true,
 					})
 					continue
@@ -729,7 +852,7 @@ export function clipsToUpdate(
 /** Where a placement goes, said: `HOLD FG · POST (column 2), replacing CF445`. */
 export function placementWords(p: Placement): string {
 	const column = unnamed(p.columnName) ? `column ${p.column}` : `${p.columnName} (column ${p.column})`
-	const extra = p.why === 'overflow' ? ', an empty clip past the named columns' : p.why === 'fixed' ? ', its fixed code' : ''
+	const extra = p.why === 'overflow' ? (p.replaces === null ? ', an empty clip past the named columns' : ', past the named columns') : p.why === 'fixed' ? ', its fixed code' : ''
 	return `${p.layer} · ${column}${extra}${p.replaces === null ? '' : `, replacing ${p.replaces.code ?? p.replaces.name}`}`
 }
 
@@ -983,6 +1106,14 @@ export function explainPlan(
 			const sure = confirmed.has(code) ? '; confirmed the same by hand' : ''
 			return { code, tone: 'ok', words: `${settledWords}${sure}`, clipId: s?.clipId ?? null }
 		})
+		// What goes with a moment that is not one of its codes: the normal
+		// background into a one-off's column.
+		const own = new Set(notes.map((n) => n.code))
+		for (const p of placements) {
+			if (p.item !== i || own.has(p.code)) continue
+			own.add(p.code)
+			notes.push({ code: p.code, tone: 'do', words: `the normal background, into ${placementWords(p)}`, clipId: p.clipId })
+		}
 		return { item: i, title: item.title, label: item.label, notes }
 	})
 	const fill = backgroundGaps(items, status, map)

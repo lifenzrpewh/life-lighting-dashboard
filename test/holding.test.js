@@ -216,8 +216,10 @@ test('what has no place is said, never guessed', () => {
 	// past WTG (the owner, 2026-10-08), and, with none empty, are said.
 	const noPromo = composition(NAMES.map((n) => (n === 'PROMO' ? 'Column #' : n)))
 	assert.deepEqual(
-		planPlacements(ITEMS, noPromo).placements.filter((x) => x.why === 'overflow').map((x) => [x.code, x.column]),
-		[['CF594', 11], ['CF562', 12]],
+		planPlacements(ITEMS, noPromo).placements.filter((x) => x.why === 'overflow').map((x) => [x.layer, x.code, x.column]),
+		// Each one's background follows into its column (the owner, 2026-10-13);
+		// column 11's HOLD BG holds CB095 already.
+		[['HOLD FG', 'CF594', 11], ['HOLD FG', 'CF562', 12], ['HOLD BG', 'CB095', 12]],
 	)
 	noPromo.layers[3].slots[10] = clip('CF001-Other.png')
 	noPromo.layers[3].slots[11] = clip('CF002-Other.png')
@@ -416,12 +418,17 @@ test('overflow: a normal service that fits its named columns overflows nothing',
 
 test('overflow: the extras go in run-sheet order into the empty clips past the last named column', () => {
 	const r = planPlacements(EVENT, wide(5))
+	// One column per one-off, across its layers (the owner, 2026-10-13): its own
+	// background, or the normal background when it has none.
 	assert.deepEqual(overflow(r), [
 		['HOLD FG', 'CF701', 13],
+		['HOLD BG', 'CB095', 13],
 		['HOLD FG', 'CF702', 14],
-		['HOLD BG', 'CB702', 13],
+		['HOLD BG', 'CB702', 14],
 		['HOLD FG', 'CF703', 15],
+		['HOLD BG', 'CB095', 15],
 		['HOLD FG', 'CF704', 16],
+		['HOLD BG', 'CB095', 16],
 	])
 	assert.ok(r.placements.filter((p) => p.why === 'overflow').every((p) => p.replaces === null && p.live === false))
 	assert.equal(r.unplaced.length, 0)
@@ -450,8 +457,9 @@ test("overflow: what still doesn't fit is said and waits in the tray, never drop
 	const r = planPlacements(EVENT, wide(2))
 	assert.deepEqual(overflow(r), [
 		['HOLD FG', 'CF701', 13],
+		['HOLD BG', 'CB095', 13],
 		['HOLD FG', 'CF702', 14],
-		['HOLD BG', 'CB702', 13],
+		['HOLD BG', 'CB702', 14],
 	])
 	const left = r.unplaced.filter((u) => u.didntFit)
 	assert.deepEqual(left.map((u) => u.code), ['CF703', 'CF704'])
@@ -484,7 +492,7 @@ test('overflow backgrounds and the normal background never meet', () => {
 	const gaps = backgroundGaps(EVENT, s)
 	assert.deepEqual(gaps.map((g) => g.column), [12])
 	const cb702 = r.placements.find((p) => p.code === 'CB702')
-	assert.equal(cb702.column, 13)
+	assert.equal(cb702.column, 14)
 	assert.ok(!gaps.some((g) => g.clipId === cb702.clipId))
 	// Update all: the normal background's step does not reach past the last PROMO.
 	const { steps } = updatePlan(EVENT, s, new Set())
@@ -545,4 +553,59 @@ test('the plan says, for every code, what Update all does with it or why it does
 	const gaps = explainPlan(ITEMS, withoutPreach(), marks).find((l) => l.item === -1)
 	assert.equal(gaps.title, 'The normal background')
 	assert.match(gaps.notes[0].words, /^into the gaps in HOLD BG: COUNTDOWN, PROMO$/)
+})
+
+// A one-off is one column across its layers (the owner, 2026-10-13: "their
+// backgrounds didn't follow").
+test('a one-off: its background goes into its foreground\'s column, wherever else its code is', () => {
+	// CB095 sits in many HOLD BG columns; it still goes into CF702's.
+	const oneOffs = [...ITEMS, oneOff('Worship Night', 'CF702'), item('Story', 'Story', ['CB095', 'CF705'], { CB095: F.CB095, CF705: L('CF705-Story') })]
+	const r = planPlacements(oneOffs, wide(3))
+	const at13 = r.placements.filter((p) => p.column === 13).map((p) => [p.layer, p.code])
+	const at14 = r.placements.filter((p) => p.column === 14).map((p) => [p.layer, p.code])
+	assert.deepEqual(at13, [['HOLD FG', 'CF702'], ['HOLD BG', 'CB095']])
+	assert.deepEqual(at14, [['HOLD FG', 'CF705'], ['HOLD BG', 'CB095']])
+	// The plan says the normal background went with the one that has none.
+	const lines = explainPlan(oneOffs, wide(3), new Set())
+	assert.match(noteOf(lines, 'Worship Night', 'CB095').words, /^the normal background, into HOLD BG · column 13/)
+})
+
+test('a one-off: a HOLD BG clip this service does not use is replaced; one it uses, or on screen, is not', () => {
+	const s = wide(3)
+	const bg = s.layers[1]
+	bg.slots[12] = clip('CB050-LastEvent.png') // last event's: replaced
+	bg.slots[13] = clip('CB105-Sunday-ReloSeries-Preach.png') // this service's (Preach BG)
+	const events = [...ITEMS, oneOff('Speaker Intro', 'CF701', 'CB701'), oneOff('Worship Night', 'CF702', 'CB702')]
+	const r = planPlacements(events, s)
+	const cb701 = r.placements.find((p) => p.code === 'CB701')
+	assert.equal(cb701.column, 13)
+	assert.equal(cb701.replaces.code, 'CB050')
+	assert.match(placementWords(cb701), /column 13, past the named columns, replacing CB050$/)
+	// Column 14's background is this service's: CF702 goes on to 15, where both fit.
+	assert.deepEqual(r.placements.filter((p) => p.item === events.length - 1).map((p) => [p.layer, p.column]), [['HOLD FG', 15], ['HOLD BG', 15]])
+	// On screen: never.
+	bg.slots[12] = { ...clip('CB050-LastEvent.png'), state: 'playing' }
+	assert.notEqual(planPlacements(events, s).placements.find((p) => p.code === 'CB701').column, 13)
+})
+
+test('a one-off placed by hand: its background follows to where its foreground is', () => {
+	const s = wide(3)
+	s.layers[3].slots[13] = clip('CF702-Conf-WorshipNight.png') // CF702 put in column 14 by hand
+	const r = planPlacements([...ITEMS, oneOff('Worship Night', 'CF702', 'CB702')], s)
+	const cb702 = r.placements.find((p) => p.code === 'CB702')
+	assert.equal(cb702.column, 14)
+	assert.ok(r.settled.some((x) => x.code === 'CF702' && x.why === 'on-layer' && x.column === 14))
+	// With its background there already: nothing to do.
+	s.layers[1].slots[13] = clip('CB702-Conf-WorshipNight.png')
+	assert.equal(planPlacements([...ITEMS, oneOff('Worship Night', 'CF702', 'CB702')], s).placements.some((p) => p.code === 'CB702'), false)
+})
+
+test('a one-off whose column\'s background cannot be taken says why, and its foreground still goes', () => {
+	const s = composition([...NAMES, 'Column #'])
+	for (const l of s.layers) if (l.slots.length === NAMES.length) l.slots.push(empty())
+	s.layers[1].slots[12] = { ...clip('CB050-LastEvent.png'), state: 'playing' }
+	const r = planPlacements([...ITEMS, oneOff('Worship Night', 'CF702', 'CB702')], s)
+	assert.equal(r.placements.find((p) => p.code === 'CF702').column, 13)
+	const lost = r.unplaced.find((u) => u.code === 'CB702')
+	assert.match(lost.detail, /CF702 is in column 13, but HOLD BG there can't take its background: that clip is on screen/)
 })
