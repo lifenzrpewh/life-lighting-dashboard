@@ -626,6 +626,21 @@ Later, not tonight:
 
 ### TODO, in order
 
+0. **Updates from this repo, not `paua-releases`** (the owner, 2026-10-13, noted, not started:
+   "why not point the updater at the main repo"). `lifenzrpewh/life-lighting-dashboard` is
+   **public** now, so the second repo's reason (a private repo) is gone. The change: `publish` in
+   `package.json` and `RELEASES_PAGE` in `src/shared/updates.ts` to this repo, the headers of both
+   updates files, and the `paua-releases` step in `.github/workflows/release.yml`. **The bridge**:
+   booths on 1.1.0/1.2.0 have `paua-releases` baked in, so the first build pointing here must be
+   published on `paua-releases` once more; after that, here only (then drop the step and the
+   `RELEASES_TOKEN` secret). Do the repo rename to `paua` **before** that build, or the feed bakes
+   in the old name. Meanwhile 1.2.0 is a draft on both: publishing it on `paua-releases` is what
+   offers it to booths today.
+0. **Start at login** (the owner, 2026-10-13: "would be good"; not started). Plan: Electron's
+   `app.setLoginItemSettings({ openAtLogin })` from main, packaged builds only (it registers
+   Paua.exe, which starts the watchdog, `src/main/entry.ts`); IPC get/set, the set Admin's; a card
+   in Settings › This computer (`settings/computer.tsx`) with On/Off. A checkout keeps
+   `scripts/windows/install-startup.cmd`. ⚠️ Whether a managed booth box lets the Run key stand.
 0. **A build of main** (Holding fixes and Show mode, merged 2026-10-13) when the owner says; at a
    booth, the checks in `docs/FIELD_TEST.md` § Holding fixes and § Show mode, and the next real
    404's `[arena] POST` line.
