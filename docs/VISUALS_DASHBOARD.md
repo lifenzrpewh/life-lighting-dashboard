@@ -911,7 +911,8 @@ in both the Media row and here (taken without an answer: the owner can trim one)
   a one-off on a normal service (Preach BG at a campus with no PREACH column) is now offered an
   empty clip past the named columns too, instead of only the tray (once its code is anywhere on
   its layer it is done, as before); an item's FG and BG overflow on each layer separately, so
-  they need not share a column; A SCREEN BG does not overflow (the rule names FG and BG). **The
+  they need not share a column (**superseded 2026-10-13**: one column across its layers, below);
+  A SCREEN BG does not overflow (the rule names FG and BG). **The
   normal background's gaps** stop at the last PROMO and overflow starts after the last named
   column, so they never meet (and `backgroundGaps` leaves any clip a placement takes).
   **Clear old FGs**: an overflow clip, once loaded, carries a code this run sheet uses, so it is
@@ -919,6 +920,66 @@ in both the Media row and here (taken without an answer: the owner can trim one)
   room for the next Update all. HOLD BG has no clear, so its leftovers stay and take room.
   ✅ Unit tests (`test/holding.test.js`, overflow). ⚠️ Not yet run against Arena or seen in the
   kiosk: no Arena or lookbook mock on the Mac.
+
+### The owner's fixes, 2026-10-13 (branch `holding-fixes`, not merged)
+
+The owner, after a service: one-off foregrounds' backgrounds did not follow; one code "failed"
+with Arena 404ing though it was there; "I think we don't really know what it's doing sometimes
+when things are wrong"; a way to place a clip anywhere; ways through "same code but different
+filename". Then: announcements and other foregrounds from PROMO 1 onwards. Their answers, asked
+in this order, are in brackets. Each in the dev kiosk on the Mac over CDP, against
+`spikes/arena-stand-in.mjs` (a made-up composition for the mismatches) and the live lookbook
+(Central Team Night, 13 Oct, a run sheet of one-offs). ⚠️ None against a real Arena or by finger.
+
+- **The plan and the result** (a panel in Holding; a line that stays). `explainPlan`: every
+  code of every moment, what Update all does with it or why not (in its column, a one-off
+  already on its layer, a cell the map gives elsewhere, confirmed by hand, no file, not
+  Arena's). The **Plan** panel sits beside the grid, open unless closed on this computer
+  (`paua.holding.planClosed`); a tap opens the clip. A confirmation's loads go to main as one
+  **run** (`media:run`): its plan and result in `paua.log` as `[holding]` lines, each failure
+  with why; the latest kept for a result line under the header ("7 loaded · 1 failed · 2
+  already there", a tap lists each code) until the next run.
+- **A one-off is one column across its layers** (yes, the column is fired; replace old BGs; the
+  normal background when it has none). `placeOneOff`: the foreground finds the column (where it
+  is on HOLD FG already, where a one-off sharing it went, else the first empty clip past the
+  last named column whose HOLD BG clip can take the background too); the background goes there
+  wherever else its code sits. HOLD BG clips this service does not use are replaced; never one
+  on screen, an item's own column or a clip with no code. A background that cannot go is said,
+  and the foreground still goes. Inside the named columns it is said "beside its foreground"
+  (`why: 'follows'`). Taken without asking: HOLD FG still overflows into empty clips only (the
+  2026-10-08 rule).
+- **A refused load** (an override, orange, "All in Arena"; kept until the file changes). Main
+  keeps Arena's own words for a refusal and logs the `file:///` address it sent; 1.5 s after a
+  refused load it looks at the clip again, and a clip holding the file counts as loaded, in
+  orange ("sent, though Arena said no"). **It's there** (Admin; on a failed code, and in Inspect
+  for a clip Arena calls missing) marks the code's clips right by hand under `thereKey`, which
+  unlike a "same" mark also covers a missing file (a same mark still never hides a file gone
+  missing since). Marked clips carry an orange hand; the summary reads "All in Arena (n by hand)"
+  in orange. ⚠️ A real 404 and the look-again never seen: the stand-in cannot refuse a load. The
+  cause is unknown; `paua.log`'s `[arena] POST …` line now says what Arena answered, and a
+  `file:///` address with `&`, `#` or a macron is the first suspect.
+- **Place anywhere** (its own layer only; remembered for the service, its other layers
+  following). A hand placement is a pin `{item, code, column}` per service on this computer
+  (`paua.holding.pins`, 12 services). The planner puts every code of a pinned moment into that
+  column first; no PROMO, one-off or overflow takes it; with no background of its own the normal
+  background follows. `pinTargets` lights every clip of the layer but reserved columns, cells
+  the map gives elsewhere and columns another moment has. Ways in: **Place…** on a code in the
+  plan, the No column tray, and **Place … elsewhere…** in Inspect. The pin is kept only when
+  Load is pressed; the plan says "by hand" with an Undo.
+- **Same code, different file** (all four helpers). Side by side, with name, size and date
+  (Arena's file time from main, the lookbook's upload time from its name), the newer side
+  marked; versions read from names (`-v5`, `_V2`, `WalkInV2`, past copy marks: `fileVerdict`,
+  "Arena has v1; the lookbook has v5, newer"); the graphics drive's files for the code
+  (`media:drive`: the lookbook's by size, a copy, the name Arena has, the one Fetch takes), and
+  Admin may load another (`drivePick`, used only if main's own search finds it); **Files to
+  check**, every mismatch on one screen in the grid's place. The owner's "what actually went
+  wrong" was not answered (the question was unclear to them).
+- **PROMO 1 onwards** (strict run-sheet order; one queue for announcements and one-offs).
+  Announcements and foregrounds with no column of their own take PROMO 1, 2, 3… in run-sheet
+  order, whatever is there (one on screen marked live); a column placed by hand is skipped.
+  Past the last PROMO they carry on as one-offs (above). A one-off sitting elsewhere on HOLD FG
+  is moved to its queue column: a pin is how to keep one. The old "older version first, then
+  last week's, then empty" choice now serves only columns the Holding map shares.
 
 ## The Lookbook view (owner's ask, 2026-10-05; built the same day)
 
@@ -1132,6 +1193,14 @@ and not in Pāua's code. Watch for it on a Mac.
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
+- **ProPresenter lower thirds** (the owner wants it built, 2026-10-13). Nothing built. The
+  lookbook's lower thirds are its `T` codes (`resolvedAssetPaths.lowerThird`), not Arena's.
+  The only plan so far was for announcements (CLAUDE.md, 2026-10-08:
+  `spikes/propresenter-playlist.mjs`, never run). Asked and unanswered: how lower thirds live in
+  ProPresenter today (media bin items, props, slides) and how they get there each week; whether
+  announcements are part of it; running the spike (read-only without `--write`) at a booth. A
+  route that may need no API writes: copy the service's T files, named in run order
+  (`03 CT123 …`), into a folder a Smart Playlist follows, sorted by name.
 
 ## The first spike
 

@@ -88,6 +88,16 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**Holding fixes** (branch `holding-fixes`, 2026-10-13; in the first build after it merges; `docs/VISUALS_DASHBOARD.md` § The owner's fixes, 2026-10-13)
+- [ ] Holding's **Plan** panel says, for every code, where it goes or why not; a tap opens its clip
+- [ ] After **Update all**, the line under the header stays ("n loaded · n failed · n already there"), and **Each code** says why a failure failed; `paua.log` has the same as `[holding]` lines
+- [ ] A one-off's background lands in its foreground's column, firing the column brings both up; one with no background gets the normal one
+- [ ] Announcements and one-off foregrounds go in PROMO 1, 2, 3… in run-sheet order; past the last PROMO, into the spare columns
+- [ ] If a load "fails" with a clip that has the file, it shows orange, "sent, though Arena said no"; the log's `[arena] POST` line says what Arena answered (note it)
+- [ ] **It's there** on a failure or a missing file: the clip gets an orange hand, the summary reads "All in Arena (1 by hand)" in orange; **Undo** in Inspect takes it back
+- [ ] **Place…** on a code in the plan: only its layer's free columns light; the confirmation names each layer; after Load the plan says "by hand", and Update all leaves it there
+- [ ] **Files to check**: each mismatch side by side with names, sizes and dates, versions in words; "on the graphics drive" lists the drive's files and which Fetch takes; **Load this one** asks first
+
 **1.2.0** (2026-10-11): comes as an update on 1.1.0 (the bar's "Pāua 1.2.0 is out", then Settings › This computer › Update). Then the section below.
 
 **Alerts, the timer, Add a column** (1.2.0)
