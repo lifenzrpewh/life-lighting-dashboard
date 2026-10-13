@@ -12,7 +12,7 @@ import { useState } from 'react'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
-import { columnNamesOf, placementWords, type Placement, type UpdateStep } from '../../shared/holding.js'
+import { columnNamesOf, placementStep, type Placement, type UpdateStep } from '../../shared/holding.js'
 import type { LookbookService } from '../../shared/media-check.js'
 import { megabytes, type FetchRequest, type FetchStates } from '../../shared/media-fetch.js'
 import { useMediaCheck, type Load, type MediaCheckState } from '../useMediaCheck.js'
@@ -264,10 +264,7 @@ function Tick({ on, onChange, tone, children }: { on: boolean; onChange: (on: bo
 
 /** Placing one code of one item in its column, said. */
 export function placeStep(p: Placement): UpdateStep {
-	return {
-		request: { code: p.code, want: p.want, clipIds: [p.clipId], lookbookPath: p.lookbookPath, allowLookbook: false, allowLive: [] },
-		what: `${p.code} (${p.label ?? p.title}) into ${placementWords(p)}`,
-	}
+	return placementStep(p)
 }
 
 /** Loading a newer file into clips, said: where, or how many. */

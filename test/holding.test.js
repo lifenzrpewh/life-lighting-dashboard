@@ -13,6 +13,8 @@ import {
 	looksOf,
 	nameWords,
 	normalBackground,
+	pinTargets,
+	pinsFrom,
 	oldForegrounds,
 	placementWords,
 	planPlacements,
@@ -628,4 +630,53 @@ test("It's there: a file Arena calls missing, said to be there, is right by hand
 	assert.deepEqual(sameMarksFrom([[...there][0], 'junk']), [...there])
 	assert.deepEqual(sameMarkFrom({ code: 'CF588', file: 'x.png', want, same: true, there: true }), { code: 'CF588', file: 'x.png', want, same: true, there: true })
 	assert.equal(sameMarkFrom({ code: 'CF588', file: 'x.png', want, same: true, there: 'yes' }), null)
+})
+
+// Placed by hand, anywhere on its layer, for this service (the owner, 2026-10-13).
+test('a pin: the whole moment goes into the chosen column, its background following, and stays there', () => {
+	const events = [...ITEMS, oneOff('Speaker Intro', 'CF701', 'CB701'), oneOff('Worship Night', 'CF702')]
+	const s = wide(4)
+	const pins = [{ item: ITEMS.length, code: 'CF701', column: 15 }]
+	const r = planPlacements(events, s, undefined, pins)
+	assert.deepEqual(r.placements.filter((p) => p.item === ITEMS.length).map((p) => [p.layer, p.code, p.column, p.why]), [
+		['HOLD FG', 'CF701', 15, 'chosen'],
+		['HOLD BG', 'CB701', 15, 'chosen'],
+	])
+	assert.match(placementWords(r.placements.find((p) => p.code === 'CF701')), /column 15, placed by hand$/)
+	// The other one-off overflows around it: 13, never 15.
+	assert.equal(r.placements.find((p) => p.code === 'CF702').column, 13)
+	// A foreground-only moment placed by hand takes the normal background with it.
+	const r2 = planPlacements(events, s, undefined, [{ item: ITEMS.length + 1, code: 'CF702', column: 16 }])
+	assert.deepEqual(r2.placements.filter((p) => p.item === ITEMS.length + 1).map((p) => [p.layer, p.code, p.column]), [
+		['HOLD FG', 'CF702', 16],
+		['HOLD BG', 'CB095', 16],
+	])
+	// Once loaded, it is in its column: the plan says by hand.
+	s.layers[3].slots[14] = clip('CF701-Conf-SpeakerIntro.png')
+	s.layers[1].slots[14] = clip('CB701-Conf-SpeakerIntro.png')
+	assert.equal(planPlacements(events, s, undefined, pins).placements.filter((p) => p.item === ITEMS.length).length, 0)
+	assert.match(noteOf(explainPlan(events, s, new Set(), undefined, undefined, pins), 'Speaker Intro', 'CF701').words, /^in HOLD FG · column 15, placed by hand$/)
+	// A pin whose run sheet changed under it (another code there now) is dropped.
+	assert.equal(planPlacements(events, wide(4), undefined, [{ item: ITEMS.length, code: 'CF999', column: 15 }]).placements.find((p) => p.code === 'CF701').column, 13)
+})
+
+test('a pin moves a moment with a column of its own, and no PROMO takes its column', () => {
+	const pins = [{ item: 2, code: 'CF465', column: 11 }] // NSL into a PROMO column
+	const r = planPlacements(ITEMS, composition(), undefined, pins)
+	assert.equal(at(r.placements, 'NSL', 'CF465').column, 11)
+	assert.ok(r.placements.filter((p) => p.item !== 2 && p.layer === 'HOLD FG').every((p) => p.column !== 11))
+})
+
+test('where a moment may be put by hand: its layer, not a reserved column, not a column another moment has', () => {
+	const s = wide(3)
+	const fg = s.layers[3]
+	const targets = pinTargets(ITEMS, s, { item: ITEMS.length - 1, code: 'CF588' }) // End's foreground
+	const cols = fg.slots.flatMap((slot, i) => (targets.has(slot.id) ? [i + 1] : []))
+	// Not COUNTDOWN (3) or VIDEO BG (4); not PRE, WTL, NSL, BIBLES, WTG or the PROMOs the
+	// announcements take; POST is End's own; 11 and 12 are PROMO columns no one took; past them, free.
+	assert.deepEqual(cols, [2, 11, 12, 13, 14, 15])
+	// Only its own layer.
+	assert.ok(!s.layers[1].slots.some((slot) => targets.has(slot.id)))
+	// Storage: anything not a pin is dropped.
+	assert.deepEqual(pinsFrom([{ item: 1, code: 'CF465', column: 11, extra: 1 }, { item: -1, code: 'CF465', column: 2 }, 'x']), [{ item: 1, code: 'CF465', column: 11 }])
 })

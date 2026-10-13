@@ -42,14 +42,10 @@ import {
 	columnNamesOf,
 	clipsToUpdate,
 	codesOn,
-	fillColumns,
 	holdingLayers,
-	layerKeyOf,
-	normalBackground,
 	reserved,
 	slotCode,
 	slotMark,
-	TYPE_LAYER,
 	type Placement,
 	type PlanLine,
 	type SlotMark,
@@ -57,7 +53,6 @@ import {
 } from '../../shared/holding.js'
 import { lookbookStem, lookbookThumbUrl, TYPE_NAMES, mediaCodeOf } from '../../shared/media-check.js'
 import { runCounts, type FetchRun, type FetchStates } from '../../shared/media-fetch.js'
-import { layerOfCode } from '../../shared/holding-map.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
 import { useOperator } from '../mode.js'
@@ -112,24 +107,18 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	// What goes where it is not yet: drawn in its slot.
 	const ghosts = new Map<string, Placement>()
 	for (const p of [...m.placements, ...m.fills]) if (!ghosts.has(`${p.layer}:${p.column}`)) ghosts.set(`${p.layer}:${p.column}`, p)
-	// HOLD BG's columns for the normal background: a one-off background may
-	// be chosen into one that holds it.
-	const fillable = new Set(fillColumns(items, status, m.map))
-	const normal = normalBackground(items, m.map)?.code ?? null
 	// What has no column: the tray. Columns not named yet are said once, above.
 	const tray = m.unplaced.filter((u) => u.kind !== 'unnamed')
-
-	/** A slot a code may be placed in by hand: on its type's layer, not a
-	 *  reserved column, and empty or not on this run sheet. One on screen may
-	 *  be picked; the confirmation asks about it apart. */
-	const freeFor = (what: Choosing, layer: ArenaLayer, slot: ArenaSlot, column: number) => {
-		const type = layerOfCode(m.map, what.code)
-		if (type === null || layerKeyOf(layer) !== type) return false
-		const mark = slotMark(slot, items, today, m.same, m.sizes)
-		const filler = TYPE_LAYER['B']?.test(layer.name.trim()) === true && fillable.has(column) && slot.state !== 'playing'
-		if (filler && normal !== null && slotCode(slot) === normal) return true
-		return !reserved(layer, column, status, m.map) && (mark === 'empty' || mark === 'not-today')
+	// Placing by hand (the owner, 2026-10-13: "send a clip and place it anywhere
+	// with a confirm"): any column on its layer no other moment has.
+	const targets = choosing === null ? new Set<number>() : m.pinTargets(choosing)
+	/** A moment's code, to place by hand, or null without a lookbook file. */
+	const chooseFor = (item: number, code: string): Choosing | null => {
+		const it = items[item]
+		const file = it?.files[code]
+		return it === undefined || file === undefined ? null : { item, title: it.title, label: it.label, code, want: lookbookStem(file), lookbookPath: file }
 	}
+	const choose = (what: Choosing | null) => setPicked(what === null ? null : { kind: 'choose', what })
 
 	const tapSlot = (layer: ArenaLayer, slot: ArenaSlot, column: number) => {
 		if (choosing === null) {
@@ -137,19 +126,8 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 			if (ghost !== undefined) return operator ? m.ask('Place', [placeStep(ghost)]) : undefined
 			return setPicked(picked?.kind === 'clip' && picked.id === slot.id ? null : { kind: 'clip', id: slot.id })
 		}
-		if (!freeFor(choosing, layer, slot, column)) return
-		m.ask('Place', [
-			placeStep({
-				...choosing,
-				layer: layer.name,
-				column,
-				columnName: columnNamesOf(layer, status)[column - 1] ?? '',
-				clipId: slot.id,
-				replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
-				why: 'chosen',
-				live: slot.state === 'playing',
-			}),
-		])
+		if (!targets.has(slot.id)) return
+		m.askPlaceAt(choosing, column)
 		setPicked(null)
 	}
 
@@ -215,14 +193,15 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 				)}
 				<Confirm key={m.asking?.id} m={m} />
 				{tray.length > 0 && (
-					<Tray m={m} tray={tray} operator={operator} choosing={choosing} onChoose={(what) => setPicked(what === null ? null : { kind: 'choose', what })} />
+					<Tray m={m} tray={tray} operator={operator} choosing={choosing} onChoose={choose} />
 				)}
 			</div>
 			<div className="flex min-h-0 flex-1">
 			<div className={`min-h-0 min-w-0 flex-1 overflow-auto ${ageMs !== null ? staleContent : ''}`}>
 				{choosing !== null && (
 					<p className="sticky top-0 left-0 z-20 bg-booth-bg px-4 py-2 text-sm">
-						Tap a lit slot for <span className="font-mono">{choosing.code}</span> ({choosing.label ?? choosing.title}), for this service
+						Tap a lit slot for <span className="font-mono">{choosing.code}</span> ({choosing.label ?? choosing.title}), for this service: the rest of it follows into
+						that column. <button type="button" onClick={() => setPicked(null)} className="ml-2 underline">Cancel</button>
 					</p>
 				)}
 				<table className="border-separate border-spacing-0">
@@ -248,7 +227,7 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 								</th>
 								{layer.slots.map((slot, i) => {
 									const mark = m.check === null ? null : slotMark(slot, items, today, m.same, m.sizes)
-									const target = choosing !== null && freeFor(choosing, layer, slot, i + 1)
+									const target = choosing !== null && targets.has(slot.id)
 									const ghost = choosing === null ? ghosts.get(`${layer.name}:${i + 1}`) : undefined
 									const columnName = columnNamesOf(layer, status)[i] ?? ''
 									return (
@@ -276,9 +255,18 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					</tbody>
 				</table>
 				<Legend operator={operator} />
-				{picked?.kind === 'clip' && <Inspect m={m} status={status} operator={operator} clipId={picked.id} onClose={() => setPicked(null)} />}
+				{picked?.kind === 'clip' && <Inspect m={m} status={status} operator={operator} clipId={picked.id} onClose={() => setPicked(null)} onPlace={(item, code) => choose(chooseFor(item, code))} />}
 			</div>
-			{planOpen && m.runSheet !== null && <PlanPanel lines={m.planLines} picked={picked?.kind === 'clip' ? picked.id : null} onPick={(id) => setPicked({ kind: 'clip', id })} />}
+			{planOpen && m.runSheet !== null && (
+				<PlanPanel
+					lines={m.planLines}
+					picked={picked?.kind === 'clip' ? picked.id : null}
+					onPick={(id) => setPicked({ kind: 'clip', id })}
+					pinned={new Set(m.pins.map((p) => p.item))}
+					onPlace={operator ? (item, code) => choose(chooseFor(item, code)) : null}
+					onUnpin={operator ? m.unpin : null}
+				/>
+			)}
 			</div>
 		</div>
 	)
@@ -294,7 +282,23 @@ const TONE: Record<PlanLine['notes'][number]['tone'], string> = {
 /** The plan, beside the grid: each moment, each code, what happens to it and
  *  why. Blue: Update all loads it; green: nothing to do, and why; amber: no
  *  place or no file; grey: not Arena's. */
-function PlanPanel({ lines, picked, onPick }: { lines: PlanLine[]; picked: number | null; onPick: (clipId: number) => void }) {
+function PlanPanel({
+	lines,
+	picked,
+	onPick,
+	pinned,
+	onPlace,
+	onUnpin,
+}: {
+	lines: PlanLine[]
+	picked: number | null
+	onPick: (clipId: number) => void
+	/** Moments placed by hand for this service. */
+	pinned: ReadonlySet<number>
+	/** Admin: place a moment's code by hand, or take a hand placement back. */
+	onPlace: ((item: number, code: string) => void) | null
+	onUnpin: ((item: number) => void) | null
+}) {
 	const counts = { do: 0, ok: 0, warn: 0, quiet: 0 }
 	for (const l of lines) for (const n of l.notes) counts[n.tone] += 1
 	return (
@@ -308,9 +312,21 @@ function PlanPanel({ lines, picked, onPick }: { lines: PlanLine[]; picked: numbe
 			{lines.length === 0 && <p className="text-booth-dim">Nothing on this run sheet for Arena.</p>}
 			{lines.map((l) => (
 				<div key={`${l.item}:${l.title}`} className="border-t border-booth-edge/60 py-1.5">
-					<p className="truncate font-medium">
-						{l.label ?? l.title}
-						{l.label !== null && l.label !== l.title && <span className="font-normal text-booth-dim"> · {l.title}</span>}
+					<p className="flex items-baseline gap-2">
+						<span className="min-w-0 flex-1 truncate font-medium">
+							{l.label ?? l.title}
+							{l.label !== null && l.label !== l.title && <span className="font-normal text-booth-dim"> · {l.title}</span>}
+						</span>
+						{pinned.has(l.item) && (
+							<span className="shrink-0 text-booth-dim">
+								by hand
+								{onUnpin !== null && (
+									<button type="button" onClick={() => onUnpin(l.item)} className="ml-1.5 underline hover:text-booth-ink">
+										Undo
+									</button>
+								)}
+							</span>
+						)}
 					</p>
 					{l.notes.map((n) => {
 						const row = (
@@ -320,19 +336,31 @@ function PlanPanel({ lines, picked, onPick }: { lines: PlanLine[]; picked: numbe
 								<span className={`min-w-0 flex-1 ${n.tone === 'warn' ? 'text-warn' : n.tone === 'do' ? '' : 'text-booth-dim'}`}>{n.words}</span>
 							</>
 						)
-						return n.clipId === null ? (
-							<p key={n.code} className="flex gap-2 py-0.5">
-								{row}
-							</p>
-						) : (
-							<button
-								key={n.code}
-								type="button"
-								onClick={() => onPick(n.clipId as number)}
-								className={`flex w-full gap-2 rounded-ctl py-0.5 text-left hover:bg-booth-hover ${picked === n.clipId ? 'bg-booth-raise' : ''}`}
-							>
-								{row}
-							</button>
+						const placeable = onPlace !== null && l.item >= 0 && n.tone !== 'quiet' && !n.words.startsWith('the lookbook has no file') && !n.words.startsWith('the normal background')
+						return (
+							<div key={n.code} className="flex items-start gap-1">
+								{n.clipId === null ? (
+									<p className="flex min-w-0 flex-1 gap-2 py-0.5">{row}</p>
+								) : (
+									<button
+										type="button"
+										onClick={() => onPick(n.clipId as number)}
+										className={`flex min-w-0 flex-1 gap-2 rounded-ctl py-0.5 text-left hover:bg-booth-hover ${picked === n.clipId ? 'bg-booth-raise' : ''}`}
+									>
+										{row}
+									</button>
+								)}
+								{placeable && (
+									<button
+										type="button"
+										onClick={() => onPlace(l.item, n.code)}
+										title={`Place ${n.code} by hand, anywhere on its layer`}
+										className="h-6 shrink-0 rounded-ctl px-1.5 text-booth-dim hover:bg-booth-hover hover:text-booth-ink"
+									>
+										Place…
+									</button>
+								)}
+							</div>
 						)
 					})}
 				</div>
@@ -616,7 +644,22 @@ const VERDICT: Record<SlotMark, string> = {
 
 /** One clip, looked at: Arena's picture beside the lookbook's, and the two
  *  answers to a clip that needs a look. */
-function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState; status: ArenaStatus; operator: boolean; clipId: number; onClose: () => void }) {
+function Inspect({
+	m,
+	status,
+	operator,
+	clipId,
+	onClose,
+	onPlace,
+}: {
+	m: MediaCheckState
+	status: ArenaStatus
+	operator: boolean
+	clipId: number
+	onClose: () => void
+	/** Place this clip's moment somewhere else by hand. */
+	onPlace: (item: number, code: string) => void
+}) {
 	let found: { slot: ArenaSlot; layer: string; column: string } | null = null
 	for (const layer of status.layers) {
 		const i = layer.slots.findIndex((s) => s.id === clipId)
@@ -635,6 +678,11 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 	const fetch = code === null ? undefined : m.fetches[code]
 	const arenaUrl = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
 	const arenaFile = slot.file ?? slot.missingFile
+	// The moment this clip is: the one the plan has in this clip, else the first with its code.
+	const owner =
+		code === null
+			? undefined
+			: (m.planLines.find((l) => l.item >= 0 && l.notes.some((n) => n.code === code && n.clipId === clipId)) ?? m.planLines.find((l) => l.item >= 0 && l.notes.some((n) => n.code === code)))
 	const answers = operator && code !== null && want !== null && file !== null && arenaFile !== null && (needsLook(mark) || mark === 'confirmed')
 	return (
 		<div className="m-4 flex max-w-3xl flex-col gap-3 rounded-ctl bg-booth-panel p-4 text-sm ring-1 ring-booth-edge ring-inset">
@@ -667,6 +715,12 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 					</figure>
 				)}
 			</div>
+			{operator && owner !== undefined && code !== null && !under(fetch) && (
+				<div className="flex flex-wrap items-center gap-2">
+					<SmallButton onClick={() => onPlace(owner.item, code)}>Place {owner.label ?? owner.title} elsewhere…</SmallButton>
+					<span className="text-xs text-booth-dim">any free column on its layer; the rest of it follows</span>
+				</div>
+			)}
 			{answers && (
 				<div className="flex flex-wrap items-center gap-2">
 					{!under(fetch) && mark !== 'confirmed' && (
