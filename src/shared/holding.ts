@@ -11,7 +11,10 @@
 //   PRE    Doors Open / Walk In          POST   End / Walk Out
 //   WTL, NSL, BIBLES, WTG                the item with that run-sheet label,
 //                                        always the same column
-//   PROMO  (as many as the campus has)   announcements and promos
+//   PROMO  (as many as the campus has)   announcements and promos, and any
+//                                        foreground with no column of its
+//                                        own: PROMO 1 onwards, in run-sheet
+//                                        order (the owner, 2026-10-13)
 //   PREACH (if a campus names one)       the message's background
 //   anything else (COUNTDOWN, …)         never placed into
 //
@@ -260,7 +263,7 @@ export type Placement = {
 	 *  hand; `fill`, the normal background into a gap (`backgroundGaps`);
 	 *  `overflow`, an empty clip after the layer's last named column, for a code
 	 *  with no column of its own (`overflowSlots`). */
-	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill' | 'overflow' | 'fixed' | 'follows'
+	why: 'named' | 'promo' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill' | 'overflow' | 'fixed' | 'follows'
 	/** The slot is playing: loading changes what is on screen. */
 	live: boolean
 }
@@ -482,7 +485,7 @@ export function planPlacements(
 	const pinned = livePins(items, pins)
 	const pinnedColumns = new Set(pinned.values())
 	const takenPromo = new Set<number>(pinnedColumns)
-	const poolOf = new Map<number, { columns: number[]; promo: boolean }>()
+	const poolOf = new Map<number, { columns: number[]; promo: boolean; oneOff?: true }>()
 	for (const [i, item] of items.entries()) {
 		if (arenaCodes(item, map).length === 0) continue
 		const pin = pinned.get(i)
@@ -500,6 +503,9 @@ export function planPlacements(
 		else if (mine.length > 1) poolOf.set(i, { columns: mine, promo: false })
 		else if (named !== null) columnOf.set(i, { column: named, why: 'named' })
 		else if (isPromo(item)) poolOf.set(i, { columns: promoColumns, promo: true })
+		// A foreground with no column of its own queues with the announcements
+		// (the owner, 2026-10-13).
+		else if (arenaCodes(item, map).some((c) => c.type === 'F' && c.want !== null)) poolOf.set(i, { columns: promoColumns, promo: true, oneOff: true })
 		else columnOf.set(i, { none: 'no-column', detail: `no column named ${item.label ?? item.title}` })
 	}
 	const promoItems = [...poolOf.keys()]
@@ -511,7 +517,7 @@ export function planPlacements(
 	const slotAt = (type: string, column: number) => layerOf(type)?.slots[column]
 	const choose = (pass: (key: NonNullable<ReturnType<typeof keyOf>>, column: number) => number | null, why: Placement['why']) => {
 		for (const i of promoItems) {
-			if (columnOf.has(i)) continue
+			if (columnOf.has(i) || poolOf.get(i)?.promo === true) continue
 			const key = keyOf(items[i] as LookbookItem)
 			if (key === undefined) continue
 			let best: { column: number; score: number } | null = null
@@ -543,14 +549,39 @@ export function planPlacements(
 		return s !== undefined && s.state !== 'empty' && free(s) ? -column : null
 	}, 'promo-free')
 	choose((key, column) => (slotAt(key.type, column)?.state === 'empty' ? -column : null), 'promo-empty')
+	// PROMO 1 ONWARDS, IN RUN-SHEET ORDER (the owner, 2026-10-13: "the default
+	// to place media, both announcements and FGs that aren't announcements, is
+	// from PROMO 1 onwards"; strict order, so firing left to right follows the
+	// service, a piece already in another PROMO column moved): announcements and
+	// foregrounds with no column of their own share one queue, each the next
+	// PROMO column, whatever it holds (one on screen is marked live and asked
+	// about). A column placed by hand is skipped; one the map leaves alone for the
+	// piece's layer too. Past the last PROMO they carry on as one-offs into the
+	// spare columns past the named ones (`placeOneOff`).
+	const promoQueue = promoColumns.filter((c) => !takenPromo.has(c))
+	let nextPromo = 0
+	for (const i of promoItems) {
+		if (columnOf.has(i) || poolOf.get(i)?.promo !== true) continue
+		const key = keyOf(items[i] as LookbookItem)
+		if (key === undefined) continue
+		while (nextPromo < promoQueue.length && cellOf(map, names[promoQueue[nextPromo] as number] ?? '', key.type).kind === 'leave') nextPromo += 1
+		const column = promoQueue[nextPromo]
+		if (column === undefined) continue
+		nextPromo += 1
+		takenPromo.add(column)
+		columnOf.set(i, { column, why: 'promo' })
+	}
 	for (const i of promoItems) {
 		if (columnOf.has(i)) continue
 		const pool = poolOf.get(i)
+		const left = promoColumns.length === 0 ? 'no PROMO columns in Arena' : 'every PROMO column is taken'
 		columnOf.set(
 			i,
-			pool?.promo !== false
-				? { none: 'no-promo', detail: promoColumns.length === 0 ? 'no PROMO columns in Arena' : 'every PROMO column is in use today' }
-				: { none: 'no-promo', detail: 'every column taking it is in use today' },
+			pool?.oneOff === true
+				? { none: 'no-column', detail: `no column named ${items[i]?.label ?? items[i]?.title ?? ''}; ${left}` }
+				: pool?.promo !== false
+					? { none: 'no-promo', detail: left }
+					: { none: 'no-promo', detail: 'every column taking it is in use today' },
 		)
 	}
 
