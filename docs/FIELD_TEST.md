@@ -88,7 +88,7 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
-**Holding fixes** (branch `holding-fixes`, 2026-10-13; in the first build after it merges; `docs/VISUALS_DASHBOARD.md` § The owner's fixes, 2026-10-13)
+**Holding fixes** (2026-10-13, merged; in the next build after 1.2.0; `docs/VISUALS_DASHBOARD.md` § The owner's fixes, 2026-10-13)
 - [ ] Holding's **Plan** panel says, for every code, where it goes or why not; a tap opens its clip
 - [ ] After **Update all**, the line under the header stays ("n loaded · n failed · n already there"), and **Each code** says why a failure failed; `paua.log` has the same as `[holding]` lines
 - [ ] A one-off's background lands in its foreground's column, firing the column brings both up; one with no background gets the normal one
@@ -97,6 +97,15 @@ Tick what you saw; anything odd is worth a line.
 - [ ] **It's there** on a failure or a missing file: the clip gets an orange hand, the summary reads "All in Arena (1 by hand)" in orange; **Undo** in Inspect takes it back
 - [ ] **Place…** on a code in the plan: only its layer's free columns light; the confirmation names each layer; after Load the plan says "by hand", and Update all leaves it there
 - [ ] **Files to check**: each mismatch side by side with names, sizes and dates, versions in words; "on the graphics drive" lists the drive's files and which Fetch takes; **Load this one** asks first
+
+**Show mode** (the next build after 1.2.0)
+- [ ] The tray's Show mode button (four corners): the tab strips and the grips between windows go, and each page fills its window's full height
+- [ ] Layouts, Settings and the lock are gone; the lock's place says **Show mode** (or **Show mode · Admin**)
+- [ ] Tapping an alert opens nothing; its × still puts it away; Connections opens and reads, but its rows open nothing
+- [ ] In Admin, leave it alone past the Admin timeout: it stays Admin
+- [ ] Tap **Show mode**: "Leave Show mode" asks the Admin passcode (or leaves at once with none set); a wrong one is refused and it stays; the right one brings the strips back, in Admin
+- [ ] Quit and reopen Pāua in Show mode: it comes back in Show mode, as volunteer
+- [ ] Settings › Top bar › Show mode hides the way in; the way out still shows while it is on
 
 **1.2.0** (2026-10-11): comes as an update on 1.1.0 (the bar's "Pāua 1.2.0 is out", then Settings › This computer › Update). Then the section below.
 

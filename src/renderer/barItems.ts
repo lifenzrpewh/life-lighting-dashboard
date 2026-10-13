@@ -12,7 +12,7 @@
 
 import { useState } from 'react'
 
-export const BAR_ITEMS = ['countdown', 'clock', 'layouts', 'connections'] as const
+export const BAR_ITEMS = ['countdown', 'clock', 'layouts', 'connections', 'show'] as const
 export type BarItem = (typeof BAR_ITEMS)[number]
 
 export const BAR_ITEM_LABEL: Record<BarItem, { name: string; what: string }> = {
@@ -20,6 +20,7 @@ export const BAR_ITEM_LABEL: Record<BarItem, { name: string; what: string }> = {
 	clock: { name: 'Clock', what: 'The time and date' },
 	layouts: { name: 'Layouts', what: 'Switch between saved layouts' },
 	connections: { name: 'Connections', what: 'What is up and what is down, and its dot' },
+	show: { name: 'Show mode', what: 'The way into Show mode. The way out always stays' },
 }
 
 const KEY = 'paua.barHidden'

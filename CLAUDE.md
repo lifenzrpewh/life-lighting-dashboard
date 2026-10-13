@@ -51,6 +51,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ⚠️ `src/main/ma-pane.ts` | The web remote as a `WebContentsView`. Real web remote on onPC 2.3.2.0, **not a desk**. Never stuck for good (2026-10-01): a 15 s load timeout, and a fresh login after 10 s of MA's own overlay saying something it never recovers from (✅ the read works in the sandbox; the fresh login is unit-tested, not watched firing). **Reload MA** (↻) in its slot's strip. The six desk checks are in `docs/MA3_READ_MODEL.md` § Web remote. |
 | ✅ `src/main/settings.ts` | Console address, port, MA users; passwords via the OS keystore. macOS Keychain, and **Windows DPAPI on the Windows box, 2026-10-04**: an operator password saved sealed (no plaintext on disk), still opened after the data folder was moved for the rename, then removed. **2026-10-08:** also Admin's passcode, as a salted scrypt hash only (`src/bridge/passcode.ts`), under `adminPasscode`. |
 | ⚠️ `src/shared/admin.ts` · `src/renderer/components/PasscodeSheet.tsx` · `src/renderer/mode.ts` · `src/main/kiosk.ts` (`admin:*`) | **Admin** (operator mode until 2026-10-08, in every word a person reads; the code keeps `operator`). **A passcode, not a 3 s hold** (the owner, 2026-10-08): Pāua's own keypad, or Keyboard for letters; opens on the keypad when it is all digits. Main checks it (`admin:unlock`) and is the only way in; the page may only step down. Five wrong tries, a 30 s wait, said in words. None set: a tap goes in, and Settings says so. **Forgotten:** with Pāua closed, delete `adminPasscode` from `settings.json` (header of `src/shared/admin.ts`, `docs/FIELD_TEST.md` § Admin). **Timeout per computer**: 2, 5, 10, 15 (default), 30 or 60 min. In the dev kiosk over CDP on the Mac, 2026-10-08: set, wrong tries, the wait, the right one, Keyboard, the 2-minute drop. ⚠️ Not by finger or on the Windows box. |
+| ⚠️ `src/renderer/showMode.ts` · `Grid.tsx` (`bare`) · `StatusBar.tsx` (`ShowButton`) | **Show mode** (2026-10-13, the owner's: "a fullscreen that takes away the windows' tops and locks the screen to whatever mode it is in"). A tool in the bar's tray, for anyone: the windows lose their strips (the page takes the 56 px), no edge grips, Layouts and Settings gone, an alert's tap opens nothing (its × still works), Connections read-only, the Showfile sheet without its writes; the lock becomes **Show mode** (· Admin), and Admin's idle drop waits. **Out is Admin's way in** whatever the mode: the passcode sheet titled Leave Show mode, or a tap with none set; leaving lands in Admin. Remembered per computer (`paua.showMode`), the mode still booting volunteer; hideable in Settings › Top bar (the way out never hides). In the dev kiosk on the Mac over CDP: in and out from volunteer and Admin, a wrong passcode refused, a reload kept it, the page boxes 892 → 948 px. ⚠️ Not by finger, on Windows, or the idle hold watched for its full timeout. `docs/FIELD_TEST.md` § Show mode. |
 | ✅ `src/renderer/mock.ts` | The mock lying desk: healthy / stale / silent / unreachable / cold, keys `1`–`5` in dev. Drives the real derivation, not a parallel one. |
 | ✅ `src/bridge/osc.ts` | OSC 1.0 decoder. An unknown type tag fails the **whole message**, not just that argument — OSC args are positional, so skipping one reads every later value at the wrong offset and a fader level becomes whatever four bytes sit there. |
 | ✅ `src/bridge/channel-b.ts` | Executor updates off the wire. A channel C push is `other-channel`, not an error: one port carries both. The middle `,sif` integer is carried un-named because its meaning is still unobserved. |
@@ -322,21 +323,23 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**Where things stand (2026-10-13, a Mac session).** The owner's Holding fixes are built on
-branch **`holding-fixes`**, pushed, **not merged and no PR**: the plan and result line, one-off
+**Where things stand (2026-10-13, evening, a Mac session).** **Merged into main, not in a
+build:** the Holding fixes and **Show mode** (status rows), at the owner's ask; next is a tag for
+the booths (`docs/FIELD_TEST.md` § Holding fixes, § Show mode). The owner takes the
+**ProPresenter lower thirds** home next. The Holding fixes: the plan and result line, one-off
 columns, the refused-load look-again and It's there, place anywhere, the same-code helpers,
 and PROMO 1 onwards (status row, the Holding view; `docs/VISUALS_DASHBOARD.md` § The owner's
 fixes, 2026-10-13). 364 tests and 256 Lua checks green. Checked in the dev kiosk on this Mac
-over CDP against `spikes/arena-stand-in.mjs` and the live lookbook only. Next: the owner's go
-to open a PR and merge, then a build for a booth (`docs/FIELD_TEST.md` § Holding fixes).
+over CDP against `spikes/arena-stand-in.mjs` and the live lookbook only.
 **ProPresenter lower thirds** wait on the owner's answers (`docs/VISUALS_DASHBOARD.md` § Open
-questions). **Show mode** is logged under Later. This Mac was left as found: the Arena
+questions). Show mode's choices taken without asking are in its commit (`785209e`) and status
+row. This Mac was left as found: the Arena
 setting and graphics folder restored, the test layout and pins removed, no kiosk, stand-in or
 Vite running.
 
 **GitHub Actions storage, cleared 2026-10-13** (it had filled: 58 artifacts, 3.5 GB, against
-0.5 GB). The release build now keeps its artifacts **one day** (`retention-days: 1`, commit on
-`holding-fixes`, in force once that merges); the release jobs read them within the run and each
+0.5 GB). The release build now keeps its artifacts **one day** (`retention-days: 1`, on main
+since the merge); the release jobs read them within the run and each
 tag's release keeps the files. All old artifacts deleted at the owner's yes; every tag's release
 still holds its installers. A Run workflow build without a tag must be downloaded within the day.
 
@@ -609,8 +612,8 @@ Later, not tonight:
   whether it opens while Arena holds the same card), OBS with its virtual camera started, then
   a build.
 - Start at login. Self-update: built 2026-10-11 (status row, Updates).
-- **Show mode** (the owner, 2026-10-13, logged for later): a "fullscreen" that takes away the
-  windows' tops (tab strips) and locks the screen to whatever mode it is in, to use the space.
+- **Show mode**: built and merged 2026-10-13 (status row). Not done: switching the window to
+  full screen with it (that stays in Settings › This computer).
 - **A service report** (high flag): from the log, LIVE, drops, saves and loads, clips
   fired, on screen or sent to the LD. **Save reminders** for MA3 and Arena. **Help per
   view** ("?"). Then, interested: a big countdown view, connection history (an hour's
@@ -621,8 +624,9 @@ Later, not tonight:
 
 ### TODO, in order
 
-0. **`holding-fixes`: a PR and merge** when the owner says, then a build; at a booth, the checks
-   in `docs/FIELD_TEST.md` § Holding fixes, and the next real 404's `[arena] POST` line.
+0. **A build of main** (Holding fixes and Show mode, merged 2026-10-13) when the owner says; at a
+   booth, the checks in `docs/FIELD_TEST.md` § Holding fixes and § Show mode, and the next real
+   404's `[arena] POST` line.
 0. **ProPresenter lower thirds:** the owner's answers first (`docs/VISUALS_DASHBOARD.md`
    § Open questions), and `spikes/propresenter-playlist.mjs` run at a booth.
 0. **v0.2.5 on GitHub** (the owner's): check its build on `release-build-log`, then publish the

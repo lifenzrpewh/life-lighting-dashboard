@@ -84,6 +84,7 @@ import { ShowfileSheet } from './components/ShowfileSheet.js'
 import { GUIDE } from '../shared/guide.js'
 import { OperatorContext, useMode } from './mode.js'
 import { useBarHidden, useTesting } from './barItems.js'
+import { useShowMode } from './showMode.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
@@ -145,6 +146,11 @@ export function App() {
 	const [barHidden, setBarHidden] = useBarHidden()
 	// Testing: Mark on the bar, on this computer (./barItems.ts).
 	const [testing, setTesting] = useTesting()
+	// Show mode (./showMode.ts): no strips, the layout and the mode held. On
+	// this computer, across a restart. `leavingShow`: the passcode sheet is open
+	// as its way out.
+	const [show, setShow] = useShowMode()
+	const [leavingShow, setLeavingShow] = useState(false)
 	// The sheets that stand in the windows' place, one at a time: Connections
 	// (a list to read), Settings (Admin's), the showfile sheet (Save As, Load).
 	// The campus is read as the showfile sheet opens, for the name Save As
@@ -520,7 +526,7 @@ export function App() {
 	const inputs = [pane?.lastInputAt ?? null, cue?.lastInputAt ?? null, ...embedReports.map((r) => r.lastInputAt)].filter(
 		(t): t is number => t !== null,
 	)
-	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs), adminIdleMs)
+	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs), adminIdleMs, show)
 	// Volunteer tapped (../shared/admin.ts): the passcode sheet, or straight in
 	// when none is set. Main decides either way; the screen follows. Outside
 	// the kiosk (a browser on the renderer alone) there is no main to ask.
@@ -537,6 +543,35 @@ export function App() {
 		}
 		const r = await api.unlockAdmin(null)
 		if (r?.ok === true) enter()
+	}
+	// Into Show mode: anyone, at once. Whatever stood over the windows goes.
+	const enterShow = () => {
+		setSheet(null)
+		setEditing(false)
+		setLayoutsOpen(false)
+		setShow(true)
+	}
+	// Out of Show mode: Admin's way in, whatever the mode (./showMode.ts).
+	const outOfShow = () => {
+		enter()
+		setShow(false)
+		setLeavingShow(false)
+	}
+	const leaveShow = async () => {
+		if (sheet === 'passcode') {
+			setSheet(null)
+			return setLeavingShow(false)
+		}
+		const api = window.life
+		if (api === undefined) return outOfShow()
+		const state = await api.adminState()
+		if (state === undefined) return
+		if (state.hasPasscode) {
+			setLeavingShow(true)
+			return setSheet('passcode')
+		}
+		const r = await api.unlockAdmin(null)
+		if (r?.ok === true) outOfShow()
 	}
 
 	// The mode is which MA user the pane is (src/renderer/mode.ts). Main does the
@@ -928,7 +963,7 @@ export function App() {
 					testing={testing}
 					onMark={() =>
 						window.life?.mark(
-							`${mode === 'operator' ? 'admin' : 'volunteer'}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
+							`${mode === 'operator' ? 'admin' : 'volunteer'}${show ? ', show mode' : ''}; layout ${layoutName === null ? 'unsaved' : `"${layoutName}"`}; showing ${viewsShown(layout, visible).map(label).join(', ') || 'nothing'}`,
 						) ?? Promise.resolve(null)
 					}
 					layoutName={layoutName}
@@ -951,6 +986,9 @@ export function App() {
 					onCollapse={collapseBar}
 					updates={updates}
 					onUpdates={() => (mode === 'operator' ? openSettings('computer') : void askAdmin())}
+					show={show}
+					onShow={enterShow}
+					onLeaveShow={() => void leaveShow()}
 				/>
 
 				{/* Above the windows, never over them: a native view cannot be overlaid.
@@ -1004,14 +1042,14 @@ export function App() {
 					{connectionsOpen ? (
 						<ConnectionsPanel
 							rows={connections}
-							operator={mode === 'operator'}
+							operator={mode === 'operator' && !show}
 							showfile={consoleOn ? showfile : null}
 							showfileFailure={failureOf(sources.showfile)}
 							onShowfile={openShowfile}
 							onOpen={(id) => openSettings(id)}
 							onClose={() => setSheet(null)}
 						/>
-					) : settingsOpen && mode === 'operator' ? (
+					) : settingsOpen && mode === 'operator' && !show ? (
 						<SettingsPanel
 							rows={connections}
 							start={settingsStart}
@@ -1027,13 +1065,21 @@ export function App() {
 							updates={updates}
 							arena={arenaStatus?.lastOk?.value ?? null}
 						/>
-					) : sheet === 'passcode' && mode === 'volunteer' ? (
-						<PasscodeSheet now={now} onUnlocked={enter} onClose={() => setSheet(null)} />
+					) : sheet === 'passcode' && (mode === 'volunteer' || leavingShow) ? (
+						<PasscodeSheet
+							now={now}
+							leaving={leavingShow}
+							onUnlocked={leavingShow ? outOfShow : enter}
+							onClose={() => {
+								setSheet(null)
+								setLeavingShow(false)
+							}}
+						/>
 					) : showfileOpen ? (
 						<ShowfileSheet
 							showfile={showfile}
 							linkLive={sources.link.state === 'live'}
-							operator={mode === 'operator'}
+							operator={mode === 'operator' && !show}
 							campus={campus}
 							now={now}
 							onClose={() => setSheet(null)}
@@ -1043,6 +1089,7 @@ export function App() {
 							<Grid
 								layout={layout}
 								editing={editing}
+								bare={show}
 								visible={visible}
 								labelOf={label}
 								nameOf={nameOf}

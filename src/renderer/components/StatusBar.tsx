@@ -40,9 +40,14 @@
 //
 // Admin hides any reading a booth does not use (Settings › Top bar,
 // ../barItems.ts), per computer. The lock, Settings and the handle always stay.
+//
+// SHOW MODE (../showMode.ts): a tool in the tray goes in. While it is on, the
+// lock gives way to Show mode's own button, the way out (Admin's passcode);
+// Layouts and Settings go, and an alert's tap opens nothing (its × still puts
+// it away). The time, the alerts and Connections, a list to read, stay.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Activity, ChevronDown, Download, Flag, Lock, LockOpen, PanelsTopLeft, Settings, X } from 'lucide-react'
+import { Activity, ChevronDown, Download, Flag, Lock, LockOpen, Maximize, PanelsTopLeft, Settings, X } from 'lucide-react'
 
 import type { LinkState, Reading } from '../../shared/reading.js'
 import type { ConnectionStatus, Tone } from '../../shared/connections.js'
@@ -156,6 +161,9 @@ export function StatusBar({
 	onCollapse,
 	updates,
 	onUpdates,
+	show,
+	onShow,
+	onLeaveShow,
 }: {
 	link: LinkState
 	/** False when the console is turned off in Settings: no link, no show. */
@@ -198,6 +206,12 @@ export function StatusBar({
 	updates: UpdateState | null
 	/** The update alert's tap. */
 	onUpdates: () => void
+	/** Show mode is on (../showMode.ts). */
+	show: boolean
+	/** Into Show mode: anyone. */
+	onShow: () => void
+	/** Out of Show mode: Admin's passcode, whatever the mode. */
+	onLeaveShow: () => void
 }) {
 	const admin = mode === 'operator'
 	const compact = collapsed
@@ -237,7 +251,7 @@ export function StatusBar({
 		>
 			{/* Where you are, and what needs a look. Gives way first. */}
 			<div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5">
-				{shows('layouts') && (
+				{shows('layouts') && !show && (
 					<button
 						type="button"
 						onClick={onLayouts}
@@ -263,9 +277,9 @@ export function StatusBar({
 						>
 							<button
 								type="button"
-								onClick={a.open === 'showfile' ? onShowfile : a.open === 'updates' ? onUpdates : onConnections}
+								onClick={show ? undefined : a.open === 'showfile' ? onShowfile : a.open === 'updates' ? onUpdates : onConnections}
 								title={a.words}
-								className={`inline-flex min-w-0 items-center gap-2 transition-[filter,transform] hover:brightness-115 active:scale-95 ${
+								className={`inline-flex min-w-0 items-center gap-2 transition-[filter,transform] ${show ? 'cursor-default' : 'hover:brightness-115 active:scale-95'} ${
 									compact ? 'pl-2' : 'pl-3'
 								} ${a.dismissable ? (compact ? 'pr-1' : 'pr-1.5') : compact ? 'pr-2' : 'pr-3'}`}
 							>
@@ -329,9 +343,16 @@ export function StatusBar({
 					{testing && (
 						<Tool icon={Flag} label="Mark this moment in the log" onClick={() => void onMark().then(setMarked)} compact={compact} />
 					)}
-					{admin && <Tool icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} compact={compact} />}
+					{shows('show') && !show && (
+						<Tool icon={Maximize} label="Show mode: no tab strips, the layout and mode held" onClick={onShow} compact={compact} />
+					)}
+					{admin && !show && <Tool icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} compact={compact} />}
 					{/* Boots into volunteer, always, and never remembers otherwise. */}
-					<LockButton admin={admin} asking={asking} onEnter={onEnter} onLeave={onLeave} compact={compact} />
+					{show ? (
+						<ShowButton admin={admin} asking={asking} onLeave={onLeaveShow} compact={compact} />
+					) : (
+						<LockButton admin={admin} asking={asking} onEnter={onEnter} onLeave={onLeave} compact={compact} />
+					)}
 				</span>
 			</div>
 
@@ -406,6 +427,28 @@ function LockButton({
 		>
 			<LockIcon key={String(admin)} size={compact ? 16 : 20} strokeWidth={2} aria-hidden className="animate-pop" />
 			{admin && 'Admin'}
+		</button>
+	)
+}
+
+/** In Show mode, where the lock was: says Show mode (and Admin, when it is),
+ *  in the selected blue, seen from across the booth. A tap asks Admin's
+ *  passcode, the way out; it never changes the mode by itself. */
+function ShowButton({ admin, asking, onLeave, compact }: { admin: boolean; asking: boolean; onLeave: () => void; compact: boolean }) {
+	const words = admin ? 'Show mode · Admin' : 'Show mode'
+	return (
+		<button
+			type="button"
+			onClick={onLeave}
+			aria-label={`${words}. Tap to leave; it asks for Admin's passcode.`}
+			aria-pressed={asking || undefined}
+			title="Leave Show mode (Admin's passcode)"
+			className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-ctl bg-accent font-bold whitespace-nowrap text-accent-ink transition-transform duration-150 active:scale-90 ${
+				compact ? 'h-7 px-2 text-[13px]' : 'h-[42px] px-3.5 text-sm'
+			}`}
+		>
+			<Lock size={compact ? 16 : 20} strokeWidth={2} aria-hidden />
+			{words}
 		</button>
 	)
 }
