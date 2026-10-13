@@ -104,9 +104,11 @@ test("a column's own words take the items they name, and its default stops", () 
 	const alpha = at(placements, 'Alpha', 'CF562')
 	assert.equal(alpha.columnName, 'WTG')
 	assert.equal(alpha.column, 8)
-	// The item labelled WTG no longer has WTG: it is a one-off now, and overflow has no room.
+	// The item labelled WTG no longer has WTG: it is a one-off now, and queues
+	// from PROMO 1 with the announcements (the owner, 2026-10-13).
 	assert.equal(at(placements, 'WTG', 'CF546')?.columnName === 'WTG', false)
-	assert.ok(unplaced.some((u) => u.label === 'WTG') || placements.some((p) => p.label === 'WTG' && p.why === 'overflow'))
+	assert.equal(at(placements, 'WTG', 'CF546').why, 'promo')
+	assert.equal(unplaced.some((u) => u.label === 'WTG'), false)
 })
 
 test('words match the whole label, or anywhere in the title and label', () => {

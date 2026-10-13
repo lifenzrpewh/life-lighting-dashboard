@@ -49,7 +49,26 @@ export type FetchRequest = {
 	/** The clips, of `clipIds`, the operator agreed to replace while they are
 	 *  on screen. Any other playing clip is refused at sending. */
 	allowLive: number[]
+	/** A file on the graphics drive the operator picked from those carrying the
+	 *  code (the owner, 2026-10-13: "show drive matches"), in place of the one
+	 *  of the lookbook's size. Main uses it only if its own search finds it. */
+	drivePick?: string
 }
+
+/** One file on the graphics drive carrying a code, for the operator to see. */
+export type DriveFile = {
+	path: string
+	size: number
+	mtimeMs: number
+	/** The lookbook's size: the lookbook's very file. */
+	matches: boolean
+	/** Named as a copy (` - Copy`). */
+	copy: boolean
+	/** The one Fetch would take, without a pick. */
+	chosen: boolean
+}
+
+export type DriveMatches = { ok: true; files: DriveFile[]; lookbookSize: number | null } | { ok: false; detail: string }
 
 /** Where a code's file will come from, said at the confirmation before
  *  anything is sent. */
@@ -67,11 +86,17 @@ export type FetchState =
 	| { state: 'finding' }
 	| { state: 'copying'; done: number; total: number }
 	| { state: 'loading'; file: string; done: number; of: number }
-	/** Arena took the load; the media check confirms the clip has it. */
-	| { state: 'sent'; file: string; clips: number; from: 'drive' | 'lookbook' }
+	/** Arena took the load; the media check confirms the clip has it.
+	 *  `doubted`: Arena said no to a load, but the clip read back holding the
+	 *  file all the same (the owner, 2026-10-13: a 404 for a clip that was
+	 *  there); what Arena said, to be shown in orange, not as a failure. */
+	| { state: 'sent'; file: string; clips: number; from: 'drive' | 'lookbook'; doubted?: string }
 	/** Copied, not loaded: nothing in Arena to load it into. */
 	| { state: 'copied'; file: string; from: 'drive' | 'lookbook' }
 	| { state: 'failed'; detail: string }
+	/** Failed, but an operator said it is in Arena all the same ("It's there",
+	 *  the owner, 2026-10-13): counted as loaded, shown in orange. */
+	| { state: 'by-hand'; detail: string }
 
 /** Each code's latest fetch, by code, stamped. */
 export type FetchStates = Record<string, FetchState & { at: number }>
@@ -85,7 +110,7 @@ export function isPlainName(name: string): boolean {
 /** A request off the IPC boundary, or null. */
 export function fetchRequestFrom(raw: unknown): FetchRequest | null {
 	if (typeof raw !== 'object' || raw === null) return null
-	const { code, want, clipIds, lookbookPath, allowLookbook, allowLive } = raw as Record<string, unknown>
+	const { code, want, clipIds, lookbookPath, allowLookbook, allowLive, drivePick } = raw as Record<string, unknown>
 	if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return null
 	if (typeof want !== 'string' || !isPlainName(want)) return null
 	if (!Array.isArray(clipIds) || clipIds.length > 100) return null
@@ -93,7 +118,16 @@ export function fetchRequestFrom(raw: unknown): FetchRequest | null {
 	if (lookbookPath !== null && !(typeof lookbookPath === 'string' && LIBRARY_FILE.test(lookbookPath) && libraryCodeIs(lookbookPath, code))) return null
 	if (typeof allowLookbook !== 'boolean') return null
 	if (!Array.isArray(allowLive) || !allowLive.every((id) => (clipIds as unknown[]).includes(id))) return null
-	return { code, want, clipIds: [...new Set(clipIds as number[])], lookbookPath, allowLookbook, allowLive: [...new Set(allowLive as number[])] }
+	if (drivePick !== undefined && !(typeof drivePick === 'string' && drivePick.length <= 400 && !/[\u0000-\u001f]/.test(drivePick))) return null
+	return {
+		code,
+		want,
+		clipIds: [...new Set(clipIds as number[])],
+		lookbookPath,
+		allowLookbook,
+		allowLive: [...new Set(allowLive as number[])],
+		...(drivePick === undefined ? {} : { drivePick }),
+	}
 }
 
 /** A folder setting: a whole path on this computer or the network, `D:\Media`,
@@ -113,4 +147,55 @@ export function libraryCodeIs(libraryPath: string, code: string): boolean {
 	const name = libraryPath.split('/').at(-1) ?? ''
 	if (!/^[A-Z]{2}\d{3}$/.test(code)) return false
 	return new RegExp(`(?<![A-Za-z0-9])${code}(?![0-9])`, 'i').test(name)
+}
+
+/** One confirmation's worth of fetches, as one run (the owner, 2026-10-13: a
+ *  result that stays): what it was, the plan it was sent with, and, once every
+ *  code has ended, what came of it. Main keeps the latest, so the result line
+ *  outlives a tab switch, and logs the plan and the result. */
+export type FetchRun = {
+	id: number
+	/** The confirmation's title: `Update all: 8 steps`, `Place`. */
+	label: string
+	at: number
+	codes: string[]
+	/** Codes the run sheet uses that needed nothing, for "2 already there". */
+	already: number
+	/** Codes main would not queue, with why. */
+	refused: Record<string, string>
+	/** Set when every code has ended. */
+	ended: number | null
+}
+
+export type RunRequest = { label: string; requests: FetchRequest[]; plan: string[]; already: number }
+
+/** A run as the page sent it, or null: every request checked as one alone. */
+export function runRequestFrom(raw: unknown): RunRequest | null {
+	if (typeof raw !== 'object' || raw === null) return null
+	const { label, requests, plan, already } = raw as Record<string, unknown>
+	if (typeof label !== 'string' || label.length > 120 || !Array.isArray(requests) || requests.length > 100) return null
+	if (!Array.isArray(plan) || plan.length > 300 || !plan.every((l) => typeof l === 'string' && l.length <= 500)) return null
+	if (typeof already !== 'number' || !Number.isSafeInteger(already) || already < 0) return null
+	const reqs = requests.map(fetchRequestFrom)
+	if (reqs.some((r) => r === null)) return null
+	return { label, requests: reqs as FetchRequest[], plan: plan as string[], already }
+}
+
+/** A run's result in a few words: `7 loaded · 1 failed · 2 already there`. */
+export function runCounts(run: FetchRun, states: FetchStates): { loaded: number; failed: number; copied: number; going: number; doubted: number; byHand: number } {
+	const out = { loaded: 0, failed: Object.keys(run.refused).length, copied: 0, going: 0, doubted: 0, byHand: 0 }
+	for (const code of run.codes) {
+		const s = states[code]
+		if (s === undefined || s.at < run.at) out.going += 1
+		else if (s.state === 'sent') {
+			out.loaded += 1
+			if (s.doubted !== undefined) out.doubted += 1
+		} else if (s.state === 'by-hand') {
+			out.loaded += 1
+			out.byHand += 1
+		} else if (s.state === 'failed') out.failed += 1
+		else if (s.state === 'copied') out.copied += 1
+		else out.going += 1
+	}
+	return out
 }

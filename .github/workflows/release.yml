@@ -8,6 +8,11 @@
 # The files are the run's artifacts, downloaded from its page; a tag also
 # makes a DRAFT GitHub Release holding them, published by hand when the time
 # comes (GitHub as the place testers download from is the end goal).
+# ARTIFACTS ARE KEPT ONE DAY: the release jobs read them within the run, and
+# the release keeps the files. At the default 90 days, some 15 builds of
+# ~250 MB filled the account's 0.5 GB of Actions storage (2026-10-13), and a
+# full store fails the uploads, so no draft and no update. A Run workflow
+# build without a tag must be downloaded from its page within the day.
 #
 # THE MAC BUILD IS UNSIGNED, ad-hoc only (`identity: "-"` in package.json):
 # no Apple Developer ID yet, so macOS asks before the first open. The way past
@@ -73,11 +78,13 @@ jobs:
             release/*.exe.blockmap
             release/latest.yml
           if-no-files-found: error
+          retention-days: 1
       - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: logs-windows
           path: logs/
+          retention-days: 1
 
   mac:
     runs-on: macos-latest # Apple Silicon
@@ -107,11 +114,13 @@ jobs:
           name: Paua-mac-arm64
           path: release/*.dmg
           if-no-files-found: error
+          retention-days: 1
       - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: logs-mac
           path: logs/
+          retention-days: 1
 
   release:
     needs: [windows, mac]

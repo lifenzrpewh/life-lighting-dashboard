@@ -6,7 +6,7 @@ import path from 'node:path'
 
 import { copyInto, downloadInto, fileUrlOf, findByCode, findMedia, pickBySize } from '../dist/src/bridge/media-files.js'
 import http from 'node:http'
-import { fetchRequestFrom, isFolderPath, isPlainName } from '../dist/src/shared/media-fetch.js'
+import { fetchRequestFrom, isFolderPath, isPlainName, runCounts, runRequestFrom } from '../dist/src/shared/media-fetch.js'
 import { openWire } from '../dist/src/bridge/arena-control.js'
 import { applyPatch, DEFAULT_SETTINGS } from '../dist/src/shared/settings.js'
 
@@ -181,4 +181,32 @@ test('a lookbook download is whole or not at all, and never overwrites', async (
 	} finally {
 		server.close()
 	}
+})
+
+test('a run is a label, checked requests, its plan and a count; its result counted from the fetches', () => {
+	const req = { code: 'CF465', want: 'CF465-Sunday-EXP-NextStepsUpstairs', clipIds: [7], lookbookPath: null, allowLookbook: false, allowLive: [] }
+	assert.deepEqual(runRequestFrom({ label: 'Update all: 1 step', requests: [req], plan: ['CF465 into HOLD FG · NSL'], already: 3 }).requests, [req])
+	assert.equal(runRequestFrom({ label: 'x', requests: [{ ...req, code: '../x' }], plan: [], already: 0 }), null)
+	assert.equal(runRequestFrom({ label: 'x', requests: [req], plan: 'no', already: 0 }), null)
+	assert.equal(runRequestFrom({ label: 'x', requests: [req], plan: [], already: -1 }), null)
+	const run = { id: 1, label: 'Update all: 4 steps', at: 1000, codes: ['CF001', 'CF002', 'CF003', 'CF004'], already: 2, refused: { CF005: 'busy' }, ended: null }
+	const states = {
+		CF001: { state: 'sent', file: 'a', clips: 1, from: 'drive', at: 2000 },
+		CF002: { state: 'sent', file: 'b', clips: 1, from: 'drive', doubted: 'Arena answered 404', at: 2000 },
+		CF003: { state: 'failed', detail: 'nope', at: 2000 },
+		// An older run's result is not this run's.
+		CF004: { state: 'sent', file: 'd', clips: 1, from: 'drive', at: 500 },
+	}
+	assert.deepEqual(runCounts(run, states), { loaded: 2, failed: 2, copied: 0, going: 1, doubted: 1, byHand: 0 })
+	// "It's there": a failure set aside counts as loaded, by hand.
+	states.CF003 = { state: 'by-hand', detail: 'Arena answered 404', at: 3000 }
+	assert.deepEqual(runCounts(run, states), { loaded: 3, failed: 1, copied: 0, going: 1, doubted: 1, byHand: 1 })
+})
+
+test('a drive pick is a path string or nothing; main uses it only if its own search finds it', () => {
+	const req = { code: 'CB100', want: 'CB100-Sunday-Fresh-Oil-V5', clipIds: [7], lookbookPath: null, allowLookbook: false, allowLive: [] }
+	assert.equal(fetchRequestFrom({ ...req, drivePick: 'G:\\Sunday Media\\CB100-Sunday-Fresh-Oil-V5.png' }).drivePick, 'G:\\Sunday Media\\CB100-Sunday-Fresh-Oil-V5.png')
+	assert.equal('drivePick' in fetchRequestFrom(req), false)
+	assert.equal(fetchRequestFrom({ ...req, drivePick: 42 }), null)
+	assert.equal(fetchRequestFrom({ ...req, drivePick: 'a\nb' }), null)
 })

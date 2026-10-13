@@ -19,6 +19,12 @@
 // - A tap on a clip opens it: Arena's picture beside the lookbook's, and the
 //   two answers, "Use the lookbook's" and "Arena's is right".
 //
+// The plan beside the grid (the owner, 2026-10-13: "we don't really know what
+// it's doing sometimes"): every moment of the run sheet, each code, and what
+// Update all does with it or why it does nothing (`explainPlan`). A tap on a
+// line opens its clip. Under the top line, the latest run's result stays until
+// the next: loaded, failed (tap for why), already there.
+//
 // Inspect only: a tap never fires a clip (Clips is for playing). Every change
 // asks first (Confirm) and is the operator's: main refuses outside operator
 // mode, and in volunteer mode the buttons that change anything are not drawn
@@ -28,34 +34,30 @@
 // it holds something, since it is rarely used.
 
 import { useState } from 'react'
-import { ArrowLeft, FileX, RefreshCw, X } from 'lucide-react'
+import { ArrowLeft, FileX, Hand, ListChecks, RefreshCw, X } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaLayer, type ArenaSlot, type ArenaStatus } from '../../shared/arena.js'
 import {
 	COLUMN_NAMES,
 	columnNamesOf,
-	clipsToUpdate,
 	codesOn,
-	fillColumns,
 	holdingLayers,
-	layerKeyOf,
-	normalBackground,
 	reserved,
 	slotCode,
 	slotMark,
-	TYPE_LAYER,
 	type Placement,
+	type PlanLine,
 	type SlotMark,
 	type Unplaced,
 } from '../../shared/holding.js'
 import { lookbookStem, lookbookThumbUrl, TYPE_NAMES, mediaCodeOf } from '../../shared/media-check.js'
-import type { FetchStates } from '../../shared/media-fetch.js'
-import { layerOfCode } from '../../shared/holding-map.js'
+import { runCounts, type FetchRun, type FetchStates } from '../../shared/media-fetch.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
 import { useOperator } from '../mode.js'
 import { ArenaReading } from './ArenaView.js'
-import { Confirm, FetchWords, ServiceLine, SmallButton, Summary, fetchShort, fileName, placeStep, under, updateStep } from './MediaCheck.js'
+import { FileCompare, FilesToCheck, Picture, ThereButton, needsLook } from './FileCompare.js'
+import { Confirm, FetchWords, ServiceLine, SmallButton, Summary, fetchShort, placeStep, under } from './MediaCheck.js'
 import { chipLabel, formatAge, staleContent } from './vocabulary.js'
 
 export function HoldingView({ status, now }: { status: Channel<ArenaStatus> | null | undefined; now: number }) {
@@ -66,8 +68,17 @@ export function HoldingView({ status, now }: { status: Channel<ArenaStatus> | nu
 type Choosing = { item: number; title: string; label: string | null; code: string; want: string; lookbookPath: string }
 type Picked = { kind: 'clip'; id: number } | { kind: 'choose'; what: Choosing } | null
 
+/** Whether the plan is open beside the grid: open unless this computer closed it. */
+const PLAN_KEY = 'paua.holding.planClosed'
+function planOpenAtFirst(): boolean {
+	try {
+		return localStorage.getItem(PLAN_KEY) !== '1'
+	} catch {
+		return true
+	}
+}
+
 const unnamedColumn = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
-const needsLook = (mark: SlotMark | null) => mark === 'may-differ' || mark === 'different' || mark === 'missing'
 
 /** `onBack`: shown in the Arena view's place, with a way back to it. */
 export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; ageMs: number | null; now: number; onBack?: () => void }) {
@@ -76,6 +87,17 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	const [picked, setPicked] = useState<Picked>(null)
 	const [details, setDetails] = useState(false)
 	const [fetchNote, setFetchNote] = useState<string | null>(null)
+	const [planOpen, setPlanOpen] = useState(planOpenAtFirst)
+	// Files to check in the grid's place (the owner, 2026-10-13).
+	const [filesOpen, setFilesOpen] = useState(false)
+	const togglePlan = () => {
+		setPlanOpen(!planOpen)
+		try {
+			localStorage.setItem(PLAN_KEY, planOpen ? '1' : '0')
+		} catch {
+			// Kept for this view only.
+		}
+	}
 	const items = m.runSheet ?? []
 	const today = codesOn(items)
 	const layers = holdingLayers(status).filter((l) => !/^playback$/i.test(l.name.trim()) || l.slots.some((s) => s.state !== 'empty'))
@@ -86,24 +108,22 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	// What goes where it is not yet: drawn in its slot.
 	const ghosts = new Map<string, Placement>()
 	for (const p of [...m.placements, ...m.fills]) if (!ghosts.has(`${p.layer}:${p.column}`)) ghosts.set(`${p.layer}:${p.column}`, p)
-	// HOLD BG's columns for the normal background: a one-off background may
-	// be chosen into one that holds it.
-	const fillable = new Set(fillColumns(items, status, m.map))
-	const normal = normalBackground(items, m.map)?.code ?? null
+	// Codes whose file needs a look, for Files to check.
+	const fileTrouble = new Set(
+		status.layers.flatMap((l) => l.slots.filter((x) => needsLook(slotMark(x, items, today, m.same, m.sizes))).map((x) => slotCode(x) ?? '')),
+	).size
 	// What has no column: the tray. Columns not named yet are said once, above.
 	const tray = m.unplaced.filter((u) => u.kind !== 'unnamed')
-
-	/** A slot a code may be placed in by hand: on its type's layer, not a
-	 *  reserved column, and empty or not on this run sheet. One on screen may
-	 *  be picked; the confirmation asks about it apart. */
-	const freeFor = (what: Choosing, layer: ArenaLayer, slot: ArenaSlot, column: number) => {
-		const type = layerOfCode(m.map, what.code)
-		if (type === null || layerKeyOf(layer) !== type) return false
-		const mark = slotMark(slot, items, today, m.same, m.sizes)
-		const filler = TYPE_LAYER['B']?.test(layer.name.trim()) === true && fillable.has(column) && slot.state !== 'playing'
-		if (filler && normal !== null && slotCode(slot) === normal) return true
-		return !reserved(layer, column, status, m.map) && (mark === 'empty' || mark === 'not-today')
+	// Placing by hand (the owner, 2026-10-13: "send a clip and place it anywhere
+	// with a confirm"): any column on its layer no other moment has.
+	const targets = choosing === null ? new Set<number>() : m.pinTargets(choosing)
+	/** A moment's code, to place by hand, or null without a lookbook file. */
+	const chooseFor = (item: number, code: string): Choosing | null => {
+		const it = items[item]
+		const file = it?.files[code]
+		return it === undefined || file === undefined ? null : { item, title: it.title, label: it.label, code, want: lookbookStem(file), lookbookPath: file }
 	}
+	const choose = (what: Choosing | null) => setPicked(what === null ? null : { kind: 'choose', what })
 
 	const tapSlot = (layer: ArenaLayer, slot: ArenaSlot, column: number) => {
 		if (choosing === null) {
@@ -111,19 +131,8 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 			if (ghost !== undefined) return operator ? m.ask('Place', [placeStep(ghost)]) : undefined
 			return setPicked(picked?.kind === 'clip' && picked.id === slot.id ? null : { kind: 'clip', id: slot.id })
 		}
-		if (!freeFor(choosing, layer, slot, column)) return
-		m.ask('Place', [
-			placeStep({
-				...choosing,
-				layer: layer.name,
-				column,
-				columnName: columnNamesOf(layer, status)[column - 1] ?? '',
-				clipId: slot.id,
-				replaces: slot.state === 'empty' ? null : { code: slotCode(slot), name: slot.name },
-				why: 'chosen',
-				live: slot.state === 'playing',
-			}),
-		])
+		if (!targets.has(slot.id)) return
+		m.askPlaceAt(choosing, column)
 		setPicked(null)
 	}
 
@@ -148,6 +157,26 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						{operator && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
 						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
+						{m.runSheet !== null && (
+							<button
+								type="button"
+								onClick={() => setFilesOpen(!filesOpen)}
+								aria-pressed={filesOpen}
+								className={`h-10 rounded-ctl px-3 text-sm ${filesOpen ? 'bg-accent text-accent-ink' : fileTrouble > 0 ? 'bg-warn/15 text-warn hover:bg-warn/25' : 'bg-booth-raise hover:bg-booth-hover'}`}
+							>
+								Files to check{fileTrouble > 0 ? ` (${fileTrouble})` : ''}
+							</button>
+						)}
+						<button
+							type="button"
+							onClick={togglePlan}
+							aria-pressed={planOpen}
+							title={planOpen ? 'Hide the plan' : 'Show the plan'}
+							className={`flex h-10 items-center gap-1.5 rounded-ctl px-3 text-sm ${planOpen ? 'bg-accent text-accent-ink' : 'bg-booth-raise hover:bg-booth-hover'}`}
+						>
+							<ListChecks size={16} aria-hidden />
+							Plan
+						</button>
 						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-ctl bg-booth-raise hover:bg-booth-hover">
 							<RefreshCw size={16} aria-hidden />
 						</button>
@@ -157,8 +186,10 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					<p className="flex items-center gap-2 pb-2 text-xs">
 						<span className="font-mono">{fetchNote}</span>
 						<FetchWords fetch={m.fetches[fetchNote]} refused={m.refused[fetchNote]} />
+						{operator && m.fetches[fetchNote]?.state === 'failed' && <ThereButton onClick={() => m.itsThere(fetchNote)} />}
 					</p>
 				)}
+				{m.lastRun !== null && <RunLine run={m.lastRun} fetches={m.fetches} onThere={operator ? m.itsThere : null} />}
 				{ageMs !== null && <p className="pb-2 text-xs text-state-stale">{formatAge(ageMs)} · Arena is not answering; this may not be what it has</p>}
 				{(details || m.service === null) && (
 					<div className="border-t border-booth-edge/60">
@@ -177,13 +208,19 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 				)}
 				<Confirm key={m.asking?.id} m={m} />
 				{tray.length > 0 && (
-					<Tray m={m} tray={tray} operator={operator} choosing={choosing} onChoose={(what) => setPicked(what === null ? null : { kind: 'choose', what })} />
+					<Tray m={m} tray={tray} operator={operator} choosing={choosing} onChoose={choose} />
 				)}
 			</div>
-			<div className={`min-h-0 flex-1 overflow-auto ${ageMs !== null ? staleContent : ''}`}>
+			<div className="flex min-h-0 flex-1">
+			<div className={`min-h-0 min-w-0 flex-1 overflow-auto ${ageMs !== null ? staleContent : ''}`}>
+				{filesOpen ? (
+					<FilesToCheck m={m} status={status} operator={operator} onClose={() => setFilesOpen(false)} />
+				) : (
+				<>
 				{choosing !== null && (
 					<p className="sticky top-0 left-0 z-20 bg-booth-bg px-4 py-2 text-sm">
-						Tap a lit slot for <span className="font-mono">{choosing.code}</span> ({choosing.label ?? choosing.title}), for this service
+						Tap a lit slot for <span className="font-mono">{choosing.code}</span> ({choosing.label ?? choosing.title}), for this service: the rest of it follows into
+						that column. <button type="button" onClick={() => setPicked(null)} className="ml-2 underline">Cancel</button>
 					</p>
 				)}
 				<table className="border-separate border-spacing-0">
@@ -209,7 +246,7 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 								</th>
 								{layer.slots.map((slot, i) => {
 									const mark = m.check === null ? null : slotMark(slot, items, today, m.same, m.sizes)
-									const target = choosing !== null && freeFor(choosing, layer, slot, i + 1)
+									const target = choosing !== null && targets.has(slot.id)
 									const ghost = choosing === null ? ghosts.get(`${layer.name}:${i + 1}`) : undefined
 									const columnName = columnNamesOf(layer, status)[i] ?? ''
 									return (
@@ -237,8 +274,172 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					</tbody>
 				</table>
 				<Legend operator={operator} />
-				{picked?.kind === 'clip' && <Inspect m={m} status={status} operator={operator} clipId={picked.id} onClose={() => setPicked(null)} />}
+				{picked?.kind === 'clip' && <Inspect m={m} status={status} operator={operator} clipId={picked.id} onClose={() => setPicked(null)} onPlace={(item, code) => choose(chooseFor(item, code))} />}
+				</>
+				)}
 			</div>
+			{planOpen && m.runSheet !== null && (
+				<PlanPanel
+					lines={m.planLines}
+					picked={picked?.kind === 'clip' ? picked.id : null}
+					onPick={(id) => setPicked({ kind: 'clip', id })}
+					pinned={new Set(m.pins.map((p) => p.item))}
+					onPlace={operator ? (item, code) => choose(chooseFor(item, code)) : null}
+					onUnpin={operator ? m.unpin : null}
+				/>
+			)}
+			</div>
+		</div>
+	)
+}
+
+const TONE: Record<PlanLine['notes'][number]['tone'], string> = {
+	do: 'bg-accent-hi',
+	ok: 'bg-state-live',
+	warn: 'bg-warn',
+	quiet: 'bg-booth-faint',
+}
+
+/** The plan, beside the grid: each moment, each code, what happens to it and
+ *  why. Blue: Update all loads it; green: nothing to do, and why; amber: no
+ *  place or no file; grey: not Arena's. */
+function PlanPanel({
+	lines,
+	picked,
+	onPick,
+	pinned,
+	onPlace,
+	onUnpin,
+}: {
+	lines: PlanLine[]
+	picked: number | null
+	onPick: (clipId: number) => void
+	/** Moments placed by hand for this service. */
+	pinned: ReadonlySet<number>
+	/** Admin: place a moment's code by hand, or take a hand placement back. */
+	onPlace: ((item: number, code: string) => void) | null
+	onUnpin: ((item: number) => void) | null
+}) {
+	const counts = { do: 0, ok: 0, warn: 0, quiet: 0 }
+	for (const l of lines) for (const n of l.notes) counts[n.tone] += 1
+	return (
+		<aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-booth-edge px-3 pb-4 text-xs">
+			<p className="sticky top-0 z-10 flex flex-wrap gap-x-3 bg-booth-bg py-2 text-booth-dim">
+				<span className="font-medium text-booth-ink">Plan</span>
+				{counts.do > 0 && <span>{counts.do} to load</span>}
+				{counts.warn > 0 && <span className="text-warn">{counts.warn} with no place</span>}
+				<span>{counts.ok} right</span>
+			</p>
+			{lines.length === 0 && <p className="text-booth-dim">Nothing on this run sheet for Arena.</p>}
+			{lines.map((l) => (
+				<div key={`${l.item}:${l.title}`} className="border-t border-booth-edge/60 py-1.5">
+					<p className="flex items-baseline gap-2">
+						<span className="min-w-0 flex-1 truncate font-medium">
+							{l.label ?? l.title}
+							{l.label !== null && l.label !== l.title && <span className="font-normal text-booth-dim"> · {l.title}</span>}
+						</span>
+						{pinned.has(l.item) && (
+							<span className="shrink-0 text-booth-dim">
+								by hand
+								{onUnpin !== null && (
+									<button type="button" onClick={() => onUnpin(l.item)} className="ml-1.5 underline hover:text-booth-ink">
+										Undo
+									</button>
+								)}
+							</span>
+						)}
+					</p>
+					{l.notes.map((n) => {
+						const row = (
+							<>
+								<span className={`mt-1 size-2 shrink-0 rounded-full ${TONE[n.tone]}`} />
+								<span className="w-11 shrink-0 font-mono">{n.code}</span>
+								<span className={`min-w-0 flex-1 ${n.tone === 'warn' ? 'text-warn' : n.tone === 'do' ? '' : 'text-booth-dim'}`}>{n.words}</span>
+							</>
+						)
+						const placeable = onPlace !== null && l.item >= 0 && n.tone !== 'quiet' && !n.words.startsWith('the lookbook has no file') && !n.words.startsWith('the normal background')
+						return (
+							<div key={n.code} className="flex items-start gap-1">
+								{n.clipId === null ? (
+									<p className="flex min-w-0 flex-1 gap-2 py-0.5">{row}</p>
+								) : (
+									<button
+										type="button"
+										onClick={() => onPick(n.clipId as number)}
+										className={`flex min-w-0 flex-1 gap-2 rounded-ctl py-0.5 text-left hover:bg-booth-hover ${picked === n.clipId ? 'bg-booth-raise' : ''}`}
+									>
+										{row}
+									</button>
+								)}
+								{placeable && (
+									<button
+										type="button"
+										onClick={() => onPlace(l.item, n.code)}
+										title={`Place ${n.code} by hand, anywhere on its layer`}
+										className="h-6 shrink-0 rounded-ctl px-1.5 text-booth-dim hover:bg-booth-hover hover:text-booth-ink"
+									>
+										Place…
+									</button>
+								)}
+							</div>
+						)
+					})}
+				</div>
+			))}
+		</aside>
+	)
+}
+
+/** The latest run's result, kept until the next (the owner, 2026-10-13):
+ *  loaded, failed, already there; a tap lists each code and why. */
+function RunLine({ run, fetches, onThere }: { run: FetchRun; fetches: FetchStates; onThere: ((code: string) => void) | null }) {
+	const [open, setOpen] = useState(false)
+	const n = runCounts(run, fetches)
+	const time = new Date(run.at).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })
+	const done = run.codes.length - n.going
+	const bad = n.failed > 0
+	return (
+		<div className="pb-2 text-xs">
+			<button type="button" onClick={() => setOpen(!open)} className={`flex min-h-8 w-full flex-wrap items-center gap-x-3 rounded-ctl px-2 text-left ${bad ? 'bg-warn/10' : 'bg-booth-raise'}`}>
+				<span className="text-booth-dim">
+					{run.label.replace(/:.*$/, '')}, {time}
+				</span>
+				{n.going > 0 ? (
+					<span>
+						{done} of {run.codes.length} done…
+					</span>
+				) : (
+					<>
+						<span>{n.loaded} loaded</span>
+						{n.doubted > 0 && <span className="text-warn">{n.doubted} after Arena said no</span>}
+						{n.byHand > 0 && <span className="text-warn">{n.byHand} said to be there by hand</span>}
+						{n.failed > 0 && <span className="font-medium text-warn">{n.failed} failed</span>}
+						{n.copied > 0 && <span>{n.copied} copied only</span>}
+						{run.already > 0 && <span className="text-booth-dim">{run.already} already there</span>}
+					</>
+				)}
+				<span className="ml-auto text-booth-dim">{open ? 'Hide' : 'Each code'}</span>
+			</button>
+			{open && (
+				<ul className="mt-1 flex flex-col gap-0.5 px-2">
+					{run.codes.map((code) => {
+						const f = fetches[code]
+						return (
+							<li key={code} className="flex items-baseline gap-2">
+								<span className="w-11 shrink-0 font-mono">{code}</span>
+								{f === undefined || f.at < run.at ? <span className="text-booth-dim">waiting</span> : <FetchWords fetch={f} refused={undefined} />}
+								{onThere !== null && f?.state === 'failed' && f.at >= run.at && <ThereButton onClick={() => onThere(code)} />}
+							</li>
+						)
+					})}
+					{Object.entries(run.refused).map(([code, why]) => (
+						<li key={`r${code}`} className="flex items-baseline gap-2">
+							<span className="w-11 shrink-0 font-mono">{code}</span>
+							<span className="text-warn">not sent: {why}</span>
+						</li>
+					))}
+				</ul>
+			)}
 		</div>
 	)
 }
@@ -256,7 +457,7 @@ function Activity({ fetches, refused, now, onTap }: { fetches: FetchStates; refu
 					key={code}
 					type="button"
 					onClick={() => onTap(code)}
-					className={`h-7 shrink-0 rounded-ctl px-2 text-xs tabular-nums ${f.state === 'failed' ? 'bg-warn/15 text-warn' : 'bg-booth-raise text-booth-dim'}`}
+					className={`h-7 shrink-0 rounded-ctl px-2 text-xs tabular-nums ${f.state === 'failed' || f.state === 'by-hand' || (f.state === 'sent' && f.doubted !== undefined) ? 'bg-warn/15 text-warn' : 'bg-booth-raise text-booth-dim'}`}
 				>
 					<span className="font-mono">{code}</span> {fetchShort(f)}
 				</button>
@@ -414,6 +615,11 @@ function Tile({
 					{mark === 'missing' ? <FileX size={13} aria-label="File missing" /> : <span className="size-2.5 rounded-full bg-warn" aria-label="May differ" />}
 				</span>
 			)}
+			{mark === 'confirmed' && (
+				<span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-black/75 text-warn" title="Said to be right by hand">
+					<Hand size={12} aria-label="By hand" />
+				</span>
+			)}
 			{slot.state === 'playing' && needsLook(mark) && <span className="absolute top-1 left-1 size-2.5 rounded-full bg-state-live" aria-label="On screen" />}
 		</button>
 	)
@@ -429,6 +635,9 @@ function Legend({ operator }: { operator: boolean }) {
 			</span>
 			<span className={item}>
 				<FileX size={13} className="text-warn" /> file missing
+			</span>
+			<span className={item}>
+				<Hand size={13} className="text-warn" /> right, said by hand
 			</span>
 			<span className={item}>
 				<span className="h-3 w-4 rounded-sm border-2 border-dashed border-accent-hi/80" /> {operator ? 'goes here: tap to place' : 'goes here'}
@@ -448,7 +657,7 @@ const VERDICT: Record<SlotMark, string> = {
 	today: 'This service',
 	different: 'Another file than the lookbook’s',
 	'may-differ': 'Named differently from the lookbook’s',
-	confirmed: 'Same as the lookbook’s, confirmed by hand',
+	confirmed: 'Right, said by hand',
 	missing: 'File missing on this computer',
 	'not-today': 'Not this service: free to replace',
 	'no-code': 'No media code: left alone',
@@ -456,7 +665,22 @@ const VERDICT: Record<SlotMark, string> = {
 
 /** One clip, looked at: Arena's picture beside the lookbook's, and the two
  *  answers to a clip that needs a look. */
-function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState; status: ArenaStatus; operator: boolean; clipId: number; onClose: () => void }) {
+function Inspect({
+	m,
+	status,
+	operator,
+	clipId,
+	onClose,
+	onPlace,
+}: {
+	m: MediaCheckState
+	status: ArenaStatus
+	operator: boolean
+	clipId: number
+	onClose: () => void
+	/** Place this clip's moment somewhere else by hand. */
+	onPlace: (item: number, code: string) => void
+}) {
 	let found: { slot: ArenaSlot; layer: string; column: string } | null = null
 	for (const layer of status.layers) {
 		const i = layer.slots.findIndex((s) => s.id === clipId)
@@ -470,11 +694,12 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 	const items = m.runSheet ?? []
 	const mark = slotMark(slot, items, codesOn(items), m.same, m.sizes)
 	const code = slotCode(slot)
-	const file = code === null ? null : (items.map((i) => i.files[code]).find((f) => f !== undefined) ?? null)
-	const want = file === null ? null : lookbookStem(file)
 	const fetch = code === null ? undefined : m.fetches[code]
-	const arenaUrl = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
-	const answers = operator && code !== null && want !== null && file !== null && slot.file !== null && (needsLook(mark) || mark === 'confirmed')
+	// The moment this clip is: the one the plan has in this clip, else the first with its code.
+	const owner =
+		code === null
+			? undefined
+			: (m.planLines.find((l) => l.item >= 0 && l.notes.some((n) => n.code === code && n.clipId === clipId)) ?? m.planLines.find((l) => l.item >= 0 && l.notes.some((n) => n.code === code)))
 	return (
 		<div className="m-4 flex max-w-3xl flex-col gap-3 rounded-ctl bg-booth-panel p-4 text-sm ring-1 ring-booth-edge ring-inset">
 			<div className="flex items-center gap-3">
@@ -490,53 +715,13 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 					<X size={18} aria-hidden />
 				</button>
 			</div>
-			<div className="flex flex-wrap gap-4">
-				<figure className="flex flex-col gap-1">
-					<Picture url={arenaUrl} large />
-					<figcaption className="max-w-64 truncate text-xs text-booth-dim" title={slot.file ?? slot.name}>
-						Arena · {slot.file === null ? slot.name : fileName(slot.file)}
-					</figcaption>
-				</figure>
-				{file !== null && want !== null && mark !== 'today' && (
-					<figure className="flex flex-col gap-1">
-						<Picture url={lookbookThumbUrl(file)} large />
-						<figcaption className="max-w-64 truncate text-xs text-booth-dim" title={want}>
-							Lookbook · {want}
-						</figcaption>
-					</figure>
-				)}
-			</div>
-			{answers && (
+			<FileCompare m={m} status={status} slot={slot} operator={operator} />
+			{operator && owner !== undefined && code !== null && !under(fetch) && (
 				<div className="flex flex-wrap items-center gap-2">
-					{!under(fetch) && mark !== 'confirmed' && (
-						<SmallButton
-							onClick={() =>
-								m.ask('Use the lookbook’s', [
-									updateStep(
-										{ code, want, clipIds: clipsToUpdate(code, want, file, status, m.same, m.sizes, m.map), lookbookPath: file, allowLookbook: false, allowLive: [] },
-										status,
-									),
-								])
-							}
-						>
-							Use the lookbook&rsquo;s
-						</SmallButton>
-					)}
-					{!under(fetch) && mark !== 'missing' && (
-						<SmallButton onClick={() => m.markSame({ code, file: slot.file as string, want, same: mark !== 'confirmed' })}>
-							{mark === 'confirmed' ? 'Undo' : 'Arena’s is right'}
-						</SmallButton>
-					)}
-					<FetchWords fetch={fetch} refused={m.refused[code]} />
+					<SmallButton onClick={() => onPlace(owner.item, code)}>Place {owner.label ?? owner.title} elsewhere…</SmallButton>
+					<span className="text-xs text-booth-dim">any free column on its layer; the rest of it follows</span>
 				</div>
 			)}
 		</div>
 	)
-}
-
-function Picture({ url, large = false, fill = false }: { url: string | null; large?: boolean; fill?: boolean }) {
-	const [failed, setFailed] = useState<string | null>(null)
-	const size = fill ? 'absolute inset-0 size-full' : large ? 'h-36 w-64' : 'h-12 w-20'
-	if (url === null || failed === url) return <span className={`${size} shrink-0 rounded-ctl bg-booth-raise`} />
-	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`${size} shrink-0 rounded-ctl bg-booth-raise ${fill ? 'object-cover' : 'object-contain'}`} />
 }

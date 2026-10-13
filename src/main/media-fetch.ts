@@ -12,28 +12,45 @@
 import path from 'node:path'
 
 import { copyInto, downloadInto, findByCode, pickBySize, type Found } from '../bridge/media-files.js'
+import { isCopyName } from '../shared/media-check.js'
 import type { ArenaCommandResult } from '../shared/arena.js'
-import { megabytes, type FetchRequest, type FetchState, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
+import { megabytes, runCounts, type DriveMatches, type FetchRequest, type FetchRun, type FetchState, type FetchStates, type MediaSource, type RunRequest } from '../shared/media-fetch.js'
 
 export type MediaFetch = {
 	/** Queue a fetch. Refused, with why, when one for that code is under way. */
 	ask(request: FetchRequest): { ok: true } | { ok: false; detail: string }
 	states(): FetchStates
+	/** Queue a confirmation's requests as one run, its plan in the log; what
+	 *  main would not queue is in the run's `refused`. */
+	run(request: RunRequest): FetchRun
+	/** The latest run, ended or not, or null before the first. */
+	lastRun(): FetchRun | null
+	/** Every file on the graphics drive carrying `code`, and which Fetch takes. */
+	drive(code: string, lookbookPath: string | null): Promise<DriveMatches>
+	/** "It's there": a failed code an operator says is in Arena all the same. */
+	there(code: string): { ok: true } | { ok: false; detail: string }
 	/** Where each request's file would come from, before anything is sent. */
 	sources(requests: FetchRequest[]): Promise<Record<string, MediaSource>>
 }
+
+/** How long after Arena refuses a load to look at the clip again. */
+const READ_BACK_MS = 1500
 
 type Resolved = { from: 'drive'; found: Found } | { from: 'lookbook'; why: string; size: number; url: string; name: string } | { from: 'none'; detail: string }
 
 export function createMediaFetch(opts: {
 	folders: () => { graphics: string | null; local: string | null }
 	open: (clipId: number, file: string, live: boolean) => Promise<ArenaCommandResult>
+	/** Whether Arena's latest reading has `file` (by name) in the clip, found. */
+	clipHas: (clipId: number, file: string) => boolean
 	lookbookSize: (libraryPath: string) => Promise<number | null>
 	lookbookUrl: (libraryPath: string) => string | null
 }): MediaFetch {
 	const states: FetchStates = {}
 	const queue: FetchRequest[] = []
 	let running = false
+	let last: FetchRun | null = null
+	let runs = 0
 
 	const set = (code: string, state: FetchState) => {
 		states[code] = { ...state, at: Date.now() }
@@ -56,6 +73,11 @@ export function createMediaFetch(opts: {
 		if (graphics === null) return lookbook('no graphics folder is set')
 		const find = await findByCode(graphics, req.code)
 		if (!find.ok) return lookbook(find.detail)
+		if (req.drivePick !== undefined) {
+			// The operator's pick, only if it is one this search found.
+			const picked = find.found.find((f) => f.path === req.drivePick)
+			return picked !== undefined ? { from: 'drive', found: picked } : { from: 'none', detail: `the picked file is no longer on the drive: ${req.drivePick}` }
+		}
 		if (size === null && req.want.toUpperCase() === req.code) {
 			// A fixed code the run sheet does not name (../shared/holding.ts
 			// `fixedPlacements`): no lookbook file to match, so the drive's newest
@@ -112,21 +134,31 @@ export function createMediaFetch(opts: {
 		// One clip at a time, each checked as it is sent (never a playing one
 		// the operator did not agree to replace on screen).
 		const failed: string[] = []
+		const doubted: string[] = []
 		for (const [i, clipId] of req.clipIds.entries()) {
 			set(req.code, { state: 'loading', file, done: i, of: req.clipIds.length })
 			const opened = await opts.open(clipId, copy.path, req.allowLive.includes(clipId))
 			if (!opened.ok) {
+				// Arena said no; look again before believing it (the owner,
+				// 2026-10-13: a 404 for a clip that held the file). Arena pushes
+				// a changed composition on its own, so a moment is enough.
+				await new Promise((r) => setTimeout(r, READ_BACK_MS))
+				if (opts.clipHas(clipId, copy.path)) {
+					console.log(`[media] ${req.code}: Arena said "${opened.detail}" for clip ${clipId}, but the clip reads back with ${file}`)
+					doubted.push(opened.detail)
+					continue
+				}
 				console.log(`[media] ${req.code}: not loaded into clip ${clipId}: ${opened.detail}`)
 				failed.push(opened.detail)
 			}
 		}
 		const loaded = req.clipIds.length - failed.length
-		console.log(`[media] ${req.code}: ${file} sent to ${loaded} of ${req.clipIds.length} clips`)
+		console.log(`[media] ${req.code}: ${file} sent to ${loaded} of ${req.clipIds.length} clips${doubted.length > 0 ? ` (${doubted.length} after Arena said no)` : ''}`)
 		if (failed.length > 0) {
 			const of = req.clipIds.length === 1 ? '' : ` (${loaded} of ${req.clipIds.length} clips)`
 			return set(req.code, { state: 'failed', detail: `copied, but not loaded into Arena${of}: ${failed[0]}` })
 		}
-		set(req.code, { state: 'sent', file, clips: loaded, from: r.from })
+		set(req.code, { state: 'sent', file, clips: loaded, from: r.from, ...(doubted[0] === undefined ? {} : { doubted: doubted[0] }) })
 	}
 
 	const next = async () => {
@@ -142,7 +174,24 @@ export function createMediaFetch(opts: {
 			}
 		} finally {
 			running = false
+			endRun()
 		}
+	}
+
+	/** The latest run's result, once every code of it has ended: in the log,
+	 *  each failure with why, so a booth's paua.log says what happened. */
+	const endRun = () => {
+		if (last === null || last.ended !== null || last.codes.some(busy)) return
+		last.ended = Date.now()
+		const n = runCounts(last, states)
+		const parts = [`${n.loaded} loaded`, ...(n.doubted > 0 ? [`${n.doubted} of them after Arena said no`] : []), ...(n.byHand > 0 ? [`${n.byHand} said to be there by hand`] : []), ...(n.failed > 0 ? [`${n.failed} failed`] : []), ...(n.copied > 0 ? [`${n.copied} copied only`] : []), ...(last.already > 0 ? [`${last.already} already there`] : [])]
+		console.log(`[holding] ${last.label} done: ${parts.join(', ')}`)
+		for (const code of last.codes) {
+			const st = states[code]
+			if (st?.state === 'failed') console.log(`[holding]   ${code} failed: ${st.detail}`)
+			if (st?.state === 'sent' && st.doubted !== undefined) console.log(`[holding]   ${code}: Arena said "${st.doubted}", but the clip has ${st.file}`)
+		}
+		for (const [code, why] of Object.entries(last.refused)) console.log(`[holding]   ${code} not queued: ${why}`)
 	}
 
 	return {
@@ -154,6 +203,47 @@ export function createMediaFetch(opts: {
 			return { ok: true }
 		},
 		states: () => ({ ...states }),
+		run({ label, requests, plan, already }) {
+			const refused: Record<string, string> = {}
+			const codes: string[] = []
+			console.log(`[holding] ${label}`)
+			for (const line of plan) console.log(`[holding]   ${line}`)
+			const run: FetchRun = { id: ++runs, label, at: Date.now(), codes, already, refused, ended: null }
+			last = run
+			for (const req of requests) {
+				if (busy(req.code)) {
+					refused[req.code] = `${req.code} is already being fetched`
+					continue
+				}
+				codes.push(req.code)
+				queue.push(req)
+				set(req.code, { state: 'finding' })
+			}
+			if (codes.length === 0) endRun()
+			else void next()
+			return { ...run, codes: [...codes], refused: { ...refused } }
+		},
+		async drive(code, lookbookPath) {
+			const { graphics } = opts.folders()
+			if (graphics === null) return { ok: false, detail: 'no graphics folder is set' }
+			const find = await findByCode(graphics, code)
+			if (!find.ok) return { ok: false, detail: find.detail }
+			const size = lookbookPath === null ? null : await opts.lookbookSize(lookbookPath)
+			const pick = size === null ? null : pickBySize(find.found, size).pick
+			return {
+				ok: true,
+				lookbookSize: size,
+				files: find.found.slice(0, 40).map((f) => ({ path: f.path, size: f.size, mtimeMs: f.mtimeMs, matches: size !== null && f.size === size, copy: isCopyName(f.path), chosen: pick?.path === f.path })),
+			}
+		},
+		there(code) {
+			const s = states[code]
+			if (s?.state !== 'failed') return { ok: false, detail: `${code} has no failure to set aside` }
+			console.log(`[media] ${code}: said to be in Arena by hand, after: ${s.detail}`)
+			set(code, { state: 'by-hand', detail: s.detail })
+			return { ok: true }
+		},
+		lastRun: () => (last === null ? null : { ...last, codes: [...last.codes], refused: { ...last.refused } }),
 		async sources(requests) {
 			const out: Record<string, MediaSource> = {}
 			for (const req of requests.slice(0, 50)) {

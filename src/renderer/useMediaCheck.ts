@@ -14,9 +14,10 @@ import { useEffect, useRef, useState } from 'react'
 import type { ArenaStatus } from '../shared/arena.js'
 import { useHoldingMap } from './holdingMapStore.js'
 import { layerOfCode } from '../shared/holding-map.js'
-import { backgroundGaps, codesOn, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { backgroundGaps, codesOn, explainPlan, oldForegrounds, pinTargets, pinsFrom, placementStep, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Pin, type PlanLine, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
+	lookbookStem,
 	nzDate,
 	offeredServices,
 	type FileSizes,
@@ -26,7 +27,7 @@ import {
 	type MediaCheck,
 	type SameMark,
 } from '../shared/media-check.js'
-import type { FetchRequest, FetchStates, MediaSource } from '../shared/media-fetch.js'
+import type { FetchRequest, FetchRun, FetchStates, MediaSource } from '../shared/media-fetch.js'
 
 export type Load<T> = { kind: 'idle' } | { kind: 'reading' } | { kind: 'read'; read: LookbookRead<T> }
 
@@ -37,6 +38,21 @@ const PICKED_KEY = 'paua.mediaCheck.service'
 /** Set when this machine picks the service by hand rather than following the
  *  run order (following is the default). */
 const BY_HAND_KEY = 'paua.mediaCheck.byHand'
+/** Moments placed by hand, per service (`Pin`, ../shared/holding.ts): on this
+ *  computer, the last few services kept. Arena holds what was loaded; this
+ *  keeps Update all from moving it back. */
+const PINS_KEY = 'paua.holding.pins'
+const PINS_SERVICES = 12
+
+function storedPins(): Record<string, Pin[]> {
+	try {
+		const raw: unknown = JSON.parse(localStorage.getItem(PINS_KEY) ?? '{}')
+		if (typeof raw !== 'object' || raw === null) return {}
+		return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, pinsFrom(v)]))
+	} catch {
+		return {}
+	}
+}
 
 function stored(key: string): string | null {
 	try {
@@ -70,10 +86,15 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	// tap it refused, by code.
 	const [fetches, setFetches] = useState<FetchStates>({})
 	const [refused, setRefused] = useState<Record<string, string>>({})
+	// The latest run (a confirmation's fetches together), as main keeps it.
+	const [lastRun, setLastRun] = useState<FetchRun | null>(null)
 	useEffect(() => {
 		if (!watchFetches || life === undefined) return
 		let alive = true
-		const poll = () => void life.mediaFetches().then((f) => alive && setFetches(f))
+		const poll = () => {
+			void life.mediaFetches().then((f) => alive && setFetches(f))
+			void life.lastMediaRun().then((r) => alive && setLastRun(r))
+		}
 		poll()
 		const id = setInterval(poll, 500)
 		return () => {
@@ -94,11 +115,27 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 			readSame()
 		})
 	}
-	const fetchCode = (req: FetchRequest) => {
-		clearRefusal(req.code)
-		void life?.fetchMedia(req).then((r) => {
-			if (!r.ok) setRefused((x) => ({ ...x, [req.code]: r.detail }))
-		})
+	/** "It's there" (the owner, 2026-10-13: "an override to say it's there and
+	 *  note it"): each clip of `code` that needs a look is marked right by hand,
+	 *  kept until a new file turns up on either side, and a failed fetch of it is
+	 *  set aside. Shown in orange from then on, never as plain green. */
+	const itsThere = (code: string) => {
+		const file = (runSheet ?? []).map((i) => i.files[code]).find((f) => f !== undefined)
+		if (file !== undefined && runSheet !== null && today !== null) {
+			for (const layer of status.layers) {
+				for (const slot of layer.slots) {
+					const arenaFile = slot.file ?? slot.missingFile
+					if (slotCode(slot) !== code || arenaFile === null) continue
+					const mark = slotMark(slot, runSheet, today, same, sizes)
+					if (mark === 'missing' || mark === 'different' || mark === 'may-differ') markSame({ code, file: arenaFile, want: lookbookStem(file), same: true, there: true })
+				}
+			}
+		}
+		if (fetches[code]?.state === 'failed') {
+			void life?.mediaThere(code).then((r) => {
+				if (!r.ok) setRefused((x) => ({ ...x, [code]: r.detail }))
+			})
+		}
 	}
 
 	const readServices = () => {
@@ -180,6 +217,16 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	}
 
 	const runSheet = service !== null && itemsFor === service.id && items.kind === 'read' && items.read.ok ? items.read.value : null
+	// Placed by hand, for this service.
+	const [pinsBy, setPinsBy] = useState<Record<string, Pin[]>>(storedPins)
+	const pins: Pin[] = service === null ? [] : (pinsBy[service.id] ?? [])
+	const savePins = (next: Pin[]) => {
+		if (service === null) return
+		const { [service.id]: _, ...rest } = pinsBy
+		const all = Object.fromEntries([...Object.entries(rest).slice(-(PINS_SERVICES - 1)), ...(next.length === 0 ? [] : [[service.id, next]])])
+		setPinsBy(all)
+		store(PINS_KEY, JSON.stringify(all))
+	}
 	// File sizes, so a file is told by its size, not its name (../shared/media-check.ts,
 	// `sameFile`): asked when the run sheet or the clips carrying its codes change.
 	const [sizes, setSizes] = useState<FileSizes | undefined>(undefined)
@@ -203,11 +250,13 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same, sizes, (code) => layerOfCode(map, code) !== null)
 	// Each item's codes into its column, by Arena's column names (../shared/holding.ts).
 	const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
-		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status, map)
-	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes, map)
+		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status, map, pins)
+	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes, map, pins)
 	// HOLD BG's gaps, for the normal background (the owner, 2026-10-06): in
 	// Update all, and drawn where they go. Not counted as something to look at.
-	const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status, map)
+	const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status, map, pins)
+	// The plan in words: every moment's codes and what Update all does with each, or why not.
+	const planLines: PlanLine[] = runSheet === null ? [] : explainPlan(runSheet, status, same, sizes, map, pins)
 	// To look at, by code, as the Holding view marks them: a code with any clip
 	// whose file may differ, differs or is missing (one of CB095's eighteen is
 	// enough), one not where its item belongs, or one with no place (a code the
@@ -239,11 +288,13 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		/** Old foregrounds to offer clearing, off until ticked (`oldForegrounds`). */
 		clears: OldClip[]
 		sources: Record<string, MediaSource> | null
+		/** Done once Load is pressed: a hand placement's pin is kept only then. */
+		after?: () => void
 	} | null>(null)
 	const askId = useRef(0)
-	const ask = (title: string, steps: UpdateStep[], unplaced: Unplaced[] = [], clears: OldClip[] = []) => {
+	const ask = (title: string, steps: UpdateStep[], unplaced: Unplaced[] = [], clears: OldClip[] = [], after?: () => void) => {
 		const id = ++askId.current
-		setAsking({ id, title, steps, unplaced, clears, sources: null })
+		setAsking({ id, title, steps, unplaced, clears, sources: null, ...(after === undefined ? {} : { after }) })
 		void life?.mediaSources(steps.map((s) => s.request)).then((sources) => setAsking((a) => (a?.id === id ? { ...a, sources } : a)))
 	}
 	/** The clips of a step that are on screen now, by where they are. */
@@ -272,7 +323,20 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		return out
 	}
 	const confirm = (answers: { lookbook: boolean; live: boolean; clear: boolean }) => {
-		for (const req of toSend(answers)) fetchCode(req)
+		asking?.after?.()
+		const requests = toSend(answers)
+		if (requests.length > 0 && asking !== null && life !== undefined) {
+			const sent = new Set(requests.map((r) => r.code))
+			// The log gets what was sent, each with where it goes, and the codes that needed nothing.
+			const lines = asking.steps.filter((s) => sent.has(s.request.code)).map((s) => s.what)
+			const settled = planLines.flatMap((l) => l.notes.filter((n) => n.tone === 'ok').map((n) => n.code))
+			const already = asking.title.startsWith('Update all') ? new Set(settled).size : 0
+			for (const r of requests) clearRefusal(r.code)
+			void life.runMedia({ label: asking.title, requests, plan: lines, already }).then((r) => {
+				if ('ok' in r) for (const req of requests) setRefused((x) => ({ ...x, [req.code]: r.detail }))
+				else setLastRun(r)
+			})
+		}
 		if (answers.clear) {
 			for (const c of asking?.clears ?? []) {
 				clearRefusal(c.code)
@@ -313,13 +377,31 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		placements,
 		unplaced,
 		fills,
+		/** The plan in words (`explainPlan`). */
+		planLines,
 		plannedUpdate,
 		same,
 		sizes,
 		// Actions, and how they are going.
 		fetches,
 		refused,
+		lastRun,
 		markSame,
+		itsThere,
+		/** Placed by hand for this service, and the actions on them. */
+		pins,
+		unpin: (item: number) => savePins(pins.filter((p) => p.item !== item)),
+		/** The clips a moment may be put in by hand, by clip id. */
+		pinTargets: (what: { item: number; code: string }): Set<number> => (runSheet === null ? new Set() : pinTargets(runSheet, status, what, map, pins)),
+		/** Put a moment in `column` (from 1) by hand: asks first, every code of
+		 *  it into that column, and keeps the pin once Load is pressed. */
+		askPlaceAt: (what: { item: number; code: string }, column: number) => {
+			if (runSheet === null) return
+			const next = [...pins.filter((p) => p.item !== what.item), { item: what.item, code: what.code, column }]
+			const steps = planPlacements(runSheet, status, map, next).placements.filter((p) => p.item === what.item).map(placementStep)
+			if (steps.length === 0) savePins(next)
+			else ask('Place by hand', steps, [], [], () => savePins(next))
+		},
 		asking,
 		ask,
 		onScreen,

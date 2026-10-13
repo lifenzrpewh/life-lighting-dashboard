@@ -12,7 +12,7 @@ import { useState } from 'react'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
-import { columnNamesOf, placementWords, type Placement, type UpdateStep } from '../../shared/holding.js'
+import { columnNamesOf, placementStep, type Placement, type UpdateStep } from '../../shared/holding.js'
 import type { LookbookService } from '../../shared/media-check.js'
 import { megabytes, type FetchRequest, type FetchStates } from '../../shared/media-fetch.js'
 import { useMediaCheck, type Load, type MediaCheckState } from '../useMediaCheck.js'
@@ -52,7 +52,8 @@ export function Summary({ m, total }: { m: MediaCheckState; total: number }) {
 	if (m.trouble > 0) return <span className="text-warn">{m.trouble === 1 ? '1 to look at' : `${m.trouble} to look at`}</span>
 	const unsettled = check.counts['no-lookbook-file']
 	if (unsettled > 0) return <span className="text-booth-dim">{unsettled === 1 ? '1 the lookbook has no file for' : `${unsettled} the lookbook has no file for`}</span>
-	if (check.counts['same-by-hand'] > 0) return <span>All {total} loaded, {check.counts['same-by-hand']} confirmed the same by hand</span>
+	// Orange, not plain (the owner, 2026-10-13): all there, some on an operator's word.
+	if (check.counts['same-by-hand'] > 0) return <span className="text-warn">All in Arena ({check.counts['same-by-hand']} by hand)</span>
 	return <span>All {total} loaded</span>
 }
 
@@ -263,10 +264,7 @@ function Tick({ on, onChange, tone, children }: { on: boolean; onChange: (on: bo
 
 /** Placing one code of one item in its column, said. */
 export function placeStep(p: Placement): UpdateStep {
-	return {
-		request: { code: p.code, want: p.want, clipIds: [p.clipId], lookbookPath: p.lookbookPath, allowLookbook: false, allowLive: [] },
-		what: `${p.code} (${p.label ?? p.title}) into ${placementWords(p)}`,
-	}
+	return placementStep(p)
 }
 
 /** Loading a newer file into clips, said: where, or how many. */
@@ -298,11 +296,13 @@ export function fetchShort(fetch: FetchStates[string]): string {
 		case 'loading':
 			return fetch.of > 1 ? `loading ${fetch.done + 1}/${fetch.of}` : 'loading'
 		case 'sent':
-			return fetch.from === 'lookbook' ? 'sent, from the lookbook' : 'sent'
+			return fetch.doubted !== undefined ? 'sent, though Arena said no' : fetch.from === 'lookbook' ? 'sent, from the lookbook' : 'sent'
 		case 'copied':
 			return 'copied, not loaded'
 		case 'failed':
 			return 'failed'
+		case 'by-hand':
+			return 'there, by hand'
 	}
 }
 
@@ -322,10 +322,11 @@ export function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | un
 			)
 		case 'sent':
 			return (
-				<span className="text-xs text-booth-dim">
+				<span className={`text-xs ${fetch.doubted === undefined ? 'text-booth-dim' : 'text-warn'}`}>
 					Sent {fetch.file}
 					{fetch.from === 'lookbook' ? ' (from the lookbook)' : ''}
 					{fetch.clips > 1 ? ` to ${fetch.clips} clips` : ''}
+					{fetch.doubted !== undefined && `; Arena answered “${fetch.doubted}”, but the clip has it`}
 				</span>
 			)
 		case 'copied':
@@ -336,6 +337,8 @@ export function FetchWords({ fetch, refused }: { fetch: FetchStates[string] | un
 			)
 		case 'failed':
 			return <span className="text-xs text-warn">{fetch.detail}</span>
+		case 'by-hand':
+			return <span className="text-xs text-warn">In Arena, said by hand (Arena had answered: {fetch.detail})</span>
 		default:
 			return <span className="text-xs text-booth-dim">{fetchShort(fetch)}…</span>
 	}

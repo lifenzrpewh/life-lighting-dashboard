@@ -78,7 +78,7 @@ import { createMediaFetch } from './media-fetch.js'
 import { createMediaSame } from './media-same.js'
 import { sameMarkFrom } from '../shared/media-check.js'
 import { presetFromFile } from '../shared/holding-map.js'
-import { fetchRequestFrom, isFolderPath, type FetchRequest, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
+import { LIBRARY_FILE, fetchRequestFrom, isFolderPath, libraryCodeIs, runRequestFrom, type DriveMatches, type FetchRequest, type FetchRun, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
@@ -447,6 +447,13 @@ app.whenReady().then(() => {
 	const mediaFetch = createMediaFetch({
 		folders: () => ({ graphics: store.current().graphicsFolder, local: store.current().localMediaFolder }),
 		open: (clipId, file, live) => arena?.open(clipId, file, live) ?? Promise.resolve({ ok: false, detail: 'no Arena is set up' }),
+		clipHas: (clipId, file) => {
+			const latest = arena?.status()?.latest
+			if (latest === null || latest === undefined || !latest.ok) return false
+			const slot = latest.value.layers.flatMap((l) => l.slots).find((s) => s.id === clipId)
+			const base = (p: string) => p.split(/[\\/]/).at(-1)?.toLowerCase() ?? ''
+			return slot !== undefined && slot.file !== null && slot.missingFile === null && base(slot.file) === base(file)
+		},
 		lookbookSize: lookbookFileSize,
 		lookbookUrl: lookbookFileUrl,
 	})
@@ -467,7 +474,9 @@ app.whenReady().then(() => {
 		for (const file of Array.isArray(wantArena) ? wantArena.slice(0, 300) : []) {
 			if (typeof file !== 'string' || !known.has(file)) continue
 			try {
-				out.arena[file] = (await fs.promises.stat(file)).size
+				const st = await fs.promises.stat(file)
+				out.arena[file] = st.size
+				;(out.arenaTimes ??= {})[file] = st.mtimeMs
 			} catch {
 				// Not on this computer: no size, and the check says the file is missing.
 			}
@@ -497,6 +506,31 @@ app.whenReady().then(() => {
 		return arena?.empty(clipId, code) ?? { ok: false, detail: 'no Arena is set up' }
 	})
 	ipcMain.handle('media:fetch-state', (e): FetchStates => (fromOurs(e) ? mediaFetch.states() : {}))
+	// A confirmation's fetches as one run (./media-fetch.ts): its plan and its
+	// result in the log, the latest kept for the Holding view's result line.
+	ipcMain.handle('media:run', (e, raw: unknown): FetchRun | { ok: false; detail: string } => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
+		const run = runRequestFrom(raw)
+		if (run === null) return { ok: false, detail: 'not a run' }
+		return mediaFetch.run(run)
+	})
+	ipcMain.handle('media:last-run', (e): FetchRun | null => (fromOurs(e) ? mediaFetch.lastRun() : null))
+	// The graphics drive's files for a code (the owner, 2026-10-13: "show drive
+	// matches"): anyone may look; picking one to load is a fetch, Admin's.
+	ipcMain.handle('media:drive', async (e, code: unknown, lookbookPath: unknown): Promise<DriveMatches> => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return { ok: false, detail: 'not a code' }
+		const lp = typeof lookbookPath === 'string' && LIBRARY_FILE.test(lookbookPath) && libraryCodeIs(lookbookPath, code) ? lookbookPath : null
+		return mediaFetch.drive(code, lp)
+	})
+	// "It's there" (the owner, 2026-10-13): a failed code set aside as in Arena.
+	ipcMain.handle('media:there', (e, code: unknown): { ok: true } | { ok: false; detail: string } => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
+		if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return { ok: false, detail: 'not a code' }
+		return mediaFetch.there(code)
+	})
 	// Browse for a folder (the Arena row's two folders): Windows' own picker,
 	// over the window that asked. Only the path comes back; Save keeps it.
 	ipcMain.handle('folder:choose', async (e, start: unknown): Promise<string | null> => {

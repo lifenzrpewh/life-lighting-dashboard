@@ -128,6 +128,58 @@ export function lookbookStem(path: string): string {
 	return fileStem(path).replace(/_\d{10,}$/, '')
 }
 
+/** When the lookbook took the file, from the upload time it appends (ms since
+ *  1970), or null. */
+export function uploadedAt(path: string): number | null {
+	const m = /_(\d{12,14})$/.exec(fileStem(path))
+	const t = m === null ? NaN : Number(m[1])
+	return Number.isFinite(t) && t > 1_000_000_000_000 ? t : null
+}
+
+/** A copy's marks at the end of a name: ` - Copy`, `_copy (2)`, ` (1)`. */
+const COPY_TAIL = /(?:[\s_-]+copy(?:\s*\(\d+\))?|\s*\(\d+\))$/i
+
+/** Whether a name is a copy of another (`CF449-Sunday-Bibles - Copy`). */
+export function isCopyName(name: string): boolean {
+	return COPY_TAIL.test(fileStem(name))
+}
+
+/** The version a name carries at its end (the owner, 2026-10-13: "same code
+ *  but different filename"): `-v5`, `_V2`, `WalkInV2`, after any copy marks
+ *  and the lookbook's upload time; null when it carries none. */
+export function versionOf(name: string): number | null {
+	const stem = lookbookStem(name).replace(COPY_TAIL, '')
+	const m = /(?<![0-9])v(\d{1,3})$/i.exec(stem)
+	return m === null ? null : Number(m[1])
+}
+
+/** Arena's file against the lookbook's, in words, for a code whose file needs
+ *  a look: which is newer by version when the names say, else what the sizes
+ *  or the names say. `newer` names the side a version says is newer. */
+export function fileVerdict(
+	arenaFile: string,
+	lookbookPath: string,
+	sizes?: FileSizes,
+): { words: string; newer: 'lookbook' | 'arena' | null } {
+	const va = versionOf(arenaFile)
+	const vl = versionOf(lookbookPath)
+	const a = sizes?.arena[arenaFile]
+	const l = sizes?.lookbook[lookbookPath]
+	if (a !== undefined && l !== undefined && a === l) return { words: 'the same file, by its size, though named differently', newer: null }
+	const bySize = a !== undefined && l !== undefined ? ` (${mb(a)} against ${mb(l)})` : ''
+	if (va !== null && vl !== null) {
+		if (va < vl) return { words: `Arena has v${va}; the lookbook has v${vl}, newer${bySize}`, newer: 'lookbook' }
+		if (va > vl) return { words: `Arena has v${va}, newer than the lookbook's v${vl}${bySize}`, newer: 'arena' }
+		return { words: `both say v${va}, but ${a !== undefined && l !== undefined ? `they are different files${bySize}` : 'the names differ otherwise'}`, newer: null }
+	}
+	if (vl !== null) return { words: `the lookbook's is v${vl}; Arena's name has no version${bySize}`, newer: 'lookbook' }
+	if (va !== null) return { words: `Arena's is v${va}; the lookbook's name has no version${bySize}`, newer: null }
+	if (a !== undefined && l !== undefined) return { words: `different files${bySize}`, newer: null }
+	return { words: 'named differently, and no sizes to tell by', newer: null }
+}
+
+const mb = (bytes: number) => `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`
+
 /** One of today's services, as the lookbook lists it. */
 export type LookbookService = {
 	id: string
@@ -222,24 +274,40 @@ export function sameKey(code: string, arenaFile: string, want: string): string {
 	return `${code.toUpperCase()}|${fileStem(arenaFile).toLowerCase()}|${want.toLowerCase()}`
 }
 
+/** What an operator's "It's there" is kept under (the owner, 2026-10-13: a
+ *  load Arena refused, or a file Arena calls missing, that is there all the
+ *  same): as a "same" mark, plus `|there`. Unlike one, it holds for a file
+ *  Arena calls missing. A new file on either side asks again. */
+export function thereKey(code: string, arenaFile: string, want: string): string {
+	return `${sameKey(code, arenaFile, want)}|there`
+}
+
+/** Whether a clip's file has been said to be right by hand: "It's there", or
+ *  "same" for a file on this computer. */
+export function markedRight(marks: ReadonlySet<string>, code: string, arenaFile: string, want: string, missing: boolean): boolean {
+	return marks.has(thereKey(code, arenaFile, want)) || (!missing && marks.has(sameKey(code, arenaFile, want)))
+}
+
 /** The most marks kept; the oldest go first. */
 export const SAME_MARKS_MAX = 500
 
 /** Marks as read back from storage: anything not a key is dropped. */
 export function sameMarksFrom(raw: unknown): string[] {
 	if (!Array.isArray(raw)) return []
-	return raw.filter((k): k is string => typeof k === 'string' && k.length <= 600 && /^[A-Z]{2}\d{3}\|[^|]+\|[^|]+$/.test(k)).slice(-SAME_MARKS_MAX)
+	return raw.filter((k): k is string => typeof k === 'string' && k.length <= 600 && /^[A-Z]{2}\d{3}\|[^|]+\|[^|]+(?:\|there)?$/.test(k)).slice(-SAME_MARKS_MAX)
 }
 
-export type SameMark = { code: string; file: string; want: string; same: boolean }
+/** `there`: "It's there" (`thereKey`), else "same" (`sameKey`). */
+export type SameMark = { code: string; file: string; want: string; same: boolean; there?: boolean }
 
 /** A mark as the page sent it, or null. Main builds the key from it, with `sameKey`. */
 export function sameMarkFrom(raw: unknown): SameMark | null {
 	if (typeof raw !== 'object' || raw === null) return null
-	const { code, file, want, same } = raw as Record<string, unknown>
+	const { code, file, want, same, there } = raw as Record<string, unknown>
 	const short = (s: unknown): s is string => typeof s === 'string' && s.length > 0 && s.length <= 260 && !s.includes('|')
 	if (typeof code !== 'string' || !/^[A-Za-z]{2}\d{3}$/.test(code) || !short(file) || !short(want) || typeof same !== 'boolean') return null
-	return { code, file, want, same }
+	if (there !== undefined && typeof there !== 'boolean') return null
+	return { code, file, want, same, ...(there === true ? { there: true } : {}) }
 }
 
 /** One code against what Arena holds. Several clips may carry it; the best
@@ -257,11 +325,14 @@ function checkCode(
 	const w = { want: want.stem, wantPath: want.path }
 	const right = places.find((p) => p.onDisk && sameFile(p.file, want.path, want.stem, sizes))
 	if (right !== undefined) return { code, state: 'ok', at: strip(right) }
+	// "It's there" wins over Pāua's reading, a file Arena calls missing included
+	// (the owner, 2026-10-13); a "same" mark only for a file on this computer,
+	// so an old one never hides a file gone missing since.
+	const marked = places.find((p) => marks.has(thereKey(code, p.file, want.stem)) || (p.onDisk && marks.has(sameKey(code, p.file, want.stem))))
+	if (marked !== undefined) return { code, state: 'same-by-hand', at: strip(marked), ...w }
 	// A missing file has no size to compare: its name says whether it was the right one.
 	const rightButGone = places.find((p) => !p.onDisk && fileStem(p.file).toLowerCase() === want.stem.toLowerCase())
 	if (rightButGone !== undefined) return { code, state: 'not-on-disk', at: strip(rightButGone), ...w }
-	const marked = places.find((p) => p.onDisk && marks.has(sameKey(code, p.file, want.stem)))
-	if (marked !== undefined) return { code, state: 'same-by-hand', at: strip(marked), ...w }
 	const first = places[0] as Place & { onDisk: boolean }
 	if (!first.onDisk) return { code, state: 'not-on-disk', at: strip(first), ...w }
 	const by = sizes?.arena[first.file] !== undefined && sizes.lookbook[want.path] !== undefined ? 'size' : 'name'
@@ -270,7 +341,12 @@ function checkCode(
 
 /** File sizes, by path: Arena's files on this computer and the lookbook's
  *  library files, as main read them (src/main/media-sizes.ts). */
-export type FileSizes = { arena: Record<string, number>; lookbook: Record<string, number> }
+export type FileSizes = {
+	arena: Record<string, number>
+	lookbook: Record<string, number>
+	/** When each of Arena's files was last written, ms since 1970: to say which is newer. */
+	arenaTimes?: Record<string, number>
+}
 
 /** Whether Arena's file is the lookbook's. ✅ 2026-10-05: the lookbook's
  *  files are byte for byte the graphics drive's (CF588, CF445, CF449, CF546,
