@@ -680,3 +680,12 @@ test('where a moment may be put by hand: its layer, not a reserved column, not a
 	// Storage: anything not a pin is dropped.
 	assert.deepEqual(pinsFrom([{ item: 1, code: 'CF465', column: 11, extra: 1 }, { item: -1, code: 'CF465', column: 2 }, 'x']), [{ item: 1, code: 'CF465', column: 11 }])
 })
+
+test('a one-off put by hand inside the named columns: its background follows, said as beside it', () => {
+	const s = composition()
+	s.layers[3].slots[11] = clip('CF702-Conf-WorshipNight.png') // the last PROMO, by hand
+	const p = planPlacements([...ITEMS, oneOff('Worship Night', 'CF702', 'CB702')], s).placements.find((x) => x.code === 'CB702')
+	assert.equal(p.column, 12)
+	assert.equal(p.why, 'follows')
+	assert.match(placementWords(p), /^HOLD BG · PROMO \(column 12\), beside its foreground$/)
+})

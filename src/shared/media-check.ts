@@ -128,6 +128,58 @@ export function lookbookStem(path: string): string {
 	return fileStem(path).replace(/_\d{10,}$/, '')
 }
 
+/** When the lookbook took the file, from the upload time it appends (ms since
+ *  1970), or null. */
+export function uploadedAt(path: string): number | null {
+	const m = /_(\d{12,14})$/.exec(fileStem(path))
+	const t = m === null ? NaN : Number(m[1])
+	return Number.isFinite(t) && t > 1_000_000_000_000 ? t : null
+}
+
+/** A copy's marks at the end of a name: ` - Copy`, `_copy (2)`, ` (1)`. */
+const COPY_TAIL = /(?:[\s_-]+copy(?:\s*\(\d+\))?|\s*\(\d+\))$/i
+
+/** Whether a name is a copy of another (`CF449-Sunday-Bibles - Copy`). */
+export function isCopyName(name: string): boolean {
+	return COPY_TAIL.test(fileStem(name))
+}
+
+/** The version a name carries at its end (the owner, 2026-10-13: "same code
+ *  but different filename"): `-v5`, `_V2`, `WalkInV2`, after any copy marks
+ *  and the lookbook's upload time; null when it carries none. */
+export function versionOf(name: string): number | null {
+	const stem = lookbookStem(name).replace(COPY_TAIL, '')
+	const m = /(?<![0-9])v(\d{1,3})$/i.exec(stem)
+	return m === null ? null : Number(m[1])
+}
+
+/** Arena's file against the lookbook's, in words, for a code whose file needs
+ *  a look: which is newer by version when the names say, else what the sizes
+ *  or the names say. `newer` names the side a version says is newer. */
+export function fileVerdict(
+	arenaFile: string,
+	lookbookPath: string,
+	sizes?: FileSizes,
+): { words: string; newer: 'lookbook' | 'arena' | null } {
+	const va = versionOf(arenaFile)
+	const vl = versionOf(lookbookPath)
+	const a = sizes?.arena[arenaFile]
+	const l = sizes?.lookbook[lookbookPath]
+	if (a !== undefined && l !== undefined && a === l) return { words: 'the same file, by its size, though named differently', newer: null }
+	const bySize = a !== undefined && l !== undefined ? ` (${mb(a)} against ${mb(l)})` : ''
+	if (va !== null && vl !== null) {
+		if (va < vl) return { words: `Arena has v${va}; the lookbook has v${vl}, newer${bySize}`, newer: 'lookbook' }
+		if (va > vl) return { words: `Arena has v${va}, newer than the lookbook's v${vl}${bySize}`, newer: 'arena' }
+		return { words: `both say v${va}, but ${a !== undefined && l !== undefined ? `they are different files${bySize}` : 'the names differ otherwise'}`, newer: null }
+	}
+	if (vl !== null) return { words: `the lookbook's is v${vl}; Arena's name has no version${bySize}`, newer: 'lookbook' }
+	if (va !== null) return { words: `Arena's is v${va}; the lookbook's name has no version${bySize}`, newer: null }
+	if (a !== undefined && l !== undefined) return { words: `different files${bySize}`, newer: null }
+	return { words: 'named differently, and no sizes to tell by', newer: null }
+}
+
+const mb = (bytes: number) => `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`
+
 /** One of today's services, as the lookbook lists it. */
 export type LookbookService = {
 	id: string
@@ -289,7 +341,12 @@ function checkCode(
 
 /** File sizes, by path: Arena's files on this computer and the lookbook's
  *  library files, as main read them (src/main/media-sizes.ts). */
-export type FileSizes = { arena: Record<string, number>; lookbook: Record<string, number> }
+export type FileSizes = {
+	arena: Record<string, number>
+	lookbook: Record<string, number>
+	/** When each of Arena's files was last written, ms since 1970: to say which is newer. */
+	arenaTimes?: Record<string, number>
+}
 
 /** Whether Arena's file is the lookbook's. ✅ 2026-10-05: the lookbook's
  *  files are byte for byte the graphics drive's (CF588, CF445, CF449, CF546,

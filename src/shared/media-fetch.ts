@@ -49,7 +49,26 @@ export type FetchRequest = {
 	/** The clips, of `clipIds`, the operator agreed to replace while they are
 	 *  on screen. Any other playing clip is refused at sending. */
 	allowLive: number[]
+	/** A file on the graphics drive the operator picked from those carrying the
+	 *  code (the owner, 2026-10-13: "show drive matches"), in place of the one
+	 *  of the lookbook's size. Main uses it only if its own search finds it. */
+	drivePick?: string
 }
+
+/** One file on the graphics drive carrying a code, for the operator to see. */
+export type DriveFile = {
+	path: string
+	size: number
+	mtimeMs: number
+	/** The lookbook's size: the lookbook's very file. */
+	matches: boolean
+	/** Named as a copy (` - Copy`). */
+	copy: boolean
+	/** The one Fetch would take, without a pick. */
+	chosen: boolean
+}
+
+export type DriveMatches = { ok: true; files: DriveFile[]; lookbookSize: number | null } | { ok: false; detail: string }
 
 /** Where a code's file will come from, said at the confirmation before
  *  anything is sent. */
@@ -91,7 +110,7 @@ export function isPlainName(name: string): boolean {
 /** A request off the IPC boundary, or null. */
 export function fetchRequestFrom(raw: unknown): FetchRequest | null {
 	if (typeof raw !== 'object' || raw === null) return null
-	const { code, want, clipIds, lookbookPath, allowLookbook, allowLive } = raw as Record<string, unknown>
+	const { code, want, clipIds, lookbookPath, allowLookbook, allowLive, drivePick } = raw as Record<string, unknown>
 	if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return null
 	if (typeof want !== 'string' || !isPlainName(want)) return null
 	if (!Array.isArray(clipIds) || clipIds.length > 100) return null
@@ -99,7 +118,16 @@ export function fetchRequestFrom(raw: unknown): FetchRequest | null {
 	if (lookbookPath !== null && !(typeof lookbookPath === 'string' && LIBRARY_FILE.test(lookbookPath) && libraryCodeIs(lookbookPath, code))) return null
 	if (typeof allowLookbook !== 'boolean') return null
 	if (!Array.isArray(allowLive) || !allowLive.every((id) => (clipIds as unknown[]).includes(id))) return null
-	return { code, want, clipIds: [...new Set(clipIds as number[])], lookbookPath, allowLookbook, allowLive: [...new Set(allowLive as number[])] }
+	if (drivePick !== undefined && !(typeof drivePick === 'string' && drivePick.length <= 400 && !/[\u0000-\u001f]/.test(drivePick))) return null
+	return {
+		code,
+		want,
+		clipIds: [...new Set(clipIds as number[])],
+		lookbookPath,
+		allowLookbook,
+		allowLive: [...new Set(allowLive as number[])],
+		...(drivePick === undefined ? {} : { drivePick }),
+	}
 }
 
 /** A folder setting: a whole path on this computer or the network, `D:\Media`,

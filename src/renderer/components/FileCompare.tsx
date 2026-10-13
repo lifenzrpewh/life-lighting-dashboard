@@ -1,0 +1,295 @@
+// Same code, different file (the owner, 2026-10-13: "give me some good ways to
+// navigate same code but different filename, I think that's causing some
+// problems"), for the Holding view (./HoldingView.tsx):
+// - Side by side: Arena's picture and file beside the lookbook's, each with its
+//   name, size and date, and the side a version says is newer marked.
+// - Versions read from the names (`-v4`, `WalkInV2`): "Arena has v4; the
+//   lookbook has v5, newer" (../../shared/media-check.ts `fileVerdict`).
+// - The drive's files for the code: every one carrying it, which is the
+//   lookbook's (by size), which is a copy, and which Fetch would take; Admin may
+//   load another.
+// - Files to check: every code whose file needs a look, on one screen, each
+//   with the same comparison and answers.
+//
+// Every load asks first, as everywhere in Holding (./MediaCheck.tsx Confirm).
+
+import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronRight, Hand, X } from 'lucide-react'
+
+import { thumbnailUrl, type ArenaSlot, type ArenaStatus } from '../../shared/arena.js'
+import { clipsToUpdate, codesOn, columnNamesOf, slotCode, slotMark, type SlotMark } from '../../shared/holding.js'
+import { fileVerdict, lookbookStem, lookbookThumbUrl, uploadedAt } from '../../shared/media-check.js'
+import type { DriveMatches, FetchRequest } from '../../shared/media-fetch.js'
+import type { MediaCheckState } from '../useMediaCheck.js'
+import { FetchWords, SmallButton, fileName, under, updateStep } from './MediaCheck.js'
+
+export const needsLook = (mark: SlotMark | null) => mark === 'may-differ' || mark === 'different' || mark === 'missing'
+
+const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`
+const when = (ms: number) =>
+	new Date(ms).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+
+/** One clip of a code against the lookbook's file, and what an operator may
+ *  do about it. */
+export function FileCompare({
+	m,
+	status,
+	slot,
+	operator,
+}: {
+	m: MediaCheckState
+	status: ArenaStatus
+	slot: ArenaSlot
+	operator: boolean
+}) {
+	const items = m.runSheet ?? []
+	const mark = slotMark(slot, items, codesOn(items), m.same, m.sizes)
+	const code = slotCode(slot)
+	const file = code === null ? null : (items.map((i) => i.files[code]).find((f) => f !== undefined) ?? null)
+	const want = file === null ? null : lookbookStem(file)
+	const fetch = code === null ? undefined : m.fetches[code]
+	const arenaFile = slot.file ?? slot.missingFile
+	const verdict = arenaFile === null || file === null || mark === 'today' ? null : fileVerdict(arenaFile, file, m.sizes)
+	const arenaSize = slot.file === null ? undefined : m.sizes?.arena[slot.file]
+	const arenaTime = slot.file === null ? undefined : m.sizes?.arenaTimes?.[slot.file]
+	const lookbookSize = file === null ? undefined : m.sizes?.lookbook[file]
+	const uploaded = file === null ? null : uploadedAt(file)
+	const answers = operator && code !== null && want !== null && file !== null && arenaFile !== null && (needsLook(mark) || mark === 'confirmed')
+	const request = (extra: Partial<FetchRequest> = {}): FetchRequest | null =>
+		code === null || want === null || file === null
+			? null
+			: { code, want, clipIds: clipsToUpdate(code, want, file, status, m.same, m.sizes, m.map), lookbookPath: file, allowLookbook: false, allowLive: [], ...extra }
+	return (
+		<div className="flex flex-col gap-3">
+			<div className="flex flex-wrap gap-4">
+				<Side
+					title="Arena"
+					url={slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)}
+					name={arenaFile === null ? slot.name : fileName(arenaFile)}
+					facts={[
+						slot.missingFile !== null ? 'missing on this computer' : arenaSize === undefined ? null : megabytes(arenaSize),
+						arenaTime === undefined ? null : `saved ${when(arenaTime)}`,
+					]}
+					newer={verdict?.newer === 'arena'}
+				/>
+				{file !== null && want !== null && mark !== 'today' && (
+					<Side
+						title="Lookbook"
+						url={lookbookThumbUrl(file)}
+						name={want}
+						facts={[lookbookSize === undefined ? null : megabytes(lookbookSize), uploaded === null ? null : `uploaded ${when(uploaded)}`]}
+						newer={verdict?.newer === 'lookbook'}
+					/>
+				)}
+			</div>
+			{verdict !== null && (
+				<p className={`text-sm ${needsLook(mark) ? 'text-warn' : 'text-booth-dim'}`}>
+					{slot.missingFile !== null && 'Arena cannot find its file on this computer; '}
+					{verdict.words}
+				</p>
+			)}
+			{answers && (
+				<div className="flex flex-wrap items-center gap-2">
+					{!under(fetch) && mark !== 'confirmed' && (
+						<SmallButton
+							onClick={() => {
+								const req = request()
+								if (req !== null) m.ask('Use the lookbook’s', [updateStep(req, status)])
+							}}
+						>
+							Use the lookbook&rsquo;s
+						</SmallButton>
+					)}
+					{!under(fetch) && mark === 'confirmed' && (
+						<SmallButton
+							onClick={() => {
+								// Either kind of mark: both are undone.
+								m.markSame({ code, file: arenaFile, want, same: false })
+								m.markSame({ code, file: arenaFile, want, same: false, there: true })
+							}}
+						>
+							Undo
+						</SmallButton>
+					)}
+					{!under(fetch) && mark !== 'confirmed' && mark !== 'missing' && (
+						<SmallButton onClick={() => m.markSame({ code, file: arenaFile, want, same: true })}>Arena&rsquo;s is right</SmallButton>
+					)}
+					{!under(fetch) && mark === 'missing' && <ThereButton onClick={() => m.itsThere(code)} />}
+					<FetchWords fetch={fetch} refused={m.refused[code]} />
+				</div>
+			)}
+			{code !== null && (
+				<DriveFiles
+					code={code}
+					lookbookPath={file}
+					arenaFile={arenaFile}
+					onLoad={
+						operator && !under(fetch)
+							? (path) => {
+									const req = request({ drivePick: path })
+									if (req !== null) m.ask(`Load ${fileName(path)} from the drive`, [updateStep(req, status)])
+								}
+							: null
+					}
+				/>
+			)}
+		</div>
+	)
+}
+
+function Side({ title, url, name, facts, newer }: { title: string; url: string | null; name: string; facts: (string | null)[]; newer: boolean }) {
+	const shown = facts.filter((f): f is string => f !== null)
+	return (
+		<figure className="flex flex-col gap-1">
+			<Picture url={url} large />
+			<figcaption className="flex max-w-64 flex-col text-xs">
+				<span className="flex items-center gap-1.5">
+					<span className="font-medium">{title}</span>
+					{newer && <span className="rounded bg-accent/30 px-1 text-[11px]">newer</span>}
+				</span>
+				<span className="truncate text-booth-dim" title={name}>
+					{name}
+				</span>
+				{shown.length > 0 && <span className="text-booth-dim">{shown.join(' · ')}</span>}
+			</figcaption>
+		</figure>
+	)
+}
+
+/** The graphics drive's files for a code, read when opened: which is the
+ *  lookbook's (by size), which a copy, which Fetch would take. */
+function DriveFiles({
+	code,
+	lookbookPath,
+	arenaFile,
+	onLoad,
+}: {
+	code: string
+	lookbookPath: string | null
+	arenaFile: string | null
+	onLoad: ((path: string) => void) | null
+}) {
+	const [open, setOpen] = useState(false)
+	const [read, setRead] = useState<DriveMatches | null>(null)
+	useEffect(() => {
+		if (!open) return
+		let alive = true
+		setRead(null)
+		void window.life?.mediaDrive(code, lookbookPath).then((r) => alive && setRead(r))
+		return () => {
+			alive = false
+		}
+	}, [open, code, lookbookPath])
+	const inArena = arenaFile === null ? null : fileName(arenaFile).toLowerCase()
+	return (
+		<div className="text-xs">
+			<button type="button" onClick={() => setOpen(!open)} className="flex h-8 items-center gap-1 rounded-ctl px-1 text-booth-dim hover:text-booth-ink">
+				{open ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}
+				{code} on the graphics drive
+			</button>
+			{open &&
+				(read === null ? (
+					<p className="px-1 text-booth-dim">Looking on the drive…</p>
+				) : !read.ok ? (
+					<p className="px-1 text-warn">{read.detail}</p>
+				) : read.files.length === 0 ? (
+					<p className="px-1 text-booth-dim">No file on the drive carries {code}.</p>
+				) : (
+					<ul className="flex flex-col gap-1 px-1">
+						{read.files.map((f) => {
+							const name = fileName(f.path)
+							return (
+								<li key={f.path} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-ctl bg-booth-raise px-2 py-1.5">
+									<span className="min-w-0 flex-1 truncate" title={f.path}>
+										{name}
+									</span>
+									<span className="text-booth-dim tabular-nums">
+										{megabytes(f.size)} · {when(f.mtimeMs)}
+									</span>
+									{f.matches && <Tag tone="good">the lookbook&rsquo;s file</Tag>}
+									{f.copy && <Tag tone="plain">a copy</Tag>}
+									{f.chosen && <Tag tone="plain">Fetch uses this</Tag>}
+									{inArena === name.toLowerCase() && <Tag tone="plain">the name Arena has</Tag>}
+									{onLoad !== null && (
+										<button type="button" onClick={() => onLoad(f.path)} className="h-7 rounded-ctl px-2 font-medium hover:bg-booth-hover">
+											Load this one
+										</button>
+									)}
+								</li>
+							)
+						})}
+						{read.lookbookSize === null && <li className="text-booth-dim">The lookbook did not say its file&rsquo;s size, so none is matched by size.</li>}
+						{read.lookbookSize !== null && !read.files.some((f) => f.matches) && (
+							<li className="text-warn">None is the lookbook&rsquo;s file (by size): Fetch would download the lookbook&rsquo;s own, if you say yes.</li>
+						)}
+					</ul>
+				))}
+		</div>
+	)
+}
+
+function Tag({ tone, children }: { tone: 'good' | 'plain'; children: React.ReactNode }) {
+	return <span className={`rounded px-1.5 text-[11px] ${tone === 'good' ? 'bg-state-live/20 text-state-live' : 'bg-booth-edge/60 text-booth-dim'}`}>{children}</span>
+}
+
+/** Every code whose file needs a look, on one screen (the owner, 2026-10-13):
+ *  one clip of each compared, the others counted. */
+export function FilesToCheck({ m, status, operator, onClose }: { m: MediaCheckState; status: ArenaStatus; operator: boolean; onClose: () => void }) {
+	const items = m.runSheet ?? []
+	const today = codesOn(items)
+	const byCode = new Map<string, { slot: ArenaSlot; where: string }[]>()
+	for (const layer of status.layers) {
+		const names = columnNamesOf(layer, status)
+		layer.slots.forEach((slot, i) => {
+			const code = slotCode(slot)
+			if (code === null || !needsLook(slotMark(slot, items, today, m.same, m.sizes))) return
+			const name = names[i] ?? ''
+			const where = `${layer.name} · ${/^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === '' ? `column ${i + 1}` : name}`
+			byCode.set(code, [...(byCode.get(code) ?? []), { slot, where }])
+		})
+	}
+	return (
+		<div className="flex flex-col gap-3 p-4">
+			<div className="flex items-center gap-3">
+				<h3 className="text-base font-bold">Files to check</h3>
+				<span className="text-sm text-booth-dim">
+					{byCode.size === 0 ? 'Every file on this run sheet is the lookbook’s, or said right by hand.' : `${byCode.size} ${byCode.size === 1 ? 'code' : 'codes'} whose file differs from the lookbook’s, or is missing`}
+				</span>
+				<button type="button" onClick={onClose} aria-label="Back to the grid" className="ml-auto grid size-10 place-items-center rounded-ctl hover:bg-booth-hover">
+					<X size={18} aria-hidden />
+				</button>
+			</div>
+			{[...byCode.entries()].map(([code, clips]) => (
+				<section key={code} className="flex flex-col gap-2 rounded-ctl bg-booth-panel p-4 ring-1 ring-booth-edge ring-inset">
+					<p className="text-sm">
+						<span className="font-mono font-medium">{code}</span>
+						<span className="text-booth-dim">
+							{' '}
+							· {clips[0]?.where}
+							{clips.length > 1 && ` and ${clips.length - 1} more ${clips.length === 2 ? 'clip' : 'clips'}`}
+						</span>
+					</p>
+					<FileCompare m={m} status={status} slot={(clips[0] as { slot: ArenaSlot }).slot} operator={operator} />
+				</section>
+			))}
+		</div>
+	)
+}
+
+export function Picture({ url, large = false, fill = false }: { url: string | null; large?: boolean; fill?: boolean }) {
+	const [failed, setFailed] = useState<string | null>(null)
+	const size = fill ? 'absolute inset-0 size-full' : large ? 'h-36 w-64' : 'h-12 w-20'
+	if (url === null || failed === url) return <span className={`${size} shrink-0 rounded-ctl bg-booth-raise`} />
+	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`${size} shrink-0 rounded-ctl bg-booth-raise ${fill ? 'object-cover' : 'object-contain'}`} />
+}
+
+/** "It's there" (the owner, 2026-10-13): Pāua's reading set aside on an
+ *  operator's word, kept until a new file turns up, and shown in orange. */
+export function ThereButton({ onClick }: { onClick: () => void }) {
+	return (
+		<button type="button" onClick={onClick} className="flex h-8 shrink-0 items-center gap-1.5 rounded-ctl bg-warn/15 px-2.5 text-xs font-medium text-warn hover:bg-warn/25">
+			<Hand size={13} aria-hidden />
+			It&rsquo;s there
+		</button>
+	)
+}

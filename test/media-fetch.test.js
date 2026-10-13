@@ -202,3 +202,11 @@ test('a run is a label, checked requests, its plan and a count; its result count
 	states.CF003 = { state: 'by-hand', detail: 'Arena answered 404', at: 3000 }
 	assert.deepEqual(runCounts(run, states), { loaded: 3, failed: 1, copied: 0, going: 1, doubted: 1, byHand: 1 })
 })
+
+test('a drive pick is a path string or nothing; main uses it only if its own search finds it', () => {
+	const req = { code: 'CB100', want: 'CB100-Sunday-Fresh-Oil-V5', clipIds: [7], lookbookPath: null, allowLookbook: false, allowLive: [] }
+	assert.equal(fetchRequestFrom({ ...req, drivePick: 'G:\\Sunday Media\\CB100-Sunday-Fresh-Oil-V5.png' }).drivePick, 'G:\\Sunday Media\\CB100-Sunday-Fresh-Oil-V5.png')
+	assert.equal('drivePick' in fetchRequestFrom(req), false)
+	assert.equal(fetchRequestFrom({ ...req, drivePick: 42 }), null)
+	assert.equal(fetchRequestFrom({ ...req, drivePick: 'a\nb' }), null)
+})

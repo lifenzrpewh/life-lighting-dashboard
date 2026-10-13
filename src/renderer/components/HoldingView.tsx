@@ -40,7 +40,6 @@ import { thumbnailUrl, type ArenaLayer, type ArenaSlot, type ArenaStatus } from 
 import {
 	COLUMN_NAMES,
 	columnNamesOf,
-	clipsToUpdate,
 	codesOn,
 	holdingLayers,
 	reserved,
@@ -57,7 +56,8 @@ import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
 import { useOperator } from '../mode.js'
 import { ArenaReading } from './ArenaView.js'
-import { Confirm, FetchWords, ServiceLine, SmallButton, Summary, fetchShort, fileName, placeStep, under, updateStep } from './MediaCheck.js'
+import { FileCompare, FilesToCheck, Picture, ThereButton, needsLook } from './FileCompare.js'
+import { Confirm, FetchWords, ServiceLine, SmallButton, Summary, fetchShort, placeStep, under } from './MediaCheck.js'
 import { chipLabel, formatAge, staleContent } from './vocabulary.js'
 
 export function HoldingView({ status, now }: { status: Channel<ArenaStatus> | null | undefined; now: number }) {
@@ -79,7 +79,6 @@ function planOpenAtFirst(): boolean {
 }
 
 const unnamedColumn = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
-const needsLook = (mark: SlotMark | null) => mark === 'may-differ' || mark === 'different' || mark === 'missing'
 
 /** `onBack`: shown in the Arena view's place, with a way back to it. */
 export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; ageMs: number | null; now: number; onBack?: () => void }) {
@@ -89,6 +88,8 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	const [details, setDetails] = useState(false)
 	const [fetchNote, setFetchNote] = useState<string | null>(null)
 	const [planOpen, setPlanOpen] = useState(planOpenAtFirst)
+	// Files to check in the grid's place (the owner, 2026-10-13).
+	const [filesOpen, setFilesOpen] = useState(false)
 	const togglePlan = () => {
 		setPlanOpen(!planOpen)
 		try {
@@ -107,6 +108,10 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 	// What goes where it is not yet: drawn in its slot.
 	const ghosts = new Map<string, Placement>()
 	for (const p of [...m.placements, ...m.fills]) if (!ghosts.has(`${p.layer}:${p.column}`)) ghosts.set(`${p.layer}:${p.column}`, p)
+	// Codes whose file needs a look, for Files to check.
+	const fileTrouble = new Set(
+		status.layers.flatMap((l) => l.slots.filter((x) => needsLook(slotMark(x, items, today, m.same, m.sizes))).map((x) => slotCode(x) ?? '')),
+	).size
 	// What has no column: the tray. Columns not named yet are said once, above.
 	const tray = m.unplaced.filter((u) => u.kind !== 'unnamed')
 	// Placing by hand (the owner, 2026-10-13: "send a clip and place it anywhere
@@ -152,6 +157,16 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						{operator && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
 						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
+						{m.runSheet !== null && (
+							<button
+								type="button"
+								onClick={() => setFilesOpen(!filesOpen)}
+								aria-pressed={filesOpen}
+								className={`h-10 rounded-ctl px-3 text-sm ${filesOpen ? 'bg-accent text-accent-ink' : fileTrouble > 0 ? 'bg-warn/15 text-warn hover:bg-warn/25' : 'bg-booth-raise hover:bg-booth-hover'}`}
+							>
+								Files to check{fileTrouble > 0 ? ` (${fileTrouble})` : ''}
+							</button>
+						)}
 						<button
 							type="button"
 							onClick={togglePlan}
@@ -198,6 +213,10 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 			</div>
 			<div className="flex min-h-0 flex-1">
 			<div className={`min-h-0 min-w-0 flex-1 overflow-auto ${ageMs !== null ? staleContent : ''}`}>
+				{filesOpen ? (
+					<FilesToCheck m={m} status={status} operator={operator} onClose={() => setFilesOpen(false)} />
+				) : (
+				<>
 				{choosing !== null && (
 					<p className="sticky top-0 left-0 z-20 bg-booth-bg px-4 py-2 text-sm">
 						Tap a lit slot for <span className="font-mono">{choosing.code}</span> ({choosing.label ?? choosing.title}), for this service: the rest of it follows into
@@ -256,6 +275,8 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 				</table>
 				<Legend operator={operator} />
 				{picked?.kind === 'clip' && <Inspect m={m} status={status} operator={operator} clipId={picked.id} onClose={() => setPicked(null)} onPlace={(item, code) => choose(chooseFor(item, code))} />}
+				</>
+				)}
 			</div>
 			{planOpen && m.runSheet !== null && (
 				<PlanPanel
@@ -673,17 +694,12 @@ function Inspect({
 	const items = m.runSheet ?? []
 	const mark = slotMark(slot, items, codesOn(items), m.same, m.sizes)
 	const code = slotCode(slot)
-	const file = code === null ? null : (items.map((i) => i.files[code]).find((f) => f !== undefined) ?? null)
-	const want = file === null ? null : lookbookStem(file)
 	const fetch = code === null ? undefined : m.fetches[code]
-	const arenaUrl = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
-	const arenaFile = slot.file ?? slot.missingFile
 	// The moment this clip is: the one the plan has in this clip, else the first with its code.
 	const owner =
 		code === null
 			? undefined
 			: (m.planLines.find((l) => l.item >= 0 && l.notes.some((n) => n.code === code && n.clipId === clipId)) ?? m.planLines.find((l) => l.item >= 0 && l.notes.some((n) => n.code === code)))
-	const answers = operator && code !== null && want !== null && file !== null && arenaFile !== null && (needsLook(mark) || mark === 'confirmed')
 	return (
 		<div className="m-4 flex max-w-3xl flex-col gap-3 rounded-ctl bg-booth-panel p-4 text-sm ring-1 ring-booth-edge ring-inset">
 			<div className="flex items-center gap-3">
@@ -699,80 +715,13 @@ function Inspect({
 					<X size={18} aria-hidden />
 				</button>
 			</div>
-			<div className="flex flex-wrap gap-4">
-				<figure className="flex flex-col gap-1">
-					<Picture url={arenaUrl} large />
-					<figcaption className="max-w-64 truncate text-xs text-booth-dim" title={slot.file ?? slot.name}>
-						Arena · {slot.file === null ? slot.name : fileName(slot.file)}
-					</figcaption>
-				</figure>
-				{file !== null && want !== null && mark !== 'today' && (
-					<figure className="flex flex-col gap-1">
-						<Picture url={lookbookThumbUrl(file)} large />
-						<figcaption className="max-w-64 truncate text-xs text-booth-dim" title={want}>
-							Lookbook · {want}
-						</figcaption>
-					</figure>
-				)}
-			</div>
+			<FileCompare m={m} status={status} slot={slot} operator={operator} />
 			{operator && owner !== undefined && code !== null && !under(fetch) && (
 				<div className="flex flex-wrap items-center gap-2">
 					<SmallButton onClick={() => onPlace(owner.item, code)}>Place {owner.label ?? owner.title} elsewhere…</SmallButton>
 					<span className="text-xs text-booth-dim">any free column on its layer; the rest of it follows</span>
 				</div>
 			)}
-			{answers && (
-				<div className="flex flex-wrap items-center gap-2">
-					{!under(fetch) && mark !== 'confirmed' && (
-						<SmallButton
-							onClick={() =>
-								m.ask('Use the lookbook’s', [
-									updateStep(
-										{ code, want, clipIds: clipsToUpdate(code, want, file, status, m.same, m.sizes, m.map), lookbookPath: file, allowLookbook: false, allowLive: [] },
-										status,
-									),
-								])
-							}
-						>
-							Use the lookbook&rsquo;s
-						</SmallButton>
-					)}
-					{!under(fetch) && mark === 'confirmed' && (
-						<SmallButton
-							onClick={() => {
-								// Either kind of mark: both are undone.
-								m.markSame({ code, file: arenaFile as string, want, same: false })
-								m.markSame({ code, file: arenaFile as string, want, same: false, there: true })
-							}}
-						>
-							Undo
-						</SmallButton>
-					)}
-					{!under(fetch) && mark !== 'confirmed' && mark !== 'missing' && (
-						<SmallButton onClick={() => m.markSame({ code, file: arenaFile as string, want, same: true })}>Arena&rsquo;s is right</SmallButton>
-					)}
-					{!under(fetch) && mark === 'missing' && <ThereButton onClick={() => m.itsThere(code)} />}
-					<FetchWords fetch={fetch} refused={m.refused[code]} />
-				</div>
-			)}
 		</div>
-	)
-}
-
-function Picture({ url, large = false, fill = false }: { url: string | null; large?: boolean; fill?: boolean }) {
-	const [failed, setFailed] = useState<string | null>(null)
-	const size = fill ? 'absolute inset-0 size-full' : large ? 'h-36 w-64' : 'h-12 w-20'
-	if (url === null || failed === url) return <span className={`${size} shrink-0 rounded-ctl bg-booth-raise`} />
-	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`${size} shrink-0 rounded-ctl bg-booth-raise ${fill ? 'object-cover' : 'object-contain'}`} />
-}
-
-/** "It's there" (the owner, 2026-10-13): Pāua's reading set aside on an
- *  operator's word, kept until a new file turns up, and shown in orange. */
-function ThereButton({ onClick }: { onClick: () => void }) {
-	return (
-		<button type="button" onClick={onClick} className="flex h-8 shrink-0 items-center gap-1.5 rounded-ctl bg-warn/15 px-2.5 text-xs font-medium text-warn hover:bg-warn/25">
-			<Hand size={13} aria-hidden />
-			It&rsquo;s there
-		</button>
 	)
 }

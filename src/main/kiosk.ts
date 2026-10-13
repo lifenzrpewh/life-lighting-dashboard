@@ -78,7 +78,7 @@ import { createMediaFetch } from './media-fetch.js'
 import { createMediaSame } from './media-same.js'
 import { sameMarkFrom } from '../shared/media-check.js'
 import { presetFromFile } from '../shared/holding-map.js'
-import { fetchRequestFrom, isFolderPath, runRequestFrom, type FetchRequest, type FetchRun, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
+import { LIBRARY_FILE, fetchRequestFrom, isFolderPath, libraryCodeIs, runRequestFrom, type DriveMatches, type FetchRequest, type FetchRun, type FetchStates, type MediaSource } from '../shared/media-fetch.js'
 import { startVideoFeed, type VideoFeed } from './video-feed.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
 import { isViewId, viewLabel, type ViewId } from '../shared/layout.js'
@@ -474,7 +474,9 @@ app.whenReady().then(() => {
 		for (const file of Array.isArray(wantArena) ? wantArena.slice(0, 300) : []) {
 			if (typeof file !== 'string' || !known.has(file)) continue
 			try {
-				out.arena[file] = (await fs.promises.stat(file)).size
+				const st = await fs.promises.stat(file)
+				out.arena[file] = st.size
+				;(out.arenaTimes ??= {})[file] = st.mtimeMs
 			} catch {
 				// Not on this computer: no size, and the check says the file is missing.
 			}
@@ -514,6 +516,14 @@ app.whenReady().then(() => {
 		return mediaFetch.run(run)
 	})
 	ipcMain.handle('media:last-run', (e): FetchRun | null => (fromOurs(e) ? mediaFetch.lastRun() : null))
+	// The graphics drive's files for a code (the owner, 2026-10-13: "show drive
+	// matches"): anyone may look; picking one to load is a fetch, Admin's.
+	ipcMain.handle('media:drive', async (e, code: unknown, lookbookPath: unknown): Promise<DriveMatches> => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return { ok: false, detail: 'not a code' }
+		const lp = typeof lookbookPath === 'string' && LIBRARY_FILE.test(lookbookPath) && libraryCodeIs(lookbookPath, code) ? lookbookPath : null
+		return mediaFetch.drive(code, lp)
+	})
 	// "It's there" (the owner, 2026-10-13): a failed code set aside as in Arena.
 	ipcMain.handle('media:there', (e, code: unknown): { ok: true } | { ok: false; detail: string } => {
 		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }

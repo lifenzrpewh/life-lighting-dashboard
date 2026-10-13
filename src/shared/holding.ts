@@ -260,7 +260,7 @@ export type Placement = {
 	 *  hand; `fill`, the normal background into a gap (`backgroundGaps`);
 	 *  `overflow`, an empty clip after the layer's last named column, for a code
 	 *  with no column of its own (`overflowSlots`). */
-	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill' | 'overflow' | 'fixed'
+	why: 'named' | 'promo-alike' | 'promo-free' | 'promo-empty' | 'chosen' | 'fill' | 'overflow' | 'fixed' | 'follows'
 	/** The slot is playing: loading changes what is on screen. */
 	live: boolean
 }
@@ -678,7 +678,11 @@ export function planPlacements(
 			const first = placements.find((p) => p.clipId === bgLayer.slots[column]?.id)
 			if (first !== undefined) placements.push({ ...first, ...base })
 		} else if (takes === 'free') {
-			placements.push(overflowPlacement(base, bg, bgLayer, column))
+			// Past the named columns it is overflow like its foreground; inside
+			// them (a foreground put there by hand), it follows its foreground.
+			const past = column > Math.max(lastNamed(fgLayer, status), lastNamed(bgLayer, status))
+			const p = overflowPlacement(base, bg, bgLayer, column)
+			placements.push(past ? p : { ...p, why: 'follows' })
 		} else if (!bg.normal) {
 			const slot = bgLayer.slots[column]
 			const held = slot === undefined ? null : slotCode(slot)
@@ -929,7 +933,9 @@ export function placementWords(p: Placement): string {
 				? ', its fixed code'
 				: p.why === 'chosen'
 					? ', placed by hand'
-					: ''
+					: p.why === 'follows'
+						? ', beside its foreground'
+						: ''
 	return `${p.layer} · ${column}${extra}${p.replaces === null ? '' : `, replacing ${p.replaces.code ?? p.replaces.name}`}`
 }
 

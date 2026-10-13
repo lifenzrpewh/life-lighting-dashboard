@@ -12,8 +12,9 @@
 import path from 'node:path'
 
 import { copyInto, downloadInto, findByCode, pickBySize, type Found } from '../bridge/media-files.js'
+import { isCopyName } from '../shared/media-check.js'
 import type { ArenaCommandResult } from '../shared/arena.js'
-import { megabytes, runCounts, type FetchRequest, type FetchRun, type FetchState, type FetchStates, type MediaSource, type RunRequest } from '../shared/media-fetch.js'
+import { megabytes, runCounts, type DriveMatches, type FetchRequest, type FetchRun, type FetchState, type FetchStates, type MediaSource, type RunRequest } from '../shared/media-fetch.js'
 
 export type MediaFetch = {
 	/** Queue a fetch. Refused, with why, when one for that code is under way. */
@@ -24,6 +25,8 @@ export type MediaFetch = {
 	run(request: RunRequest): FetchRun
 	/** The latest run, ended or not, or null before the first. */
 	lastRun(): FetchRun | null
+	/** Every file on the graphics drive carrying `code`, and which Fetch takes. */
+	drive(code: string, lookbookPath: string | null): Promise<DriveMatches>
 	/** "It's there": a failed code an operator says is in Arena all the same. */
 	there(code: string): { ok: true } | { ok: false; detail: string }
 	/** Where each request's file would come from, before anything is sent. */
@@ -70,6 +73,11 @@ export function createMediaFetch(opts: {
 		if (graphics === null) return lookbook('no graphics folder is set')
 		const find = await findByCode(graphics, req.code)
 		if (!find.ok) return lookbook(find.detail)
+		if (req.drivePick !== undefined) {
+			// The operator's pick, only if it is one this search found.
+			const picked = find.found.find((f) => f.path === req.drivePick)
+			return picked !== undefined ? { from: 'drive', found: picked } : { from: 'none', detail: `the picked file is no longer on the drive: ${req.drivePick}` }
+		}
 		if (size === null && req.want.toUpperCase() === req.code) {
 			// A fixed code the run sheet does not name (../shared/holding.ts
 			// `fixedPlacements`): no lookbook file to match, so the drive's newest
@@ -214,6 +222,19 @@ export function createMediaFetch(opts: {
 			if (codes.length === 0) endRun()
 			else void next()
 			return { ...run, codes: [...codes], refused: { ...refused } }
+		},
+		async drive(code, lookbookPath) {
+			const { graphics } = opts.folders()
+			if (graphics === null) return { ok: false, detail: 'no graphics folder is set' }
+			const find = await findByCode(graphics, code)
+			if (!find.ok) return { ok: false, detail: find.detail }
+			const size = lookbookPath === null ? null : await opts.lookbookSize(lookbookPath)
+			const pick = size === null ? null : pickBySize(find.found, size).pick
+			return {
+				ok: true,
+				lookbookSize: size,
+				files: find.found.slice(0, 40).map((f) => ({ path: f.path, size: f.size, mtimeMs: f.mtimeMs, matches: size !== null && f.size === size, copy: isCopyName(f.path), chosen: pick?.path === f.path })),
+			}
 		},
 		there(code) {
 			const s = states[code]
