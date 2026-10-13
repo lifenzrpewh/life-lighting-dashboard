@@ -80,7 +80,7 @@
 // above.
 
 import type { ArenaLayer, ArenaSlot, ArenaStatus } from './arena.js'
-import { TYPE_NAMES, fileStem, lookbookStem, mediaCodeOf, sameFile, sameKey, type FileSizes, type LookbookItem } from './media-check.js'
+import { TYPE_NAMES, fileStem, lookbookStem, markedRight, mediaCodeOf, sameFile, type FileSizes, type LookbookItem } from './media-check.js'
 import type { FetchRequest } from './media-fetch.js'
 import { DEFAULT_MAP, LAYER_KEYS, cellOf, layerOfCode, takesItem, takesOf, type HoldingMap, type LayerKey } from './holding-map.js'
 
@@ -173,7 +173,8 @@ export type SlotMark =
 	| 'different'
 	/** On the run sheet, another name than the lookbook's, and no sizes to tell. */
 	| 'may-differ'
-	/** Another name, but an operator has confirmed it is the same file. */
+	/** Another name, or a file Arena calls missing, but an operator has said
+	 *  it is right (the owner, 2026-10-13: "say it's there and note it"). */
 	| 'confirmed'
 	/** On the run sheet, but Arena cannot find its file on this computer. */
 	| 'missing'
@@ -193,12 +194,14 @@ export function slotMark(
 	const code = slotCode(slot)
 	if (code === null) return 'no-code'
 	if (!today.has(code)) return 'not-today'
-	if (slot.missingFile !== null) return 'missing'
 	const file = items.map((i) => i.files[code]).find((f) => f !== undefined)
-	if (file === undefined || slot.file === null) return 'today'
+	const arenaFile = slot.file ?? slot.missingFile
+	if (file === undefined || arenaFile === null) return slot.missingFile !== null ? 'missing' : 'today'
 	const want = lookbookStem(file)
-	if (sameFile(slot.file, file, want, sizes)) return 'today'
-	if (marks.has(sameKey(code, slot.file, want))) return 'confirmed'
+	if (slot.file !== null && slot.missingFile === null && sameFile(slot.file, file, want, sizes)) return 'today'
+	if (markedRight(marks, code, arenaFile, want, slot.missingFile !== null)) return 'confirmed'
+	if (slot.missingFile !== null) return 'missing'
+	if (slot.file === null) return 'today'
 	return sizes?.arena[slot.file] !== undefined && sizes.lookbook[file] !== undefined ? 'different' : 'may-differ'
 }
 
@@ -836,13 +839,15 @@ export function clipsToUpdate(
 			if (slotCode(slot) !== code) continue
 			// Left alone means left alone: not even a newer file.
 			if (slotCell(layer, i + 1, status, map).kind === 'leave') continue
+			// Said to be right by hand ("It's there" for a missing file too): left.
+			const arenaFile = slot.file ?? slot.missingFile
+			if (arenaFile !== null && markedRight(marks, code, arenaFile, want, slot.missingFile !== null)) continue
 			if (slot.missingFile !== null) {
 				out.push(slot.id)
 				continue
 			}
 			if (slot.file === null) continue
 			if (sameFile(slot.file, wantPath, want, sizes)) continue
-			if (marks.has(sameKey(code, slot.file, want))) continue
 			out.push(slot.id)
 		}
 	}

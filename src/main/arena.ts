@@ -218,7 +218,13 @@ function watchArena(
 					body: call.body === null ? null : typeof call.body === 'object' ? call.body.text : JSON.stringify(call.body),
 					signal: AbortSignal.timeout(ARENA_REQUEST_TIMEOUT_MS),
 				})
-				if (!r.ok) return { ok: false, detail: `Arena answered ${r.status}` }
+				if (!r.ok) {
+					// Arena's own words, when it gives any (the owner, 2026-10-13: a
+					// 404 for a clip that was there; the number alone said nothing).
+					const said = (await r.text().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 160)
+					console.log(`[arena] POST ${call.path}: ${r.status}${said === '' ? '' : ` "${said}"`}`)
+					return { ok: false, detail: `Arena answered ${r.status}${said === '' ? '' : `: ${said}`}` }
+				}
 			} catch (e) {
 				const why = (e as Error).name === 'TimeoutError' ? 'Arena did not answer in time' : (e as Error).message
 				console.log(`[arena] sending failed: ${why}`)
@@ -257,7 +263,7 @@ function watchArena(
 			const layer = latest.value.layers.find((l) => l.slots.some((s) => s.id === clipId))
 			const column = (layer?.slots.findIndex((s) => s.id === clipId) ?? -1) + 1
 			const playing = layer?.slots[column - 1]?.state === 'playing'
-			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}${playing ? ', ON SCREEN (Admin said yes)' : ''}`)
+			console.log(`[arena] loading ${file} into ${layer?.name ?? 'a layer'}, column ${column}${playing ? ', ON SCREEN (Admin said yes)' : ''} as ${fileUrlOf(file)}`)
 			return send(wire.value)
 		},
 		async empty(clipId, code) {

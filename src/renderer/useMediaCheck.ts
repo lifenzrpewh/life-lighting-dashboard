@@ -17,6 +17,7 @@ import { layerOfCode } from '../shared/holding-map.js'
 import { backgroundGaps, codesOn, explainPlan, oldForegrounds, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type PlanLine, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
+	lookbookStem,
 	nzDate,
 	offeredServices,
 	type FileSizes,
@@ -98,6 +99,28 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 			if (!r.ok) setRefused((x) => ({ ...x, [mark.code]: r.detail }))
 			readSame()
 		})
+	}
+	/** "It's there" (the owner, 2026-10-13: "an override to say it's there and
+	 *  note it"): each clip of `code` that needs a look is marked right by hand,
+	 *  kept until a new file turns up on either side, and a failed fetch of it is
+	 *  set aside. Shown in orange from then on, never as plain green. */
+	const itsThere = (code: string) => {
+		const file = (runSheet ?? []).map((i) => i.files[code]).find((f) => f !== undefined)
+		if (file !== undefined && runSheet !== null && today !== null) {
+			for (const layer of status.layers) {
+				for (const slot of layer.slots) {
+					const arenaFile = slot.file ?? slot.missingFile
+					if (slotCode(slot) !== code || arenaFile === null) continue
+					const mark = slotMark(slot, runSheet, today, same, sizes)
+					if (mark === 'missing' || mark === 'different' || mark === 'may-differ') markSame({ code, file: arenaFile, want: lookbookStem(file), same: true, there: true })
+				}
+			}
+		}
+		if (fetches[code]?.state === 'failed') {
+			void life?.mediaThere(code).then((r) => {
+				if (!r.ok) setRefused((x) => ({ ...x, [code]: r.detail }))
+			})
+		}
 	}
 
 	const readServices = () => {
@@ -336,6 +359,7 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		refused,
 		lastRun,
 		markSame,
+		itsThere,
 		asking,
 		ask,
 		onScreen,

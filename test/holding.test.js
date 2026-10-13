@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { sameKey } from '../dist/src/shared/media-check.js'
+import { sameKey, thereKey, sameMarkFrom, sameMarksFrom } from '../dist/src/shared/media-check.js'
 import {
 	backgroundGaps,
 	clipsToUpdate,
@@ -608,4 +608,24 @@ test('a one-off whose column\'s background cannot be taken says why, and its for
 	assert.equal(r.placements.find((p) => p.code === 'CF702').column, 13)
 	const lost = r.unplaced.find((u) => u.code === 'CB702')
 	assert.match(lost.detail, /CF702 is in column 13, but HOLD BG there can't take its background: that clip is on screen/)
+})
+
+// "It's there" (the owner, 2026-10-13: Arena 404ing on a clip that was there).
+test("It's there: a file Arena calls missing, said to be there, is right by hand; a same mark is not enough", () => {
+	const s = composition()
+	const fg = s.layers[3]
+	fg.slots[0] = clip('CF588-Sunday-ReloSeries-WalkInV2.png', 'loaded', true) // Arena calls it missing
+	const today = codesOn(ITEMS)
+	const want = 'CF588-Sunday-ReloSeries-WalkInV2'
+	assert.equal(slotMark(fg.slots[0], ITEMS, today, new Set()), 'missing')
+	assert.equal(slotMark(fg.slots[0], ITEMS, today, new Set([sameKey('CF588', fg.slots[0].missingFile, want)])), 'missing')
+	const there = new Set([thereKey('CF588', fg.slots[0].missingFile, want)])
+	assert.equal(slotMark(fg.slots[0], ITEMS, today, there), 'confirmed')
+	// Update all leaves it.
+	assert.ok(clipsToUpdate('CF588', want, F.CF588, s, new Set()).includes(fg.slots[0].id))
+	assert.ok(!clipsToUpdate('CF588', want, F.CF588, s, there).includes(fg.slots[0].id))
+	// Kept as a key of its own, read back from storage and from the page.
+	assert.deepEqual(sameMarksFrom([[...there][0], 'junk']), [...there])
+	assert.deepEqual(sameMarkFrom({ code: 'CF588', file: 'x.png', want, same: true, there: true }), { code: 'CF588', file: 'x.png', want, same: true, there: true })
+	assert.equal(sameMarkFrom({ code: 'CF588', file: 'x.png', want, same: true, there: 'yes' }), null)
 })

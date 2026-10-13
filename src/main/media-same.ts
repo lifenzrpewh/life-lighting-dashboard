@@ -6,7 +6,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { SAME_MARKS_MAX, sameKey, sameMarksFrom, type SameMark } from '../shared/media-check.js'
+import { SAME_MARKS_MAX, sameKey, sameMarksFrom, thereKey, type SameMark } from '../shared/media-check.js'
 
 export function createMediaSame(dataDir: string) {
 	const file = path.join(dataDir, 'media-same.json')
@@ -21,7 +21,7 @@ export function createMediaSame(dataDir: string) {
 	return {
 		marks: (): string[] => marks,
 		mark(m: SameMark): { ok: true } | { ok: false; detail: string } {
-			const key = sameKey(m.code, m.file, m.want)
+			const key = m.there === true ? thereKey(m.code, m.file, m.want) : sameKey(m.code, m.file, m.want)
 			const next = marks.filter((k) => k !== key)
 			if (m.same) next.push(key)
 			try {
@@ -31,7 +31,8 @@ export function createMediaSame(dataDir: string) {
 				return { ok: false, detail: `could not keep the mark: ${(e as Error).message}` }
 			}
 			marks = next.slice(-SAME_MARKS_MAX)
-			console.log(`[media] ${m.code} ${m.same ? 'marked the same by hand' : 'mark undone'}: ${m.file} against ${m.want}`)
+			const what = m.there === true ? 'said to be in Arena by hand' : 'marked the same by hand'
+			console.log(`[media] ${m.code} ${m.same ? what : 'mark undone'}: ${m.file} against ${m.want}`)
 			return { ok: true }
 		},
 	}

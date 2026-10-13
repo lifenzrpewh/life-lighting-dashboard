@@ -24,15 +24,22 @@ export type MediaFetch = {
 	run(request: RunRequest): FetchRun
 	/** The latest run, ended or not, or null before the first. */
 	lastRun(): FetchRun | null
+	/** "It's there": a failed code an operator says is in Arena all the same. */
+	there(code: string): { ok: true } | { ok: false; detail: string }
 	/** Where each request's file would come from, before anything is sent. */
 	sources(requests: FetchRequest[]): Promise<Record<string, MediaSource>>
 }
+
+/** How long after Arena refuses a load to look at the clip again. */
+const READ_BACK_MS = 1500
 
 type Resolved = { from: 'drive'; found: Found } | { from: 'lookbook'; why: string; size: number; url: string; name: string } | { from: 'none'; detail: string }
 
 export function createMediaFetch(opts: {
 	folders: () => { graphics: string | null; local: string | null }
 	open: (clipId: number, file: string, live: boolean) => Promise<ArenaCommandResult>
+	/** Whether Arena's latest reading has `file` (by name) in the clip, found. */
+	clipHas: (clipId: number, file: string) => boolean
 	lookbookSize: (libraryPath: string) => Promise<number | null>
 	lookbookUrl: (libraryPath: string) => string | null
 }): MediaFetch {
@@ -119,21 +126,31 @@ export function createMediaFetch(opts: {
 		// One clip at a time, each checked as it is sent (never a playing one
 		// the operator did not agree to replace on screen).
 		const failed: string[] = []
+		const doubted: string[] = []
 		for (const [i, clipId] of req.clipIds.entries()) {
 			set(req.code, { state: 'loading', file, done: i, of: req.clipIds.length })
 			const opened = await opts.open(clipId, copy.path, req.allowLive.includes(clipId))
 			if (!opened.ok) {
+				// Arena said no; look again before believing it (the owner,
+				// 2026-10-13: a 404 for a clip that held the file). Arena pushes
+				// a changed composition on its own, so a moment is enough.
+				await new Promise((r) => setTimeout(r, READ_BACK_MS))
+				if (opts.clipHas(clipId, copy.path)) {
+					console.log(`[media] ${req.code}: Arena said "${opened.detail}" for clip ${clipId}, but the clip reads back with ${file}`)
+					doubted.push(opened.detail)
+					continue
+				}
 				console.log(`[media] ${req.code}: not loaded into clip ${clipId}: ${opened.detail}`)
 				failed.push(opened.detail)
 			}
 		}
 		const loaded = req.clipIds.length - failed.length
-		console.log(`[media] ${req.code}: ${file} sent to ${loaded} of ${req.clipIds.length} clips`)
+		console.log(`[media] ${req.code}: ${file} sent to ${loaded} of ${req.clipIds.length} clips${doubted.length > 0 ? ` (${doubted.length} after Arena said no)` : ''}`)
 		if (failed.length > 0) {
 			const of = req.clipIds.length === 1 ? '' : ` (${loaded} of ${req.clipIds.length} clips)`
 			return set(req.code, { state: 'failed', detail: `copied, but not loaded into Arena${of}: ${failed[0]}` })
 		}
-		set(req.code, { state: 'sent', file, clips: loaded, from: r.from })
+		set(req.code, { state: 'sent', file, clips: loaded, from: r.from, ...(doubted[0] === undefined ? {} : { doubted: doubted[0] }) })
 	}
 
 	const next = async () => {
@@ -159,7 +176,7 @@ export function createMediaFetch(opts: {
 		if (last === null || last.ended !== null || last.codes.some(busy)) return
 		last.ended = Date.now()
 		const n = runCounts(last, states)
-		const parts = [`${n.loaded} loaded`, ...(n.doubted > 0 ? [`${n.doubted} of them after Arena said no`] : []), ...(n.failed > 0 ? [`${n.failed} failed`] : []), ...(n.copied > 0 ? [`${n.copied} copied only`] : []), ...(last.already > 0 ? [`${last.already} already there`] : [])]
+		const parts = [`${n.loaded} loaded`, ...(n.doubted > 0 ? [`${n.doubted} of them after Arena said no`] : []), ...(n.byHand > 0 ? [`${n.byHand} said to be there by hand`] : []), ...(n.failed > 0 ? [`${n.failed} failed`] : []), ...(n.copied > 0 ? [`${n.copied} copied only`] : []), ...(last.already > 0 ? [`${last.already} already there`] : [])]
 		console.log(`[holding] ${last.label} done: ${parts.join(', ')}`)
 		for (const code of last.codes) {
 			const st = states[code]
@@ -197,6 +214,13 @@ export function createMediaFetch(opts: {
 			if (codes.length === 0) endRun()
 			else void next()
 			return { ...run, codes: [...codes], refused: { ...refused } }
+		},
+		there(code) {
+			const s = states[code]
+			if (s?.state !== 'failed') return { ok: false, detail: `${code} has no failure to set aside` }
+			console.log(`[media] ${code}: said to be in Arena by hand, after: ${s.detail}`)
+			set(code, { state: 'by-hand', detail: s.detail })
+			return { ok: true }
 		},
 		lastRun: () => (last === null ? null : { ...last, codes: [...last.codes], refused: { ...last.refused } }),
 		async sources(requests) {

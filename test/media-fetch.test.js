@@ -197,5 +197,8 @@ test('a run is a label, checked requests, its plan and a count; its result count
 		// An older run's result is not this run's.
 		CF004: { state: 'sent', file: 'd', clips: 1, from: 'drive', at: 500 },
 	}
-	assert.deepEqual(runCounts(run, states), { loaded: 2, failed: 2, copied: 0, going: 1, doubted: 1 })
+	assert.deepEqual(runCounts(run, states), { loaded: 2, failed: 2, copied: 0, going: 1, doubted: 1, byHand: 0 })
+	// "It's there": a failure set aside counts as loaded, by hand.
+	states.CF003 = { state: 'by-hand', detail: 'Arena answered 404', at: 3000 }
+	assert.deepEqual(runCounts(run, states), { loaded: 3, failed: 1, copied: 0, going: 1, doubted: 1, byHand: 1 })
 })

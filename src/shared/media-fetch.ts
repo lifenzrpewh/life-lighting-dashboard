@@ -75,6 +75,9 @@ export type FetchState =
 	/** Copied, not loaded: nothing in Arena to load it into. */
 	| { state: 'copied'; file: string; from: 'drive' | 'lookbook' }
 	| { state: 'failed'; detail: string }
+	/** Failed, but an operator said it is in Arena all the same ("It's there",
+	 *  the owner, 2026-10-13): counted as loaded, shown in orange. */
+	| { state: 'by-hand'; detail: string }
 
 /** Each code's latest fetch, by code, stamped. */
 export type FetchStates = Record<string, FetchState & { at: number }>
@@ -151,14 +154,17 @@ export function runRequestFrom(raw: unknown): RunRequest | null {
 }
 
 /** A run's result in a few words: `7 loaded · 1 failed · 2 already there`. */
-export function runCounts(run: FetchRun, states: FetchStates): { loaded: number; failed: number; copied: number; going: number; doubted: number } {
-	const out = { loaded: 0, failed: Object.keys(run.refused).length, copied: 0, going: 0, doubted: 0 }
+export function runCounts(run: FetchRun, states: FetchStates): { loaded: number; failed: number; copied: number; going: number; doubted: number; byHand: number } {
+	const out = { loaded: 0, failed: Object.keys(run.refused).length, copied: 0, going: 0, doubted: 0, byHand: 0 }
 	for (const code of run.codes) {
 		const s = states[code]
 		if (s === undefined || s.at < run.at) out.going += 1
 		else if (s.state === 'sent') {
 			out.loaded += 1
 			if (s.doubted !== undefined) out.doubted += 1
+		} else if (s.state === 'by-hand') {
+			out.loaded += 1
+			out.byHand += 1
 		} else if (s.state === 'failed') out.failed += 1
 		else if (s.state === 'copied') out.copied += 1
 		else out.going += 1

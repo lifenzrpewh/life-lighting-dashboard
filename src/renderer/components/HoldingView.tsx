@@ -34,7 +34,7 @@
 // it holds something, since it is rarely used.
 
 import { useState } from 'react'
-import { ArrowLeft, FileX, ListChecks, RefreshCw, X } from 'lucide-react'
+import { ArrowLeft, FileX, Hand, ListChecks, RefreshCw, X } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaLayer, type ArenaSlot, type ArenaStatus } from '../../shared/arena.js'
 import {
@@ -193,9 +193,10 @@ export function Holding({ status, ageMs, now, onBack }: { status: ArenaStatus; a
 					<p className="flex items-center gap-2 pb-2 text-xs">
 						<span className="font-mono">{fetchNote}</span>
 						<FetchWords fetch={m.fetches[fetchNote]} refused={m.refused[fetchNote]} />
+						{operator && m.fetches[fetchNote]?.state === 'failed' && <ThereButton onClick={() => m.itsThere(fetchNote)} />}
 					</p>
 				)}
-				{m.lastRun !== null && <RunLine run={m.lastRun} fetches={m.fetches} />}
+				{m.lastRun !== null && <RunLine run={m.lastRun} fetches={m.fetches} onThere={operator ? m.itsThere : null} />}
 				{ageMs !== null && <p className="pb-2 text-xs text-state-stale">{formatAge(ageMs)} · Arena is not answering; this may not be what it has</p>}
 				{(details || m.service === null) && (
 					<div className="border-t border-booth-edge/60">
@@ -342,7 +343,7 @@ function PlanPanel({ lines, picked, onPick }: { lines: PlanLine[]; picked: numbe
 
 /** The latest run's result, kept until the next (the owner, 2026-10-13):
  *  loaded, failed, already there; a tap lists each code and why. */
-function RunLine({ run, fetches }: { run: FetchRun; fetches: FetchStates }) {
+function RunLine({ run, fetches, onThere }: { run: FetchRun; fetches: FetchStates; onThere: ((code: string) => void) | null }) {
 	const [open, setOpen] = useState(false)
 	const n = runCounts(run, fetches)
 	const time = new Date(run.at).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })
@@ -362,6 +363,7 @@ function RunLine({ run, fetches }: { run: FetchRun; fetches: FetchStates }) {
 					<>
 						<span>{n.loaded} loaded</span>
 						{n.doubted > 0 && <span className="text-warn">{n.doubted} after Arena said no</span>}
+						{n.byHand > 0 && <span className="text-warn">{n.byHand} said to be there by hand</span>}
 						{n.failed > 0 && <span className="font-medium text-warn">{n.failed} failed</span>}
 						{n.copied > 0 && <span>{n.copied} copied only</span>}
 						{run.already > 0 && <span className="text-booth-dim">{run.already} already there</span>}
@@ -377,6 +379,7 @@ function RunLine({ run, fetches }: { run: FetchRun; fetches: FetchStates }) {
 							<li key={code} className="flex items-baseline gap-2">
 								<span className="w-11 shrink-0 font-mono">{code}</span>
 								{f === undefined || f.at < run.at ? <span className="text-booth-dim">waiting</span> : <FetchWords fetch={f} refused={undefined} />}
+								{onThere !== null && f?.state === 'failed' && f.at >= run.at && <ThereButton onClick={() => onThere(code)} />}
 							</li>
 						)
 					})}
@@ -405,7 +408,7 @@ function Activity({ fetches, refused, now, onTap }: { fetches: FetchStates; refu
 					key={code}
 					type="button"
 					onClick={() => onTap(code)}
-					className={`h-7 shrink-0 rounded-ctl px-2 text-xs tabular-nums ${f.state === 'failed' ? 'bg-warn/15 text-warn' : 'bg-booth-raise text-booth-dim'}`}
+					className={`h-7 shrink-0 rounded-ctl px-2 text-xs tabular-nums ${f.state === 'failed' || f.state === 'by-hand' || (f.state === 'sent' && f.doubted !== undefined) ? 'bg-warn/15 text-warn' : 'bg-booth-raise text-booth-dim'}`}
 				>
 					<span className="font-mono">{code}</span> {fetchShort(f)}
 				</button>
@@ -563,6 +566,11 @@ function Tile({
 					{mark === 'missing' ? <FileX size={13} aria-label="File missing" /> : <span className="size-2.5 rounded-full bg-warn" aria-label="May differ" />}
 				</span>
 			)}
+			{mark === 'confirmed' && (
+				<span className="absolute top-1 right-1 grid size-5 place-items-center rounded-full bg-black/75 text-warn" title="Said to be right by hand">
+					<Hand size={12} aria-label="By hand" />
+				</span>
+			)}
 			{slot.state === 'playing' && needsLook(mark) && <span className="absolute top-1 left-1 size-2.5 rounded-full bg-state-live" aria-label="On screen" />}
 		</button>
 	)
@@ -578,6 +586,9 @@ function Legend({ operator }: { operator: boolean }) {
 			</span>
 			<span className={item}>
 				<FileX size={13} className="text-warn" /> file missing
+			</span>
+			<span className={item}>
+				<Hand size={13} className="text-warn" /> right, said by hand
 			</span>
 			<span className={item}>
 				<span className="h-3 w-4 rounded-sm border-2 border-dashed border-accent-hi/80" /> {operator ? 'goes here: tap to place' : 'goes here'}
@@ -597,7 +608,7 @@ const VERDICT: Record<SlotMark, string> = {
 	today: 'This service',
 	different: 'Another file than the lookbook’s',
 	'may-differ': 'Named differently from the lookbook’s',
-	confirmed: 'Same as the lookbook’s, confirmed by hand',
+	confirmed: 'Right, said by hand',
 	missing: 'File missing on this computer',
 	'not-today': 'Not this service: free to replace',
 	'no-code': 'No media code: left alone',
@@ -623,7 +634,8 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 	const want = file === null ? null : lookbookStem(file)
 	const fetch = code === null ? undefined : m.fetches[code]
 	const arenaUrl = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
-	const answers = operator && code !== null && want !== null && file !== null && slot.file !== null && (needsLook(mark) || mark === 'confirmed')
+	const arenaFile = slot.file ?? slot.missingFile
+	const answers = operator && code !== null && want !== null && file !== null && arenaFile !== null && (needsLook(mark) || mark === 'confirmed')
 	return (
 		<div className="m-4 flex max-w-3xl flex-col gap-3 rounded-ctl bg-booth-panel p-4 text-sm ring-1 ring-booth-edge ring-inset">
 			<div className="flex items-center gap-3">
@@ -671,11 +683,21 @@ function Inspect({ m, status, operator, clipId, onClose }: { m: MediaCheckState;
 							Use the lookbook&rsquo;s
 						</SmallButton>
 					)}
-					{!under(fetch) && mark !== 'missing' && (
-						<SmallButton onClick={() => m.markSame({ code, file: slot.file as string, want, same: mark !== 'confirmed' })}>
-							{mark === 'confirmed' ? 'Undo' : 'Arena’s is right'}
+					{!under(fetch) && mark === 'confirmed' && (
+						<SmallButton
+							onClick={() => {
+								// Either kind of mark: both are undone.
+								m.markSame({ code, file: arenaFile as string, want, same: false })
+								m.markSame({ code, file: arenaFile as string, want, same: false, there: true })
+							}}
+						>
+							Undo
 						</SmallButton>
 					)}
+					{!under(fetch) && mark !== 'confirmed' && mark !== 'missing' && (
+						<SmallButton onClick={() => m.markSame({ code, file: arenaFile as string, want, same: true })}>Arena&rsquo;s is right</SmallButton>
+					)}
+					{!under(fetch) && mark === 'missing' && <ThereButton onClick={() => m.itsThere(code)} />}
 					<FetchWords fetch={fetch} refused={m.refused[code]} />
 				</div>
 			)}
@@ -688,4 +710,15 @@ function Picture({ url, large = false, fill = false }: { url: string | null; lar
 	const size = fill ? 'absolute inset-0 size-full' : large ? 'h-36 w-64' : 'h-12 w-20'
 	if (url === null || failed === url) return <span className={`${size} shrink-0 rounded-ctl bg-booth-raise`} />
 	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`${size} shrink-0 rounded-ctl bg-booth-raise ${fill ? 'object-cover' : 'object-contain'}`} />
+}
+
+/** "It's there" (the owner, 2026-10-13): Pāua's reading set aside on an
+ *  operator's word, kept until a new file turns up, and shown in orange. */
+function ThereButton({ onClick }: { onClick: () => void }) {
+	return (
+		<button type="button" onClick={onClick} className="flex h-8 shrink-0 items-center gap-1.5 rounded-ctl bg-warn/15 px-2.5 text-xs font-medium text-warn hover:bg-warn/25">
+			<Hand size={13} aria-hidden />
+			It&rsquo;s there
+		</button>
+	)
 }
