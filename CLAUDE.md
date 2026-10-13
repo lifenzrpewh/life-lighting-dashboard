@@ -323,6 +323,24 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**Pick up here (handoff, 2026-10-13, evening; the owner continues at home).**
+- **Next: ProPresenter lower thirds**, the owner's to work on at home: the open questions in
+  `docs/VISUALS_DASHBOARD.md` § Open questions, and `spikes/propresenter-playlist.mjs` (run it
+  where ProPresenter is).
+- **On main, not in a build:** the Holding fixes and Show mode. A tag when the owner says; the
+  build no longer hits the Actions storage limit (one-day artifacts, the old 57 deleted).
+- **1.2.0 is a draft on `paua-releases`** (and here): publishing it there is what offers it to
+  the booths today.
+- **Noted, not started** (TODO, top two): updates from this repo now it is public (one last
+  publish on `paua-releases` as the bridge; rename the repo first if it is to be `paua`), and
+  start at login.
+- **The field results of 2026-10-13**: touch good in Pāua and the Cue Manager, the console lag
+  fixed, the Spout picture good, settings survive a reinstall, SmartScreen shows (minor).
+- **The Cue Manager's campus bug** (a device read-only on a one-off service: campuses taken from
+  child PCO folders) is with another session on the Print Server: visuals-song-comms `CLAUDE.md`
+  § Open: campuses taken from child PCO folders.
+- This Mac: no kiosk or Vite running, no passcode set, volunteer, Show mode off.
+
 **Where things stand (2026-10-13, evening, a Mac session).** **Merged into main, not in a
 build:** the Holding fixes and **Show mode** (status rows), at the owner's ask; next is a tag for
 the booths (`docs/FIELD_TEST.md` § Holding fixes, § Show mode). The owner takes the
