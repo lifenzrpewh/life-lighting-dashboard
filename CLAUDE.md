@@ -340,8 +340,9 @@ hand once; updates come by themselves after that. All checked on the Mac only
 **Published** the same evening, here and on `paua-releases` (its `latest.yml` answers publicly;
 the packaged `app-update.yml` points there). The visuals app's PRs #1 and #2 (copy between cue
 fields, devices following the current service, the run sheet noticing Planning Center, dragging a
-song onto a song) are **merged but not deployed**: deploying is from the Print Server
-(visuals-song-comms `CLAUDE.md` § Deployment). The owner set `RELEASES_TOKEN` the same day, so the next
+song onto a song) were **deployed 2026-10-13** from the Print Server (visuals-song-comms `8b28488`;
+the same day campuses became the top-level PCO folders only, so a booth can edit its own campus's
+one-offs, and a whole PCO folder can be followed). The owner set `RELEASES_TOKEN` the same day, so the next
 tag drafts its release on `paua-releases` itself (⚠️ not yet seen run). The desk's lag: fine since
 (above, row 3).
 
