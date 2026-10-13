@@ -334,12 +334,15 @@ questions). **Show mode** is logged under Later. This Mac was left as found: the
 setting and graphics folder restored, the test layout and pins removed, no kiosk, stand-in or
 Vite running.
 
-**GitHub Actions storage is full** (the owner's alert, 2026-10-13: 0.5 GB of 0.5 GB). Each
-tag's build keeps its installers as workflow artifacts for 90 days (about 250 MB a build, some
-15 builds); release assets do not count. With storage blocked, the next tag's upload-artifact
-steps fail and no draft release is made on either repo, so no update. Offered, waiting on the
-owner's yes: `retention-days: 1` on the four uploads in `.github/workflows/release.yml`, and
-deleting the old artifacts (`gh` is signed in on this Mac; deleting is permanent).
+**GitHub Actions storage, cleared 2026-10-13** (it had filled: 58 artifacts, 3.5 GB, against
+0.5 GB). The release build now keeps its artifacts **one day** (`retention-days: 1`, commit on
+`holding-fixes`, in force once that merges); the release jobs read them within the run and each
+tag's release keeps the files. All old artifacts deleted at the owner's yes; every tag's release
+still holds its installers. A Run workflow build without a tag must be downloaded within the day.
+
+**The Cue Manager, seen 2026-10-13:** a booth device could not enter cues on a one-off service.
+Cause: its campus is taken from a child PCO folder, not the top folder. Noted for a session on the
+Print Server in visuals-song-comms `CLAUDE.md` § Open: campuses taken from child PCO folders.
 
 **2026-10-11: v1.2.0 tagged** at the owner's ask, from a Mac session: the bar's alerts put away by
 a × (all but the base show's), no countdown box when there is nothing to count, and Settings ›
@@ -617,8 +620,6 @@ Later, not tonight:
 
 ### TODO, in order
 
-0. **Actions storage before the next tag** (the owner's yes needed): `retention-days: 1` on the
-   release build's uploads and delete the old artifacts (§ Next session starts here).
 0. **`holding-fixes`: a PR and merge** when the owner says, then a build; at a booth, the checks
    in `docs/FIELD_TEST.md` § Holding fixes, and the next real 404's `[arena] POST` line.
 0. **ProPresenter lower thirds:** the owner's answers first (`docs/VISUALS_DASHBOARD.md`
