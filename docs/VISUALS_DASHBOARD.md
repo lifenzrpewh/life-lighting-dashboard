@@ -1006,6 +1006,15 @@ label, a state (In Arena, To load, Needs you, Loading…, On screen), a chip per
 → WTL`, `FG CF445 may differ`, `LT CT108 in ProPresenter`), each problem with its fix (Compare
 opens the side-by-side; Choose a slot opens the moment's foreground layer, its free columns lit;
 It's there after a failed load), and, in Admin, a tick, Load, and Move… once it is in Arena.
+**Parts, and a quieter confirmation** (the owner, 2026-10-14, later: "choose which PART of it you
+load, but keeping it clean", and the confirmation "cluttered and full"; both their picks from two
+options with previews). The chips are the switches: ticking a card lights every part with
+something to load; a tap on a chip leaves it out (the tick shows a dash), or on a card not ticked
+picks just that part; the card's button says what it loads ("Load FG") and the top says
+"Load n parts". The confirmation is one line ("Update all: 8 files into Arena", then "7 from the
+graphics drive · 1 only in the lookbook · 2 with no column: left out") and its questions; each
+step and where it comes from is under **Show each**.
+
 Gone with Holding: the grid, the plan panel, the No column tray, the legend, the activity chips,
 the result line and Files to check (a card that needs a look says so; the filter gathers them).
 Update all, Clear old FGs (in its confirmation, or alone when nothing else is to load), pins
