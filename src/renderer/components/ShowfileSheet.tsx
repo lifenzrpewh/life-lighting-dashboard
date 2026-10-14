@@ -225,6 +225,14 @@ function HoldButton({ disabled, label, onHeld }: { disabled: boolean; label: str
 		setHolding(false)
 	}
 	useEffect(() => cancel, [])
+	// A hold under way when the button turns off (the link dropped, the name
+	// stopped checking out) ends there, and what fires is what is current: not
+	// the Load as it stood when the finger went down.
+	useEffect(() => {
+		if (disabled) cancel()
+	}, [disabled])
+	const held = useRef(onHeld)
+	held.current = onHeld
 	return (
 		<button
 			type="button"
@@ -234,7 +242,7 @@ function HoldButton({ disabled, label, onHeld }: { disabled: boolean; label: str
 				setHolding(true)
 				timer.current = setTimeout(() => {
 					cancel()
-					onHeld()
+					held.current()
 				}, HOLD_MS)
 			}}
 			onPointerUp={cancel}

@@ -130,6 +130,20 @@ export type GridProps = {
 
 export function Grid(p: GridProps) {
 	const gridRef = useRef<HTMLDivElement>(null)
+	// The one finger a drag follows, whichever handle it is on. A palm or a
+	// second finger on another edge, tab or seam meanwhile is not a second
+	// drag: it would take over the first's start and move a window by the
+	// wrong amount.
+	const finger = useRef<number | null>(null)
+	const takes = (e: ReactPointerEvent<HTMLElement>) => {
+		if (finger.current !== null && finger.current !== e.pointerId) return false
+		finger.current = e.pointerId
+		return true
+	}
+	const mine = (e: ReactPointerEvent<HTMLElement>) => finger.current === e.pointerId
+	const letGo = () => {
+		finger.current = null
+	}
 	const start = useRef<{ id: string; from: Box; px: number; py: number; edges: Edges; scale: { x: number; y: number } } | null>(null)
 	const [drag, setDrag] = useState<{ id: string; box: Box; ok: boolean } | null>(null)
 	const latest = useRef(drag)
@@ -186,26 +200,38 @@ export function Grid(p: GridProps) {
 			? {}
 			: {
 					onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+						if (!takes(e)) return
 						e.currentTarget.setPointerCapture(e.pointerId)
 						tabStart.current = { win: win.id, tab: t.id, px: e.clientX, py: e.clientY, moved: false }
 					},
 					onPointerMove: (e: ReactPointerEvent<HTMLElement>) => {
 						const s = tabStart.current
-						if (s === null) return
+						if (s === null || !mine(e)) return
 						if (!s.moved && Math.hypot(e.clientX - s.px, e.clientY - s.py) < 8) return
 						s.moved = true
 						setTabDrag({ win: s.win, tab: s.tab, label: titleOf(t), x: e.clientX, y: e.clientY, to: landing(e.clientX, e.clientY) })
 					},
-					onPointerUp: () => {
+					onPointerUp: (e: ReactPointerEvent<HTMLElement>) => {
+						if (!mine(e)) return
+						letGo()
 						const d = tabLatest.current
 						if (d !== null && d.to !== null) p.onMoveTab(d.win, d.tab, d.to.win, d.to.before)
 						setTabDrag(null)
 						// The click that follows a drag is not a tap; the next one is.
 						setTimeout(() => (tabStart.current = null), 0)
 					},
-					onPointerCancel: () => {
+					onPointerCancel: (e: ReactPointerEvent<HTMLElement>) => {
+						if (!mine(e)) return
+						letGo()
 						tabStart.current = null
 						setTabDrag(null)
+					},
+					// The press taken away: no drag left hanging with its ghost label.
+					onLostPointerCapture: (e: ReactPointerEvent<HTMLElement>) => {
+						if (!mine(e)) return
+						letGo()
+						setTabDrag(null)
+						setTimeout(() => (tabStart.current = null), 0)
 					},
 				}
 	/** A tap on a tab selects it; the end of a drag does not. */
@@ -236,7 +262,7 @@ export function Grid(p: GridProps) {
 	const handle = (win: GridWindow, edges: Edges) => ({
 		onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
 			const grid = gridRef.current
-			if (grid === null) return
+			if (grid === null || !takes(e)) return
 			e.currentTarget.setPointerCapture(e.pointerId)
 			e.stopPropagation()
 			const from = { x: win.x, y: win.y, w: win.w, h: win.h }
@@ -245,7 +271,7 @@ export function Grid(p: GridProps) {
 		},
 		onPointerMove: (e: ReactPointerEvent<HTMLElement>) => {
 			const s = start.current
-			if (s === null) return
+			if (s === null || !mine(e)) return
 			const dx = Math.round((e.clientX - s.px) / s.scale.x)
 			const dy = Math.round((e.clientY - s.py) / s.scale.y)
 			const box = dragBox(p.layout, s.id, s.from, s.edges, dx, dy, { x: SNAP / s.scale.x, y: SNAP / s.scale.y })
@@ -253,13 +279,24 @@ export function Grid(p: GridProps) {
 			if (d !== null && d.box.x === box.x && d.box.y === box.y && d.box.w === box.w && d.box.h === box.h) return
 			setDrag({ id: s.id, box, ok: fits(p.layout, box, s.id) })
 		},
-		onPointerUp: () => {
+		onPointerUp: (e: ReactPointerEvent<HTMLElement>) => {
+			if (!mine(e)) return
+			letGo()
 			const d = latest.current
 			if (d !== null && d.ok) p.onPlace(d.id, d.box)
 			start.current = null
 			setDrag(null)
 		},
-		onPointerCancel: () => {
+		onPointerCancel: (e: ReactPointerEvent<HTMLElement>) => {
+			if (!mine(e)) return
+			letGo()
+			start.current = null
+			setDrag(null)
+		},
+		// The press taken away: the window stays where it was.
+		onLostPointerCapture: (e: ReactPointerEvent<HTMLElement>) => {
+			if (!mine(e)) return
+			letGo()
 			start.current = null
 			setDrag(null)
 		},
@@ -472,7 +509,7 @@ export function Grid(p: GridProps) {
 							aria-label="Drag to give one window more room and the other less"
 							onPointerDown={(e) => {
 								const grid = gridRef.current
-								if (grid === null) return
+								if (grid === null || !takes(e)) return
 								e.currentTarget.setPointerCapture(e.pointerId)
 								const scale = scaleOf(grid)
 								seamStart.current = { seam, at: upright ? e.clientX : e.clientY, scale: upright ? scale.x : scale.y }
@@ -481,7 +518,7 @@ export function Grid(p: GridProps) {
 							}}
 							onPointerMove={(e) => {
 								const s = seamStart.current
-								if (s === null) return
+								if (s === null || !mine(e)) return
 								const x = s.seam.axis === 'x'
 								const want = s.seam.at + ((x ? e.clientX : e.clientY) - s.at) / s.scale
 								// Snaps to the edges of windows not on the seam, so it can
@@ -491,12 +528,24 @@ export function Grid(p: GridProps) {
 								const next = moveSeam(p.layout, s.seam, snapLine(want, lines, SNAP / s.scale) ?? want)
 								if (next !== seamLatest.current) setSeamDrag(next)
 							}}
-							onPointerUp={() => endSeam(true)}
-							onPointerCancel={() => endSeam(false)}
+							onPointerUp={(e) => {
+								if (!mine(e)) return
+								letGo()
+								endSeam(true)
+							}}
+							onPointerCancel={(e) => {
+								if (!mine(e)) return
+								letGo()
+								endSeam(false)
+							}}
 							// The press taken away (another pointer, the window losing
 							// focus): ends where it got to, and never leaves the pages as
 							// pictures waiting for a lift that will not come.
-							onLostPointerCapture={() => endSeam(true)}
+							onLostPointerCapture={(e) => {
+								if (!mine(e)) return
+								letGo()
+								endSeam(true)
+							}}
 							onContextMenu={(e) => e.preventDefault()}
 							style={
 								upright

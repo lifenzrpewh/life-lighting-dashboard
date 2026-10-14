@@ -37,18 +37,20 @@ function read(): ReadonlySet<BarItem> {
 /** The items hidden on this computer, and a way to hide or show one. */
 export function useBarHidden(): [ReadonlySet<BarItem>, (item: BarItem, hidden: boolean) => void] {
 	const [hidden, setHidden] = useState(read)
-	const set = (item: BarItem, hide: boolean) => {
-		const next = new Set(hidden)
-		if (hide) next.add(item)
-		else next.delete(item)
-		setHidden(next)
-		try {
-			if (next.size === 0) localStorage.removeItem(KEY)
-			else localStorage.setItem(KEY, JSON.stringify([...next]))
-		} catch {
-			// Kept for this run only.
-		}
-	}
+	const set = (item: BarItem, hide: boolean) =>
+		// From the latest, so two quick taps both count.
+		setHidden((hidden) => {
+			const next = new Set(hidden)
+			if (hide) next.add(item)
+			else next.delete(item)
+			try {
+				if (next.size === 0) localStorage.removeItem(KEY)
+				else localStorage.setItem(KEY, JSON.stringify([...next]))
+			} catch {
+				// Kept for this run only.
+			}
+			return next
+		})
 	return [hidden, set]
 }
 

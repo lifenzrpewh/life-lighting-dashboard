@@ -228,6 +228,9 @@ export function App() {
 	useEffect(() => {
 		if (!DEV) return
 		const onKey = (e: KeyboardEvent) => {
+			// Typing a number in a field (an address, the passcode) is not a scenario.
+			const t = e.target as HTMLElement | null
+			if (t !== null && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
 			if (e.key === '0') return setScenario('real')
 			const i = Number(e.key) - 1
 			const picked = SCENARIOS[i]
@@ -325,7 +328,8 @@ export function App() {
 	const editTurn = useRef(0)
 	const startEditing = () => {
 		const id = ++editTurn.current
-		const pictures = window.life?.snapshotPanes() ?? Promise.resolve({})
+		// No pictures (main failed to take them) still opens, on placeholders.
+		const pictures = (window.life?.snapshotPanes() ?? Promise.resolve({})).catch(() => ({}))
 		void pictures.then((s) => {
 			if (editTurn.current !== id) return
 			setStills(s)
@@ -338,7 +342,7 @@ export function App() {
 	const [frozen, setFrozen] = useState(false)
 	const startSeam = () => {
 		const id = ++editTurn.current
-		void window.life?.snapshotPanes().then((s) => {
+		void window.life?.snapshotPanes().catch(() => ({})).then((s) => {
 			if (editTurn.current !== id) return
 			setStills(s)
 			setFrozen(true)
@@ -354,7 +358,8 @@ export function App() {
 	// pages are pictures while it is open, taken before it opens.
 	const openLayouts = () => {
 		const id = ++editTurn.current
-		const pictures = window.life?.snapshotPanes() ?? Promise.resolve({})
+		// No pictures (main failed to take them) still opens, on placeholders.
+		const pictures = (window.life?.snapshotPanes() ?? Promise.resolve({})).catch(() => ({}))
 		void pictures.then((s) => {
 			if (editTurn.current !== id) return
 			setStills(s)
