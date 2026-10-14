@@ -74,6 +74,7 @@ import { registerThumbnailScheme, serveLookbookThumbnails, serveThumbnails } fro
 import { lookbookFileSize, lookbookFileUrl, lookbookItems, lookbookServiceForPlan, lookbookServices } from './lookbook.js'
 import type { FileSizes, LookbookItem, LookbookRead, LookbookService } from '../shared/media-check.js'
 import { createPopouts, type Popouts } from './popout.js'
+import { lockPage, openInBrowser, reloadOnCrash } from './page-lock.js'
 import { createMediaFetch } from './media-fetch.js'
 import { createMediaSame } from './media-same.js'
 import { sameMarkFrom } from '../shared/media-check.js'
@@ -219,17 +220,15 @@ function createWindow(): void {
 	// A renderer crash mid-service must not leave a dead rectangle in the booth.
 	// Reload rather than quit: the operator's fallback is the console 30 cm away,
 	// but only if this screen gets out of the way by coming back.
-	window.webContents.on('render-process-gone', (_event, details) => {
-		console.error(`[kiosk] renderer gone: ${details.reason}. Reloading.`)
-		window?.reload()
-	})
+	reloadOnCrash(window.webContents, 'the kiosk', () => window?.reload())
 
 	// The page never opens a window or navigates away. The only other windows
 	// are pop-outs, and main opens those (./popout.ts).
 	window.webContents.setWindowOpenHandler(({ url }) => {
-		void shell.openExternal(url)
+		openInBrowser(url)
 		return { action: 'deny' }
 	})
+	lockPage(window.webContents, 'the kiosk')
 
 	loadPage(window, null)
 }
@@ -885,10 +884,10 @@ app.whenReady().then(() => {
 	// The camera rule for Pāua's own pages (the kiosk and its pop-outs, in the
 	// default session; the MA, the run order and embeds have sessions of their
 	// own that refuse everything): video only, for capture inputs
-	// (../shared/capture.ts). Never the microphone. Other permissions keep
-	// Electron's default, as they had before this rule.
+	// (../shared/capture.ts). Never the microphone. The pages use no other
+	// permission, so every other is refused.
 	session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {
-		if (permission !== 'media') return callback(true)
+		if (permission !== 'media') return callback(false)
 		const types = 'mediaTypes' in details ? (details.mediaTypes ?? []) : []
 		callback(types.length > 0 && types.every((t) => t === 'video'))
 	})

@@ -24,6 +24,7 @@ import path from 'node:path'
 import type { ViewId } from '../shared/layout.js'
 import { POPOUT_MIN, popoutBounds, popoutPlacesFrom, type Box } from '../shared/popout.js'
 import { fitWindow, type Size } from '../shared/video-feed.js'
+import { lockPage, reloadOnCrash } from './page-lock.js'
 
 /** A pane main draws: the MA or the run order. */
 type Movable = { host(): BrowserWindow; moveTo(win: BrowserWindow): void }
@@ -110,8 +111,8 @@ export function createPopouts(opts: {
 		windows.set(view, win)
 		win.once('ready-to-show', () => win.show())
 		win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-		win.webContents.on('render-process-gone', (_e, details) => {
-			console.error(`[kiosk] ${labelOf(view)} pop-out's page gone: ${details.reason}. Reloading.`)
+		lockPage(win.webContents, `the ${labelOf(view)} pop-out`)
+		reloadOnCrash(win.webContents, `the ${labelOf(view)} pop-out`, () => {
 			if (!win.isDestroyed()) win.reload()
 		})
 		// Home on `close`, while the window still stands. A page that closes its
