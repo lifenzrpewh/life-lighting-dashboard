@@ -13,6 +13,7 @@ import {
 } from '../dist/src/shared/holding.js'
 import {
 	DEFAULT_MAP,
+	defaultTakesWords,
 	holdingMapFrom,
 	layerOfCode,
 	presetFile,
@@ -111,12 +112,25 @@ test("a column's own words take the items they name, and its default stops", () 
 	assert.equal(unplaced.some((u) => u.label === 'WTG'), false)
 })
 
-test('words match the whole label, or anywhere in the title and label', () => {
+test('words match the whole label, or as whole words anywhere in the title and label', () => {
 	assert.equal(takesItem(['walk in'], { title: 'Doors Open', label: 'Walk In' }), true)
 	assert.equal(takesItem(['WTL'], { title: 'Welcome', label: 'wtl' }), true)
 	assert.equal(takesItem(['Alpha'], { title: 'EOS Announcements', label: 'Alpha Course' }), true)
 	assert.equal(takesItem(['Alpha'], { title: 'Welcome', label: 'WTL' }), false)
 	assert.equal(takesItem([], { title: 'Welcome', label: 'WTL' }), false)
+	// Whole words: Pre is not in Preach, nor End in Weekend.
+	assert.equal(takesItem(['Pre'], { title: 'Message', label: 'Preach BG' }), false)
+	assert.equal(takesItem(['End'], { title: 'Weekend Away', label: null }), false)
+	assert.equal(takesItem(['End'], { title: 'End', label: 'Walk Out' }), true)
+	assert.equal(takesItem(['prayer & fasting'], { title: 'Announcement', label: 'Prayer & Fasting' }), true)
+	assert.equal(takesItem(['(x'], { title: 'a (x b', label: null }), true)
+})
+
+test("a column's default, said: a video column is never a PROMO's", () => {
+	assert.equal(defaultTakesWords('Promo 3'), 'Announcements, promos')
+	assert.equal(defaultTakesWords('PROMO VIDEO'), 'Nothing')
+	assert.equal(defaultTakesWords('Countdown'), 'Nothing')
+	assert.equal(defaultTakesWords('WTL'), 'The item labelled WTL')
 })
 
 test('left alone: nothing placed, updated or cleared there', () => {

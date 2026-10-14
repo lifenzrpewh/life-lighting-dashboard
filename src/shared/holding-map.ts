@@ -99,14 +99,17 @@ export function layerOfCode(map: HoldingMap, code: string): LayerKey | null {
 }
 
 /** Does an item answer to these words: one is its whole label, or appears in
- *  its title or label. */
+ *  its title or label as whole words (`Pre` is not in `Preach`, nor `End` in
+ *  `Weekend`). */
 export function takesItem(words: readonly string[], item: { title: string; label: string | null }): boolean {
 	const label = columnKey(item.label ?? '')
 	const text = `${item.title} ${item.label ?? ''}`.toLowerCase()
 	return words.some((w) => {
-		const word = w.trim()
+		const word = w.trim().toLowerCase()
 		if (word === '') return false
-		return (label !== '' && label === columnKey(word)) || text.includes(word.toLowerCase())
+		if (label !== '' && label === columnKey(word)) return true
+		const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+		return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`).test(text)
 	})
 }
 
@@ -116,9 +119,10 @@ export function defaultTakesWords(columnName: string): string {
 	if (key === '') return 'Nothing (not named)'
 	if (/^PRE\d*$/.test(key)) return 'Doors Open, Walk In'
 	if (/^POST\d*$/.test(key)) return 'End, Walk Out'
+	// Before PROMO and PREACH: `PROMO VIDEO` is a video column, never filled.
+	if (/COUNTDOWN|VIDEO|BROADCAST/.test(key)) return 'Nothing'
 	if (key.startsWith('PROMO')) return 'Announcements, promos'
 	if (key.startsWith('PREACH')) return 'The message'
-	if (/COUNTDOWN|VIDEO|BROADCAST/.test(key)) return 'Nothing'
 	return `The item labelled ${columnName.trim()}`
 }
 
