@@ -404,9 +404,23 @@ export function applyParameter(tree: ArenaTree, id: number, value: unknown): Dec
 	return { ok: true, value: next }
 }
 
+/** Each tree's status, worked out once: the views ask four times a second, and
+ *  between updates the tree is the same object. A tree is never changed in
+ *  place (an update makes a new one), so the status cannot go out of date.
+ *  The status is shared: whoever reads it must not change it. */
+const statuses = new WeakMap<ArenaTree, ArenaStatus>()
+
 /** The tree without its parameter ids: what crosses to anyone else. A clip's
  *  rate is worked out here, where its group's speed is known. */
 export function statusOf(tree: ArenaTree): ArenaStatus {
+	const held = statuses.get(tree)
+	if (held !== undefined) return held
+	const status = statusFrom(tree)
+	statuses.set(tree, status)
+	return status
+}
+
+function statusFrom(tree: ArenaTree): ArenaStatus {
 	const groupSpeed = new Map(tree.groups.map((g) => [g.name, g.speed.value]))
 	return {
 		master: tree.master.value,

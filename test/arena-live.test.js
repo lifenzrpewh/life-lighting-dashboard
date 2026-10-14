@@ -168,6 +168,17 @@ test('a run of updates lands each on its own, leaving what it does not touch sha
 	assert.equal(applyParameter(t, 999, 0.5), null)
 })
 
+test("a tree's status is worked out once, and a new tree gets its own", () => {
+	const tree = decoded(real())
+	const s = statusOf(tree)
+	assert.equal(statusOf(tree), s)
+	const moved = applyParameter(tree, tree.layers[4].master.id, 0.5)
+	assert.ok(moved?.ok)
+	assert.notEqual(statusOf(moved.value), s)
+	assert.equal(statusOf(moved.value).layers[4].master, 0.5)
+	assert.equal(s.layers[4].master, 1)
+})
+
 test('an update for another parameter is not ours; one of the wrong kind fails', () => {
 	const tree = decoded(real())
 	assert.equal(applyParameter(tree, 999, 0.5), null)
