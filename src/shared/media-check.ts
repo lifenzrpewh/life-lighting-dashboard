@@ -136,8 +136,11 @@ export function uploadedAt(path: string): number | null {
 	return Number.isFinite(t) && t > 1_000_000_000_000 ? t : null
 }
 
-/** A copy's marks at the end of a name: ` - Copy`, `_copy (2)`, ` (1)`. */
-const COPY_TAIL = /(?:[\s_-]+copy(?:\s*\(\d+\))?|\s*\(\d+\))$/i
+/** A copy's marks at the end of a name: ` - Copy`, `_copy (2)`, ` (1)`. A
+ *  bare number in brackets counts only as Windows and the browsers write it, a
+ *  space then one or two digits, so `Easter(2026)` and `Easter (2026)` are
+ *  names, not copies. */
+const COPY_TAIL = /(?:[\s_-]+copy(?:\s*\(\d+\))?|\s+\(\d{1,2}\))$/i
 
 /** Whether a name is a copy of another (`CF449-Sunday-Bibles - Copy`). */
 export function isCopyName(name: string): boolean {
@@ -146,10 +149,13 @@ export function isCopyName(name: string): boolean {
 
 /** The version a name carries at its end (the owner, 2026-10-13: "same code
  *  but different filename"): `-v5`, `_V2`, `WalkInV2`, after any copy marks
- *  and the lookbook's upload time; null when it carries none. */
+ *  and the lookbook's upload time; null when it carries none. The v follows a
+ *  separator (`-`, `_`, space, `.`), or is a capital after a small letter
+ *  (`WalkInV2`), so a word ending in v and a number (`-Rev3`, `Mov2`) is not
+ *  read as a version. */
 export function versionOf(name: string): number | null {
 	const stem = lookbookStem(name).replace(COPY_TAIL, '')
-	const m = /(?<![0-9])v(\d{1,3})$/i.exec(stem)
+	const m = /(?:(?:^|(?<=[\s._-]))[vV]|(?<=[a-z])V)(\d{1,3})$/.exec(stem)
 	return m === null ? null : Number(m[1])
 }
 
@@ -409,8 +415,9 @@ export function offeredServices(services: LookbookService[], today: string, camp
 /** The New Zealand date, `2026-10-04`, plus `days`: the lookbook's dates are
  *  New Zealand days. */
 export function nzDate(at: Date, days = 0): string {
-	const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
-	if (days === 0) return parts
-	const [y, m, d] = parts.split('-').map(Number) as [number, number, number]
-	return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+	// By parts, as `nzStamp` (./showfile-write.ts) does: a locale's own date
+	// format (en-CA's yyyy-mm-dd) is not a promise every runtime keeps.
+	const parts = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(at)
+	const get = (type: string) => Number(parts.find((p) => p.type === type)?.value)
+	return new Date(Date.UTC(get('year'), get('month') - 1, get('day') + days)).toISOString().slice(0, 10)
 }
