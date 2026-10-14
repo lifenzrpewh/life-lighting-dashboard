@@ -151,8 +151,14 @@ export function chooseTimer(sources: TimerSources, now: number): TimerView {
 
 /** A countdown as a person reads it: `4:05`, `1:02:30`, and overtime as `+0:12`.
  *  Rounded up while counting down, so 0:00 arrives when the time is actually up
- *  rather than a second early. */
+ *  rather than a second early; overtime counts whole seconds past, as a
+ *  stopwatch does, so its first second is `+0:00`. A value that is not a
+ *  number (a decode gone wrong) is the no-value dash the views already draw
+ *  for a missing one, never `NaN:NaN` or a time it is not. */
+export const NO_COUNTDOWN = '\u2013:\u2013\u2013'
+
 export function formatCountdown(ms: number): string {
+	if (!Number.isFinite(ms)) return NO_COUNTDOWN
 	const over = ms < 0
 	const total = over ? Math.floor(-ms / 1000) : Math.ceil(ms / 1000)
 	const h = Math.floor(total / 3600)

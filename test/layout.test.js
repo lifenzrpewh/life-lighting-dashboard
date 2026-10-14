@@ -212,6 +212,8 @@ test('saved layouts: save, replace by name, delete, and a full list', () => {
 	assert.deepEqual(saved, [{ name: 'sunday', layout: wide }])
 	saved = deleteLayout(saved, 'sunday')
 	assert.deepEqual(saved, [])
+	// Deleted by name in any case, as it is saved.
+	assert.deepEqual(deleteLayout(saveLayout([], 'Sunday', DEFAULT_LAYOUT), ' SUNDAY '), [])
 	let full = []
 	for (let i = 0; i < 12; i++) full = saveLayout(full, `L${i}`, DEFAULT_LAYOUT)
 	assert.equal(saveLayout(full, 'one more', DEFAULT_LAYOUT), null)

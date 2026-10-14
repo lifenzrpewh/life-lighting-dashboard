@@ -174,6 +174,11 @@ test('countdowns read as people read them', () => {
 	assert.equal(formatCountdown(3_750_000), '1:02:30')
 	assert.equal(formatCountdown(0), '0:00')
 	assert.equal(formatCountdown(-12_400), '+0:12')
+	// Overtime counts whole seconds past, as a stopwatch does.
+	assert.equal(formatCountdown(-400), '+0:00')
+	// Not a number is the no-value dash, never NaN:NaN or a time.
+	assert.equal(formatCountdown(NaN), '\u2013:\u2013\u2013')
+	assert.equal(formatCountdown(Infinity), '\u2013:\u2013\u2013')
 })
 
 // --- settings ------------------------------------------------------------------

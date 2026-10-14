@@ -617,8 +617,10 @@ export function saveLayout(saved: readonly SavedLayout[], name: string, layout: 
 	return [...saved, { name: n, layout }]
 }
 
+/** Delete the layout named `name`, any case, as `saveLayout` matches it. */
 export function deleteLayout(saved: readonly SavedLayout[], name: string): SavedLayout[] {
-	return saved.filter((s) => s.name !== name)
+	const n = name.trim().toLowerCase()
+	return saved.filter((s) => s.name.toLowerCase() !== n)
 }
 
 /** Whether two layouts are the same arrangement: the same windows in the same
