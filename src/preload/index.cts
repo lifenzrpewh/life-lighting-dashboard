@@ -28,6 +28,7 @@ import type { AdminState, UnlockResult } from '../shared/admin.js' with { 'resol
 import type { EmbedReport } from '../shared/embeds.js' with { 'resolution-mode': 'import' }
 import type { NdiState } from '../shared/ndi.js' with { 'resolution-mode': 'import' }
 import type { CaptureInput } from '../shared/capture.js' with { 'resolution-mode': 'import' }
+import type { PlaylistRead } from '../shared/announcements.js' with { 'resolution-mode': 'import' }
 import type { DriveMatches, FetchRequest, FetchRun, FetchStates, MediaSource, RunRequest } from '../shared/media-fetch.js' with { 'resolution-mode': 'import' }
 
 /** Every view on this page showing the video feed, each drawing every frame.
@@ -141,6 +142,9 @@ const api = {
 	/** What OnTime and ProPresenter last said, for the countdown chip. A source
 	 *  is null when settings name no address for it. */
 	timers: (): Promise<TimerSources> => ipcRenderer.invoke('timers:state'),
+	/** ProPresenter's "Announcements AM" or "PM", read once
+	 *  (src/shared/announcements.ts). Read-only. */
+	proPresenterPlaylist: (name: string): Promise<PlaylistRead | undefined> => ipcRenderer.invoke('propresenter:playlist', name),
 
 	/** Whether Arena's web server answers, and which Arena. Null when settings
 	 *  name no Arena. */

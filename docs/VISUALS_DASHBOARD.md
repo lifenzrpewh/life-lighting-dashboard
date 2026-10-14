@@ -1193,14 +1193,61 @@ and not in Pāua's code. Watch for it on a Mac.
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
-- **ProPresenter lower thirds** (the owner wants it built, 2026-10-13). Nothing built. The
-  lookbook's lower thirds are its `T` codes (`resolvedAssetPaths.lowerThird`), not Arena's.
-  The only plan so far was for announcements (CLAUDE.md, 2026-10-08:
-  `spikes/propresenter-playlist.mjs`, never run). Asked and unanswered: how lower thirds live in
-  ProPresenter today (media bin items, props, slides) and how they get there each week; whether
-  announcements are part of it; running the spike (read-only without `--write`) at a booth. A
-  route that may need no API writes: copy the service's T files, named in run order
-  (`03 CT123 …`), into a folder a Smart Playlist follows, sorted by name.
+- **ProPresenter announcements, loading**: the check is built, and ProPresenter will not take a
+  playlist of pictures over its API (§ ProPresenter announcements, ❌ the write). Which route
+  instead is the owner's to choose.
+
+## ProPresenter announcements (2026-10-14)
+
+**The check, built** (`src/shared/announcements.ts`, `src/bridge/propresenter-playlist.ts`,
+`src/main/propresenter-playlist.ts`, the **Announcements** view). The owner's answers: the
+playlists are "-Announcements AM", "-Announcements PM" and "-Announcements EVENT"; each item is
+a picture named by its file; someone puts them in by hand; the files are on the graphics drive
+and the NAS, which ProPresenter's computer (another machine) also reaches.
+
+✅ **Read from Central's ProPresenter** (10.11.60.7:1025, on the booth network) the same day:
+twelve playlists, no groups; "-Announcements AM" holds a header NORMAL NOTICES (CT108 Connect
+With Us, CT003 Next Steps Lounge, CT110 Bibles, CT109 Ways to Give), a header PROMOS, then
+CT290 Prayer & Fasting. A media item's name is its file's without the extension. The fixture is
+`test/fixtures/propresenter-announcements-am.json`.
+
+What the real data changed from the owner's first answers:
+- **Every T code on the run sheet** belongs, not only announcement items': on Central's 11 and 18
+  October run sheets the Welcome moments (WTL, NSL, WTG) carry T codes and all are in the
+  playlist. Speaker titles have their own playlist and no T code there.
+- **Order is not checked**: the playlist is not in run-sheet order (standing notices in a fixed
+  order, then promos).
+- **AM or PM by the service's name**, else EVENT (`Central Team Night`).
+
+✅ Against the live booth and the lookbook, 18 October: AM has 4 of 5, **CT299 Value Your Vote
+missing**, CT290 still in; PM lacks CT110 and CT299 and holds CT290 and CT131 Altar Call. Seen in
+the dev kiosk on the Mac (this Mac's ProPresenter address set to the booth's, then cleared).
+
+**The owner's answers for loading, 2026-10-14:** keep today's pattern for now (NORMAL NOTICES
+in their fixed order, then PROMOS in run-sheet order; a trial of all in run-sheet order later).
+CT131 Altar Call is a normal weekly announcement and belongs on the run sheet: its absence from
+the lookbook was most likely missed there, so it is rightly said. The folder:
+`smb://10.0.0.71/graphics/Other Media/Paua Smart Folder` (the graphics share; on this Mac
+`/Volumes/graphics/Other Media/Paua Smart Folder`, empty, made by the owner).
+
+**❌ The write, 2026-10-14, at the owner's go, on the owner's test playlist "PAUA TEST" at
+Central** (one picture, CT292): `PUT /v1/playlist/<uuid>` with a JSON list answers **404** for
+every shape tried (the spike's `append` adding CT108; the playlist written back unchanged with
+`id, type, is_hidden, is_pco`, with `id, type`, and with the uuid alone), and **400** "expected a
+sequence" for `{ items }`, so the endpoint is there and reads the body. Nothing changed (read
+back each time), and ProPresenter kept answering. The pictures are not in the Media Bin (its only
+media playlists are Background, holding a test card, and Foreground, empty): they were dragged
+into the playlist, so there is no Media Bin id to try instead. Most likely the PUT takes
+presentations only, or this version (not reported: `/v1/version` is 404) has a bug. Not tried: a
+playlist of presentations, and a newer ProPresenter.
+
+**Routes left for loading, the owner's to choose:**
+- **The folder only**: Pāua copies the week's T files into the Paua Smart Folder, named in the
+  pattern's order (`01 CT108 …`), last week's moved aside; a Smart Playlist in ProPresenter's
+  Media Bin follows it, and the operator fires from there, or drags them into the announcements
+  playlist (a person still places them, but the right files, in order, in one place).
+- **Check only**: keep the Announcements view as the safety net, the playlist put in by hand.
+- **Ask Renewed Vision** whether the PUT can take media items (or try a newer ProPresenter).
 
 ## The first spike
 

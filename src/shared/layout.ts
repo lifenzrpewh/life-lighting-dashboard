@@ -34,7 +34,7 @@ import { isNdiId, ndiIdOf, ndiView, type NdiSource, type NdiView } from './ndi.j
 import { captureIdOf, captureView, isCaptureId, type CaptureInput, type CaptureView } from './capture.js'
 
 /** The views that come with Pāua. */
-export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'video' | 'timer' | 'guide'
+export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'announcements' | 'video' | 'timer' | 'guide'
 
 /** A built-in view, or an embed, NDI source or capture input someone added in
  *  Settings (./embeds.ts, ./ndi.ts, ./capture.ts). Since 2026-10-08 a tab
@@ -82,7 +82,7 @@ export function sameChoice(a: VideoChoice | null | undefined, b: VideoChoice | n
 }
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
-export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'video', 'timer', 'guide']
+export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'announcements', 'video', 'timer', 'guide']
 
 export const VIEW_LABEL: Record<BuiltInView, string> = {
 	cue: 'Run order',
@@ -94,6 +94,8 @@ export const VIEW_LABEL: Record<BuiltInView, string> = {
 	holding: 'Holding',
 	/** The run sheet's moments as the lookbook draws them, big, against Arena (./components/LookbookView.tsx). */
 	lookbook: 'Lookbook',
+	/** ProPresenter's announcement playlist against the run sheet (./components/AnnouncementsView.tsx, 2026-10-14). */
+	announcements: 'Announcements',
 	video: 'Video',
 	/** The countdown beside the clock, big (./components/TimerView.tsx, 2026-10-08). */
 	timer: 'Timer',
