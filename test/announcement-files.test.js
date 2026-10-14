@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { OLD_FOLDER, numbered, placeFile, setAside, touchLater } from '../dist/src/bridge/announcement-files.js'
+import { OLD_FOLDER, listPictures, numbered, placeFile, setAside } from '../dist/src/bridge/announcement-files.js'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'paua-ann-'))
 
@@ -32,8 +32,7 @@ test('announcement files: last week\'s set aside into Old, never deleted, nothin
 	assert.deepEqual(await setAside(dir, new Set(['01 CT108 a.png'])), ['05 CT290 old.png'])
 	assert.deepEqual(fs.readdirSync(dir).sort(), ['01 CT108 a.png', OLD_FOLDER, 'notes.txt'])
 	assert.deepEqual(fs.readdirSync(path.join(dir, OLD_FOLDER)).sort(), ['05 CT290 old (2).png', '05 CT290 old.png'])
-	const f = path.join(dir, '01 CT108 a.png')
-	fs.utimesSync(f, new Date(2020, 0, 1), new Date(2020, 0, 1))
-	await touchLater([f], 10)
-	assert.ok(fs.statSync(f).mtimeMs > Date.now() - 60_000)
+	// The folder's pictures, as ProPresenter names them: no extension, not Old's, no notes.
+	fs.writeFileSync(path.join(dir, '02 CT003 b.JPG'), 'b')
+	assert.deepEqual(await listPictures(dir), ['01 CT108 a', '02 CT003 b'])
 })

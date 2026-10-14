@@ -4,9 +4,9 @@
 // are ../../shared/announcements.ts.
 //
 // Each lower third the run sheet calls for, in the playlist's order (NORMAL
-// NOTICES, then PROMOS), with where it has got to: the folder's Smart
-// Playlist, the media playlist a person drags it into, and the output playlist
-// the show plays from. Admin sees the two writes: Copy to the folder, and
+// NOTICES, then PROMOS), with where it has got to: the folder, the media
+// playlist a person drags it into from there, and the output playlist the show
+// plays from. Admin sees the two writes: Copy to the folder, and
 // Write the output playlist (confirmed first). Everyone sees the check.
 //
 // Arena is not needed: the service and run sheet come from the lookbook, and
@@ -19,7 +19,8 @@ import type { ArenaStatus } from '../../shared/arena.js'
 import {
 	SECTION_HEADER,
 	checkAnnouncements,
-	itemOf,
+	inFolder,
+	pictureOf,
 	sessionOf,
 	wantedAnnouncements,
 	type AnnouncementsRead,
@@ -58,7 +59,7 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 		void api.announcements(session).then((r) => {
 			setReading(false)
 			const none: PlaylistRead = { ok: false, detail: 'Pāua did not answer', at: Date.now() }
-			setRead(r ?? { output: none, media: none, smart: none })
+			setRead(r ?? { output: none, media: none, folder: none })
 		})
 	}
 	useEffect(() => {
@@ -77,10 +78,17 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 	const want = wantedAnnouncements(m.runSheet ?? [])
 	const output = read?.output.ok === true ? read.output : null
 	const media = read?.media.ok === true ? read.media.items : null
-	const smart = read?.smart.ok === true ? read.smart.items : null
+	const folder = read?.folder.ok === true ? read.folder.names : null
 	const check = output === null ? null : checkAnnouncements(output.name, want, output.items)
 	const there = check?.rows.filter((r) => r.state === 'there').length ?? 0
-	const inMedia = media === null ? 0 : want.filter((w) => itemOf(media, w.code) !== null).length
+	// What the write will hold: the ones with a file in the folder. The rest (a
+	// promo not made yet) are left out and named at the confirmation.
+	const ready = folder === null ? [] : want.filter((w) => inFolder(folder, w.code))
+	const leftOut = folder === null ? [] : want.filter((w) => !inFolder(folder, w.code)).map((w) => w.code)
+	const inMedia = media === null || folder === null ? 0 : ready.filter((w) => pictureOf(media, w.code, folder) !== null).length
+	const canWrite = ready.length > 0 && inMedia === ready.length && output !== null
+	const mediaName = read?.media.ok === true ? read.media.name : 'the media playlist'
+	const noFile = (codes: readonly string[]) => `${codes.join(', ')} ${codes.length === 1 ? 'has' : 'have'} no file in the folder`
 	const outcomeOf = (code: string) => (copied?.ok === true ? copied.outcomes.find((o) => o.code === code) : undefined)
 
 	const copy = () => {
@@ -118,7 +126,7 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 				{check.extras.length > 0 && ` · ${check.extras.length} not on this run sheet`}
 			</span>
 		)
-	const failed = read === null ? [] : [read.output, read.media, read.smart].flatMap((r) => (r.ok ? [] : [r.detail]))
+	const failed = read === null ? [] : [read.output, read.media, read.folder].flatMap((r) => (r.ok ? [] : [r.detail]))
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
@@ -160,7 +168,7 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 							</Button>
 							<span className="min-w-0 text-booth-dim">
 								{copied === null
-									? `The ${want.length} lower thirds, numbered in order, for "${read.smart.ok ? read.smart.name : 'the Smart Playlist'}".`
+									? `The ${want.length} lower thirds, numbered in order, into the announcements folder.`
 									: copied.ok
 										? `${copied.outcomes.filter((o) => o.state !== 'not-on-drive' && o.state !== 'failed').length} in the folder${
 												copied.setAside.length > 0 ? `, ${copied.setAside.length} old set aside` : ''
@@ -170,12 +178,12 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 						</div>
 						<div className="flex min-w-0 items-center gap-3">
 							<span className="w-6 text-center font-bold text-booth-dim">2</span>
-							<span className={inMedia === want.length ? 'text-state-live' : 'text-booth-ink'}>
-								{inMedia === want.length
-									? `All ${want.length} in "${read.media.ok ? read.media.name : 'the media playlist'}".`
-									: `In ProPresenter, drag the new ones from "${read.smart.ok ? read.smart.name : 'the Smart Playlist'}" into "${
-											read.media.ok ? read.media.name : 'the media playlist'
-										}": ${inMedia} of ${want.length} there.`}
+							<span className={canWrite ? 'text-state-live' : 'text-booth-ink'}>
+								{ready.length === 0
+									? 'Nothing in the folder yet: Copy first.'
+									: canWrite
+										? `All ${ready.length} in "${mediaName}".`
+										: `In ProPresenter, drag them from the folder (in Finder or Explorer) into "${mediaName}": ${inMedia} of ${ready.length} there.`}
 							</span>
 						</div>
 						<div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -183,7 +191,13 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 							{confirming ? (
 								<>
 									<span className="text-booth-ink">
-										Replace everything in "{output?.name}" with {SECTION_HEADER.notices} and {SECTION_HEADER.promos}, in the order below?
+										Replace everything in "{output?.name}" with{' '}
+										{(['notices', 'promos'] as const)
+											.filter((sec) => ready.some((w) => w.section === sec))
+											.map((sec) => SECTION_HEADER[sec])
+											.join(' and ')}
+										, in the order below?
+										{leftOut.length > 0 && <span className="font-bold text-warn"> {noFile(leftOut)} and {leftOut.length === 1 ? 'is' : 'are'} left out.</span>}
 									</span>
 									<Button size="sm" variant="warn" onClick={write}>
 										Write it
@@ -194,16 +208,16 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 								</>
 							) : (
 								<>
-									<Button size="sm" icon={ListOrdered} disabled={writing || inMedia !== want.length || output === null} onClick={() => setConfirming(true)}>
+									<Button size="sm" icon={ListOrdered} disabled={writing || !canWrite} onClick={() => setConfirming(true)}>
 										{writing ? 'Writing…' : `Write "${output?.name ?? 'the playlist'}"`}
 									</Button>
 									<span className="min-w-0 text-booth-dim">
 										{written === null
-											? inMedia !== want.length
-												? 'Once every one is in the media playlist.'
-												: 'Headers and order, read back after.'
+											? !canWrite
+												? 'Once every one in the folder is in the media playlist.'
+												: `Headers and order, read back after.${leftOut.length > 0 ? ` ${noFile(leftOut)}: left out.` : ''}`
 											: written.ok
-												? `Written and read back: ${written.items} items.`
+												? `Written and read back: ${written.items} items.${written.leftOut.length > 0 ? ` Left out, no file: ${written.leftOut.join(', ')}.` : ''}`
 												: written.detail}
 									</span>
 								</>
@@ -239,10 +253,15 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 												{w.title}
 												{w.label !== null && ` · ${w.label}`}
 											</span>
-											{o !== undefined && (o.state === 'not-on-drive' || o.state === 'failed') && <span className="truncate text-sm text-warn">{o.detail}</span>}
+											{o !== undefined && (o.state === 'not-on-drive' || o.state === 'failed') ? (
+												<span className="truncate text-sm text-warn">{o.detail}</span>
+											) : (
+												folder !== null &&
+												!inFolder(folder, w.code) && <span className="truncate text-sm text-warn">No file in the folder: left out of the write</span>
+											)}
 										</span>
-										<Step label="Folder" on={smart === null ? null : itemOf(smart, w.code) !== null} />
-										<Step label="Media" on={media === null ? null : itemOf(media, w.code) !== null} />
+										<Step label="Folder" on={folder === null ? null : inFolder(folder, w.code)} />
+										<Step label="Media" on={media === null || folder === null ? null : pictureOf(media, w.code, folder) !== null} />
 										{row?.state === 'there' ? (
 											<span className="flex shrink-0 items-center gap-2 text-state-live">
 												<Check size={20} aria-hidden /> In the playlist, item {row.at + 1}

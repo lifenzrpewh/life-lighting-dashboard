@@ -1,11 +1,11 @@
 // The announcements folder (../shared/announcements.ts § LOADING): the week's
-// lower thirds copied in, numbered in the playlist's order, so a ProPresenter
-// Smart Playlist on the folder has them.
+// lower thirds copied in, numbered in the playlist's order, for a person to
+// drag into ProPresenter's media playlist. Each is written under a `.part`
+// name and renamed into place, so a half-copied file is never dragged.
 //
-// ✅ Seen on Central's ProPresenter, 2026-10-14: a Smart Playlist on a network
-// folder does NOT notice a file appearing, but does notice one modified after
-// it lands (within 10 s). So each file is written under a `.part` name,
-// renamed into place, and touched a moment later (`touchLater`).
+// No Smart Playlist follows the folder any more: a touch a moment after landing
+// was what one needed, and at Central's first test run (2026-10-14, evening) it
+// still never noticed two of the four files, touched twice.
 //
 // Last week's files are moved into `Old` inside the folder, never deleted: the
 // drive is the comms team's, and a moved file can be moved back.
@@ -72,13 +72,12 @@ export async function setAside(dir: string, keep: ReadonlySet<string>): Promise<
 	return moved
 }
 
-/** Set each file's modified time to now, after `ms`, so a Smart Playlist on a
- *  network folder notices them (the header). */
-export function touchLater(files: readonly string[], ms: number): Promise<void> {
-	return new Promise((resolve) =>
-		setTimeout(() => {
-			const now = new Date()
-			void Promise.all(files.map((f) => fs.promises.utimes(f, now, now).catch(() => {}))).then(() => resolve())
-		}, ms),
-	)
+/** The media files in `dir` (not Old), by name without the extension, as
+ *  ProPresenter names a picture it holds. */
+export async function listPictures(dir: string): Promise<string[]> {
+	const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+	return entries
+		.filter((e) => e.isFile() && MEDIA_EXTENSIONS.includes(path.extname(e.name).toLowerCase()))
+		.map((e) => path.basename(e.name, path.extname(e.name)))
+		.sort()
 }

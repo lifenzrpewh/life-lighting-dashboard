@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { readFileSync } from 'node:fs'
 
-import { PLAYLIST_AM, PLAYLIST_EVENT, PLAYLIST_PM, checkAnnouncements, isTCode, outputName, playlistBody, playlistFor, sameOrder, sessionOf, wantedAnnouncements } from '../dist/src/shared/announcements.js'
+import { PLAYLIST_AM, PLAYLIST_EVENT, PLAYLIST_PM, checkAnnouncements, inFolder, isTCode, outputName, pictureOf, playlistBody, playlistFor, sameOrder, sessionOf, wantedAnnouncements } from '../dist/src/shared/announcements.js'
 import { DEFAULT_SETTINGS, applyPatch, fromDisk, patchFrom } from '../dist/src/shared/settings.js'
 import { viewIsOn } from '../dist/src/shared/connections.js'
 /** Central's "-Announcements AM", read from its ProPresenter on 2026-10-14. */
@@ -110,8 +110,10 @@ const PAUA = [media('01 CT108-Sunday-ConnectWithUs', 'm108'), media('02 CT003-Su
 
 test('announcements: the write sends each section\'s header and its pictures by their Media Bin ids, in order', () => {
 	const current = decodePlaylist(REAL_AM).value
-	const body = playlistBody(wantedAnnouncements(RUN_SHEET), PAUA, current)
+	const folder = ['01 CT108-Sunday-ConnectWithUs', '02 CT003-Sunday-NextStepsLounge', '04 CT110-Sunday-Bibles', '03 CT109-Sunday-WaystoGive', '05 CT290-Sunday-Prayer&Fasting-Oct']
+	const body = playlistBody(wantedAnnouncements(RUN_SHEET), PAUA, current, folder)
 	assert.equal(body.ok, true)
+	assert.deepEqual(body.leftOut, [])
 	assert.deepEqual(
 		body.items.map((i) => [i.type, i.id.uuid, i.id.name]),
 		[
@@ -134,12 +136,39 @@ test('announcements: the write sends each section\'s header and its pictures by 
 })
 
 test('announcements: nothing is written while one is missing from the media playlist, or with nothing wanted', () => {
-	const r = playlistBody(wantedAnnouncements(RUN_SHEET), PAUA.slice(0, 3), [])
+	const folder = ['01 CT108-Sunday-ConnectWithUs', '02 CT003-Sunday-NextStepsLounge', '04 CT110-Sunday-Bibles', '03 CT109-Sunday-WaystoGive', '05 CT290-Sunday-Prayer&Fasting-Oct']
+	const r = playlistBody(wantedAnnouncements(RUN_SHEET), PAUA.slice(0, 3), [], folder)
 	assert.deepEqual(r, { ok: false, missing: ['CT109', 'CT290'] })
-	assert.deepEqual(playlistBody([], PAUA, []), { ok: false, missing: [] })
+	assert.deepEqual(playlistBody([], PAUA, [], folder), { ok: false, missing: [] })
+	// An empty folder: nothing to write, nothing said missing from the media playlist.
+	assert.deepEqual(playlistBody(wantedAnnouncements(RUN_SHEET), PAUA, [], []), { ok: false, missing: [] })
 	assert.equal(isTCode('CT108'), true)
 	assert.equal(isTCode('CF108'), false)
 	assert.equal(isTCode('ct108'), false)
+})
+
+test('announcements: a lower third with no file in the folder (not made yet) is left out of the write and named', () => {
+	// Central, 18 October: CT290 not made yet, so Copy found no file for it.
+	const folder = ['01 CT108-Sunday-ConnectWithUs', '02 CT003-Sunday-NextStepsLounge', '04 CT110-Sunday-Bibles', '03 CT109-Sunday-WaystoGive']
+	const body = playlistBody(wantedAnnouncements(RUN_SHEET), PAUA, [], folder)
+	assert.equal(body.ok, true)
+	assert.deepEqual(body.leftOut, ['CT290'])
+	// No PROMOS header with nothing under it.
+	assert.deepEqual(body.items.map((i) => i.id.name), ['NORMAL NOTICES', '01 CT108-Sunday-ConnectWithUs', '02 CT003-Sunday-NextStepsLounge', '04 CT110-Sunday-Bibles', '03 CT109-Sunday-WaystoGive'])
+	assert.equal(inFolder(folder, 'CT290'), false)
+	assert.equal(inFolder(folder, 'CT110'), true)
+})
+
+test('announcements: last week\'s entry in the media playlist, its file set aside, is not this week\'s picture', () => {
+	// Central, the first test run: Paua held "03 CT109…" and "04 CT110…" from the week
+	// before; Copy renumbered them "03 CT110…" and "04 CT109…" and set the old aside.
+	const stale = [media('03 CT109-Sunday-WaystoGive', 'old109'), media('04 CT110-Sunday-Bibles', 'old110')]
+	const folder = ['03 CT110-Sunday-Bibles', '04 CT109-Sunday-WaystoGive']
+	assert.equal(pictureOf(stale, 'CT109', folder), null)
+	assert.equal(pictureOf(stale, 'CT110', folder), null)
+	const dragged = [...stale, media('03 CT110-Sunday-Bibles', 'new110'), media('04 CT109-Sunday-WaystoGive', 'new109')]
+	assert.equal(pictureOf(dragged, 'CT109', folder)?.uuid, 'new109')
+	assert.equal(pictureOf(dragged, 'CT110', folder)?.uuid, 'new110')
 })
 
 test('announcements: the settings, on by default, named as Central named them, and off hides the view', () => {
@@ -148,7 +177,7 @@ test('announcements: the settings, on by default, named as Central named them, a
 	const r = applyPatch(DEFAULT_SETTINGS, { announcementsOn: false, announcementsPlaylist: ' Notices ', announcementsFolder: '/Volumes/graphics/Other Media/Paua Smart Folder' })
 	assert.equal(r.ok, true)
 	assert.equal(r.settings.announcementsPlaylist, 'Notices')
-	assert.equal(applyPatch(DEFAULT_SETTINGS, { announcementsSmartPlaylist: '  ' }).ok, false)
+	assert.equal(applyPatch(DEFAULT_SETTINGS, { announcementsMediaPlaylist: '  ' }).ok, false)
 	assert.equal(fromDisk({ announcementsOn: false, announcementsMediaPlaylist: 'Bin' }).announcementsMediaPlaylist, 'Bin')
 	assert.equal(patchFrom({ announcementsOn: 'yes' }), null)
 	assert.equal(viewIsOn('announcements', [], [], [], [], false), false)

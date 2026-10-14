@@ -65,7 +65,6 @@ test('a corrupt file costs only the bad values', () => {
 		proPresenterTimer: null,
 		announcementsOn: true,
 		announcementsFolder: null,
-		announcementsSmartPlaylist: 'Paua Smart Folder',
 		announcementsMediaPlaylist: 'Paua',
 		announcementsPlaylist: 'Announcements',
 		arenaHost: null,

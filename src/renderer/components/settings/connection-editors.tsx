@@ -47,7 +47,6 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 	const [timer, setTimer] = useState(view.proPresenterTimer ?? '')
 	const [annOn, setAnnOn] = useState(view.announcementsOn)
 	const [annFolder, setAnnFolder] = useState(view.announcementsFolder ?? '')
-	const [annSmart, setAnnSmart] = useState(view.announcementsSmartPlaylist)
 	const [annMedia, setAnnMedia] = useState(view.announcementsMediaPlaylist)
 	const [annOutput, setAnnOutput] = useState(view.announcementsPlaylist)
 	const names = useProPresenterNames()
@@ -60,7 +59,6 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 				proPresenterTimer: timer === '' ? null : timer,
 				announcementsOn: annOn,
 				announcementsFolder: annFolder.trim() === '' ? null : annFolder,
-				announcementsSmartPlaylist: annSmart,
 				announcementsMediaPlaylist: annMedia,
 				announcementsPlaylist: annOutput,
 			})}
@@ -122,18 +120,15 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 					{annOn && (
 						<>
 							<p className="text-sm text-booth-dim">
-								Copy to the folder puts the week's lower thirds (from Arena's graphics folder) into the folder below; a Smart
-								Playlist in ProPresenter follows it; someone drags them into the media playlist; then Write sets the output
-								playlist, AM, PM or EVENT by the service's name.
+								Copy to the folder puts the week's lower thirds (from Arena's graphics folder) into the folder below; someone
+								drags them from it, in Finder or Explorer, into the media playlist; then Write sets the output playlist, AM, PM
+								or EVENT by the service's name.
 							</p>
-							<Field label="Folder" error={err('announcementsFolder')} hint="As this computer reaches it. The Smart Playlist follows the same folder.">
+							<Field label="Folder" error={err('announcementsFolder')} hint="As this computer reaches it, and ProPresenter's computer too.">
 								<FolderInput value={annFolder} onChange={setAnnFolder} placeholder="\\10.0.0.71\graphics\Other Media\Paua Smart Folder" />
 							</Field>
-							<div className="grid grid-cols-3 gap-4">
-								<Field label="Smart Playlist" error={err('announcementsSmartPlaylist')} hint="In the Media Bin, on the folder.">
-									<Input value={annSmart} onChange={setAnnSmart} />
-								</Field>
-								<Field label="Media playlist" error={err('announcementsMediaPlaylist')} hint="Ordinary; they are dragged into it.">
+							<div className="grid grid-cols-2 gap-4">
+								<Field label="Media playlist" error={err('announcementsMediaPlaylist')} hint="In the Media Bin; they are dragged into it.">
 									<Input value={annMedia} onChange={setAnnMedia} />
 								</Field>
 								<Field label="Output playlist" error={err('announcementsPlaylist')} hint="Without AM, PM or EVENT.">

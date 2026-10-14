@@ -26,13 +26,20 @@
 // playlist write takes pictures only by their Media Bin id, and refuses a Smart
 // Playlist's, so a week's load is:
 // 1. Pāua copies the T files into the announcements folder, numbered in the
-//    order below, and touches them: a Smart Playlist on a network folder
-//    notices a file once it is modified after landing.
-// 2. A person drags them from the Smart Playlist into an ordinary media
-//    playlist (the one step the API cannot do).
+//    order below.
+// 2. A person drags them from that folder, in Finder or Explorer, into an
+//    ordinary media playlist (the one step the API cannot do). Not from a Smart
+//    Playlist on the folder: ❌ at Central, the first test run (2026-10-14,
+//    evening), it never noticed two of the four new files, touched or not.
 // 3. Pāua writes the output playlist from that media playlist (`playlistBody`):
 //    NORMAL NOTICES, the standing ones in their fixed order, then PROMOS, the
 //    rest in run-sheet order (the owner, 2026-10-14). Admin only, confirmed.
+// The folder is the truth for which pictures belong: a media playlist item
+// counts only when its name is a file in the folder now (`pictureOf`), so last
+// week's entries, their files set aside, never pass for this week's. A lower
+// third with no file in the folder (a promo not made yet) is left out of the
+// write and named at its confirmation (the owner, 2026-10-14); the check still
+// says it is missing.
 // Every name is a setting (Settings › ProPresenter › Announcements), and a
 // campus that does not use them turns them off there.
 //
@@ -182,10 +189,19 @@ export function checkAnnouncements(playlist: string, want: readonly WantedAnnoun
 /** Main's answer to a playlist ask: its items, or why not, and when. */
 export type PlaylistRead = { ok: true; name: string; uuid: string; items: PlaylistItem[]; at: number } | { ok: false; detail: string; at: number }
 
-/** The newest item in a playlist carrying `code`: the last, since a picture
- *  dragged in again lands at the end. */
-export function itemOf(items: readonly PlaylistItem[], code: string): PlaylistItem | null {
-	for (let i = items.length - 1; i >= 0; i--) if (mediaCodeOf(items[i]!.name)?.code === code) return items[i]!
+/** The folder's pictures, by name without the extension (`01 CT108-Sunday-ConnectWithUs`,
+ *  as ProPresenter names a media item), or why they could not be read. */
+export type FolderRead = { ok: true; names: string[]; at: number } | { ok: false; detail: string; at: number }
+
+/** Whether the folder holds a picture for `code`. */
+export const inFolder = (folder: readonly string[], code: string) => folder.some((n) => mediaCodeOf(n)?.code === code)
+
+/** The media playlist's picture for `code`: the newest item (the last, since a
+ *  picture dragged in again lands at the end) whose name is a file in the
+ *  folder now. Last week's entry, its file set aside, is not it. */
+export function pictureOf(media: readonly PlaylistItem[], code: string, folder: readonly string[]): PlaylistItem | null {
+	const names = new Set(folder.filter((n) => mediaCodeOf(n)?.code === code))
+	for (let i = media.length - 1; i >= 0; i--) if (names.has(media[i]!.name)) return media[i]!
 	return null
 }
 
@@ -200,27 +216,32 @@ export type PutItem = {
 
 /** The output playlist's whole new list: each section's header (its colour
  *  kept from the playlist now, else grey) and its pictures by their Media Bin
- *  ids in `media`. Every wanted code must be there, or nothing is written. */
+ *  ids in `media`. A wanted code with no file in the folder is left out
+ *  (`leftOut`); every one with a file must be in `media`, or nothing is
+ *  written. */
 export function playlistBody(
 	want: readonly WantedAnnouncement[],
 	media: readonly PlaylistItem[],
 	current: readonly PlaylistItem[],
-): { ok: true; items: PutItem[] } | { ok: false; missing: string[] } {
-	const missing = want.filter((w) => itemOf(media, w.code) === null).map((w) => w.code)
-	if (want.length === 0 || missing.length > 0) return { ok: false, missing }
+	folder: readonly string[],
+): { ok: true; items: PutItem[]; leftOut: string[] } | { ok: false; missing: string[] } {
+	const ready = want.filter((w) => inFolder(folder, w.code))
+	const leftOut = want.filter((w) => !inFolder(folder, w.code)).map((w) => w.code)
+	const missing = ready.filter((w) => pictureOf(media, w.code, folder) === null).map((w) => w.code)
+	if (ready.length === 0 || missing.length > 0) return { ok: false, missing }
 	const colorOf = (header: string) => current.find((i) => i.type === 'header' && i.name.trim().toUpperCase() === header)?.color ?? GREY
 	const items: PutItem[] = []
 	for (const section of ['notices', 'promos'] as const) {
-		const these = want.filter((w) => w.section === section)
+		const these = ready.filter((w) => w.section === section)
 		if (these.length === 0) continue
 		const header = SECTION_HEADER[section]
 		items.push({ id: { uuid: null, name: header, index: items.length }, type: 'header', header_color: colorOf(header), is_hidden: false, is_pco: false })
 		for (const w of these) {
-			const it = itemOf(media, w.code)!
+			const it = pictureOf(media, w.code, folder)!
 			items.push({ id: { uuid: it.uuid, name: it.name, index: items.length }, type: 'media', is_hidden: false, is_pco: false })
 		}
 	}
-	return { ok: true, items }
+	return { ok: true, items, leftOut }
 }
 
 /** Whether a playlist read back after a write holds what was written: the same
@@ -244,11 +265,11 @@ export type AnnouncementsRead = {
 	output: PlaylistRead
 	/** The ordinary media playlist the pictures are dragged into. */
 	media: PlaylistRead
-	/** The Smart Playlist on the folder. */
-	smart: PlaylistRead
+	/** The announcements folder's pictures. */
+	folder: FolderRead
 }
 
-export type WriteResult = { ok: true; items: number } | { ok: false; detail: string }
+export type WriteResult = { ok: true; items: number; leftOut: string[] } | { ok: false; detail: string }
 
 /** A lower-third code the page may hand main: `CT108`. */
 export const isTCode = (v: unknown): v is string => typeof v === 'string' && /^[A-Z]T\d{3}$/.test(v)

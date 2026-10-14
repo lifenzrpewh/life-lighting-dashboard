@@ -60,13 +60,11 @@ export type Settings = {
 	/** ProPresenter's announcements (./announcements.ts § LOADING): whether this
 	 *  booth uses them at all (off hides the view, for a campus without them),
 	 *  the folder Pāua copies the week's lower thirds into (as this computer
-	 *  reaches it), the Smart Playlist following that folder, the ordinary media
-	 *  playlist they are dragged into, and the output playlist's name without
+	 *  reaches it), the ordinary media playlist they are dragged into from it, and the output playlist's name without
 	 *  its AM, PM or EVENT. Which names a booth gave its playlists is a habit of
 	 *  the booth, not a fact the show holds. */
 	announcementsOn: boolean
 	announcementsFolder: string | null
-	announcementsSmartPlaylist: string
 	announcementsMediaPlaylist: string
 	announcementsPlaylist: string
 	/** Resolume Arena's web server. Null host: no Arena. Often this very
@@ -144,7 +142,6 @@ export const DEFAULT_SETTINGS: Settings = {
 	proPresenterTimer: null,
 	announcementsOn: true,
 	announcementsFolder: null,
-	announcementsSmartPlaylist: 'Paua Smart Folder',
 	announcementsMediaPlaylist: 'Paua',
 	announcementsPlaylist: 'Announcements',
 	arenaHost: null,
@@ -346,7 +343,7 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 	}
 	if (patch.windowed !== undefined) next.windowed = patch.windowed
 	if (patch.announcementsOn !== undefined) next.announcementsOn = patch.announcementsOn
-	for (const key of ['announcementsSmartPlaylist', 'announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {
+	for (const key of ['announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {
 		const v = patch[key]
 		if (v === undefined) continue
 		const e = playlistNameError(v)
@@ -428,7 +425,7 @@ export function fromDisk(raw: unknown): Settings {
 	out.captureInputs = captureInputsFrom(r['captureInputs']) ?? []
 	out.windowed = r['windowed'] === true
 	if (typeof r['announcementsOn'] === 'boolean') out.announcementsOn = r['announcementsOn']
-	for (const key of ['announcementsSmartPlaylist', 'announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {
+	for (const key of ['announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {
 		const v = r[key]
 		if (typeof v === 'string' && playlistNameError(v) === null) out[key] = v.trim()
 	}
@@ -470,7 +467,6 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['windowed', (v) => typeof v === 'boolean'],
 		['announcementsOn', (v) => typeof v === 'boolean'],
 		['announcementsFolder', strOrNull],
-		['announcementsSmartPlaylist', str],
 		['announcementsMediaPlaylist', str],
 		['announcementsPlaylist', str],
 		['graphicsFolder', strOrNull],
