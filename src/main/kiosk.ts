@@ -58,7 +58,8 @@ import type { Channel, LinkState } from '../shared/reading.js'
 import { unread } from '../shared/reading.js'
 import type { Showfile } from '../shared/showfile.js'
 import type { Mode, PaneRect } from '../shared/ma-pane.js'
-import { changedFields, isLoopback, patchFrom, replyPortOf } from '../shared/settings.js'
+import { applyPatch, changedFields, fromDisk, isLoopback, patchFrom, replyPortOf, type SettingsPatch } from '../shared/settings.js'
+import { COMPUTER_FILE_MAX, COMPUTER_LOCAL, computerFile, computerFileFrom, computerLocalFrom } from '../shared/computer-file.js'
 import { createMaPane, type MaPane } from './ma-pane.js'
 import { createCuePane, type CuePane } from './cue-pane.js'
 import { openSettings, type SettingsStore } from './settings.js'
@@ -582,6 +583,68 @@ app.whenReady().then(() => {
 		}
 		const r = owner === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(owner, opts)
 		return r.canceled ? null : (r.filePaths[0] ?? null)
+	})
+	// This computer's setup to or from one file (../shared/computer-file.ts):
+	// Admin only. Reading a file says what it would change and holds it; only
+	// Apply changes anything. The page's stored items go back to the page,
+	// which writes them and starts again.
+	let pendingSetup: { patch: SettingsPatch; local: Record<string, string> } | null = null
+	ipcMain.handle('computer:export', async (e, rawLocal: unknown): Promise<{ ok: true; path: string } | { ok: false; detail: string } | null> => {
+		if (operatorOnly(e) !== null || settings === null) return null
+		const local = computerLocalFrom(rawLocal)
+		if (local === null) return { ok: false, detail: 'This page’s stored setup could not be read.' }
+		const file = computerFile(app.getVersion(), { ...fromDisk(settings.view()) }, local, new Date())
+		const owner = BrowserWindow.fromWebContents(e.sender)
+		const name = (settings.view().campus ?? 'Booth').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').trim() || 'Booth'
+		const opts = { title: 'Save this computer’s setup', defaultPath: `${name}.paua-setup.json`, filters: [{ name: 'Pāua setup', extensions: ['json'] }] }
+		const r = owner === null ? await dialog.showSaveDialog(opts) : await dialog.showSaveDialog(owner, opts)
+		if (r.canceled || r.filePath === undefined) return null
+		try {
+			await fs.promises.writeFile(r.filePath, JSON.stringify(file, null, '\t'), 'utf8')
+		} catch (err) {
+			return { ok: false, detail: `Could not write the file: ${String(err)}` }
+		}
+		console.log(`[settings] this computer's setup saved to ${r.filePath}`)
+		return { ok: true, path: r.filePath }
+	})
+	ipcMain.handle(
+		'computer:read',
+		async (e): Promise<{ ok: true; from: string; settings: string[]; local: string[] } | { ok: false; detail: string } | null> => {
+			if (operatorOnly(e) !== null || settings === null) return null
+			pendingSetup = null
+			const owner = BrowserWindow.fromWebContents(e.sender)
+			const opts = { title: 'Open a Pāua setup', properties: ['openFile' as const], filters: [{ name: 'Pāua setup', extensions: ['json'] }] }
+			const r = owner === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(owner, opts)
+			const path_ = r.canceled ? undefined : r.filePaths[0]
+			if (path_ === undefined) return null
+			const stat = await fs.promises.stat(path_)
+			if (stat.size > COMPUTER_FILE_MAX) return { ok: false, detail: 'That file is far too big to be a Pāua setup file.' }
+			const read = computerFileFrom(await fs.promises.readFile(path_, 'utf8'))
+			if (!read.ok) return read
+			const patch = patchFrom(read.file.settings)
+			if (patch === null) return { ok: false, detail: 'That setup file’s settings could not be read.' }
+			const before = settings.view()
+			const checked = applyPatch(fromDisk(before), patch)
+			if (!checked.ok) return { ok: false, detail: `That setup does not check out here: ${Object.values(checked.errors).join(' ')}` }
+			pendingSetup = { patch, local: read.file.local }
+			return {
+				ok: true,
+				from: `Pāua ${read.file.app}, ${read.file.exportedAt.slice(0, 16).replace('T', ' ')} UTC`,
+				settings: changedFields(fromDisk(before), checked.settings, {}),
+				local: Object.keys(read.file.local).map((k) => COMPUTER_LOCAL[k] ?? k),
+			}
+		},
+	)
+	ipcMain.handle('computer:apply', (e): { ok: true; local: Record<string, string> } | { ok: false; detail: string } | null => {
+		if (operatorOnly(e) !== null || settings === null || pendingSetup === null) return null
+		const { patch, local } = pendingSetup
+		pendingSetup = null
+		const before = settings.view()
+		const checked = settings.save(patch)
+		if (!checked.ok) return { ok: false, detail: Object.values(checked.errors).join(' ') }
+		const changed = changedFields(before, checked.settings, patch)
+		console.log(`[settings] set up from a file: ${changed.join('; ') || 'no settings changed'}; stored: ${Object.keys(local).join(', ') || 'none'}`)
+		return { ok: true, local }
 	})
 	// A Holding preset to or from a file (../shared/holding-map.ts), to carry
 	// one campus's map to another computer. Admin only. Main only checks it is

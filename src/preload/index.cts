@@ -194,6 +194,15 @@ const api = {
 	/** Windows' folder picker, starting at `start`: the folder picked, or null
  *  when cancelled. Operator mode only (main answers null otherwise). */
 	chooseFolder: (start: string | null): Promise<string | null> => ipcRenderer.invoke('folder:choose', start),
+	/** This computer's setup to a file (Admin only); `local` is the page's stored items. */
+	exportComputer: (local: Record<string, string>): Promise<{ ok: true; path: string } | { ok: false; detail: string } | null> =>
+		ipcRenderer.invoke('computer:export', local),
+	/** Open a setup file and say what it would change; nothing changes yet. */
+	readComputer: (): Promise<{ ok: true; from: string; settings: string[]; local: string[] } | { ok: false; detail: string } | null> =>
+		ipcRenderer.invoke('computer:read'),
+	/** Apply the setup file last read; its stored items come back for the page. */
+	applyComputer: (): Promise<{ ok: true; local: Record<string, string> } | { ok: false; detail: string } | null> =>
+		ipcRenderer.invoke('computer:apply'),
 	/** Whether the installed app starts at login, as the system says. */
 	loginItem: (): Promise<{ available: boolean; on: boolean } | null> => ipcRenderer.invoke('login:get'),
 	/** Start at login on or off (Admin only), and what the system says after. */

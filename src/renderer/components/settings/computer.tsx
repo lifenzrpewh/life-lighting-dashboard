@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { Download, RefreshCw } from 'lucide-react'
 
 import type { About } from '../../../shared/about.js'
+import { COMPUTER_LOCAL } from '../../../shared/computer-file.js'
 import { updateWords, type UpdateState } from '../../../shared/updates.js'
 
 import { Button, Card, SectionTitle, Segmented } from '../ui.js'
@@ -71,6 +72,91 @@ export function StartAtLogin() {
 			) : (
 				<p className="text-sm text-booth-dim">For the installed app. A checkout starts at login with scripts/windows/install-startup.cmd.</p>
 			)}
+		</Card>
+	)
+}
+
+/** This computer's setup to a file, or another's from one
+ *  (../../../shared/computer-file.ts): what it would change is said first. */
+export function SetupFile() {
+	const [said, setSaid] = useState<string | null>(null)
+	const [reading, setReading] = useState<{ from: string; settings: string[]; local: string[] } | null>(null)
+	if (window.life === undefined) return null
+	const exportIt = () => {
+		const local: Record<string, string> = {}
+		try {
+			for (const key of Object.keys(COMPUTER_LOCAL)) {
+				const v = localStorage.getItem(key)
+				if (v !== null) local[key] = v
+			}
+		} catch {
+			// Nothing stored to carry: the settings still go.
+		}
+		void window.life?.exportComputer(local).then((r) => r !== null && setSaid(r.ok ? `Saved to ${r.path}.` : r.detail))
+	}
+	const readIt = () => {
+		setSaid(null)
+		void window.life?.readComputer().then((r) => {
+			if (r === null) return
+			if (!r.ok) return setSaid(r.detail)
+			setReading(r)
+		})
+	}
+	const applyIt = () =>
+		void window.life?.applyComputer().then((r) => {
+			setReading(null)
+			if (r === null) return
+			if (!r.ok) return setSaid(r.detail)
+			try {
+				for (const key of Object.keys(COMPUTER_LOCAL)) {
+					// What the file does not carry stays as this computer had it.
+					const v = r.local[key]
+					if (v !== undefined) localStorage.setItem(key, v)
+				}
+			} catch {
+				return setSaid('The settings were set, but this computer would not keep the layouts and Holding map.')
+			}
+			// Every store reads its item again as the page starts.
+			window.location.reload()
+		})
+	return (
+		<Card>
+			<SectionTitle>Setup file</SectionTitle>
+			<p className="max-w-prose text-sm text-booth-dim">
+				Everything this computer is set to (addresses, folders, web pages, video sources, layouts, the top bar, the Holding map), in
+				one file to set another booth up from. Never the MA passwords, the passcode or any sign-in: those are set on each
+				computer.
+			</p>
+			{reading === null ? (
+				<div className="flex flex-wrap gap-2">
+					<Button onClick={exportIt}>To a file</Button>
+					<Button onClick={readIt}>From a file</Button>
+				</div>
+			) : (
+				<div className="flex flex-col gap-2 rounded-ctl bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
+					<span className="font-bold">From {reading.from}</span>
+					{reading.settings.length === 0 ? (
+						<span className="text-booth-dim">No setting changes.</span>
+					) : (
+						<ul className="flex flex-col gap-0.5 text-xs">
+							{reading.settings.map((line) => (
+								<li key={line} className="break-words">
+									{line}
+								</li>
+							))}
+						</ul>
+					)}
+					{reading.local.length > 0 && <span className="text-booth-dim">Replaces {reading.local.join(', ')}.</span>}
+					<span className="text-booth-dim">The screen starts again to take it.</span>
+					<div className="flex gap-2">
+						<Button variant="primary" onClick={applyIt}>
+							Apply
+						</Button>
+						<Button onClick={() => setReading(null)}>Cancel</Button>
+					</div>
+				</div>
+			)}
+			{said !== null && <p className="text-sm text-booth-dim">{said}</p>}
 		</Card>
 	)
 }
