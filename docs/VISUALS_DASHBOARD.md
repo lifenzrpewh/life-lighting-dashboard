@@ -1241,6 +1241,21 @@ into the playlist, so there is no Media Bin id to try instead. Most likely the P
 presentations only, or this version (not reported: `/v1/version` is 404) has a bug. Not tried: a
 playlist of presentations, and a newer ProPresenter.
 
+**✅ Then the write worked, 2026-10-14, the owner's go, on "PAUA TEST"**: the reason for the 404s
+is that **a playlist reports each entry's own id, while the write wants the picture's Media Bin
+id**. The test card dragged into the playlist read back as `7C0DE076…`, but its Media Bin id
+(`GET /v1/media/playlist/Background`) is `778A87D7…`; `PUT` with that one item by its Media Bin
+id answered **204**, and the playlist read back as the test card alone (a new entry id,
+`DA196462…`). So a picture dragged in from Finder (no Media Bin id) can never be written back,
+and every PUT replaces the whole list: a write must name every item from the Media Bin (and the
+headers, `uuid: null` in the spec's example, ⚠️ not yet tried). The owner put CT292 back by hand.
+
+**So the route is whole:** Pāua copies the T files into the Smart Folder; ProPresenter's Smart
+Playlist following it makes them Media Bin items; Pāua reads their Media Bin ids
+(`GET /v1/media/playlist/<smart playlist>`) and PUTs "-Announcements AM": NORMAL NOTICES, the
+standing ones in their order, PROMOS, the rest, after a confirmation. Next: a Smart Playlist set up
+on that ProPresenter on the Paua Smart Folder, and a header written once on PAUA TEST.
+
 **Routes left for loading, the owner's to choose:**
 - **The folder only**: Pāua copies the week's T files into the Paua Smart Folder, named in the
   pattern's order (`01 CT108 …`), last week's moved aside; a Smart Playlist in ProPresenter's

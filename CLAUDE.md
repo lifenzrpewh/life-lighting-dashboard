@@ -328,8 +328,9 @@ run: one kiosk per computer, so the second only focuses the first.
 `propresenter-announcements` (pushed, not merged), read against Central's real ProPresenter at
 10.11.60.7 (reachable from this Mac). Next: the owner's word on the order rule and the NAS
 folder: answered (keep today's pattern; `smb://10.0.0.71/graphics/Other Media/Paua Smart
-Folder`). ❌ **ProPresenter refused the playlist write** (404, on the owner's "PAUA TEST", nothing
-changed), so loading needs another route, the owner's choice (`docs/VISUALS_DASHBOARD.md`
+Folder`). ✅ **The playlist write works by Media Bin ids** (the 404s were playlist-entry ids; 204 on the
+owner's "PAUA TEST" with the test card's Media Bin id), so loading can go through a Smart Playlist
+on the Paua Smart Folder (`docs/VISUALS_DASHBOARD.md`
 § ProPresenter announcements). This Mac's own
 ProPresenter 18.4 crashes on launch in CoreMIDI (a buffer overflow, macOS 26.3): unplug MIDI
 gear or update it.
