@@ -139,6 +139,35 @@ test('subscriptions cover every level, and an update lands on its own', () => {
 	assert.equal(statusOf(bypass.value).groups[1].bypassed, true)
 })
 
+test('a run of updates lands each on its own, leaving what it does not touch shared', () => {
+	const tree = decoded(real())
+	const vfx1 = tree.layers[4].master.id
+	let t = tree
+	for (const v of [0.1, 0.2, 0.3]) {
+		const r = applyParameter(t, vfx1, v)
+		assert.ok(r?.ok)
+		t = r.value
+	}
+	const bypass = applyParameter(t, tree.groups[1].bypassed.id, true)
+	assert.ok(bypass?.ok)
+	t = bypass.value
+	const s = statusOf(t)
+	assert.equal(s.layers[4].master, 0.3)
+	assert.equal(s.groups[1].bypassed, true)
+	// Everything else reads as it did, and the tree has the same parameters.
+	assert.deepEqual({ ...s, layers: s.layers.filter((_, i) => i !== 4), groups: s.groups.filter((_, i) => i !== 1) }, {
+		...statusOf(tree),
+		layers: statusOf(tree).layers.filter((_, i) => i !== 4),
+		groups: statusOf(tree).groups.filter((_, i) => i !== 1),
+	})
+	assert.deepEqual(subscriptionsOf(t), subscriptionsOf(tree))
+	assert.equal(t.layers[0], tree.layers[0], 'a layer not touched is the same object')
+	assert.equal(t.columns, tree.columns)
+	// The derived tree still knows the wrong kind and an unknown id.
+	assert.equal(applyParameter(t, vfx1, true)?.ok, false)
+	assert.equal(applyParameter(t, 999, 0.5), null)
+})
+
 test('an update for another parameter is not ours; one of the wrong kind fails', () => {
 	const tree = decoded(real())
 	assert.equal(applyParameter(tree, 999, 0.5), null)

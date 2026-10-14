@@ -305,36 +305,103 @@ export function unsubscribeMessage(id: number): string {
 	return JSON.stringify({ action: 'unsubscribe', parameter: `/parameter/by-id/${id}` })
 }
 
+/** Where a parameter sits in a tree. */
+type Where =
+	| { at: 'master' | 'speed' }
+	| { at: 'group'; i: number; field: 'master' | 'bypassed' | 'speed' }
+	| { at: 'layer'; i: number; field: 'master' | 'bypassed' }
+	| { at: 'transport'; i: number; field: keyof TreeTransport }
+
+/** Each tree's parameters by id, built once per composition: updates come
+ *  ~100 a second, and each used to list and scan every parameter. A tree an
+ *  update makes has the same shape as the one it came from, so it is handed
+ *  the same index. An id in more than one place (not seen) is set in each. */
+const indexes = new WeakMap<ArenaTree, Map<number, Where[]>>()
+
+function indexOf(tree: ArenaTree): Map<number, Where[]> {
+	const held = indexes.get(tree)
+	if (held !== undefined) return held
+	const ix = new Map<number, Where[]>()
+	const add = (id: number, w: Where) => {
+		const list = ix.get(id)
+		if (list === undefined) ix.set(id, [w])
+		else list.push(w)
+	}
+	add(tree.master.id, { at: 'master' })
+	add(tree.speed.id, { at: 'speed' })
+	tree.groups.forEach((g, i) => {
+		for (const field of ['master', 'bypassed', 'speed'] as const) add(g[field].id, { at: 'group', i, field })
+	})
+	tree.layers.forEach((l, i) => {
+		for (const field of ['master', 'bypassed'] as const) add(l[field].id, { at: 'layer', i, field })
+		const t = l.playing?.transport ?? null
+		if (t !== null) for (const field of ['position', 'playmode', 'direction', 'speed'] as const) add(t[field].id, { at: 'transport', i, field })
+	})
+	indexes.set(tree, ix)
+	return ix
+}
+
+function paramAt(tree: ArenaTree, w: Where): Param<unknown> {
+	switch (w.at) {
+		case 'master':
+		case 'speed':
+			return tree[w.at]
+		case 'group':
+			return tree.groups[w.i]![w.field]
+		case 'layer':
+			return tree.layers[w.i]![w.field]
+		case 'transport':
+			return tree.layers[w.i]!.playing!.transport![w.field]
+	}
+}
+
+/** `tree` with the parameter at `w` set to `value`, sharing every branch it
+ *  does not touch. The caller has checked the value's kind. */
+function setAt(tree: ArenaTree, w: Where, value: unknown): ArenaTree {
+	const set = <P extends Param<unknown>>(p: P): P => ({ ...p, value }) as P
+	switch (w.at) {
+		case 'master':
+			return { ...tree, master: set(tree.master) }
+		case 'speed':
+			return { ...tree, speed: set(tree.speed) }
+		case 'group': {
+			const groups = tree.groups.slice()
+			const g = groups[w.i]!
+			groups[w.i] = { ...g, [w.field]: set(g[w.field]) }
+			return { ...tree, groups }
+		}
+		case 'layer': {
+			const layers = tree.layers.slice()
+			const l = layers[w.i]!
+			layers[w.i] = { ...l, [w.field]: set(l[w.field]) }
+			return { ...tree, layers }
+		}
+		case 'transport': {
+			const layers = tree.layers.slice()
+			const l = layers[w.i]!
+			const clip = l.playing!
+			const t = clip.transport!
+			layers[w.i] = { ...l, playing: { ...clip, transport: { ...t, [w.field]: set(t[w.field]) } } }
+			return { ...tree, layers }
+		}
+	}
+}
+
 /** Fold one parameter's new value into the tree. `null` when the id is not one
  *  of the tree's; a value of the wrong kind for its parameter fails. */
 export function applyParameter(tree: ArenaTree, id: number, value: unknown): Decoded<ArenaTree> | null {
-	const target = paramsOf(tree).find((p) => p.id === id)
-	if (target === undefined) return null
-	const wanted = typeof target.value
+	const ix = indexOf(tree)
+	const where = ix.get(id)
+	if (where === undefined) return null
+	const wanted = typeof paramAt(tree, where[0]!).value
 	if (typeof value !== wanted || (wanted === 'number' && !Number.isFinite(value))) {
 		const kind = wanted === 'number' ? 'a number' : wanted === 'boolean' ? 'on or off' : 'a setting'
 		return { ok: false, detail: `parameter ${id} sent ${JSON.stringify(value)}, not ${kind}` }
 	}
-	// The kind was checked against the target above, so the value fits it.
-	const set = <P extends Param<unknown>>(p: P): P => (p.id === id ? ({ ...p, value } as P) : p)
-	const transport = (t: TreeTransport | null): TreeTransport | null =>
-		t === null ? null : { position: set(t.position), playmode: set(t.playmode), direction: set(t.direction), speed: set(t.speed) }
-	return {
-		ok: true,
-		value: {
-			master: set(tree.master),
-			speed: set(tree.speed),
-			deck: tree.deck,
-			columns: tree.columns,
-			groups: tree.groups.map((g) => ({ ...g, master: set(g.master), bypassed: set(g.bypassed), speed: set(g.speed) })),
-			layers: tree.layers.map((l) => ({
-				...l,
-				master: set(l.master),
-				bypassed: set(l.bypassed),
-				playing: l.playing === null ? null : { ...l.playing, transport: transport(l.playing.transport) },
-			})),
-		},
-	}
+	let next = tree
+	for (const w of where) next = setAt(next, w, value)
+	indexes.set(next, ix)
+	return { ok: true, value: next }
 }
 
 /** The tree without its parameter ids: what crosses to anyone else. A clip's
