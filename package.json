@@ -2,7 +2,7 @@
 	"name": "paua",
 	"productName": "Paua",
 	"description": "Pāua: the booth dashboard for lighting and visuals at LIFE.",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"private": true,
 	"type": "module",
 	"engines": {
@@ -73,7 +73,7 @@
 			{
 				"provider": "github",
 				"owner": "lifenzrpewh",
-				"repo": "paua-releases",
+				"repo": "life-lighting-dashboard",
 				"releaseType": "release"
 			}
 		],

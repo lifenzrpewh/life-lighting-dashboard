@@ -1,4 +1,4 @@
-// The updater: asks paua-releases whether a newer Pāua is out, and installs
+// The updater: asks this repo's releases whether a newer Pāua is out, and installs
 // it when an Admin says so. The rules are ../shared/updates.ts.
 //
 // electron-updater does the work: it reads `latest.yml` from the newest

@@ -87,7 +87,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/log-file.ts` · `src/main/log.ts` | **The app's own log**, `paua.log` in the data folder, timed, two 5 MB files at most; the kiosk page's errors and a crashed GPU or page process go in too. Version and path at the foot of Connections. Watched writing on the Windows box, 2026-10-04. |
 | ✅ `src/main/entry.ts` · `src/main/supervisor.ts` · `src/bridge/supervise.ts` | **The installed app's watchdog**: Paua.exe in Node mode runs the app and restarts it 5 s after a crash, gives up after 5 in 2 minutes, leaves a clean quit alone. A checkout is left to kiosk.cmd. Watched on the packaged build on the Windows box, 2026-10-04. |
 | ✅ `.github/workflows/release.yml` · `docs/FIELD_TEST.md` | **Field-test builds**: a tag `v<version>` builds `Paua-Setup-<v>.exe` and `Paua-<v>-arm64.dmg` (ad-hoc signed, Syphon.framework left as upstream signed it) and drafts a release; logs pushed to `release-build-log`. v0.1.0 built green 2026-10-04. ⚠️ Neither file installed anywhere yet; the Mac build never opened on a Mac. |
-| ⚠️ `src/shared/updates.ts` · `src/main/updates.ts` · `settings/computer.tsx` (`UpdatesCard`) | **Updates** (2026-10-11, the owner's ask and choice of host): electron-updater reads the newest **published** release of the public `lifenzrpewh/paua-releases` (this repo is private; a token in the app could be taken out of it). Checked a minute after the start and every 4 h; **never installed by itself**: the bar's alert lane says "Pāua X is out", Settings › This computer has Check for updates and Update (Admin, asked twice), which downloads, installs silently and reopens. Windows only (the Mac build is ad-hoc signed; told to download by hand). The release build drafts the same release there when the `RELEASES_TOKEN` secret is set; publishing that draft is the rollout. `PAUA_FAKE_UPDATE=<version>` on a checkout pretends one is out (the screens watched that way on the Mac, 2026-10-11). ⚠️ The repo and secret not yet made; no real update installed; the watchdog's part not watched. `docs/FIELD_TEST.md` § Updates. |
+| ⚠️ `src/shared/updates.ts` · `src/main/updates.ts` · `settings/computer.tsx` (`UpdatesCard`) | **Updates** (2026-10-11, the owner's ask and choice of host): electron-updater reads the newest **published** release of **this repo** since 1.4.1 (public since 2026-10-13); 1.1.0 to 1.4.0 read the public `lifenzrpewh/paua-releases`, which had only drafts after 1.1.0, so no booth moved (the bridge: TODO). Checked a minute after the start and every 4 h; **never installed by itself**: the bar's alert lane says "Pāua X is out", Settings › This computer has Check for updates and Update (Admin, asked twice), which downloads, installs silently and reopens. Windows only (the Mac build is ad-hoc signed; told to download by hand). The release build drafts the same release there when the `RELEASES_TOKEN` secret is set; publishing that draft is the rollout. `PAUA_FAKE_UPDATE=<version>` on a checkout pretends one is out (the screens watched that way on the Mac, 2026-10-11). ⚠️ The repo and secret not yet made; no real update installed; the watchdog's part not watched. `docs/FIELD_TEST.md` § Updates. |
 | ✅ `src/bridge/ping.ts` · `src/main/bridge/link.ts` | The link: after 15 s of console silence, `SendOSC 3 "/ping,s,<token>"` over A, echoed back over C; anything the console says counts as proof it is there. **LIVE against onPC 2.3.2.0 on this Mac, 2026-09-30: 5 asks a quiet minute, one command line each.** A ping a second through the plugin was two lines a second, far too loud. `docs/MA3_READ_MODEL.md` § The link ping. |
 
 **✅ Delivery is proven, both directions — desk `10.11.60.40`, 2.3.2.0, 2026-09-21.**
@@ -323,6 +323,10 @@ self-update and start at login, the next steps. Close the installed copy before 
 run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
+
+**2026-10-14, night: v1.4.1 tagged**: the updater reads this repo's releases (the booths never
+moved past 1.1.0: `paua-releases` held only drafts after it). Publish 1.4.1 here **and on
+`paua-releases`** once, the bridge (TODO, top). 1.4.0 is the same app with the old feed: skip it.
 
 **2026-10-14, night: v1.4.0 tagged** at the owner's ask, with `lookbook-merge` merged: **one
 Lookbook** (Holding merged in, from the owner's interview; status row) and Settings › Admin ›
@@ -674,16 +678,13 @@ Later, not tonight:
    Central, 2026-10-14 evening. Left: the owner's word on merging, then the real
    "-Announcements AM" at a quiet time (its Finder-dragged pictures cannot be kept, so the write
    replaces it whole). `docs/VISUALS_DASHBOARD.md` § ProPresenter announcements.
-0. **Updates from this repo, not `paua-releases`** (the owner, 2026-10-13, noted, not started:
-   "why not point the updater at the main repo"). `lifenzrpewh/life-lighting-dashboard` is
-   **public** now, so the second repo's reason (a private repo) is gone. The change: `publish` in
-   `package.json` and `RELEASES_PAGE` in `src/shared/updates.ts` to this repo, the headers of both
-   updates files, and the `paua-releases` step in `.github/workflows/release.yml`. **The bridge**:
-   booths on 1.1.0/1.2.0 have `paua-releases` baked in, so the first build pointing here must be
-   published on `paua-releases` once more; after that, here only (then drop the step and the
-   `RELEASES_TOKEN` secret). Do the repo rename to `paua` **before** that build, or the feed bakes
-   in the old name. Meanwhile 1.2.0 is a draft on both: publishing it on `paua-releases` is what
-   offers it to booths today.
+0. **Updates from this repo: the bridge** (switched in 1.4.1, 2026-10-14, the owner's ask: the
+   booths sat on 1.1.0 because `paua-releases` had only drafts after it, while the releases
+   published here were never read). Publish **1.4.1 on `paua-releases` too**, once: that moves
+   booths on 1.1.0 to 1.4.0 onto this repo's releases. After every booth is past 1.4.0, drop the
+   release workflow's paua-releases step and the `RELEASES_TOKEN` secret. ⚠️ If this repo is
+   renamed to `paua`, the feed baked into 1.4.1 names the old one: GitHub redirects a renamed
+   repo, but the updater through it is unwatched.
 0. **Start at login** (the owner, 2026-10-13: "would be good"; not started). Plan: Electron's
    `app.setLoginItemSettings({ openAtLogin })` from main, packaged builds only (it registers
    Paua.exe, which starts the watchdog, `src/main/entry.ts`); IPC get/set, the set Admin's; a card

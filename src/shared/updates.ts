@@ -2,11 +2,14 @@
 // it prompt to auto update, or a check updates button in the settings"): what
 // main's updater (../main/updates.ts) last knew, for the bar and Settings.
 //
-// WHERE THEY COME FROM: the public lifenzrpewh/paua-releases repo (the owner's
-// choice, 2026-10-11), because this repo is private and a token built into the
-// app would be one anybody could take out of it. The release build drafts a
-// release there; publishing that draft is what rolls an update out, so nothing
-// reaches a booth until the owner says.
+// WHERE THEY COME FROM: this repo's own releases, lifenzrpewh/life-lighting-dashboard,
+// public since 2026-10-13 (the owner, 2026-10-14: the booths sat on 1.1.0 because
+// the separate paua-releases repo, there while this one was private, had only
+// drafts after it, while the releases published here were never read). The
+// release build drafts each version here; publishing that draft is what rolls
+// an update out, so nothing reaches a booth until the owner says. From 1.4.1;
+// 1.1.0 to 1.4.0 still read paua-releases, so 1.4.1 is published there once too,
+// the bridge.
 //
 // THE RULES THIS FILE CARRIES:
 // - Checking is automatic; installing never is. A booth mid-service restarting
@@ -43,7 +46,7 @@ export const FIRST_CHECK_MS = 60 * 1000
 
 /** Where a person downloads a build by hand: the Mac, or when the updater
  *  cannot. */
-export const RELEASES_PAGE = 'https://github.com/lifenzrpewh/paua-releases/releases/latest'
+export const RELEASES_PAGE = 'https://github.com/lifenzrpewh/life-lighting-dashboard/releases/latest'
 
 /** The state in a few words, for Settings. */
 export function updateWords(u: UpdateState, version: string): string {

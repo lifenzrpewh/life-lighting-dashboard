@@ -88,8 +88,9 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
-**1.4.0** (2026-10-14): comes as an update on 1.1.0 to 1.3.0 once its draft on `paua-releases` is
-published. New since 1.3.0: **One Lookbook** (Holding merged in) and Settings › Admin › **Leaving
+**1.4.1** (2026-10-14): 1.4.0 with the updater reading this repo's releases. Booths on 1.1.0 to
+1.4.0 are offered it once it is published on `paua-releases` (the bridge); from then on, publishing
+a release here is what offers it. 1.4.0 itself: skip. New since 1.3.0: **One Lookbook** (Holding merged in) and Settings › Admin › **Leaving
 Show mode** (the sections below).
 
 **1.3.0** (2026-10-14): comes as an update on 1.1.0 or 1.2.0, once its draft on `paua-releases` is
@@ -160,7 +161,7 @@ computer reaches it, Arena's graphics folder set; first run at Central 2026-10-1
 - [ ] **Save as a preset**, **Reset to defaults** (Holding back to the usual), **Use** (back again)
 - [ ] **To a file** on one computer, **Import** on another: the same map in use there
 
-**Updates** (from the first build after 1.0.1; needs the public `lifenzrpewh/paua-releases` repo and the `RELEASES_TOKEN` secret, and that version's draft published there)
+**Updates** (from 1.4.1 read from this repo's published releases; 1.1.0 to 1.4.0 from the public `lifenzrpewh/paua-releases` repo with the `RELEASES_TOKEN` secret, and that version's draft published there)
 - [ ] About a minute after the start, the bar says **Pāua <new> is out** (a download icon, quiet blue)
 - [ ] As a volunteer, tapping it asks for the Admin passcode; in Admin it opens Settings › This computer
 - [ ] **Check for updates** says "is the newest" when nothing is newer, and "Could not check: …" with the network unplugged (never "newest")
