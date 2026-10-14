@@ -13,6 +13,10 @@
 // Arena says nothing while idle, so the websocket's silence cannot age the
 // status. The link poll does: each answer while the socket is open restamps the
 // status, so an Arena that stops answering takes its status STALE with it.
+// The socket has no heartbeat, so after the link fails the socket open since
+// before it is not trusted (half-open after a network drop): when the link
+// answers again the socket is opened afresh, and the status stays stale until
+// that connection's composition arrives, rather than being restamped.
 
 import { decodeArenaProduct } from '../bridge/arena.js'
 import { checkCommand, emptyWire, openWire, type ArenaWire } from '../bridge/arena-control.js'
@@ -42,6 +46,10 @@ import { getJson, poll } from './http-poll.js'
 
 /** How long after the websocket closes before trying again. */
 const RECONNECT_MS = 5_000
+/** A link out this long leaves the socket open through it untrusted: a drop
+ *  shorter than this leaves a TCP connection standing, and a half-open one
+ *  (Arena gone or restarted while the network was down) takes longer. */
+const TRUST_AFTER_MS = 5_000
 
 export type ArenaHandle = {
 	source(): ArenaSource
@@ -73,6 +81,7 @@ export function startArena(s: Settings): ArenaHandle {
 			const r = await getJson(`http://${s.arenaHost}:${s.arenaPort}/api/v1/product`, ARENA_REQUEST_TIMEOUT_MS)
 			const outcome = r.ok ? ({ ok: true, decoded: decodeArenaProduct(r.body) } as const) : r
 			if (outcome.ok && outcome.decoded.ok) live.answered()
+			else live.unanswered()
 			return outcome
 		},
 	})
@@ -95,6 +104,7 @@ function watchArena(
 ): {
 	status(): Channel<ArenaStatus>
 	answered(): void
+	unanswered(): void
 	command(raw: unknown): Promise<ArenaCommandResult>
 	open(clipId: number, file: string, live: boolean): Promise<ArenaCommandResult>
 	empty(clipId: number, code: string): Promise<ArenaCommandResult>
@@ -103,6 +113,10 @@ function watchArena(
 	let channel = unread<ArenaTree>()
 	let socket: WebSocket | null = null
 	let open = false
+	/** When the socket open now opened, and when the link first failed since
+	 *  it last answered (null while it answers). */
+	let openedAt = 0
+	let linkLostAt: number | null = null
 	let subscribed = new Set<number>()
 	let retry: ReturnType<typeof setTimeout> | null = null
 	let stopped = false
@@ -195,6 +209,7 @@ function watchArena(
 		socket = ws
 		ws.addEventListener('open', () => {
 			open = true
+			openedAt = Date.now()
 		})
 		ws.addEventListener('message', (e) => onMessage(e.data))
 		// Either ends it, once. A refused connection fires `error` and never
@@ -214,6 +229,21 @@ function watchArena(
 		ws.addEventListener('error', end)
 		ws.addEventListener('close', end)
 	}
+	/** Let the socket go and open another at once. Its own close is ignored
+	 *  (`end` checks it is still the socket). */
+	const reconnect = () => {
+		const ws = socket
+		if (ws === null) return
+		console.log('[arena] websocket: Arena answers again; opening the websocket afresh')
+		socket = null
+		open = false
+		subscribed = new Set()
+		ws.close()
+		put({ ok: false, reason: 'error', at: Date.now(), detail: 'reconnecting after Arena stopped answering' })
+		if (retry !== null) clearTimeout(retry)
+		connect()
+	}
+
 	/** Put a checked command on the wire. Each REST call waits for the one
 	 *  before, so a release never overtakes its press. */
 	const send = async (wire: ArenaWire): Promise<ArenaCommandResult> => {
@@ -290,8 +320,18 @@ function watchArena(
 			return send(wire.value)
 		},
 		answered() {
+			const lost = linkLostAt
+			linkLostAt = null
+			// The link was out for a while (TRUST_AFTER_MS) with this socket open
+			// throughout: it may be half-open, so it is not taken as proof, and a
+			// fresh one brings a composition. One missed poll (Arena busy for a
+			// moment) is not worth a 1.3 MB reread and a blink of the view.
+			if (lost !== null && open && openedAt <= lost && Date.now() - lost >= TRUST_AFTER_MS) return reconnect()
 			const latest = channel.latest
 			if (open && latest !== null && latest.ok) channel = record(channel, { ok: true, value: latest.value, at: Date.now() })
+		},
+		unanswered() {
+			linkLostAt ??= Date.now()
 		},
 		stop() {
 			stopped = true
