@@ -1,73 +1,29 @@
-// The pieces Settings and the Connections list are built from: a row in a
-// list, a detail's heading, a row's own Save, and the tones a status is drawn in.
-// Split out of ConnectionsPanel.tsx on 2026-10-08, when Connections became a
-// list everyone reads and Settings the place Admin changes things.
+// The pieces Settings and the Connections list are built from. Split out of
+// ConnectionsPanel.tsx on 2026-10-08, when Connections became a list everyone
+// reads and Settings the place Admin changes things.
+//
+// The layout since 2026-10-15 (the owner: the settings "visually don't feel
+// like much has changed"; a grouped list, label-and-field pages, one Save bar,
+// help behind a ?): a page is its header (name, state, address, the On/Off
+// switch, ?), then rows of a label on the left and its field on the right,
+// nothing else. What explains a field is help, shown when ? is tapped; what
+// went wrong is always shown, under its field. Typed fields wait for the Save
+// bar, which appears only once something on the page has changed; a switch or
+// a choice of options takes effect when tapped.
 
-import { useState, type ReactNode } from 'react'
-import { ChevronRight, FolderOpen, Save as SaveIcon } from 'lucide-react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
+import { CircleHelp, FolderOpen, RotateCcw, Save as SaveIcon } from 'lucide-react'
 
 import type { Tone } from '../../../shared/connections.js'
 import type { SettingsField, SettingsPatch } from '../../../shared/settings.js'
 
-import { Field, Input } from '../form.js'
-import { Button, Segmented } from '../ui.js'
+import { Input } from '../form.js'
+import { Button } from '../ui.js'
 
 export type Errors = Partial<Record<SettingsField, string>>
 /** Null on success; otherwise what went wrong, per field. */
 export type Save = (patch: SettingsPatch) => Promise<Errors | null>
-
-/** One line in the list: what it is, its state in a word, its address. */
-export function ListRow({
-	selected,
-	onClick,
-	lead,
-	title,
-	sub,
-	aside = null,
-	struck = false,
-}: {
-	selected: boolean
-	onClick: () => void
-	lead: ReactNode
-	title: string
-	sub: ReactNode
-	aside?: string | null
-	struck?: boolean
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			aria-current={selected}
-			className={`group relative grid min-h-16 w-full grid-cols-[1.25rem_1fr_auto] items-center gap-3.5 rounded-ctl px-4 py-2 text-left transition-[background-color,transform] duration-150 active:scale-[0.99] ${
-				selected ? 'bg-accent text-accent-ink' : 'hover:bg-booth-raise'
-			}`}
-		>
-			<span className="flex justify-center">{lead}</span>
-			<span className="flex min-w-0 flex-col leading-tight">
-				<span className="truncate text-base font-bold">{title}</span>
-				<span className={`mt-0.5 truncate text-sm ${selected ? '[&_*]:!text-accent-ink/80' : ''}`}>{sub}</span>
-			</span>
-			{aside !== null && (
-				<span className={`max-w-40 truncate text-xs ${selected ? 'text-accent-ink/80' : 'text-booth-dim'} ${struck ? 'line-through opacity-60' : ''}`}>{aside}</span>
-			)}
-		</button>
-	)
-}
-
-export function DetailHead({ title, status, address = null }: { title: string; status?: ReactNode; address?: string | null }) {
-	return (
-		<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-			<h3 className="text-3xl font-extrabold tracking-tight">{title}</h3>
-			{status}
-			{address !== null && <span className="text-[15px] font-medium text-booth-dim">{address}</span>}
-		</div>
-	)
-}
-
-export function Empty({ children }: { children: ReactNode }) {
-	return <div className="flex flex-1 items-center justify-center text-booth-dim">{children}</div>
-}
+export type Err = (field: SettingsField) => string | undefined
 
 export const toneText: Record<Tone, string> = {
 	live: 'text-state-live',
@@ -83,142 +39,190 @@ export const tonePill: Record<Tone, string> = {
 	off: 'bg-booth-raise text-booth-dim',
 }
 
-/** Whether this booth uses a connection. Off keeps the address but stops
- *  asking, leaves the dot alone, and takes its views and chips off the screen. */
-export function OnOff({ on, onSet }: { on: boolean; onSet: (on: boolean) => void }) {
+/** A group's heading in the list down the left. */
+export function NavGroup({ title, children }: { title: string; children: ReactNode }) {
 	return (
-		<div className="flex items-center gap-4">
-			<Segmented
-				label="Used at this booth"
-				value={on}
-				onChange={onSet}
-				options={[
-					{ value: true, label: 'On' },
-					{ value: false, label: 'Off' },
-				]}
-			/>
-			<span className="text-sm text-booth-dim">
-				{on ? 'Used at this booth.' : 'Not used here: not asked, not in the dot, and its views and chips are hidden.'}
-			</span>
+		<div className="flex flex-col gap-0.5">
+			<span className="px-3 pt-3 pb-1 text-xs font-bold tracking-wide text-booth-faint">{title}</span>
+			{children}
 		</div>
 	)
 }
 
-/** A row's own Save, with what went wrong under it. One row's fields only:
- *  saving OnTime never re-sends the console's. */
-export function Editor({
-	save,
-	patch,
-	note,
-	children,
+/** One line in the list: what it is, and a word or an address on the right. */
+export function NavRow({
+	selected,
+	onClick,
+	lead,
+	title,
+	aside = null,
+	dim = false,
 }: {
-	save: Save
-	patch: () => SettingsPatch
-	note?: string
-	/** The fields, handed what the last Save said about each. */
-	children: (err: Err) => ReactNode
+	selected: boolean
+	onClick: () => void
+	lead?: ReactNode
+	title: string
+	aside?: ReactNode
+	dim?: boolean
 }) {
-	const [errors, setErrors] = useState<Errors>({})
-	const [saved, setSaved] = useState(false)
 	return (
-		<>
-			{children((field) => errors[field])}
-			{errors.form !== undefined && <p className="text-sm text-state-unreachable">{errors.form}</p>}
-			<div className="flex items-center gap-4">
-				<Button
-					variant="primary"
-					icon={SaveIcon}
-					onClick={() =>
-						void save(patch()).then((e) => {
-							setErrors(e ?? {})
-							setSaved(e === null)
-						})
-					}
-					className="px-7"
-				>
-					Save
-				</Button>
-				{saved && <span className="text-sm text-state-live">Saved.{note === undefined ? '' : ` ${note}`}</span>}
-			</div>
-		</>
+		<button
+			type="button"
+			onClick={onClick}
+			aria-current={selected}
+			className={`flex min-h-12 w-full items-center gap-3 rounded-ctl px-3 text-left transition-colors duration-150 ${
+				selected ? 'bg-accent text-accent-ink' : 'hover:bg-booth-raise'
+			} ${dim && !selected ? 'text-booth-dim' : ''}`}
+		>
+			{lead !== undefined && <span className="flex w-4 shrink-0 justify-center">{lead}</span>}
+			<span className="min-w-0 flex-1 truncate text-base font-bold">{title}</span>
+			{aside !== null && <span className={`max-w-44 shrink-0 truncate text-xs ${selected ? 'text-accent-ink/80' : 'text-booth-dim'}`}>{aside}</span>}
+		</button>
 	)
 }
 
-export type Err = (field: SettingsField) => string | undefined
+/** A page's own heading, for the pages that are not a connection (Holding). */
+export function DetailHead({ title, status, address = null }: { title: string; status?: ReactNode; address?: string | null }) {
+	return (
+		<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+			<h3 className="text-3xl font-extrabold tracking-tight">{title}</h3>
+			{status}
+			{address !== null && <span className="text-[15px] font-medium text-booth-dim">{address}</span>}
+		</div>
+	)
+}
 
-/** The fields a booth rarely changes (ports, MA's own names), folded away
- *  under one line that says what they hold. Opens by itself when one of them
- *  is not the usual, or the last Save found fault with one, so nothing set
- *  differently is ever out of sight. */
-export function Advanced({
-	summary,
-	changed,
-	errors,
+export function Empty({ children }: { children: ReactNode }) {
+	return <div className="flex flex-1 items-center justify-center text-booth-dim">{children}</div>
+}
+
+/** On or off, as one switch. */
+export function Switch({ on, onSet, label }: { on: boolean; onSet: (on: boolean) => void; label: string }) {
+	return (
+		<button
+			type="button"
+			role="switch"
+			aria-checked={on}
+			aria-label={label}
+			onClick={() => onSet(!on)}
+			className="flex h-12 shrink-0 items-center gap-3 rounded-ctl px-2 text-sm font-bold text-booth-dim hover:text-booth-ink"
+		>
+			{on ? 'On' : 'Off'}
+			<span className={`relative h-7 w-12 rounded-full transition-colors duration-150 ${on ? 'bg-accent' : 'bg-booth-raise ring-1 ring-booth-edge ring-inset'}`}>
+				<span className={`absolute top-1 size-5 rounded-full bg-booth-ink transition-[left] duration-150 ${on ? 'left-6' : 'left-1'}`} />
+			</span>
+		</button>
+	)
+}
+
+const HelpShown = createContext(false)
+
+/** What explains a field or a page: shown only once the page's ? is tapped. */
+export function Help({ children }: { children: ReactNode }) {
+	return useContext(HelpShown) ? <p className="max-w-prose text-sm leading-relaxed text-booth-dim">{children}</p> : null
+}
+
+/** A page: its header, and its rows. `on` puts the On/Off switch in the
+ *  header; `help` the ? that shows every <Help> on the page. */
+export function Page({
+	title,
+	status,
+	address = null,
+	on,
+	help = false,
 	children,
 }: {
-	/** What the fields hold now, in a few words: shown folded. */
-	summary: string
-	/** One of them is not its usual value. */
-	changed: boolean
-	errors: ReadonlyArray<string | undefined>
+	title: string
+	status?: { tone: Tone; words: string; detail?: string | null }
+	address?: string | null
+	on?: { value: boolean; set: (on: boolean) => void }
+	help?: boolean
 	children: ReactNode
 }) {
-	const [open, setOpen] = useState(changed)
-	const shown = open || errors.some((e) => e !== undefined)
+	const [shown, setShown] = useState(false)
 	return (
-		<div className="flex flex-col gap-3">
-			<button
-				type="button"
-				onClick={() => setOpen(!shown)}
-				aria-expanded={shown}
-				className="flex min-h-10 items-center gap-2 self-start text-sm font-bold text-booth-dim hover:text-booth-ink"
-			>
-				<ChevronRight size={16} aria-hidden className={`transition-transform ${shown ? 'rotate-90' : ''}`} />
-				Advanced
-				<span className="font-normal">{summary}</span>
-			</button>
-			{shown && <div className="flex flex-col gap-4 border-l-2 border-booth-edge pl-4">{children}</div>}
+		<HelpShown.Provider value={shown}>
+			<div className="flex flex-1 flex-col gap-6">
+				<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+					<h3 className="text-3xl font-extrabold tracking-tight">{title}</h3>
+					{status !== undefined && (
+						<span className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm ${tonePill[status.tone]}`}>
+							{status.words}
+							{status.detail != null && <span className="text-booth-dim">· {status.detail}</span>}
+						</span>
+					)}
+					{address !== null && <span className="text-[15px] font-medium text-booth-dim">{address}</span>}
+					<span className="ml-auto flex items-center gap-1">
+						{help && (
+							<button
+								type="button"
+								aria-pressed={shown}
+								aria-label={shown ? 'Hide the help' : 'Show the help'}
+								onClick={() => setShown(!shown)}
+								className={`grid size-12 place-items-center rounded-ctl transition-colors ${shown ? 'bg-accent text-accent-ink' : 'text-booth-dim hover:bg-booth-raise hover:text-booth-ink'}`}
+							>
+								<CircleHelp size={22} aria-hidden />
+							</button>
+						)}
+						{on !== undefined && <Switch on={on.value} onSet={on.set} label={`${title} used at this booth`} />}
+					</span>
+				</div>
+				{on !== undefined && !on.value && <p className="text-sm text-booth-dim">Off at this booth: not asked, not in the dot, and its views are hidden.</p>}
+				{children}
+			</div>
+		</HelpShown.Provider>
+	)
+}
+
+/** One setting: its label on the left, its field on the right, what went
+ *  wrong under the field, and its help under that while ? is on. */
+export function Row({ label, error, help, children }: { label: string; error?: string | undefined; help?: ReactNode; children: ReactNode }) {
+	return (
+		<div className="grid grid-cols-[11rem_minmax(0,1fr)] items-start gap-x-6">
+			<span className="flex min-h-12 items-center text-base font-medium text-booth-dim">{label}</span>
+			<div className="flex min-w-0 flex-col gap-1.5">
+				{children}
+				{error !== undefined && <span className="text-sm text-state-unreachable">{error}</span>}
+				{help !== undefined && <Help>{help}</Help>}
+			</div>
 		</div>
 	)
 }
 
-/** An address, and its port folded under Advanced: the port is the program's
- *  own default nearly everywhere. */
-export function HostPort(p: {
-	err: Err
+/** A group of rows under a quiet heading, inside one page. */
+export function Rows({ title, children }: { title?: string; children: ReactNode }) {
+	return (
+		<section className="flex flex-col gap-4">
+			{title !== undefined && <h4 className="border-b border-booth-edge pb-2 text-sm font-bold tracking-wide text-booth-faint">{title}</h4>}
+			{children}
+		</section>
+	)
+}
+
+/** An address and its port on one line. */
+export function AddressPort(p: {
 	host: string
 	port: string
 	onHost: (v: string) => void
 	onPort: (v: string) => void
-	hostField: SettingsField
-	portField: SettingsField
-	hostLabel: string
-	portHint: string
-	defaultPort: number
 	placeholder?: string
-	/** Beside the address: a Find, say. */
 	aside?: ReactNode
 }) {
 	return (
-		<>
-			<Field label={p.hostLabel} error={p.err(p.hostField)}>
-				<span className="flex min-w-0 gap-2">
-					<span className="min-w-0 flex-1">
-						<Input value={p.host} onChange={p.onHost} placeholder={p.placeholder ?? 'not used'} mono />
-					</span>
-					{p.aside}
-				</span>
-			</Field>
-			<Advanced summary={`port ${p.port.trim() || p.defaultPort}`} changed={p.port.trim() !== String(p.defaultPort)} errors={[p.err(p.portField)]}>
-				<Field label="Port" error={p.err(p.portField)} hint={p.portHint}>
-					<Input value={p.port} onChange={p.onPort} inputMode="numeric" />
-				</Field>
-			</Advanced>
-		</>
+		<span className="flex min-w-0 items-center gap-2">
+			<span className="min-w-0 flex-1">
+				<Input value={p.host} onChange={p.onHost} placeholder={p.placeholder ?? 'not used'} mono />
+			</span>
+			<span className="text-booth-faint">port</span>
+			<span className="w-28 shrink-0">
+				<Input value={p.port} onChange={p.onPort} inputMode="numeric" />
+			</span>
+			{p.aside}
+		</span>
 	)
 }
 
-/** A folder, typed or picked with Windows' own folder picker (the owner's
+/** A folder, typed or picked with the system's own folder picker (the owner's
  *  ask, 2026-10-05). Picking only fills the field; Save keeps it. */
 export function FolderInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
 	const browse = () => void window.life?.chooseFolder(value.trim() === '' ? null : value).then((f) => f !== null && onChange(f))
@@ -231,5 +235,99 @@ export function FolderInput({ value, onChange, placeholder }: { value: string; o
 				Browse
 			</Button>
 		</span>
+	)
+}
+
+/** A page's typed fields as drafts: what they were when the page opened,
+ *  what they are now, which differ, and back to how they were. */
+export function useDraft<T extends Record<string, string | boolean>>(initial: T) {
+	const [start, setStart] = useState(initial)
+	const [draft, setDraft] = useState(initial)
+	const changed = (Object.keys(start) as (keyof T)[]).filter((k) => draft[k] !== start[k])
+	return {
+		draft,
+		set: <K extends keyof T>(k: K, v: T[K]) => setDraft((d) => ({ ...d, [k]: v })),
+		changed,
+		revert: () => setDraft(start),
+		/** After a Save: what is there now is what the page holds. */
+		settle: () => setStart(draft),
+	}
+}
+
+/** A page's Save: its fields, handed what the last Save said about each, and
+ *  the Save bar along the foot once something has changed, naming what. One
+ *  page's fields only: saving OnTime never re-sends the console's. */
+export function Editor({
+	save,
+	patch,
+	changes,
+	onRevert,
+	onSaved,
+	note,
+	children,
+}: {
+	save: Save
+	patch: () => SettingsPatch
+	/** What has changed, in the words of its labels. Empty: no bar. */
+	changes: readonly string[]
+	onRevert: () => void
+	/** The page now holds what was saved (`useDraft`'s settle). */
+	onSaved?: () => void
+	/** Said after a Save, such as what reconnects. */
+	note?: string
+	children: (err: Err) => ReactNode
+}) {
+	const [errors, setErrors] = useState<Errors>({})
+	const [saved, setSaved] = useState(false)
+	const failing = Object.keys(errors).length > 0
+	return (
+		<>
+			{children((field) => errors[field])}
+			{(changes.length > 0 || saved || errors.form !== undefined) && (
+				<div className="sticky bottom-0 mt-auto -mx-2 flex flex-wrap items-center gap-3 rounded-ctl bg-booth-raise px-4 py-3 ring-1 ring-booth-edge ring-inset">
+					<span className="min-w-0 flex-1 text-sm">
+						{errors.form !== undefined ? (
+							<span className="text-state-unreachable">{errors.form}</span>
+						) : changes.length > 0 ? (
+							<>
+								<span className="font-bold">{changes.length === 1 ? '1 change' : `${changes.length} changes`}</span>
+								<span className="text-booth-dim">: {changes.join(', ')}</span>
+								{failing && <span className="text-state-unreachable"> · not saved, see above</span>}
+							</>
+						) : (
+							<span className="text-state-live">Saved.{note === undefined ? '' : ` ${note}`}</span>
+						)}
+					</span>
+					{changes.length > 0 && (
+						<>
+							<Button
+								variant="ghost"
+								icon={RotateCcw}
+								onClick={() => {
+									setErrors({})
+									onRevert()
+								}}
+							>
+								Revert
+							</Button>
+							<Button
+								variant="primary"
+								icon={SaveIcon}
+								onClick={() =>
+									void save(patch()).then((e) => {
+										setErrors(e ?? {})
+										setSaved(e === null)
+										if (e === null) onSaved?.()
+									})
+								}
+								className="px-7"
+							>
+								Save
+							</Button>
+						</>
+					)}
+				</div>
+			)}
+		</>
 	)
 }

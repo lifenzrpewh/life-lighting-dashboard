@@ -1,7 +1,7 @@
 // The views a booth adds itself: web pages (../../../shared/embeds.ts), NDI
 // sources (../../../shared/ndi.ts) and capture inputs (../../../shared/capture.ts).
-// Each is added from a list in Settings and named, turned off or removed
-// there. Admin only, as all of Settings is.
+// Each is added from Settings › Add a view and named, turned off or removed on
+// its own page. Admin only, as all of Settings is.
 
 import { useEffect, useState } from 'react'
 import { Cast, Plus, Trash2, Webcam } from 'lucide-react'
@@ -11,9 +11,32 @@ import { NDI_SOURCES_MAX, ndiNameError, ndiShortName, type NdiSource, type NdiSt
 import { CAPTURE_INPUTS_MAX, captureNameError, captureShortName, type CaptureInput } from '../../../shared/capture.js'
 import { useCameras } from '../../capture.js'
 
-import { Field, Input } from '../form.js'
-import { Button } from '../ui.js'
-import { DetailHead, Editor, type Errors, type Save } from './parts.js'
+import { Input } from '../form.js'
+import { Button, Segmented } from '../ui.js'
+import { Editor, Help, Page, Row, Rows, type Errors, type Save } from './parts.js'
+
+/** The second tap that removes, and its words: it times out on its own. */
+function useRemoving(): [boolean, (on: boolean) => void] {
+	const [removing, setRemoving] = useState(false)
+	useEffect(() => {
+		if (!removing) return
+		const id = setTimeout(() => setRemoving(false), 4_000)
+		return () => clearTimeout(id)
+	}, [removing])
+	return [removing, setRemoving]
+}
+
+function RemoveRow({ removing, onTap, label, help }: { removing: boolean; onTap: () => void; label: string; help: string }) {
+	return (
+		<Row label="Remove" help={help}>
+			<span>
+				<Button variant={removing ? 'danger' : 'quiet'} icon={Trash2} onClick={onTap}>
+					{removing ? 'Tap again to remove' : label}
+				</Button>
+			</span>
+		</Row>
+	)
+}
 
 /** An embed's name and address, and Remove. Removing forgets its sign-in, so
  *  it takes a second tap. */
@@ -21,12 +44,8 @@ export function EmbedEditor({ embed, all, save, onRemoved }: { embed: Embed; all
 	const [name, setName] = useState(embed.name)
 	const [url, setUrl] = useState(embed.url)
 	const [local, setLocal] = useState<Errors>({})
-	const [removing, setRemoving] = useState(false)
-	useEffect(() => {
-		if (!removing) return
-		const id = setTimeout(() => setRemoving(false), 4_000)
-		return () => clearTimeout(id)
-	}, [removing])
+	const [removing, setRemoving] = useRemoving()
+	const changes = [...(name !== embed.name ? ['name'] : []), ...(url !== embed.url ? ['address'] : [])]
 	return (
 		<>
 			<Editor
@@ -39,25 +58,21 @@ export function EmbedEditor({ embed, all, save, onRemoved }: { embed: Embed; all
 				patch={() => ({
 					embeds: all.map((e) => (e.id === embed.id ? { ...e, name: name.trim(), url: embedUrlOf(url) ?? url } : e)),
 				})}
+				changes={changes}
+				onRevert={() => (setName(embed.name), setUrl(embed.url), setLocal({}))}
 				note="Its page loads the new address."
 			>
-				{(err) => (
-					<EmbedFields name={name} url={url} onName={setName} onUrl={setUrl} errors={{ ...local, form: err('embeds') }} />
-				)}
+				{(err) => <EmbedFields name={name} url={url} onName={setName} onUrl={setUrl} errors={{ ...local, form: err('embeds') }} />}
 			</Editor>
-			<div className="flex items-center gap-4 border-t border-booth-edge pt-5">
-				<Button
-					variant={removing ? 'danger' : 'quiet'}
-					icon={Trash2}
-					onClick={() => {
-						if (!removing) return setRemoving(true)
-						void save({ embeds: all.filter((e) => e.id !== embed.id) }).then((e) => e === null && onRemoved())
-					}}
-				>
-					{removing ? 'Tap again to remove' : 'Remove this page'}
-				</Button>
-				<span className="text-sm text-booth-dim">Removing it also signs it out and forgets what it kept on this computer.</span>
-			</div>
+			<RemoveRow
+				removing={removing}
+				label="Remove this page"
+				help="Removing it also signs it out and forgets what it kept on this computer."
+				onTap={() => {
+					if (!removing) return setRemoving(true)
+					void save({ embeds: all.filter((e) => e.id !== embed.id) }).then((e) => e === null && onRemoved())
+				}}
+			/>
 		</>
 	)
 }
@@ -75,15 +90,12 @@ export function embedErrors(name: string, url: string): EmbedErrors {
 export function EmbedFields(p: { name: string; url: string; onName: (v: string) => void; onUrl: (v: string) => void; errors: EmbedErrors }) {
 	return (
 		<>
-			<div className="grid grid-cols-[1fr_2fr] gap-4">
-				<Field label="Name" error={p.errors.name} hint="What its tab says.">
-					<Input value={p.name} onChange={p.onName} placeholder="Run sheet" />
-				</Field>
-				<Field label="Web address" error={p.errors.url} hint="Copied from the browser's address bar.">
-					<Input value={p.url} onChange={p.onUrl} placeholder="https://docs.google.com/spreadsheets/…" />
-				</Field>
-			</div>
-			{p.errors.form !== undefined && <p className="text-sm text-state-unreachable">{p.errors.form}</p>}
+			<Row label="Name" error={p.errors.name} help="What its tab says.">
+				<Input value={p.name} onChange={p.onName} placeholder="Run sheet" />
+			</Row>
+			<Row label="Web address" error={p.errors.url ?? p.errors.form} help="Copied from the browser’s address bar.">
+				<Input value={p.url} onChange={p.onUrl} placeholder="https://docs.google.com/spreadsheets/…" />
+			</Row>
 		</>
 	)
 }
@@ -108,28 +120,27 @@ export function AddEmbed({ all, save }: { all: readonly Embed[]; save: Save }) {
 		setUrl('')
 	}
 	return (
-		<section className="flex flex-col gap-5">
-			<DetailHead title="Add a web page" />
-			<p className="max-w-prose text-sm text-booth-dim">
-				Any page, such as a Google Sheet, becomes a view of its own, with its own sign-in. Links that open a new window
-				open in this computer's browser.
-			</p>
+		<Rows>
+			<Help>
+				Any page, such as a Google Sheet, becomes a view of its own, with its own sign-in. Links that open a new window open in
+				this computer’s browser.
+			</Help>
 			{full ? (
 				<p className="text-sm text-booth-dim">That is {EMBEDS_MAX}, the most there can be. Remove one to add another.</p>
 			) : (
 				<>
 					<EmbedFields name={name} url={url} onName={setName} onUrl={setUrl} errors={errors} />
-					<div className="flex items-center gap-4">
-						<Button variant="primary" icon={Plus} onClick={() => void add()}>
-							Add
-						</Button>
-						{added !== null && (
-							<span className="text-sm text-state-live">Added {added}. A window's pencil, then its +, puts it on screen.</span>
-						)}
-					</div>
+					<Row label="">
+						<span className="flex flex-wrap items-center gap-4">
+							<Button variant="primary" icon={Plus} onClick={() => void add()}>
+								Add
+							</Button>
+							{added !== null && <span className="text-sm text-state-live">Added {added}. A window’s pencil, then its +, puts it on screen.</span>}
+						</span>
+					</Row>
 				</>
 			)}
-		</section>
+		</Rows>
 	)
 }
 
@@ -207,18 +218,14 @@ export function AddNdi({ all, save }: { all: readonly NdiSource[]; save: Save })
 		)
 	})()
 	return (
-		<section className="flex flex-col gap-5">
-			<h3 className="text-xl font-extrabold tracking-tight">Add an NDI source</h3>
-			<p className="max-w-prose text-sm text-booth-dim">
-				A camera, ProPresenter’s output, Arena’s or another computer’s screen: any NDI source on this network, for
-				the Video view.
-			</p>
+		<Rows>
+			<Help>A camera, ProPresenter’s output, Arena’s or another computer’s screen: any NDI source on this network, for the Video view.</Help>
 			{full && <p className="text-sm text-booth-dim">That is {NDI_SOURCES_MAX}, the most there can be. Remove one to add another.</p>}
 			{body}
 			{added !== null && <span className="text-sm text-state-live">Added {added}. Any Video tab’s feed button offers it (a window’s pencil, then +, adds a Video tab).</span>}
 			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
 			<NdiNotice />
-		</section>
+		</Rows>
 	)
 }
 
@@ -226,17 +233,9 @@ export function AddNdi({ all, save }: { all: readonly NdiSource[]; save: Save })
 export function NdiEditor({ source, all, save, onRemoved }: { source: NdiSource; all: readonly NdiSource[]; save: Save; onRemoved: () => void }) {
 	const [name, setName] = useState(source.name)
 	const [local, setLocal] = useState<string | undefined>(undefined)
-	const [removing, setRemoving] = useState(false)
-	useEffect(() => {
-		if (!removing) return
-		const id = setTimeout(() => setRemoving(false), 4_000)
-		return () => clearTimeout(id)
-	}, [removing])
+	const [removing, setRemoving] = useRemoving()
 	return (
 		<>
-			<p className="text-sm text-booth-dim">
-				<span className="font-mono text-booth-ink">{source.source}</span>, as NDI names it.
-			</p>
 			<Editor
 				save={async (patch) => {
 					const e = ndiNameError(name.trim())
@@ -245,26 +244,29 @@ export function NdiEditor({ source, all, save, onRemoved }: { source: NdiSource;
 					return save(patch)
 				}}
 				patch={() => ({ ndiSources: all.map((s) => (s.id === source.id ? { ...s, name: name.trim() } : s)) })}
+				changes={name !== source.name ? ['name'] : []}
+				onRevert={() => (setName(source.name), setLocal(undefined))}
 			>
 				{(err) => (
-					<Field label="Name" error={local ?? err('ndiSources')} hint="What its tab says.">
-						<Input value={name} onChange={setName} placeholder={ndiShortName(source.source)} />
-					</Field>
+					<>
+						<Row label="Source">
+							<span className="flex min-h-12 items-center font-mono text-sm text-booth-ink">{source.source}</span>
+						</Row>
+						<Row label="Name" error={local ?? err('ndiSources')} help="What its tab says.">
+							<Input value={name} onChange={setName} placeholder={ndiShortName(source.source)} />
+						</Row>
+					</>
 				)}
 			</Editor>
-			<div className="flex items-center gap-4 border-t border-booth-edge pt-5">
-				<Button
-					variant={removing ? 'danger' : 'quiet'}
-					icon={Trash2}
-					onClick={() => {
-						if (!removing) return setRemoving(true)
-						void save({ ndiSources: all.filter((s) => s.id !== source.id) }).then((e) => e === null && onRemoved())
-					}}
-				>
-					{removing ? 'Tap again to remove' : 'Remove this source'}
-				</Button>
-				<span className="text-sm text-booth-dim">Its tabs leave the screen. It can be added again from the list.</span>
-			</div>
+			<RemoveRow
+				removing={removing}
+				label="Remove this source"
+				help="Its tabs leave the screen. It can be added again from Add a view."
+				onTap={() => {
+					if (!removing) return setRemoving(true)
+					void save({ ndiSources: all.filter((s) => s.id !== source.id) }).then((e) => e === null && onRemoved())
+				}}
+			/>
 			<NdiNotice />
 		</>
 	)
@@ -287,12 +289,11 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 		setAdded(name)
 	}
 	return (
-		<section className="flex flex-col gap-5">
-			<h3 className="text-xl font-extrabold tracking-tight">Add a capture input</h3>
-			<p className="max-w-prose text-sm text-booth-dim">
-				Anything this computer sees as a camera, for the Video view: a Blackmagic card’s input (with Desktop Video
-				installed), an ATEM Mini’s USB output, OBS’s Virtual Camera (Start Virtual Camera in OBS), or a webcam.
-			</p>
+		<Rows>
+			<Help>
+				Anything this computer sees as a camera, for the Video view: a Blackmagic card’s input (with Desktop Video installed), an
+				ATEM Mini’s USB output, OBS’s Virtual Camera (Start Virtual Camera in OBS), or a webcam.
+			</Help>
 			{full && <p className="text-sm text-booth-dim">That is {CAPTURE_INPUTS_MAX}, the most there can be. Remove one to add another.</p>}
 			{cameras === null ? (
 				<p className="text-sm text-booth-dim">Looking for cameras…</p>
@@ -320,7 +321,7 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 			)}
 			{added !== null && <span className="text-sm text-state-live">Added {added}. Any Video tab’s feed button offers it (a window’s pencil, then +, adds a Video tab).</span>}
 			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
-		</section>
+		</Rows>
 	)
 }
 
@@ -328,18 +329,9 @@ export function AddCapture({ all, save }: { all: readonly CaptureInput[]; save: 
 export function CaptureEditor({ input, all, save, onRemoved }: { input: CaptureInput; all: readonly CaptureInput[]; save: Save; onRemoved: () => void }) {
 	const [name, setName] = useState(input.name)
 	const [local, setLocal] = useState<string | undefined>(undefined)
-	const [removing, setRemoving] = useState(false)
-	useEffect(() => {
-		if (!removing) return
-		const id = setTimeout(() => setRemoving(false), 4_000)
-		return () => clearTimeout(id)
-	}, [removing])
+	const [removing, setRemoving] = useRemoving()
 	return (
 		<>
-			<p className="text-sm text-booth-dim">
-				<span className="font-mono text-booth-ink">{input.device}</span>, as this computer names it. A card input shows a
-				picture once its signal matches the format set in Desktop Video Setup.
-			</p>
 			<Editor
 				save={async (patch) => {
 					const e = captureNameError(name.trim())
@@ -348,26 +340,58 @@ export function CaptureEditor({ input, all, save, onRemoved }: { input: CaptureI
 					return save(patch)
 				}}
 				patch={() => ({ captureInputs: all.map((c) => (c.id === input.id ? { ...c, name: name.trim() } : c)) })}
+				changes={name !== input.name ? ['name'] : []}
+				onRevert={() => (setName(input.name), setLocal(undefined))}
 			>
 				{(err) => (
-					<Field label="Name" error={local ?? err('captureInputs')} hint="What its tab says.">
-						<Input value={name} onChange={setName} placeholder={captureShortName(input.device)} />
-					</Field>
+					<>
+						<Row label="Device" help="As this computer names it. A card input shows a picture once its signal matches the format set in Desktop Video Setup.">
+							<span className="flex min-h-12 items-center font-mono text-sm text-booth-ink">{input.device}</span>
+						</Row>
+						<Row label="Name" error={local ?? err('captureInputs')} help="What its tab says.">
+							<Input value={name} onChange={setName} placeholder={captureShortName(input.device)} />
+						</Row>
+					</>
 				)}
 			</Editor>
-			<div className="flex items-center gap-4 border-t border-booth-edge pt-5">
-				<Button
-					variant={removing ? 'danger' : 'quiet'}
-					icon={Trash2}
-					onClick={() => {
-						if (!removing) return setRemoving(true)
-						void save({ captureInputs: all.filter((c) => c.id !== input.id) }).then((e) => e === null && onRemoved())
-					}}
-				>
-					{removing ? 'Tap again to remove' : 'Remove this input'}
-				</Button>
-				<span className="text-sm text-booth-dim">Its tabs leave the screen. It can be added again from the list.</span>
-			</div>
+			<RemoveRow
+				removing={removing}
+				label="Remove this input"
+				help="Its tabs leave the screen. It can be added again from Add a view."
+				onTap={() => {
+					if (!removing) return setRemoving(true)
+					void save({ captureInputs: all.filter((c) => c.id !== input.id) }).then((e) => e === null && onRemoved())
+				}}
+			/>
 		</>
+	)
+}
+
+/** Settings › Add a view: a web page, an NDI source or a capture input, one
+ *  kind at a time (were two pages, Add a web page and Video sources). */
+export function AddView({ embeds, ndiSources, captureInputs, save }: { embeds: readonly Embed[]; ndiSources: readonly NdiSource[]; captureInputs: readonly CaptureInput[]; save: Save }) {
+	const [kind, setKind] = useState<'web' | 'ndi' | 'capture'>('web')
+	return (
+		<Page title="Add a view" help>
+			<Help>
+				Each one becomes a view a window can hold, with a row in Connections. This computer’s own Spout or Syphon senders need no
+				adding: any Video tab offers them.
+			</Help>
+			<Row label="Kind">
+				<span>
+					<Segmented
+						label="Kind of view"
+						value={kind}
+						onChange={setKind}
+						options={[
+							{ value: 'web', label: 'Web page' },
+							{ value: 'ndi', label: 'NDI source' },
+							{ value: 'capture', label: 'Capture input' },
+						]}
+					/>
+				</span>
+			</Row>
+			{kind === 'web' ? <AddEmbed all={embeds} save={save} /> : kind === 'ndi' ? <AddNdi all={ndiSources} save={save} /> : <AddCapture all={captureInputs} save={save} />}
+		</Page>
 	)
 }

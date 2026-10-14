@@ -13,12 +13,14 @@
 // only: its button is not drawn in volunteer mode, main refuses a save outside
 // Admin, and the App closes it when the mode drops.
 //
-// A list and a detail since 2026-10-05: the list always all in view with its
-// status, and the one tapped on the right. Only what no show knows is
-// configured here (src/shared/settings.ts).
+// A list and a detail since 2026-10-05; since 2026-10-15 (the owner) the list
+// in three groups, Programs, Views you added and This booth, and each page
+// rows of a label and its field, with one Save bar and its help behind a ?
+// (./settings/parts.tsx). Only what no show knows is configured here
+// (src/shared/settings.ts).
 
 import { useEffect, useState } from 'react'
-import { Grid3x3, Lock, Monitor, MonitorPlay, PanelTop, Plus } from 'lucide-react'
+import { Cast, FolderOpen, Globe, Grid3x3, Lock, Monitor, Plus, Webcam } from 'lucide-react'
 
 import type { ConnectionId, ConnectionStatus, RowId } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -27,25 +29,24 @@ import { captureIdOf } from '../../shared/capture.js'
 import type { DeskState } from '../../shared/desk.js'
 import type { SettingsView } from '../../shared/settings.js'
 
-import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor, VideoInfo } from './settings/connection-editors.js'
+import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, MediaEditor, OnTimeEditor, ProPresenterEditor, VideoInfo } from './settings/connection-editors.js'
 import { AdminSettings } from './settings/admin.js'
-import { AboutFoot, SetupFile, StartAtLogin, ThisScreen, UpdatesCard } from './settings/computer.js'
+import { ComputerSettings } from './settings/computer.js'
 import { HoldingSettings } from './settings/holding.js'
 import type { ArenaStatus } from '../../shared/arena.js'
 import { isDefault } from '../../shared/holding-map.js'
 import { useHoldingMapState } from '../holdingMapStore.js'
 import type { UpdateState } from '../../shared/updates.js'
-import { TopBarSettings } from './settings/top-bar.js'
 import type { BarItem } from '../barItems.js'
-import { DetailHead, Empty, ListRow, OnOff, tonePill, toneText, type Save } from './settings/parts.js'
-import { AddCapture, AddEmbed, AddNdi, CaptureEditor, EmbedEditor, NdiEditor } from './settings/views.js'
+import { Empty, NavGroup, NavRow, Page, type Save } from './settings/parts.js'
+import { AddView, CaptureEditor, EmbedEditor, NdiEditor } from './settings/views.js'
 import { Dot, Sheet } from './ui.js'
 import { sentence } from './vocabulary.js'
 
 /** What the right side shows: a connection, or one of the pages after them. */
-export type SettingsPage = RowId | 'add' | 'sources' | 'admin' | 'bar' | 'computer' | 'holding'
+export type SettingsPage = RowId | 'add' | 'media' | 'admin' | 'computer' | 'holding'
 
-const PAGES: readonly string[] = ['add', 'sources', 'admin', 'bar', 'computer', 'holding']
+const PAGES: readonly string[] = ['add', 'media', 'admin', 'computer', 'holding']
 
 /** Every connection's address as the list shows it, from the stored settings. */
 export function addressOf(view: SettingsView, id: RowId): string | null {
@@ -179,142 +180,98 @@ export function SettingsPanel({
 	const selected: SettingsPage = picked === null || !known(picked) ? fallback : picked
 	const row = rows.find((r) => r.id === selected) ?? null
 
+	// The list's groups: the programs Pāua talks to, then what the booth added.
+	const added = (id: RowId) => embedIdOf(id) !== null || ndiIdOf(id) !== null || captureIdOf(id) !== null
+	const programs = rows.filter((r) => !added(r.id))
+	const views = rows.filter((r) => added(r.id))
+	const addedIcon = (id: RowId) => (embedIdOf(id) !== null ? Globe : ndiIdOf(id) !== null ? Cast : Webcam)
+	const go = (p: SettingsPage) => setPicked(p)
+
 	return (
 		<Sheet title="Settings" description={description} onClose={onClose}>
-			<div className="grid min-h-0 flex-1 grid-cols-[minmax(22rem,28rem)_1fr]">
-				<nav className="flex min-h-0 flex-col gap-1 overflow-y-auto border-r border-booth-edge bg-booth-panel p-3">
+			<div className="grid min-h-0 flex-1 grid-cols-[minmax(18rem,22rem)_1fr]">
+				<nav className="flex min-h-0 flex-col gap-2 overflow-y-auto border-r border-booth-edge bg-booth-panel p-3">
 					{rows.every((r) => r.tone === 'off') && (
 						// A fresh install: every row off, which reads as a broken screen
 						// unless something says it is only empty.
-						<p className="mb-2 rounded-ctl bg-booth-raise px-4 py-3 text-sm">
-							Nothing is set up yet. Tap a connection to give it an address; start with the Console.
+						<p className="rounded-ctl bg-booth-raise px-4 py-3 text-sm">
+							Nothing is set up yet. Start with the Console, or set this computer up from a file (Updates and setup file).
 						</p>
 					)}
-					{rows.map((r) => (
-						<ListRow
-							key={r.id}
-							selected={selected === r.id}
-							onClick={() => setPicked(r.id)}
-							lead={<Dot tone={r.tone} />}
-							title={r.name}
-							sub={<span className={toneText[r.tone]}>{sentence(r.status)}</span>}
-							aside={addressOf(view, r.id)}
-							struck={isOff(view, r.id)}
-						/>
-					))}
-					<span className="mx-3 my-2 h-px bg-booth-edge" />
-					<ListRow
-						selected={selected === 'add'}
-						onClick={() => setPicked('add')}
-						lead={<Plus size={18} className="text-booth-dim" aria-hidden />}
-						title="Add a web page"
-						sub={<span className="text-booth-dim">A Google Sheet or any page, as a view</span>}
-					/>
-					<ListRow
-						selected={selected === 'sources'}
-						onClick={() => setPicked('sources')}
-						lead={<MonitorPlay size={18} className="text-booth-dim" aria-hidden />}
-						title="Video sources"
-						sub={<span className="text-booth-dim">NDI sources and capture inputs, for the Video view</span>}
-					/>
-					<span className="mx-3 my-2 h-px bg-booth-edge" />
-					<ListRow
-						selected={selected === 'admin'}
-						onClick={() => setPicked('admin')}
-						lead={<Lock size={18} className="text-booth-dim" aria-hidden />}
-						title="Admin"
-						sub={
-							<span className='text-booth-dim'>
-								{view.hasAdminPasscode ? 'Passcode set' : 'No passcode'} · back to volunteer after {view.adminTimeoutMin} min
-							</span>
-						}
-					/>
-					<ListRow
-						selected={selected === 'bar'}
-						onClick={() => setPicked('bar')}
-						lead={<PanelTop size={18} className="text-booth-dim" aria-hidden />}
-						title="Top bar"
-						sub={
-							<span className="text-booth-dim">
-								{barHidden.size === 0 ? 'Everything shown' : `${barHidden.size} hidden`}
-								{testing && ' · testing'}
-							</span>
-						}
-					/>
-					<ListRow
-						selected={selected === 'holding'}
-						onClick={() => setPicked('holding')}
-						lead={<Grid3x3 size={18} className="text-booth-dim" aria-hidden />}
-						title="Holding"
-						sub={<span className="text-booth-dim">{holdingSub}</span>}
-					/>
-					<ListRow
-						selected={selected === 'computer'}
-						onClick={() => setPicked('computer')}
-						lead={<Monitor size={18} className="text-booth-dim" aria-hidden />}
-						title="This computer"
-						sub={
-							updates?.state === 'available' ? (
-								<span className="font-bold text-booth-ink">Pāua {updates.version} is out</span>
-							) : (
-								<span className="text-booth-dim">Screen and updates</span>
+					<NavGroup title="Programs">
+						{programs.map((r) => (
+							<NavRow
+								key={r.id}
+								selected={selected === r.id}
+								onClick={() => go(r.id)}
+								lead={<Dot tone={r.tone} size="sm" />}
+								title={r.name}
+								aside={isOff(view, r.id) ? 'off' : addressOf(view, r.id)}
+								dim={isOff(view, r.id)}
+							/>
+						))}
+					</NavGroup>
+					<NavGroup title="Views you added">
+						{views.map((r) => {
+							const IconC = addedIcon(r.id)
+							return (
+								<NavRow
+									key={r.id}
+									selected={selected === r.id}
+									onClick={() => go(r.id)}
+									lead={<IconC size={16} className={r.tone === 'down' ? 'text-state-unreachable' : 'text-booth-dim'} aria-hidden />}
+									title={r.name}
+									aside={isOff(view, r.id) ? 'off' : addressOf(view, r.id)}
+									dim={isOff(view, r.id)}
+								/>
 							)
-						}
-					/>
-					<AboutFoot />
+						})}
+						<NavRow selected={selected === 'add'} onClick={() => go('add')} lead={<Plus size={16} className="text-booth-dim" aria-hidden />} title="Add a view" />
+					</NavGroup>
+					<NavGroup title="This booth">
+						<NavRow selected={selected === 'media'} onClick={() => go('media')} lead={<FolderOpen size={16} className="text-booth-dim" aria-hidden />} title="Media and folders" />
+						<NavRow selected={selected === 'holding'} onClick={() => go('holding')} lead={<Grid3x3 size={16} className="text-booth-dim" aria-hidden />} title="Holding map" aside={holdingSub} />
+						<NavRow
+							selected={selected === 'admin'}
+							onClick={() => go('admin')}
+							lead={<Lock size={16} className="text-booth-dim" aria-hidden />}
+							title="Screen and Admin"
+							aside={view.hasAdminPasscode ? 'passcode set' : 'no passcode'}
+						/>
+						<NavRow
+							selected={selected === 'computer'}
+							onClick={() => go('computer')}
+							lead={<Monitor size={16} className="text-booth-dim" aria-hidden />}
+							title="Updates and setup file"
+							aside={updates?.state === 'available' ? <span className="font-bold text-booth-ink">{updates.version} is out</span> : null}
+						/>
+					</NavGroup>
 				</nav>
 
 				<div className="min-h-0 overflow-y-auto">
-					<div key={selected} className="flex max-w-4xl animate-rise flex-col gap-6 px-10 py-8 select-text">
+					<div key={selected} className="flex min-h-full max-w-4xl animate-rise flex-col px-10 py-8 select-text">
 						{selected === 'add' ? (
-							<AddEmbed all={view.embeds} save={save} />
-						) : selected === 'sources' ? (
-							<>
-								<DetailHead title="Video sources" />
-								<p className="max-w-prose text-sm text-booth-dim">
-									What a Video tab can show besides this computer’s own Spout or Syphon senders, which need no adding. Each added
-									source is offered by every Video tab’s feed button and gets a row in Connections.
-								</p>
-								<AddNdi all={view.ndiSources} save={save} />
-								<span className="h-px bg-booth-edge" />
-								<AddCapture all={view.captureInputs} save={save} />
-							</>
+							<AddView embeds={view.embeds} ndiSources={view.ndiSources} captureInputs={view.captureInputs} save={save} />
+						) : selected === 'media' ? (
+							<Page title="Media and folders" help>
+								<MediaEditor view={view} save={save} />
+							</Page>
 						) : selected === 'admin' ? (
-							<AdminSettings view={view} save={save} />
-						) : selected === 'bar' ? (
-							<TopBarSettings hidden={barHidden} onSet={onBarHidden} testing={testing} onTesting={onTesting} />
+							<AdminSettings view={view} save={save} barHidden={barHidden} onBarHidden={onBarHidden} testing={testing} onTesting={onTesting} />
 						) : selected === 'holding' ? (
 							<HoldingSettings status={arena} />
 						) : selected === 'computer' ? (
-							<>
-								<DetailHead title="This computer" />
-								<ThisScreen windowed={view.windowed} save={save} />
-								<StartAtLogin />
-								<SetupFile />
-								<UpdatesCard updates={updates} />
-							</>
+							<ComputerSettings updates={updates} />
 						) : row === null ? null : (
-							<>
-								<DetailHead
-									title={row.name}
-									status={
-										<span className={`inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm ${tonePill[row.tone]}`}>
-											<Dot tone={row.tone} size="sm" />
-											{sentence(row.status)}
-											{row.detail !== null && <span className="text-booth-dim">· {row.detail}</span>}
-										</span>
-									}
-									address={addressOf(view, row.id)}
-								/>
-								<OnOff on={!isOff(view, row.id)} onSet={(on) => void setOn(row.id, on)} />
-								{row.id === 'video' && (
-									<p className="max-w-prose text-sm text-booth-dim">
-										A picture another program on this computer sends over Spout (Windows) or Syphon (Mac), such as Arena’s
-										multiview. Separate from Arena: it works with Arena’s web server off.
-									</p>
-								)}
-								{row.id === 'video' && <VideoInfo />}
+							<Page
+								title={row.name}
+								status={{ tone: row.tone, words: sentence(row.status), detail: row.detail }}
+								address={addressOf(view, row.id)}
+								on={{ value: !isOff(view, row.id), set: (on) => void setOn(row.id, on) }}
+								help
+							>
 								{row.id === 'console' && <ConsoleInfo paneSummary={paneSummary} desk={desk} now={now} />}
+								{row.id === 'video' && <VideoInfo />}
 								{captureOf(row.id) !== null ? (
 									<CaptureEditor key={row.id} input={captureOf(row.id)!} all={view.captureInputs} save={save} onRemoved={() => setPicked(null)} />
 								) : ndiOf(row.id) !== null ? (
@@ -331,7 +288,7 @@ export function SettingsPanel({
 									<ArenaEditor view={view} save={save} />
 								) : null}
 								{row.id === 'cue' && <CueInfo />}
-							</>
+							</Page>
 						)}
 					</div>
 				</div>

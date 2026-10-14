@@ -1,5 +1,6 @@
-// This computer: full screen or a window, updates, and which build this is
-// and where it logs. In Settings, so Admin only.
+// Settings › Updates and setup file: updates, this computer's setup to or
+// from a file, and which build this is and where it logs. Start at login is
+// here too, drawn on Screen and Admin's page. In Settings, so Admin only.
 
 import { useEffect, useState } from 'react'
 
@@ -9,28 +10,23 @@ import type { About } from '../../../shared/about.js'
 import { COMPUTER_LOCAL } from '../../../shared/computer-file.js'
 import { updateWords, type UpdateState } from '../../../shared/updates.js'
 
-import { Button, Card, SectionTitle, Segmented } from '../ui.js'
-import type { Save } from './parts.js'
+import { Button, Segmented } from '../ui.js'
+import { Page, Row, Rows } from './parts.js'
 
-/** Full screen or a window: for testers on a laptop; the booth stays full
- *  screen. Changes at once, no restart. */
-export function ThisScreen({ windowed, save }: { windowed: boolean; save: Save }) {
+/** The page: updates, the setup file, the version and the log. */
+export function ComputerSettings({ updates }: { updates: UpdateState | null }) {
 	return (
-		<Card>
-			<SectionTitle>This screen</SectionTitle>
-			<div className="flex flex-wrap items-center gap-4">
-				<Segmented
-					label="This screen"
-					value={windowed}
-					onChange={(v) => void save({ windowed: v })}
-					options={[
-						{ value: false, label: 'Full screen' },
-						{ value: true, label: 'Window' },
-					]}
-				/>
-				<span className="text-sm text-booth-dim">A window is for testing on a laptop; the booth stays full screen.</span>
-			</div>
-		</Card>
+		<Page title="Updates and setup file" help>
+			<Rows title="Updates">
+				<UpdatesCard updates={updates} />
+			</Rows>
+			<Rows title="Setup file">
+				<SetupFile />
+			</Rows>
+			<Rows title="This build">
+				<AboutRows />
+			</Rows>
+		</Page>
 	)
 }
 
@@ -48,8 +44,10 @@ export function StartAtLogin() {
 			setRefused(now.on !== on)
 		})
 	return (
-		<Card>
-			<SectionTitle>Start at login</SectionTitle>
+		<Row
+			label="Start at login"
+			help={item.available ? undefined : 'For the installed app. A checkout starts at login with scripts/windows/install-startup.cmd.'}
+		>
 			{item.available ? (
 				<div className="flex flex-wrap items-center gap-4">
 					<Segmented
@@ -70,9 +68,9 @@ export function StartAtLogin() {
 					</span>
 				</div>
 			) : (
-				<p className="text-sm text-booth-dim">For the installed app. A checkout starts at login with scripts/windows/install-startup.cmd.</p>
+				<span className="flex min-h-12 items-center text-sm text-booth-dim">Installed app only</span>
 			)}
-		</Card>
+		</Row>
 	)
 }
 
@@ -120,13 +118,10 @@ export function SetupFile() {
 			window.location.reload()
 		})
 	return (
-		<Card>
-			<SectionTitle>Setup file</SectionTitle>
-			<p className="max-w-prose text-sm text-booth-dim">
-				Everything this computer is set to (addresses, folders, web pages, video sources, layouts, the top bar, the Holding map), in
-				one file to set another booth up from. Never the MA passwords, the passcode or any sign-in: those are set on each
-				computer.
-			</p>
+		<Row
+			label="This computer"
+			help="Everything this computer is set to (addresses, folders, web pages, video sources, layouts, the top bar, the Holding map), in one file to set another booth up from. Never the MA passwords, the passcode or any sign-in: those are set on each computer."
+		>
 			{reading === null ? (
 				<div className="flex flex-wrap gap-2">
 					<Button onClick={exportIt}>To a file</Button>
@@ -157,26 +152,27 @@ export function SetupFile() {
 				</div>
 			)}
 			{said !== null && <p className="text-sm text-booth-dim">{said}</p>}
-		</Card>
+		</Row>
 	)
 }
 
-/** Which build this is and where it logs: what a field tester's report needs.
- *  At the foot of Settings' list, whichever page is open. */
-export function AboutFoot() {
+/** Which build this is and where it logs: what a field tester's report needs. */
+function AboutRows() {
 	const [about, setAbout] = useState<About | null>(null)
 	useEffect(() => void window.life?.about().then((a) => setAbout(a ?? null)), [])
 	if (about === null) return null
 	return (
-		<div className="mt-auto flex flex-col gap-2 border-t border-booth-edge px-4 pt-4 pb-1 text-xs text-booth-dim select-text">
-			<span>
-				<span className="font-medium text-booth-ink">Pāua {about.version}</span> · the log is at
-			</span>
-			<span className="font-mono break-all text-booth-ink">{about.logPath}</span>
-			<Button size="sm" onClick={() => window.life?.showLog()} className="self-start">
-				Show the log
-			</Button>
-		</div>
+		<>
+			<Row label="Version">
+				<span className="flex min-h-12 items-center text-base">Pāua {about.version}</span>
+			</Row>
+			<Row label="Log">
+				<span className="flex min-w-0 flex-wrap items-center gap-3">
+					<span className="min-w-0 font-mono text-sm break-all text-booth-dim select-text">{about.logPath}</span>
+					<Button onClick={() => window.life?.showLog()}>Show the log</Button>
+				</span>
+			</Row>
+		</>
 	)
 }
 
@@ -190,9 +186,8 @@ export function UpdatesCard({ updates }: { updates: UpdateState | null }) {
 	if (updates === null) return null
 	const busy = updates.state === 'checking' || updates.state === 'downloading' || updates.state === 'installing'
 	return (
-		<Card>
-			<SectionTitle>Updates</SectionTitle>
-			<p className={`text-sm ${updates.state === 'failed' ? 'text-state-unreachable' : updates.state === 'available' ? 'font-bold text-booth-ink' : 'text-booth-dim'}`}>
+		<Row label="Pāua">
+			<p className={`flex min-h-12 items-center text-base ${updates.state === 'failed' ? 'text-state-unreachable' : updates.state === 'available' ? 'font-bold text-booth-ink' : 'text-booth-dim'}`}>
 				{updateWords(updates, version ?? '?')}
 			</p>
 			{updates.state === 'downloading' && (
@@ -229,6 +224,6 @@ export function UpdatesCard({ updates }: { updates: UpdateState | null }) {
 					</Button>
 				</div>
 			)}
-		</Card>
+		</Row>
 	)
 }

@@ -1,7 +1,11 @@
-// Settings › Admin: the passcode Admin asks for, and how long Admin lasts
-// with nobody touching anything (../../../shared/admin.ts has the rules).
-// Only Admin reaches Settings, so changing the passcode needs Admin already;
-// the old passcode is not asked again.
+// Settings › Screen and Admin: the passcode Admin asks for, how long Admin
+// lasts with nobody touching anything (../../../shared/admin.ts has the rules),
+// Show mode's way out, the top bar's items and Testing (../../barItems.ts),
+// full screen or a window, and start at login. All of it takes effect when
+// tapped; nothing waits for a Save. Only Admin reaches Settings, so changing
+// the passcode needs Admin already; the old passcode is not asked again.
+// (Admin, Top bar and This computer's screen were three pages until
+// 2026-10-15.)
 
 import { useEffect, useState } from 'react'
 import { KeyRound, Trash2 } from 'lucide-react'
@@ -9,18 +13,99 @@ import { KeyRound, Trash2 } from 'lucide-react'
 import { ADMIN_TIMEOUTS_MIN, passcodeError } from '../../../shared/admin.js'
 import type { SettingsView } from '../../../shared/settings.js'
 
+import { BAR_ITEMS, BAR_ITEM_LABEL, type BarItem } from '../../barItems.js'
 import { PasscodeEntry } from '../PasscodeSheet.js'
-import { Button, Card, SectionTitle, Segmented } from '../ui.js'
-import { DetailHead, type Save } from './parts.js'
+import { Button, Segmented } from '../ui.js'
+import { Help, Page, Row, Rows, Switch, type Save } from './parts.js'
+import { StartAtLogin } from './computer.js'
 
-export function AdminSettings({ view, save }: { view: SettingsView; save: Save }) {
+export function AdminSettings({
+	view,
+	save,
+	barHidden,
+	onBarHidden,
+	testing,
+	onTesting,
+}: {
+	view: SettingsView
+	save: Save
+	barHidden: ReadonlySet<BarItem>
+	onBarHidden: (item: BarItem, hidden: boolean) => void
+	testing: boolean
+	onTesting: (on: boolean) => void
+}) {
+	const [error, setError] = useState<string | null>(null)
+	const saved = (field: 'adminTimeoutMin' | 'showModeLocked' | 'windowed') => (e: Awaited<ReturnType<Save>>) =>
+		setError(e === null ? null : (e[field] ?? e.form ?? 'Not saved.'))
 	return (
-		<>
-			<DetailHead title="Admin" />
-			<Passcode has={view.hasAdminPasscode} save={save} />
-			<Timeout minutes={view.adminTimeoutMin} save={save} />
-			<LeavingShow locked={view.showModeLocked} save={save} />
-		</>
+		<Page title="Screen and Admin" help>
+			<Help>
+				On this computer only. Each takes effect when tapped. Forgotten the passcode? Close Pāua, open settings.json in its data
+				folder (beside the log), delete the “adminPasscode” entry, and start it again: Admin then opens with a tap. Five wrong
+				tries make the screen wait 30 seconds.
+			</Help>
+			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
+			<Rows title="Admin">
+				<Passcode has={view.hasAdminPasscode} save={save} />
+				<Row label="Back to volunteer" help="With no touch or key anywhere, the MA and the run order included, Admin goes back to volunteer by itself.">
+					<span>
+						<Segmented
+							label="Back to volunteer after"
+							value={String(view.adminTimeoutMin)}
+							onChange={(v) => void save({ adminTimeoutMin: Number(v) }).then(saved('adminTimeoutMin'))}
+							options={ADMIN_TIMEOUTS_MIN.map((m) => ({ value: String(m), label: `${m} min` }))}
+						/>
+					</span>
+				</Row>
+				<Row
+					label="Leaving Show mode"
+					help={
+						view.showModeLocked
+							? 'Show mode is a lock: leaving it asks for the passcode (a tap if none is set) and lands in Admin.'
+							: 'Show mode only gives the windows the space: anyone leaves it with a tap, back to volunteer.'
+					}
+				>
+					<span>
+						<Segmented
+							label="Leaving Show mode"
+							value={view.showModeLocked ? 'locked' : 'open'}
+							onChange={(v) => void save({ showModeLocked: v === 'locked' }).then(saved('showModeLocked'))}
+							options={[
+								{ value: 'locked', label: 'Admin’s passcode' },
+								{ value: 'open', label: 'Anyone, with a tap' },
+							]}
+						/>
+					</span>
+				</Row>
+			</Rows>
+			<Rows title="Top bar">
+				<Help>The lock, Connections, the fold handle and, in Admin, Settings are always there.</Help>
+				{BAR_ITEMS.map((item) => (
+					<Row key={item} label={BAR_ITEM_LABEL[item].name} help={BAR_ITEM_LABEL[item].what}>
+						<Switch label={BAR_ITEM_LABEL[item].name} on={!barHidden.has(item)} onSet={(shown) => onBarHidden(item, !shown)} />
+					</Row>
+				))}
+				<Row label="Testing" help="While a field test is on, Mark sits on the bar: one tap writes a numbered line to the log at that moment.">
+					<Switch label="Testing" on={testing} onSet={onTesting} />
+				</Row>
+			</Rows>
+			<Rows title="This screen">
+				<Row label="Screen" help="A window is for testing on a laptop; the booth stays full screen.">
+					<span>
+						<Segmented
+							label="This screen"
+							value={view.windowed}
+							onChange={(v) => void save({ windowed: v }).then(saved('windowed'))}
+							options={[
+								{ value: false, label: 'Full screen' },
+								{ value: true, label: 'Window' },
+							]}
+						/>
+					</span>
+				</Row>
+				<StartAtLogin />
+			</Rows>
+		</Page>
 	)
 }
 
@@ -58,11 +143,8 @@ function Passcode({ has, save }: { has: boolean; save: Save }) {
 	}
 
 	return (
-		<Card>
-			<SectionTitle aside={has ? 'Set' : undefined}>Passcode</SectionTitle>
-			<p className={`text-sm ${has ? 'text-booth-dim' : 'text-booth-ink'}`}>
-				{has ? 'Tapping Volunteer asks for it before Admin opens.' : 'No passcode: anyone can tap into Admin.'}
-			</p>
+		<Row label="Passcode" help={has ? 'Tapping Volunteer asks for it before Admin opens.' : undefined}>
+			{!has && <span className="flex min-h-12 items-center text-base text-booth-ink">None: anyone can tap into Admin.</span>}
 			{step === null ? (
 				<div className="flex flex-wrap items-center gap-3">
 					<Button icon={KeyRound} onClick={() => (setSaid(null), setStep('new'))}>
@@ -95,60 +177,6 @@ function Passcode({ has, save }: { has: boolean; save: Save }) {
 				</div>
 			)}
 			{said !== null && <p className={`text-sm ${said.bad ? 'text-state-unreachable' : 'text-state-live'}`}>{said.words}</p>}
-			<p className="text-xs leading-relaxed text-booth-faint">
-				Forgotten? Close Pāua, open settings.json in its data folder (beside the log), delete the “adminPasscode” entry, and start it
-				again: Admin then opens with a tap. Five wrong tries make the screen wait 30 seconds.
-			</p>
-		</Card>
-	)
-}
-
-function Timeout({ minutes, save }: { minutes: number; save: Save }) {
-	const [error, setError] = useState<string | null>(null)
-	return (
-		<Card>
-			<SectionTitle>Back to volunteer after</SectionTitle>
-			<div>
-				<Segmented
-					label="Back to volunteer after"
-					value={String(minutes)}
-					onChange={(v) => void save({ adminTimeoutMin: Number(v) }).then((e) => setError(e === null ? null : (e.adminTimeoutMin ?? e.form ?? 'Not saved.')))}
-					options={ADMIN_TIMEOUTS_MIN.map((m) => ({ value: String(m), label: `${m} min` }))}
-				/>
-			</div>
-			<p className="text-sm text-booth-dim">
-				With no touch or key anywhere, the MA and the run order included, Admin goes back to volunteer by itself. On this computer only.
-			</p>
-			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
-		</Card>
-	)
-}
-
-/** Whether Show mode is a lock (../../showMode.ts): leaving it asks Admin's way
- *  in, or is a tap for anyone. */
-function LeavingShow({ locked, save }: { locked: boolean; save: Save }) {
-	const [error, setError] = useState<string | null>(null)
-	return (
-		<Card>
-			<SectionTitle>Leaving Show mode</SectionTitle>
-			<div>
-				<Segmented
-					label="Leaving Show mode"
-					value={locked ? 'locked' : 'open'}
-					onChange={(v) => void save({ showModeLocked: v === 'locked' }).then((e) => setError(e === null ? null : (e.showModeLocked ?? e.form ?? 'Not saved.')))}
-					options={[
-						{ value: 'locked', label: "Admin's passcode" },
-						{ value: 'open', label: 'Anyone, with a tap' },
-					]}
-				/>
-			</div>
-			<p className="text-sm text-booth-dim">
-				{locked
-					? 'Show mode is a lock: leaving it asks for the passcode (a tap if none is set) and lands in Admin.'
-					: 'Show mode only gives the windows the space: anyone leaves it with a tap, and the mode stays as it was.'}{' '}
-				On this computer only.
-			</p>
-			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
-		</Card>
+		</Row>
 	)
 }
