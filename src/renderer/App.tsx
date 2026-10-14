@@ -191,6 +191,8 @@ export function App() {
 	// that say so have been read: before then, every embed looks removed.
 	const [settingsRead, setSettingsRead] = useState(false)
 	// Settings › Admin's timeout (../shared/admin.ts), read with the rest.
+	// Settings › ProPresenter › Announcements: off hides the Announcements view.
+	const [announcementsOn, setAnnouncementsOn] = useState(true)
 	const [adminIdleMs, setAdminIdleMs] = useState(DEFAULT_ADMIN_TIMEOUT_MIN * 60_000)
 	const readOff = () =>
 		void window.life?.settings().then((s) => {
@@ -199,6 +201,7 @@ export function App() {
 			setNdiSources(s.ndiSources)
 			setCaptureInputs(s.captureInputs)
 			setAdminIdleMs(s.adminTimeoutMin * 60_000)
+			setAnnouncementsOn(s.announcementsOn)
 			setSettingsRead(true)
 		})
 	useEffect(readOff, [])
@@ -620,7 +623,7 @@ export function App() {
 	// A tab whose connection is off is not on screen (../shared/layout.ts),
 	// and comes back when it is on. Until settings are read, nothing is off:
 	// every embed would otherwise look removed for a moment.
-	const visibleView = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds, ndiSources, captureInputs)
+	const visibleView = (v: ViewId) => !settingsRead || viewIsOn(v, off, embeds, ndiSources, captureInputs, announcementsOn)
 	/** A tab is on screen while its view is (a Video tab's feed's view). A
 	 *  Video tab with no feed yet always is, so its feed can be picked. */
 	const visible = (t: Tab) => (t.view === 'video' && t.feed == null) || visibleView(tabView(t))

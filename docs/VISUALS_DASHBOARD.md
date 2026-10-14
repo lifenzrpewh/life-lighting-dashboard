@@ -1292,12 +1292,32 @@ On/Off (off hides the view, for a campus that does not use them), Folder, Smart 
 EVENT added by the service's name). Order: NORMAL NOTICES (WTL, NSL, Bibles, WTG, by the run-sheet
 item's label), then PROMOS, everything else in run-sheet order; CT131 Altar Call is a promo. The
 view's three steps: **Copy to the folder** (each T code found on Arena's graphics folder by code,
-copied as `01 CT108-…` under `.part`, renamed, touched 1.5 s later; last week's moved into `Old`,
-never deleted), the drag (the view counts them into the media playlist), **Write** (confirmed;
+copied as `01 CT108-…` under `.part`, renamed; last week's moved into `Old`, never deleted; the
+1.5 s touch and the Smart Playlist setting left after the first run, below), the drag (from the
+folder; the view counts them into the media playlist), **Write** (confirmed;
 headers' colours kept; read back in order before "written"). Each lower third shows Folder, Media
 and the playlist. ⚠️ The code itself has not yet run against ProPresenter: each step was proven by
 hand on PAUA TEST only. A Finder-dragged picture in the output playlist cannot be kept by a
 write, so the first Write replaces Central's hand-made "-Announcements AM" whole.
+
+**✅ The first run of Load from the kiosk, 2026-10-14, evening** (the owner's go, on the Mac on
+the booth network, Central AM 18 October, output "PAUA TEST AM", the owner's renamed PAUA TEST):
+**Copy** put four files in the folder (CT108 and CT003 already there, CT110 and CT109 copied
+under their new numbers, the old `03 CT109` and `04 CT110` set aside into `Old`) and said
+"no file for CT299" (Value Your Vote: not made yet, the owner said). **Write** answered 204 and read
+back as NORMAL NOTICES and the four, CT299 named as left out. What the run changed:
+- **❌ The Smart Playlist is gone from the route.** It never noticed `03 CT110` or `04 CT109`, in
+  the API or on ProPresenter's own screen (the owner looked), after Pāua's touch and a second by
+  hand. The person drags from the folder in Finder or Explorer into "Paua" instead (✅ the owner
+  did, and the four were in the API within seconds). The setting, the touch and the read are
+  gone; the view's Folder step reads the folder itself.
+- **Stale entries in "Paua"**: last week's `03 CT109` and `04 CT110` stayed there, pointing at
+  files now in `Old`, and the view counted them by code ("4 of 5"). A media item now counts only
+  when its name is a file in the folder now (`pictureOf`).
+- **A lower third with no file is left out** (the owner's choice): Write is allowed once every
+  one in the folder is in "Paua"; the confirmation and the result name the rest, and the check
+  still says they are missing. Before, one promo not made yet blocked the whole write.
+- The confirmation names only the headers it writes (no PROMOS with nothing under it).
 
 **What is left on Central's ProPresenter and the NAS from the tests (2026-10-14):** the presentation
 playlist **PAUA TEST** (NORMAL NOTICES and four pictures), the media playlists **Paua** (four

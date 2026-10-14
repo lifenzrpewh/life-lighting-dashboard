@@ -57,6 +57,16 @@ export type Settings = {
 	 *  one counts to the next thing is a habit of the people, not a fact any
 	 *  program holds, so it passes the test above. */
 	proPresenterTimer: string | null
+	/** ProPresenter's announcements (./announcements.ts § LOADING): whether this
+	 *  booth uses them at all (off hides the view, for a campus without them),
+	 *  the folder Pāua copies the week's lower thirds into (as this computer
+	 *  reaches it), the ordinary media playlist they are dragged into from it, and the output playlist's name without
+	 *  its AM, PM or EVENT. Which names a booth gave its playlists is a habit of
+	 *  the booth, not a fact the show holds. */
+	announcementsOn: boolean
+	announcementsFolder: string | null
+	announcementsMediaPlaylist: string
+	announcementsPlaylist: string
 	/** Resolume Arena's web server. Null host: no Arena. Often this very
 	 *  computer, 127.0.0.1, because the visuals station runs on Arena's machine. */
 	arenaHost: string | null
@@ -130,6 +140,10 @@ export const DEFAULT_SETTINGS: Settings = {
 	proPresenterHost: null,
 	proPresenterPort: DEFAULT_PROPRESENTER_PORT,
 	proPresenterTimer: null,
+	announcementsOn: true,
+	announcementsFolder: null,
+	announcementsMediaPlaylist: 'Paua',
+	announcementsPlaylist: 'Announcements',
 	arenaHost: null,
 	arenaPort: DEFAULT_ARENA_PORT,
 	campus: null,
@@ -206,6 +220,13 @@ const TIMER_NAME_MAX = 128
 
 function timerNameError(name: string): string | null {
 	if (name.trim() === '') return 'A timer name is needed.'
+	if (name.length > TIMER_NAME_MAX) return `At most ${TIMER_NAME_MAX} characters.`
+	if (/[\u0000-\u001f\u007f]/.test(name)) return 'Letters, numbers and punctuation only.'
+	return null
+}
+
+function playlistNameError(name: string): string | null {
+	if (name.trim() === '') return 'A playlist name is needed.'
 	if (name.length > TIMER_NAME_MAX) return `At most ${TIMER_NAME_MAX} characters.`
 	if (/[\u0000-\u001f\u007f]/.test(name)) return 'Letters, numbers and punctuation only.'
 	return null
@@ -321,8 +342,16 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		else next.off = off
 	}
 	if (patch.windowed !== undefined) next.windowed = patch.windowed
+	if (patch.announcementsOn !== undefined) next.announcementsOn = patch.announcementsOn
+	for (const key of ['announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {
+		const v = patch[key]
+		if (v === undefined) continue
+		const e = playlistNameError(v)
+		if (e === null) next[key] = v.trim()
+		else errors[key] = e
+	}
 	const folderError = 'A whole folder path: D:\\Media, \\\\NAS\\Graphics, or /Volumes/Graphics.'
-	for (const key of ['graphicsFolder', 'localMediaFolder'] as const) {
+	for (const key of ['graphicsFolder', 'localMediaFolder', 'announcementsFolder'] as const) {
 		const v = patch[key]
 		if (v === undefined) continue
 		const text = v === null ? '' : v.trim()
@@ -395,7 +424,12 @@ export function fromDisk(raw: unknown): Settings {
 	out.ndiSources = ndiSourcesFrom(r['ndiSources']) ?? []
 	out.captureInputs = captureInputsFrom(r['captureInputs']) ?? []
 	out.windowed = r['windowed'] === true
-	for (const key of ['graphicsFolder', 'localMediaFolder'] as const) {
+	if (typeof r['announcementsOn'] === 'boolean') out.announcementsOn = r['announcementsOn']
+	for (const key of ['announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {
+		const v = r[key]
+		if (typeof v === 'string' && playlistNameError(v) === null) out[key] = v.trim()
+	}
+	for (const key of ['graphicsFolder', 'localMediaFolder', 'announcementsFolder'] as const) {
 		const v = r[key]
 		if (typeof v === 'string' && isFolderPath(v)) out[key] = v
 	}
@@ -431,6 +465,10 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['ndiSources', Array.isArray],
 		['captureInputs', Array.isArray],
 		['windowed', (v) => typeof v === 'boolean'],
+		['announcementsOn', (v) => typeof v === 'boolean'],
+		['announcementsFolder', strOrNull],
+		['announcementsMediaPlaylist', str],
+		['announcementsPlaylist', str],
 		['graphicsFolder', strOrNull],
 		['localMediaFolder', strOrNull],
 		['volunteerUser', str],

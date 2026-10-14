@@ -93,8 +93,8 @@ import { logPage, startLog } from './log.js'
 import type { About } from '../shared/about.js'
 import type { UpdateState } from '../shared/updates.js'
 import { startUpdates, type Updates } from './updates.js'
-import { readAnnouncementPlaylist } from './propresenter-playlist.js'
-import { isAnnouncementPlaylist, type PlaylistRead } from '../shared/announcements.js'
+import { copyAnnouncements, readAnnouncements, writeAnnouncements } from './announcements.js'
+import { SESSIONS, isTCode, type AnnouncementsRead, type CopyOutcome, type Section, type Session, type WriteResult } from '../shared/announcements.js'
 import { NO_LOCKOUT, lockoutWait, tryUnlock, type AdminState, type Lockout, type UnlockResult } from '../shared/admin.js'
 
 // Pāua's data folder, %APPDATA%paua, moved in whole from the name before the
@@ -592,11 +592,31 @@ app.whenReady().then(() => {
 		...(timers?.sources() ?? { ontime: null, propresenter: null }),
 		proPresenterTimer: store.current().proPresenterTimer,
 	}))
-	// The announcements check (../shared/announcements.ts): one read-only ask,
-	// for one of the two playlists by name.
-	ipcMain.handle('propresenter:playlist', async (e, name: unknown): Promise<PlaylistRead | undefined> =>
-		fromOurs(e) && isAnnouncementPlaylist(name) ? readAnnouncementPlaylist(store.current(), name) : undefined,
+	// ProPresenter's announcements (./announcements.ts): the reads are anyone's;
+	// the copy into the folder and the playlist write are Admin's.
+	const isSession = (v: unknown): v is Session => (SESSIONS as readonly unknown[]).includes(v)
+	ipcMain.handle('announcements:read', async (e, session: unknown): Promise<AnnouncementsRead | undefined> =>
+		fromOurs(e) && isSession(session) ? readAnnouncements(store.current(), session) : undefined,
 	)
+	ipcMain.handle(
+		'announcements:copy',
+		async (e, codes: unknown): Promise<{ ok: true; outcomes: CopyOutcome[]; setAside: string[] } | { ok: false; detail: string }> => {
+			if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+			if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
+			if (!Array.isArray(codes) || codes.length === 0 || codes.length > 40 || !codes.every(isTCode) || new Set(codes).size !== codes.length)
+				return { ok: false, detail: 'not a list of lower thirds' }
+			return copyAnnouncements(store.current(), codes)
+		},
+	)
+	ipcMain.handle('announcements:write', async (e, session: unknown, want: unknown): Promise<WriteResult> => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
+		if (!isSession(session)) return { ok: false, detail: 'not a session' }
+		const list = Array.isArray(want) ? want : []
+		const ok = list.length > 0 && list.length <= 40 && list.every((w) => typeof w === 'object' && w !== null && isTCode(w.code) && (w.section === 'notices' || w.section === 'promos'))
+		if (!ok) return { ok: false, detail: 'not a list of lower thirds' }
+		return writeAnnouncements(store.current(), session, (list as { code: string; section: Section }[]).map(({ code, section }) => ({ code, section })))
+	})
 
 	// Started before the window exists, so the first thing the renderer asks for
 	// already has whatever the desk has said in the meantime.

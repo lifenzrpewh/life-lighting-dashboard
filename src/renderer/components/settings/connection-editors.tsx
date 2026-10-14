@@ -12,7 +12,7 @@ import { replyPortOf, type SettingsPatch, type SettingsView } from '../../../sha
 
 import { CueManagerSettings } from '../CueManagerSettings.js'
 import { Field, Input, Select, User, portOf, useProPresenterNames } from '../form.js'
-import { Button } from '../ui.js'
+import { Button, Segmented } from '../ui.js'
 import { formatAge } from '../vocabulary.js'
 import { Editor, FolderInput, HostPort, type Save } from './parts.js'
 
@@ -45,6 +45,10 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 	const [host, setHost] = useState(view.proPresenterHost ?? '')
 	const [port, setPort] = useState(String(view.proPresenterPort))
 	const [timer, setTimer] = useState(view.proPresenterTimer ?? '')
+	const [annOn, setAnnOn] = useState(view.announcementsOn)
+	const [annFolder, setAnnFolder] = useState(view.announcementsFolder ?? '')
+	const [annMedia, setAnnMedia] = useState(view.announcementsMediaPlaylist)
+	const [annOutput, setAnnOutput] = useState(view.announcementsPlaylist)
 	const names = useProPresenterNames()
 	return (
 		<Editor
@@ -53,6 +57,10 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 				proPresenterHost: host,
 				proPresenterPort: portOf(port),
 				proPresenterTimer: timer === '' ? null : timer,
+				announcementsOn: annOn,
+				announcementsFolder: annFolder.trim() === '' ? null : annFolder,
+				announcementsMediaPlaylist: annMedia,
+				announcementsPlaylist: annOutput,
 			})}
 		>
 			{(err) => (
@@ -94,6 +102,41 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 							]}
 						/>
 					</Field>
+					<p className="pt-2 text-sm font-bold text-booth-ink">Announcements</p>
+					<div className="flex items-center gap-4">
+						<Segmented
+							label="Announcements"
+							value={annOn}
+							onChange={setAnnOn}
+							options={[
+								{ value: true, label: 'On' },
+								{ value: false, label: 'Off' },
+							]}
+						/>
+						<span className="text-sm text-booth-dim">
+							{annOn ? 'The Announcements view checks and loads the lower thirds.' : 'Not used at this campus: the Announcements view is hidden.'}
+						</span>
+					</div>
+					{annOn && (
+						<>
+							<p className="text-sm text-booth-dim">
+								Copy to the folder puts the week's lower thirds (from Arena's graphics folder) into the folder below; someone
+								drags them from it, in Finder or Explorer, into the media playlist; then Write sets the output playlist, AM, PM
+								or EVENT by the service's name.
+							</p>
+							<Field label="Folder" error={err('announcementsFolder')} hint="As this computer reaches it, and ProPresenter's computer too.">
+								<FolderInput value={annFolder} onChange={setAnnFolder} placeholder="\\10.0.0.71\graphics\Other Media\Paua Smart Folder" />
+							</Field>
+							<div className="grid grid-cols-2 gap-4">
+								<Field label="Media playlist" error={err('announcementsMediaPlaylist')} hint="In the Media Bin; they are dragged into it.">
+									<Input value={annMedia} onChange={setAnnMedia} />
+								</Field>
+								<Field label="Output playlist" error={err('announcementsPlaylist')} hint="Without AM, PM or EVENT.">
+									<Input value={annOutput} onChange={setAnnOutput} />
+								</Field>
+							</div>
+						</>
+					)}
 				</>
 			)}
 		</Editor>
