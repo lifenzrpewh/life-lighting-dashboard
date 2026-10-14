@@ -95,6 +95,9 @@ export function startLink(options: {
 	const ours = `/${options.prefix}/`
 	let sender: CommandSender | null = null
 	let timer: ReturnType<typeof setInterval> | null = null
+	/** The show asked for after a Save As; cleared on stop, so it cannot fire
+	 *  into a closed socket when the address changes within the wait. */
+	let askAfterSave: ReturnType<typeof setTimeout> | null = null
 	let lastState = tracker.link(clock()).state
 	let lastShow = showfile.channel(clock()).latest
 
@@ -199,7 +202,12 @@ export function startLink(options: {
 			sender?.send(saveAsCommand(name))
 			// The watcher pushes the new name within a second when it runs; an
 			// ask restarts it when it does not (an older plugin, a Load since).
-			setTimeout(() => askShow('link-up'), 1_500).unref?.()
+			if (askAfterSave !== null) clearTimeout(askAfterSave)
+			askAfterSave = setTimeout(() => {
+				askAfterSave = null
+				askShow('link-up')
+			}, 1_500)
+			askAfterSave.unref?.()
 			return { ok: true }
 		},
 		load(name, saveFirst) {
@@ -213,6 +221,7 @@ export function startLink(options: {
 		stats: () => tracker.stats(),
 		stop() {
 			if (timer !== null) clearInterval(timer)
+			if (askAfterSave !== null) clearTimeout(askAfterSave)
 			sender?.close()
 		},
 	}

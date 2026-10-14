@@ -51,17 +51,31 @@ export function openSettings(): SettingsStore {
 
 	let settings: Settings = fromDisk(null)
 	let secrets: Secrets = { volunteer: null, operator: null }
+	/** Passwords on disk that would not decrypt here, kept as they were: a save
+	 *  of anything else writes them back rather than dropping them for good. */
+	let sealed: Partial<Record<Mode, string>> = {}
 	let passcode: StoredPasscode | null = null
 
 	try {
 		const raw: unknown = JSON.parse(fs.readFileSync(file, 'utf8'))
 		settings = fromDisk(raw)
-		secrets = readSecrets(raw)
+		;({ secrets, sealed } = readSecrets(raw))
 		passcode = storedPasscodeFrom((raw as { adminPasscode?: unknown } | null)?.adminPasscode)
 	} catch (e) {
 		// No file yet is the normal first boot. Anything else is worth a line in
 		// the log, and still boots: on defaults, the pane says no address is set.
-		if ((e as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`[settings] unreadable, using defaults: ${String(e)}`)
+		// The file is kept aside first, since the next save would write over it:
+		// a stray comma left by a hand edit (the forgotten-passcode steps,
+		// ../shared/admin.ts) must not cost every address and login.
+		if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+			const aside = `${file}.unreadable-${new Date().toISOString().replace(/[:.]/g, '-')}`
+			try {
+				fs.copyFileSync(file, aside)
+				console.error(`[settings] unreadable, using defaults; the file is kept as ${path.basename(aside)}: ${String(e)}`)
+			} catch {
+				console.error(`[settings] unreadable, using defaults: ${String(e)}`)
+			}
+		}
 	}
 
 	return {
@@ -90,12 +104,16 @@ export function openSettings(): SettingsStore {
 				}
 				next[mode] = pw
 			}
+			const nextSealed = { ...sealed }
+			for (const [mode, key] of [['volunteer', 'volunteerPassword'], ['operator', 'operatorPassword']] as const) {
+				if (patch[key] !== undefined) delete nextSealed[mode]
+			}
 			const nextPasscode = patch.adminPasscode === undefined ? passcode : patch.adminPasscode === null ? null : hashPasscode(patch.adminPasscode)
 
 			try {
 				const tmp = `${file}.tmp`
 				fs.mkdirSync(path.dirname(file), { recursive: true })
-				const out = { ...checked.settings, secrets: writeSecrets(next), ...(nextPasscode === null ? {} : { adminPasscode: nextPasscode }) }
+				const out = { ...checked.settings, secrets: { ...nextSealed, ...writeSecrets(next) }, ...(nextPasscode === null ? {} : { adminPasscode: nextPasscode }) }
 				fs.writeFileSync(tmp, JSON.stringify(out, null, '\t'))
 				fs.renameSync(tmp, file)
 			} catch (e) {
@@ -104,6 +122,7 @@ export function openSettings(): SettingsStore {
 
 			settings = checked.settings
 			secrets = next
+			sealed = nextSealed
 			if (patch.adminPasscode !== undefined) console.log(`[admin] passcode ${nextPasscode === null ? 'removed' : 'set'} in Settings`)
 			passcode = nextPasscode
 			for (const l of listeners) l()
@@ -124,20 +143,26 @@ function writeSecrets(s: Secrets): Record<string, string> {
 }
 
 /** A secret that will not decrypt (the file came from another machine or
- *  Windows account) is dropped, not guessed at: the pane then logs in without
- *  it and MA refuses, which is visible, rather than silently wrong. */
-function readSecrets(raw: unknown): Secrets {
-	const out: Secrets = { volunteer: null, operator: null }
+ *  Windows account, or the keystore refused once) is not guessed at: the pane
+ *  logs in without it and MA refuses, which is visible, rather than silently
+ *  wrong. It is kept sealed as it was, so a keystore that answers next time
+ *  still has it, until a new password is saved over it. */
+function readSecrets(raw: unknown): { secrets: Secrets; sealed: Partial<Record<Mode, string>> } {
+	const secrets: Secrets = { volunteer: null, operator: null }
+	const sealed: Partial<Record<Mode, string>> = {}
 	const stored = (raw as { secrets?: Record<string, unknown> } | null)?.secrets
-	if (typeof stored !== 'object' || stored === null || !safeStorage.isEncryptionAvailable()) return out
+	if (typeof stored !== 'object' || stored === null) return { secrets, sealed }
+	const canDecrypt = safeStorage.isEncryptionAvailable()
 	for (const mode of ['volunteer', 'operator'] as const) {
 		const b64 = stored[mode]
 		if (typeof b64 !== 'string') continue
 		try {
-			out[mode] = safeStorage.decryptString(Buffer.from(b64, 'base64'))
+			if (!canDecrypt) throw new Error('no keystore')
+			secrets[mode] = safeStorage.decryptString(Buffer.from(b64, 'base64'))
 		} catch {
-			console.error(`[settings] the ${mode === 'operator' ? 'admin' : mode} MA password would not decrypt on this machine; dropped`)
+			sealed[mode] = b64
+			console.error(`[settings] the ${mode === 'operator' ? 'admin' : mode} MA password would not decrypt on this machine; kept sealed, not used`)
 		}
 	}
-	return out
+	return { secrets, sealed }
 }

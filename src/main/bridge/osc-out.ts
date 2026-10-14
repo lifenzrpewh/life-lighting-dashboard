@@ -32,9 +32,13 @@ export function createCommandSender(options: {
 	const address = `/${options.prefix}/cmd`
 	const socket = dgram.createSocket({ type: 'udp4' })
 	socket.on('error', (e) => options.onError?.(e.message))
+	// A send after close throws synchronously (ERR_SOCKET_DGRAM_NOT_RUNNING),
+	// which in a late timer is an uncaught exception and a restart.
+	let closed = false
 
 	return {
 		send(command) {
+			if (closed) return
 			const encoded = encodeOscString(address, command)
 			if (!encoded.ok) {
 				options.onError?.(`refused to send ${JSON.stringify(command)}: ${encoded.detail}`)
@@ -45,6 +49,7 @@ export function createCommandSender(options: {
 			})
 		},
 		close() {
+			closed = true
 			try {
 				socket.close()
 			} catch {

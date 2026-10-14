@@ -59,11 +59,30 @@ export function startLog(dir: string): LogFile {
 	return log
 }
 
+/** A line the page says again within this long is counted, not written. */
+const REPEAT_MS = 10_000
+const REPEATS_HELD = 50
+
 /** Copy a page's warnings and errors into the log, named `who`. Its info and
- *  debug lines stay out: the page is chatty and the log is for faults. */
+ *  debug lines stay out: the page is chatty and the log is for faults. A line
+ *  repeated (a frame that fails to draw, sixty a second) is written once each
+ *  10 s with how many times it came, so it cannot rotate away the hours
+ *  before it that a tester's report needs. */
 export function logPage(contents: WebContents, who: string): void {
+	const seen = new Map<string, { at: number; count: number }>()
 	contents.on('console-message', (e) => {
-		if (e.level === 'warning') console.warn(`[${who}] ${e.message}`)
-		else if (e.level === 'error') console.error(`[${who}] ${e.message} (${e.sourceId}:${e.lineNumber})`)
+		if (e.level !== 'warning' && e.level !== 'error') return
+		const line = e.level === 'warning' ? `[${who}] ${e.message}` : `[${who}] ${e.message} (${e.sourceId}:${e.lineNumber})`
+		const now = Date.now()
+		const last = seen.get(line)
+		if (last !== undefined && now - last.at < REPEAT_MS) {
+			last.count++
+			return
+		}
+		const again = last !== undefined && last.count > 0 ? ` (and ${last.count} more like it in the ${Math.round((now - last.at) / 1000)} s before)` : ''
+		if (seen.size >= REPEATS_HELD && last === undefined) seen.delete(seen.keys().next().value!)
+		seen.set(line, { at: now, count: 0 })
+		if (e.level === 'warning') console.warn(line + again)
+		else console.error(line + again)
 	})
 }

@@ -404,6 +404,21 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 	return Object.keys(errors).length === 0 ? { ok: true, settings: next } : { ok: false, errors }
 }
 
+/** A list on disk, one entry at a time: the whole list when it reads, else
+ *  every entry that reads alongside those before it (so the list's own
+ *  limits, its count and no two alike, still hold). One entry edited by hand
+ *  into something unreadable costs that entry, not the list: an embed list
+ *  read as empty would also have its sign-ins swept away (../main/embeds.ts).
+ *  Patches from the panel stay all or nothing (`applyPatch`). */
+function eachOf<T>(v: unknown, from: (v: unknown) => T[] | null): T[] {
+	const whole = from(v)
+	if (whole !== null) return whole
+	if (!Array.isArray(v)) return []
+	let out: T[] = []
+	for (const e of v) out = from([...out, e]) ?? out
+	return out
+}
+
 /** Settings read back off disk, which may be old, hand-edited or corrupt. Each
  *  field that does not check out falls back to its default on its own, so one
  *  bad value costs that value and not the rest. */
@@ -426,9 +441,9 @@ export function fromDisk(raw: unknown): Settings {
 	if (typeof r['arenaPort'] === 'number' && isPort(r['arenaPort'])) out.arenaPort = r['arenaPort']
 	if (typeof r['campus'] === 'string' && campusError(r['campus']) === null) out.campus = r['campus']
 	out.off = offFrom(r['off']) ?? []
-	out.embeds = embedsFrom(r['embeds']) ?? []
-	out.ndiSources = ndiSourcesFrom(r['ndiSources']) ?? []
-	out.captureInputs = captureInputsFrom(r['captureInputs']) ?? []
+	out.embeds = eachOf(r['embeds'], embedsFrom)
+	out.ndiSources = eachOf(r['ndiSources'], ndiSourcesFrom)
+	out.captureInputs = eachOf(r['captureInputs'], captureInputsFrom)
 	out.windowed = r['windowed'] === true
 	if (typeof r['announcementsOn'] === 'boolean') out.announcementsOn = r['announcementsOn']
 	for (const key of ['announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {

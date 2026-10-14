@@ -264,10 +264,13 @@ export function createMaPane(window: BrowserWindow, settings: SettingsStore): Ma
 	wc.on('will-navigate', (e) => stayHome(e, e.url))
 	wc.on('will-redirect', (e) => stayHome(e, e.url))
 
-	// New address or new logins: the next load uses them. Idle stays idle.
+	// New address or new logins: the next load uses them. Idle stays idle. A
+	// save of anything else (a timer's name, a video source) leaves the MA
+	// alone: reloading it under the LD's finger for no change is all cost.
 	settings.onChange(() => {
-		if (wanted) reconnect()
-		else {
+		if (wanted) {
+			if (resolve()?.login !== target?.login) reconnect()
+		} else {
 			target = resolve()
 			idle()
 		}
