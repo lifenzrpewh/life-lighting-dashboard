@@ -38,6 +38,7 @@ import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
 import { HoldingView } from './components/HoldingView.js'
 import { LookbookView } from './components/LookbookView.js'
+import { AnnouncementsView } from './components/AnnouncementsView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
 import { TimerView } from './components/TimerView.js'
 import type { VideoFeedState } from '../shared/video-feed.js'
@@ -739,6 +740,7 @@ export function App() {
 			case 'clips':
 			case 'holding':
 			case 'lookbook':
+			case 'announcements':
 			case 'timer':
 				return out
 			case 'video':
@@ -855,6 +857,8 @@ export function App() {
 				return <HoldingView status={arenaStatus} now={now} />
 			case 'lookbook':
 				return <LookbookView status={arenaStatus} now={now} />
+			case 'announcements':
+				return <AnnouncementsView status={arenaStatus} now={now} />
 			case 'video':
 				return spoutBody(tab.feed)
 			case 'timer':

@@ -93,6 +93,8 @@ import { logPage, startLog } from './log.js'
 import type { About } from '../shared/about.js'
 import type { UpdateState } from '../shared/updates.js'
 import { startUpdates, type Updates } from './updates.js'
+import { readAnnouncementPlaylist } from './propresenter-playlist.js'
+import { isAnnouncementPlaylist, type PlaylistRead } from '../shared/announcements.js'
 import { NO_LOCKOUT, lockoutWait, tryUnlock, type AdminState, type Lockout, type UnlockResult } from '../shared/admin.js'
 
 // Pāua's data folder, %APPDATA%paua, moved in whole from the name before the
@@ -590,6 +592,11 @@ app.whenReady().then(() => {
 		...(timers?.sources() ?? { ontime: null, propresenter: null }),
 		proPresenterTimer: store.current().proPresenterTimer,
 	}))
+	// The announcements check (../shared/announcements.ts): one read-only ask,
+	// for one of the two playlists by name.
+	ipcMain.handle('propresenter:playlist', async (e, name: unknown): Promise<PlaylistRead | undefined> =>
+		fromOurs(e) && isAnnouncementPlaylist(name) ? readAnnouncementPlaylist(store.current(), name) : undefined,
+	)
 
 	// Started before the window exists, so the first thing the renderer asks for
 	// already has whatever the desk has said in the meantime.

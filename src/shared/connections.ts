@@ -42,6 +42,7 @@ export const CONNECTION_OF_VIEW: Record<Exclude<BuiltInView, 'timer' | 'guide'>,
 	clips: 'arena',
 	holding: 'arena',
 	lookbook: 'arena',
+	announcements: 'propresenter',
 	video: 'video',
 }
 

@@ -13,7 +13,7 @@
 // thing a sheet is for is the light fill.
 
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { BookImage, BookOpen, Cast, Webcam, GalleryHorizontalEnd, Globe, Layers, LayoutGrid, ListChecks, MonitorPlay, SlidersHorizontal, Timer, X } from 'lucide-react'
+import { BookImage, BookOpen, Cast, Webcam, GalleryHorizontalEnd, Globe, Layers, LayoutGrid, ListChecks, Megaphone, MonitorPlay, SlidersHorizontal, Timer, X } from 'lucide-react'
 
 import type { Tone } from '../../shared/connections.js'
 import { embedIdOf } from '../../shared/embeds.js'
@@ -256,6 +256,8 @@ export function viewIcon(view: ViewId): Icon {
 			return GalleryHorizontalEnd
 		case 'lookbook':
 			return BookImage
+		case 'announcements':
+			return Megaphone
 		case 'video':
 			return MonitorPlay
 		case 'timer':
