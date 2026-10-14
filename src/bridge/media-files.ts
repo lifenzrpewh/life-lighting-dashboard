@@ -53,10 +53,109 @@ export async function findByCode(root: string, code: string, opts: { maxDepth?: 
 	return findWhere(root, (name) => carries.test(name), opts)
 }
 
+/** Each media code a file's name carries: as `findByCode` matches one, but
+ *  every one at once. Two never overlap (a code is two letters then three
+ *  digits, and one may not follow a letter or digit), so a global match
+ *  finds them all. */
+const CODES_IN = /(?<![A-Za-z0-9])[A-Za-z]{2}\d{3}(?![0-9])/g
+
+/** Every code `findByCode` would match `stem` for, upper case. */
+export function codesIn(stem: string): string[] {
+	return [...new Set((stem.match(CODES_IN) ?? []).map((c) => c.toUpperCase()))]
+}
+
+/** A walk of the graphics folder, once: each code to the files carrying it,
+ *  in the walk's order, and how many entries were looked at. */
+type CodeWalk = { ok: true; byCode: Map<string, string[]>; looked: number; finds: Map<string, Promise<FindResult>> } | { ok: false; detail: string }
+
+/** Walks kept a short while, by folder and options: a batch (a Place all, the
+ *  sources for a confirmation, a week's announcements) asks up to 50 codes,
+ *  and each used to walk the whole folder, up to 100,000 entries on a NAS. */
+const walks = new Map<string, { at: number; walk: Promise<CodeWalk> }>()
+/** How long a walk serves: long enough for one batch and the confirmation
+ *  before it, short enough that a file the comms team just put on the drive
+ *  is seen on the next press. */
+export const CODE_INDEX_MS = 30_000
+
+/** As `findByCode`, from one walk of `root` shared by every code asked within
+ *  `maxAgeMs` (CODE_INDEX_MS). A folder that cannot be walked is not kept, so
+ *  one that comes back is walked again at once. Files are looked at (their
+ *  size and time) only for the codes asked, once per walk. */
+export async function findByCodeIndexed(
+	root: string,
+	code: string,
+	opts: { maxDepth?: number; limit?: number; maxAgeMs?: number } = {},
+): Promise<FindResult> {
+	if (!/^[A-Za-z]{2}\d{3}$/.test(code)) return { ok: false, detail: `${code} is not a media code` }
+	const maxAge = opts.maxAgeMs ?? CODE_INDEX_MS
+	const key = JSON.stringify([root, opts.maxDepth ?? null, opts.limit ?? null])
+	const now = Date.now()
+	for (const [k, w] of walks) if (now - w.at >= CODE_INDEX_MS && k !== key) walks.delete(k)
+	let held = walks.get(key)
+	if (held === undefined || now - held.at >= maxAge) {
+		held = { at: now, walk: walkCodes(root, opts) }
+		walks.set(key, held)
+		const mine = held
+		const drop = () => {
+			if (walks.get(key) === mine) walks.delete(key)
+		}
+		void mine.walk.then((w) => (w.ok ? undefined : drop()), drop)
+	}
+	const walk = await held.walk
+	if (!walk.ok) return walk
+	const want = code.toUpperCase()
+	let find = walk.finds.get(want)
+	if (find === undefined) {
+		find = statAll(walk.byCode.get(want) ?? []).then((found) => ({ ok: true, found, looked: walk.looked }) as const)
+		walk.finds.set(want, find)
+	}
+	return find
+}
+
+async function walkCodes(root: string, opts: { maxDepth?: number; limit?: number }): Promise<CodeWalk> {
+	const byCode = new Map<string, string[]>()
+	const walked = await walkMedia(root, opts, (file, stem) => {
+		for (const c of codesIn(stem)) {
+			const list = byCode.get(c)
+			if (list === undefined) byCode.set(c, [file])
+			else list.push(file)
+		}
+	})
+	return walked.ok ? { ok: true, byCode, looked: walked.looked, finds: new Map() } : walked
+}
+
+/** Each file's size and time, newest first; one gone since the walk is left out. */
+async function statAll(files: readonly string[]): Promise<Found[]> {
+	const found: Found[] = []
+	for (const file of files) {
+		try {
+			const st = await fs.promises.stat(file)
+			found.push({ path: file, size: st.size, mtimeMs: st.mtimeMs })
+		} catch {
+			// Gone between listing and looking: not found.
+		}
+	}
+	found.sort((a, b) => b.mtimeMs - a.mtimeMs)
+	return found
+}
+
 async function findWhere(root: string, match: (stem: string) => boolean, opts: { maxDepth?: number; limit?: number }): Promise<FindResult> {
+	const files: string[] = []
+	const walked = await walkMedia(root, opts, (file, stem) => {
+		if (match(stem)) files.push(file)
+	})
+	if (!walked.ok) return walked
+	return { ok: true, found: await statAll(files), looked: walked.looked }
+}
+
+/** Every media file under `root`, to `each` with its name's stem. */
+async function walkMedia(
+	root: string,
+	opts: { maxDepth?: number; limit?: number },
+	each: (file: string, stem: string) => void,
+): Promise<{ ok: true; looked: number } | { ok: false; detail: string }> {
 	const maxDepth = opts.maxDepth ?? 6
 	const limit = opts.limit ?? 100_000
-	const found: Found[] = []
 	let looked = 0
 	try {
 		await fs.promises.access(root)
@@ -78,19 +177,13 @@ async function findWhere(root: string, match: (stem: string) => boolean, opts: {
 			}
 			if (!e.isFile()) continue
 			const ext = path.extname(e.name).toLowerCase()
-			if (!MEDIA_EXTENSIONS.includes(ext) || !match(path.basename(e.name, path.extname(e.name)))) continue
-			try {
-				const st = await fs.promises.stat(path.join(dir, e.name))
-				found.push({ path: path.join(dir, e.name), size: st.size, mtimeMs: st.mtimeMs })
-			} catch {
-				// Gone between listing and looking: not found.
-			}
+			if (!MEDIA_EXTENSIONS.includes(ext)) continue
+			each(path.join(dir, e.name), path.basename(e.name, path.extname(e.name)))
 		}
 	}
 	await walk(root, 0)
 	if (looked > limit) return { ok: false, detail: `the graphics folder holds more than ${limit.toLocaleString('en-NZ')} entries; pick the folder the media is in` }
-	found.sort((a, b) => b.mtimeMs - a.mtimeMs)
-	return { ok: true, found, looked }
+	return { ok: true, looked }
 }
 
 /** Which of the drive's files for a code is the lookbook's: the one of the

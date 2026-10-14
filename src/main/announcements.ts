@@ -11,7 +11,7 @@
 import path from 'node:path'
 
 import { listPictures, placeFile, setAside, numbered } from '../bridge/announcement-files.js'
-import { findByCode } from '../bridge/media-files.js'
+import { findByCodeIndexed } from '../bridge/media-files.js'
 import { decodePlaylist, decodePlaylistTree, findPlaylist } from '../bridge/propresenter-playlist.js'
 import {
 	outputName,
@@ -87,7 +87,7 @@ export async function copyAnnouncements(s: Settings, codes: readonly string[]): 
 	const outcomes: CopyOutcome[] = []
 	const keep = new Set<string>()
 	for (const [i, code] of codes.entries()) {
-		const found = await findByCode(s.graphicsFolder, code)
+		const found = await findByCodeIndexed(s.graphicsFolder, code)
 		if (!found.ok) return { ok: false, detail: found.detail }
 		const src = [...found.found].sort((a, b) => Number(isCopy(a.path)) - Number(isCopy(b.path)))[0]
 		if (src === undefined) {

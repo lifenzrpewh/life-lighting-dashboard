@@ -11,7 +11,7 @@
 
 import path from 'node:path'
 
-import { copyInto, downloadInto, findByCode, pickBySize, type Found } from '../bridge/media-files.js'
+import { copyInto, downloadInto, findByCodeIndexed, pickBySize, type Found } from '../bridge/media-files.js'
 import { isCopyName } from '../shared/media-check.js'
 import type { ArenaCommandResult } from '../shared/arena.js'
 import { megabytes, runCounts, type DriveMatches, type FetchRequest, type FetchRun, type FetchState, type FetchStates, type MediaSource, type RunRequest } from '../shared/media-fetch.js'
@@ -71,7 +71,7 @@ export function createMediaFetch(opts: {
 			return { from: 'lookbook', why, size, url, name: `${req.want}${ext}` }
 		}
 		if (graphics === null) return lookbook('no graphics folder is set')
-		const find = await findByCode(graphics, req.code)
+		const find = await findByCodeIndexed(graphics, req.code)
 		if (!find.ok) return lookbook(find.detail)
 		if (req.drivePick !== undefined) {
 			// The operator's pick, only if it is one this search found.
@@ -226,7 +226,7 @@ export function createMediaFetch(opts: {
 		async drive(code, lookbookPath) {
 			const { graphics } = opts.folders()
 			if (graphics === null) return { ok: false, detail: 'no graphics folder is set' }
-			const find = await findByCode(graphics, code)
+			const find = await findByCodeIndexed(graphics, code)
 			if (!find.ok) return { ok: false, detail: find.detail }
 			const size = lookbookPath === null ? null : await opts.lookbookSize(lookbookPath)
 			const pick = size === null ? null : pickBySize(find.found, size).pick
