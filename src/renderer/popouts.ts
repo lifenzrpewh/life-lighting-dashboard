@@ -23,7 +23,11 @@ export function usePopouts(): {
 		let alive = true
 		const poll = () => {
 			const asked = taps.current
-			void api.popouts().then((v) => alive && asked === taps.current && setPopped(new Set(v)))
+			void api.popouts().then((v) => {
+				if (!alive || asked !== taps.current) return
+				// The same answer keeps the same set, so nothing re-renders for it.
+				setPopped((old) => (old.size === v.length && v.every((x) => old.has(x)) ? old : new Set(v)))
+			})
 		}
 		poll()
 		const id = setInterval(poll, 300)

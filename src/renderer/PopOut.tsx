@@ -40,25 +40,7 @@ import { Button, IconButton, viewIcon } from './components/ui.js'
 import { RotateCw, SendToBack, Undo2 } from 'lucide-react'
 import { usePanePlacement } from './panePlacement.js'
 import { OperatorContext, useMainMode } from './mode.js'
-
-/** What main last said, asked every `ms`. Undefined until it has answered. */
-function usePolled<T>(ask: ((api: NonNullable<Window['life']>) => Promise<T>) | null, ms: number): T | undefined {
-	const [value, setValue] = useState<T | undefined>(undefined)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined || ask === null) return
-		let alive = true
-		const poll = () => void ask(api).then((v) => alive && setValue(v))
-		poll()
-		const id = setInterval(poll, ms)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-		// `ask` is chosen once per window, by its view, so it is not a dependency.
-	}, [ms])
-	return value
-}
+import { usePolled } from './usePolled.js'
 
 export function PopOut({ view }: { view: ViewId }) {
 	const [now, setNow] = useState(() => Date.now())

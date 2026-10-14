@@ -85,6 +85,7 @@ import { GUIDE } from '../shared/guide.js'
 import { OperatorContext, useMode } from './mode.js'
 import { useBarHidden, useTesting } from './barItems.js'
 import { useShowMode } from './showMode.js'
+import { usePolled } from './usePolled.js'
 import { SCENARIOS, SCENARIO_LABEL, mockState, type Scenario } from './mock.js'
 
 const DEV = import.meta.env.DEV
@@ -115,6 +116,8 @@ type SheetId = 'connections' | 'settings' | 'showfile' | 'passcode'
 
 /** Where this computer remembers the top bar folded. */
 const BAR_KEY = 'paua.barCollapsed'
+
+const NO_EMBED_REPORTS: EmbedReport[] = []
 
 export function App() {
 	const [now, setNow] = useState(() => Date.now())
@@ -239,121 +242,37 @@ export function App() {
 	// `window.life` is absent when the renderer is opened in a plain browser, and
 	// then cold is exactly right: no preload, no main, no desk. Polled in dev too,
 	// for the 'real' scenario.
-	const [mainLink, setMainLink] = useState<LinkState | null>(null)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.linkState().then((l) => alive && setMainLink(l))
-		poll()
-		const id = setInterval(poll, 1000)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const mainLink: LinkState | null = usePolled((api) => api.linkState(), 1000) ?? null
 
 	// The showfile, as main holds it: what LifeBridge's `show` verb said, stamped
 	// on the wall clock so the age derived here is true. Polled like the link;
 	// it changes rarely, but its age is shown and must not lag.
-	const [mainShowfile, setMainShowfile] = useState<Channel<Showfile> | null>(null)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.showfile().then((c) => alive && setMainShowfile(c))
-		poll()
-		const id = setInterval(poll, 1000)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const mainShowfile: Channel<Showfile> | null = usePolled((api) => api.showfile(), 1000) ?? null
 
 	// OnTime and ProPresenter, as main last heard them. Real in dev too: they are
 	// not the console, so the mock desk has nothing to say about them. Polled
 	// faster than the rest, so a ProPresenter timer, which cannot be counted
 	// down here, is never far behind the one on stage.
-	const [timers, setTimers] = useState<TimerSources | null>(null)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.timers().then((t) => alive && setTimers(t))
-		poll()
-		const id = setInterval(poll, 250)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const timers: TimerSources | null = usePolled((api) => api.timers(), 250) ?? null
 
 	// Arena's link, as main last heard it. Real in dev too, like the timers.
 	// Undefined until main has answered once: a renderer that has not asked yet
 	// is not an Arena that is not set up.
-	const [arena, setArena] = useState<ArenaSource | undefined>(undefined)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.arena().then((a) => alive && setArena(a))
-		poll()
-		const id = setInterval(poll, 1_000)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const arena: ArenaSource | undefined = usePolled((api) => api.arena(), 1_000)
 
 	// What Arena is playing, for the Arena view. Faster than its link, so a
 	// fader moved in Arena is not visibly behind here. Undefined until main has
 	// answered once, like the link above.
-	const [arenaStatus, setArenaStatus] = useState<Channel<ArenaStatus> | null | undefined>(undefined)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.arenaStatus().then((a) => alive && setArenaStatus(a))
-		poll()
-		const id = setInterval(poll, 250)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const arenaStatus: Channel<ArenaStatus> | null | undefined = usePolled((api) => api.arenaStatus(), 250)
 
 	// The video feed's senders and its last frame, for the picker and the
 	// view's words. The frames themselves never pass through here.
-	const [videoFeed, setVideoFeed] = useState<VideoFeedState | null | undefined>(undefined)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.videoFeed().then((v) => alive && setVideoFeed(v))
-		poll()
-		const id = setInterval(poll, 500)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const videoFeed: VideoFeedState | null | undefined = usePolled((api) => api.videoFeed(), 500)
 
 	// NDI (../shared/ndi.ts): what the network has and how each added source
 	// is received. Asked only once a source is added, since asking starts NDI.
-	const [ndi, setNdi] = useState<NdiState | null | undefined>(undefined)
 	const anyNdi = ndiSources.length > 0
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined || !anyNdi) return
-		let alive = true
-		const poll = () => void api.ndi().then((v) => alive && setNdi(v))
-		poll()
-		const id = setInterval(poll, 500)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [anyNdi])
+	const ndi: NdiState | null | undefined = usePolled(anyNdi ? (api) => api.ndi() : null, 500)
 
 	// The cameras this computer has (./capture.ts), once a capture input is
 	// added: for their rows, and for a view to say one has gone.
@@ -366,51 +285,15 @@ export function App() {
 
 	// The run order is the Cue Manager itself, in its own pane: real in dev
 	// too, like the MA pane. Polled for its load state and its last input.
-	const [cue, setCue] = useState<CuePaneReport | null>(null)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.cuePane().then((r) => alive && setCue(r ?? null))
-		poll()
-		const id = setInterval(poll, 1000)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const cue: CuePaneReport | null = usePolled((api) => api.cuePane(), 1000) ?? null
 
 	// Each embed's page, as main holds it. Polled like the run order.
-	const [embedReports, setEmbedReports] = useState<EmbedReport[]>([])
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.embeds().then((r) => alive && setEmbedReports(r))
-		poll()
-		const id = setInterval(poll, 1000)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const embedReports: EmbedReport[] = usePolled((api) => api.embeds(), 1000) ?? NO_EMBED_REPORTS
 	const embedReport = (id: string) => embedReports.find((r) => r.id === id) ?? null
 
 	// The MA pane is real in dev too: it is a page from the console, not a value
 	// the mock desk could fake. Polled, like the link, because main owns it.
-	const [pane, setPane] = useState<MaPaneReport | null>(null)
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.maPane().then((r) => alive && setPane(r))
-		poll()
-		const id = setInterval(poll, 1000)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	const pane: MaPaneReport | null = usePolled((api) => api.maPane(), 1000) ?? null
 
 	// The pages main draws (the MA, the run order, each embed) are placed from
 	// here, which never unmounts, over the body of the tab that is their home
@@ -510,22 +393,11 @@ export function App() {
 	// the four READING states; this is the real console, and being able to watch
 	// real fader traffic arrive while the mock exercises the failure modes is the
 	// whole point of having both on screen at once.
-	const [desk, setDesk] = useState<DeskState | null>(null)
 	const updates = useUpdates()
-	useEffect(() => {
-		const api = window.life
-		if (api === undefined) return
-		let alive = true
-		const poll = () => void api.deskState().then((d) => alive && setDesk(d))
-		poll()
-		// 2 Hz. Main already coalesces to 10 Hz; this only has to be fast enough
-		// that "heard 0s ago" does not visibly lag a fader being moved.
-		const id = setInterval(poll, 500)
-		return () => {
-			alive = false
-			clearInterval(id)
-		}
-	}, [])
+	// Asked only while Settings is open, the one place that shows it. 2 Hz:
+	// main already coalesces to 10 Hz; this only has to be fast enough that
+	// "heard 0s ago" does not visibly lag a fader being moved.
+	const desk: DeskState | null = usePolled(settingsOpen ? (api) => api.deskState() : null, 500) ?? null
 
 	// Input in either pane counts: an LD writing notes in the Cue Manager is
 	// as busy as one working the MA.
