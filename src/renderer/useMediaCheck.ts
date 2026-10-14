@@ -1,15 +1,15 @@
 // The media check's state, shared by the Arena view's Media row and the
 // Lookbook view (./components/MediaCheck.tsx, ./components/LookbookView.tsx): which
 // service is checked, its run sheet, the "same" confirmations, fetches under way,
-// and the actions. Both read the same rules, so a fix made in one shows in the
-// other at Arena's next push.
+// and the actions. Both read the same rules, and the pins and "same" marks are
+// shared: one made in either (or in a pop-out) shows in the others at once.
 //
 // Which service: the one the run order (the Cue Manager) has open, by its
 // Planning Center plan, unless this machine picks by hand. The lookbook is
 // asked when the service changes and on Check again, never polled: it is a
 // hosted app beyond the booth, not a feed.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 
 import type { ArenaStatus } from '../shared/arena.js'
 import { useHoldingMap } from './holdingMapStore.js'
@@ -53,6 +53,44 @@ function storedPins(): Record<string, Pin[]> {
 		return {}
 	}
 }
+
+/** Bumped (in this page's storage) when a "same" mark changes, so another
+ *  page (a pop-out) reads the marks again from main. */
+const SAME_CHANGED_KEY = 'paua.mediaCheck.sameChanged'
+
+// One copy of the pins for every check on this page, and kept in step with
+// other pages (a pop-out) by the storage event. Before, each view held its own
+// copy from when it mounted, and a stale one's Update all moved a moment back
+// that another had placed by hand, then saved over its pin.
+let pinsNow: Record<string, Pin[]> = storedPins()
+let sameTick = 0
+const listeners = new Set<() => void>()
+const tell = () => {
+	for (const l of listeners) l()
+}
+const subscribe = (l: () => void) => {
+	listeners.add(l)
+	return () => void listeners.delete(l)
+}
+if (typeof window !== 'undefined') {
+	window.addEventListener('storage', (e) => {
+		if (e.key === PINS_KEY) pinsNow = storedPins()
+		else if (e.key === SAME_CHANGED_KEY) sameTick++
+		else return
+		tell()
+	})
+}
+function writePins(all: Record<string, Pin[]>): void {
+	pinsNow = all
+	store(PINS_KEY, JSON.stringify(all))
+	tell()
+}
+function sameChanged(): void {
+	sameTick++
+	store(SAME_CHANGED_KEY, String(Date.now()))
+	tell()
+}
+const NO_PINS: Pin[] = []
 
 function stored(key: string): string | null {
 	try {
@@ -104,15 +142,22 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	}, [watchFetches])
 	const clearRefusal = (code: string) => setRefused(({ [code]: _, ...rest }) => rest)
 
-	// The "same" confirmations, read once and after each change.
+	// The "same" confirmations, read once and after each change, made here or
+	// in any other check (`sameChanged`).
 	const [same, setSame] = useState<ReadonlySet<string>>(new Set())
-	const readSame = () => void life?.sameMarks().then((m) => setSame(new Set(m)))
-	useEffect(readSame, [])
+	const sameAt = useSyncExternalStore(subscribe, () => sameTick)
+	useEffect(() => {
+		let alive = true
+		void life?.sameMarks().then((m) => alive && setSame(new Set(m)))
+		return () => {
+			alive = false
+		}
+	}, [sameAt])
 	const markSame = (mark: SameMark) => {
 		clearRefusal(mark.code)
 		void life?.markSame(mark).then((r) => {
 			if (!r.ok) setRefused((x) => ({ ...x, [mark.code]: r.detail }))
-			readSame()
+			sameChanged()
 		})
 	}
 	/** "It's there" (the owner, 2026-10-13: "an override to say it's there and
@@ -217,15 +262,13 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	}
 
 	const runSheet = service !== null && itemsFor === service.id && items.kind === 'read' && items.read.ok ? items.read.value : null
-	// Placed by hand, for this service.
-	const [pinsBy, setPinsBy] = useState<Record<string, Pin[]>>(storedPins)
-	const pins: Pin[] = service === null ? [] : (pinsBy[service.id] ?? [])
+	// Placed by hand, for this service: one copy for every check (above).
+	const pinsBy = useSyncExternalStore(subscribe, () => pinsNow)
+	const pins: Pin[] = service === null ? NO_PINS : (pinsBy[service.id] ?? NO_PINS)
 	const savePins = (next: Pin[]) => {
 		if (service === null) return
-		const { [service.id]: _, ...rest } = pinsBy
-		const all = Object.fromEntries([...Object.entries(rest).slice(-(PINS_SERVICES - 1)), ...(next.length === 0 ? [] : [[service.id, next]])])
-		setPinsBy(all)
-		store(PINS_KEY, JSON.stringify(all))
+		const { [service.id]: _, ...rest } = pinsNow
+		writePins(Object.fromEntries([...Object.entries(rest).slice(-(PINS_SERVICES - 1)), ...(next.length === 0 ? [] : [[service.id, next]])]))
 	}
 	// File sizes, so a file is told by its size, not its name (../shared/media-check.ts,
 	// `sameFile`): asked when the run sheet or the clips carrying its codes change.
@@ -247,31 +290,42 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	}, [sizeKey])
 	// The Holding map on this computer (Settings › Holding): what each column takes.
 	const map = useHoldingMap()
-	const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same, sizes, (code) => layerOfCode(map, code) !== null)
-	// Each item's codes into its column, by Arena's column names (../shared/holding.ts).
-	const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
-		runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status, map, pins)
-	const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes, map, pins)
-	// HOLD BG's gaps, for the normal background (the owner, 2026-10-06): in
-	// Update all, and drawn where they go. Not counted as something to look at.
-	const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status, map, pins)
-	// The plan in words: every moment's codes and what Update all does with each, or why not.
-	const planLines: PlanLine[] = runSheet === null ? [] : explainPlan(runSheet, status, same, sizes, map, pins)
-	// To look at, by code, as the Holding view marks them: a code with any clip
-	// whose file may differ, differs or is missing (one of CB095's eighteen is
-	// enough), one not where its item belongs, or one with no place (a code the
-	// lookbook has no file for is said apart).
-	const look = new Set<string>()
-	if (runSheet !== null && today !== null) {
-		for (const layer of status.layers) {
-			for (const slot of layer.slots) {
-				const mark = slotMark(slot, runSheet, today, same, sizes)
-				if (mark === 'may-differ' || mark === 'different' || mark === 'missing') look.add(slotCode(slot) ?? '')
+	// The plan, worked out once per change of what it is planned from, not on
+	// every render of every view that shows it.
+	const derived = useMemo(() => {
+		const check: MediaCheck | null = runSheet === null ? null : checkMedia(runSheet, status, same, sizes, (code) => layerOfCode(map, code) !== null)
+		// Each item's codes into its column, by Arena's column names (../shared/holding.ts).
+		const { placements, unplaced }: { placements: Placement[]; unplaced: Unplaced[] } =
+			runSheet === null ? { placements: [], unplaced: [] } : planPlacements(runSheet, status, map, pins)
+		const plannedUpdate: { steps: UpdateStep[]; unplaced: Unplaced[] } = runSheet === null ? { steps: [], unplaced: [] } : updatePlan(runSheet, status, same, sizes, map, pins)
+		// HOLD BG's gaps, for the normal background (the owner, 2026-10-06): in
+		// Update all, and drawn where they go. Not counted as something to look at.
+		const fills: Placement[] = runSheet === null ? [] : backgroundGaps(runSheet, status, map, pins)
+		// The plan in words: every moment's codes and what Update all does with each, or why not.
+		const planLines: PlanLine[] = runSheet === null ? [] : explainPlan(runSheet, status, same, sizes, map, pins)
+		// To look at, by code, as the Holding view marks them: a code with any clip
+		// whose file may differ, differs or is missing (one of CB095's eighteen is
+		// enough), one not where its item belongs, or one with no place (a code the
+		// lookbook has no file for is said apart).
+		const look = new Set<string>()
+		if (runSheet !== null && today !== null) {
+			for (const layer of status.layers) {
+				for (const slot of layer.slots) {
+					const mark = slotMark(slot, runSheet, today, same, sizes)
+					if (mark === 'may-differ' || mark === 'different' || mark === 'missing') look.add(slotCode(slot) ?? '')
+				}
 			}
+			for (const p of placements) look.add(p.code)
+			for (const u of unplaced) if (u.kind !== 'no-file') look.add(u.code)
 		}
-		for (const p of placements) look.add(p.code)
-		for (const u of unplaced) if (u.kind !== 'no-file') look.add(u.code)
-	}
+		// Old foregrounds (../shared/holding.ts): never one Update all is about to load into.
+		const loading = new Set(plannedUpdate.steps.flatMap((s) => s.request.clipIds))
+		const oldFgs: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, loading, map)
+		const allOld: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, new Set(), map)
+		return { check, placements, unplaced, plannedUpdate, fills, planLines, look, oldFgs, allOld }
+		// `today` follows `runSheet`.
+	}, [runSheet, status, same, sizes, map, pins])
+	const { check, placements, unplaced, plannedUpdate, fills, planLines, look, oldFgs, allOld } = derived
 	const trouble = check === null ? 0 : look.size
 
 	// Nothing is copied or loaded into Arena without a confirmation first (the
@@ -305,24 +359,26 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 			),
 		)
 	/** Which steps Load would send, as it would send them: a file only in the
-	 *  lookbook only when `lookbook`, a clip on screen only when `live` (the
-	 *  owner, 2026-10-05: "happy to have it override the live clip, with an
-	 *  extra warning"). A step left with no clip to load is not sent; a file
-	 *  with nowhere to come from is left out. */
-	const toSend = (answers: { lookbook: boolean; live: boolean }): FetchRequest[] => {
+	 *  lookbook only when `lookbook`, a clip on screen only when it is one of
+	 *  `live`, the clips the operator agreed to replace (the owner, 2026-10-05:
+	 *  "happy to have it override the live clip, with an extra warning"). A
+	 *  clip that went on screen since is left alone. A step left with no clip
+	 *  to load is not sent; a file with nowhere to come from is left out. */
+	const toSend = (answers: { lookbook: boolean; live: readonly number[] }): FetchRequest[] => {
 		if (asking === null || asking.sources === null) return []
 		const out: FetchRequest[] = []
 		for (const step of asking.steps) {
 			const from = asking.sources[step.request.code]?.from
 			if (!(from === 'drive' || (from === 'lookbook' && answers.lookbook))) continue
 			const live = onScreen(step).map((c) => c.id)
-			const clipIds = answers.live ? step.request.clipIds : step.request.clipIds.filter((id) => !live.includes(id))
+			const replace = live.filter((id) => answers.live.includes(id))
+			const clipIds = step.request.clipIds.filter((id) => !live.includes(id) || replace.includes(id))
 			if (step.request.clipIds.length > 0 && clipIds.length === 0) continue
-			out.push({ ...step.request, clipIds, allowLookbook: from === 'lookbook', allowLive: answers.live ? live : [] })
+			out.push({ ...step.request, clipIds, allowLookbook: from === 'lookbook', allowLive: replace })
 		}
 		return out
 	}
-	const confirm = (answers: { lookbook: boolean; live: boolean; clear: boolean }) => {
+	const confirm = (answers: { lookbook: boolean; live: readonly number[]; clear: boolean }) => {
 		asking?.after?.()
 		const requests = toSend(answers)
 		if (requests.length > 0 && asking !== null && life !== undefined) {
@@ -347,12 +403,8 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		}
 		setAsking(null)
 	}
-	// Old foregrounds (../shared/holding.ts): never one Update all is about to load into.
-	const loading = new Set(plannedUpdate.steps.flatMap((s) => s.request.clipIds))
-	const oldFgs: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, loading, map)
 	const askUpdateAll = () =>
 		ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced, oldFgs)
-	const allOld: OldClip[] = runSheet === null ? [] : oldForegrounds(runSheet, status, new Set(), map)
 	const askClearOld = () => ask(`Clear old foregrounds: ${allOld.length}`, [], [], allOld)
 
 	return {
@@ -371,7 +423,14 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		// Its run sheet and what the check made of it.
 		items,
 		runSheet,
-		readItemsAgain: () => service !== null && readItems(service.id),
+		/** Check again: the run sheet, or, when the service itself did not
+		 *  read (the lookbook had not listed it yet, or did not answer), the
+		 *  service first. */
+		readItemsAgain: () => {
+			if (service !== null) return readItems(service.id)
+			if (!byHand && plan !== null) return readFollowed(plan)
+			if (byHand) readServices()
+		},
 		check,
 		trouble,
 		placements,

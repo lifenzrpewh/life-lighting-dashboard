@@ -6,7 +6,7 @@
 // texty"): the service and how many need a look. A tap opens the Lookbook
 // in the Arena view's place (Holding until 2026-10-14).
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 
 import type { ArenaStatus } from '../../shared/arena.js'
@@ -151,8 +151,19 @@ function ServicePicker({
  *  where, with each step a tap away (Show each): the owner, 2026-10-14. */
 export function Confirm({ m }: { m: MediaCheckState }) {
 	const [lookbook, setLookbook] = useState(false)
-	const [live, setLive] = useState(false)
+	// The clips on screen agreed to, as they were when ticked: a tick is for
+	// those clips only. If what is on screen changes before Load, it unticks
+	// rather than replacing a clip nobody was asked about.
+	const [agreed, setAgreed] = useState<{ ids: number[]; key: string } | null>(null)
 	const [clear, setClear] = useState(false)
+	const liveIds = m.asking === null ? [] : [...new Set(m.asking.steps.flatMap((s) => m.onScreen(s).map((c) => c.id)))].sort((a, b) => a - b)
+	const liveKey = liveIds.join(',')
+	useEffect(() => {
+		if (agreed !== null && agreed.key !== liveKey) setAgreed(null)
+	}, [liveKey, agreed])
+	const live = agreed !== null && agreed.key === liveKey
+	const setLive = (on: boolean) => setAgreed(on ? { ids: liveIds, key: liveKey } : null)
+	const agreedIds = live ? agreed.ids : []
 	// Each step, its place and its source: a tap away (the owner, 2026-10-14: "I
 	// like the info, just the way it shows feels cluttered and full").
 	const [each, setEach] = useState(false)
@@ -166,12 +177,12 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 	const lookbookCodes = steps.filter((s) => fromOf(s.request.code) === 'lookbook').map((s) => s.request.code)
 	const nowhere = steps.filter((s) => fromOf(s.request.code) === 'none').length
 	const onScreen = steps.flatMap((s) => m.onScreen(s).map((c) => ({ code: s.request.code, where: c.where })))
-	const sending = m.toSend({ lookbook, live })
-	const done = (answers: { lookbook: boolean; live: boolean; clear: boolean } | null) => {
+	const sending = m.toSend({ lookbook, live: agreedIds })
+	const done = (answers: { lookbook: boolean; live: readonly number[]; clear: boolean } | null) => {
 		if (answers !== null) m.confirm(answers)
 		else m.cancel()
 		setLookbook(false)
-		setLive(false)
+		setAgreed(null)
 		setClear(false)
 		setEach(false)
 	}
@@ -247,13 +258,13 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 			)}
 			<div className="flex flex-wrap items-center gap-2">
 				{onlyClear ? (
-					<SmallButton onClick={() => done({ lookbook: false, live: false, clear: true })}>Clear {clears.length}</SmallButton>
+					<SmallButton onClick={() => done({ lookbook: false, live: [], clear: true })}>Clear {clears.length}</SmallButton>
 				) : sources === null ? (
 					<span className="flex h-10 items-center text-xs text-booth-dim">Looking on the drive…</span>
 				) : sending.length === 0 && !clearing ? (
 					<span className="flex h-10 items-center text-xs text-booth-dim">Nothing to load{lookbookCodes.length + onScreen.length > 0 ? ' unless ticked' : ''}</span>
 				) : (
-					<SmallButton onClick={() => done({ lookbook, live, clear: clearing })} tone={live && onScreen.length > 0 ? 'live' : 'plain'}>
+					<SmallButton onClick={() => done({ lookbook, live: agreedIds, clear: clearing })} tone={live && onScreen.length > 0 ? 'live' : 'plain'}>
 						{live && onScreen.length > 0 ? `Load, replacing ${onScreen.length} on screen` : sending.length === 0 ? 'Clear only' : `Load ${sending.length}`}
 						{clearing && sending.length > 0 ? `, clear ${clears.length}` : ''}
 					</SmallButton>
