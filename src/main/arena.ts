@@ -109,6 +109,8 @@ function watchArena(
 	// Logged once per distinct fault or change, as ./http-poll.ts does.
 	let lastFault: string | null = null
 	let lastPlaying: string | null = null
+	/** Parameters that sent a value of the wrong kind since the last composition. */
+	const badParams = new Set<number>()
 
 	const fault = (detail: string) => {
 		if (detail !== lastFault) console.log(`[arena] websocket: ${detail}`)
@@ -143,6 +145,7 @@ function watchArena(
 				const tree = decodeComposition(msg.body)
 				if (!tree.ok) return put({ ok: false, reason: 'error', at, detail: tree.detail })
 				put({ ok: true, value: tree.value, at })
+				badParams.clear()
 				logPlaying(tree.value)
 				// Subscribe to what is new, and let go of what is gone: a clip
 				// no longer playing would otherwise keep sending its position.
@@ -157,7 +160,17 @@ function watchArena(
 				if (latest === null || !latest.ok) return
 				const next = applyParameter(latest.value, msg.id, msg.value)
 				if (next === null) return
-				return put(next.ok ? { ok: true, value: next.value, at } : { ok: false, reason: 'error', at, detail: next.detail })
+				if (!next.ok) {
+					// One bad value is that parameter's, not the composition's: it
+					// keeps its last value and every later update still lands. Before,
+					// the whole status turned to an error and stayed one until the next
+					// composition, and Clips, Load and Clear all refused. Said once per
+					// parameter until the next composition, not ~100 times a second.
+					if (!badParams.has(msg.id)) console.log(`[arena] websocket: ${next.detail}; kept its last value`)
+					badParams.add(msg.id)
+					return
+				}
+				return put({ ok: true, value: next.value, at })
 			}
 			case 'refused':
 				return fault(`Arena refused ${msg.path}: ${msg.detail}`)
