@@ -329,8 +329,10 @@ run: one kiosk per computer, so the second only focuses the first.
 10.11.60.7 (reachable from this Mac). Next: the owner's word on the order rule and the NAS
 folder: answered (keep today's pattern; `smb://10.0.0.71/graphics/Other Media/Paua Smart
 Folder`). ✅ **The playlist write works by Media Bin ids** (the 404s were playlist-entry ids; 204 on the
-owner's "PAUA TEST" with the test card's Media Bin id), so loading can go through a Smart Playlist
-on the Paua Smart Folder (`docs/VISUALS_DASHBOARD.md`
+owner's "PAUA TEST" with the test card's Media Bin id), but **not from a Smart Playlist**
+(404): ✅ proven instead through an ordinary media playlist **Paua**, one drag by a person from
+the Smart Folder's playlist, then Pāua writes the playlist with headers in the pattern (204 on
+PAUA TEST). Next: the owner's go to build Load (`docs/VISUALS_DASHBOARD.md`
 § ProPresenter announcements). This Mac's own
 ProPresenter 18.4 crashes on launch in CoreMIDI (a buffer overflow, macOS 26.3): unplug MIDI
 gear or update it.

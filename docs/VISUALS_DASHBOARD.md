@@ -1278,6 +1278,14 @@ one (every media playlist endpoint is GET). The ids of a Smart Playlist's items 
 is re-added (01 CT108 was `A58399F2…`, then `4CE237E3…`). PAUA TEST was left as NORMAL NOTICES and
 the test card.
 
+**✅ Route proven end to end, 2026-10-14** (the owner's go, PAUA TEST only): the owner made an
+ordinary media playlist **Paua** (`3B9CBA09…`) and dragged the four Smart Folder pictures into it
+(the API showed them about 20 s later); a PUT of a NORMAL NOTICES header and those four, by
+Paua's ids, in the pattern's order (CT108, CT003, CT110, CT109) answered **204** and read back
+exactly so. So a week's loading is: Pāua copies the T files into the Smart Folder (and touches
+them); **one drag by a person** from the Smart Playlist into Paua; Pāua writes the announcements
+playlist from Paua, headers and order, after a confirmation; the Announcements view checks it.
+
 **Routes left for loading, the owner's to choose** (as of the Smart Playlist refusal above):
 - **An ordinary media playlist**, filled by hand: the standing notices (CT108, CT003, CT110,
   CT109, CT131) imported into it once, each week's promos dragged in as they come; Pāua then
