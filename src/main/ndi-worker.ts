@@ -147,6 +147,8 @@ type Receiver = {
 	 *  under it, so a receiver let go then is destroyed when it returns. */
 	capturing: boolean
 	stopping: boolean
+	/** `NDIlib_recv_destroy` has run: it runs once, never on a freed receiver. */
+	destroyed: boolean
 }
 
 let ndi: Ndi | null = null
@@ -206,7 +208,7 @@ function sync(): void {
 		if (wanted.has(id) && sources.get(id) === r.source) continue
 		receivers.delete(id)
 		r.stopping = true
-		if (!r.capturing) ndi?.recvDestroy(r.native)
+		if (!r.capturing) destroy(r)
 		log(`stopped receiving "${r.source}"`)
 	}
 	if (ndi === null) return
@@ -234,6 +236,7 @@ function sync(): void {
 				copies: { frames: 0, ms: 0, since: performance.now(), came: 0, early: 0, busy: 0 },
 				capturing: false,
 				stopping: false,
+				destroyed: false,
 			}
 			receivers.set(id, r)
 			log(`receiving "${source}"`)
@@ -244,6 +247,13 @@ function sync(): void {
 	}
 }
 
+/** Give `r`'s receiver back to NDI, once. */
+function destroy(r: Receiver): void {
+	if (r.destroyed) return
+	r.destroyed = true
+	ndi?.recvDestroy(r.native)
+}
+
 /** Wait for `r`'s next frame on koffi's own thread, so this process's event
  *  loop stays free, then handle it and wait again. ✅ 2026-10-05: polling
  *  every 5 ms with no wait held the view near 20 fps, because Windows runs a
@@ -251,6 +261,12 @@ function sync(): void {
  *  next; waiting on NDI took 47 fps from Arena's 50 in plain Node. Every frame
  *  is taken as it comes, so none queue; those not due are given straight back. */
 function capture(id: string, r: Receiver): void {
+	// Let go between two captures (the next waits on setImmediate or a
+	// timer): sync() destroyed it then, so it is never captured from again.
+	if (r.stopping) {
+		destroy(r)
+		return
+	}
 	if (ndi === null) return
 	const lib = ndi
 	const v = {} as VideoFrame
@@ -259,7 +275,7 @@ function capture(id: string, r: Receiver): void {
 		r.capturing = false
 		if (r.stopping) {
 			if (err == null && type === FRAME_VIDEO) lib.recvFree(r.native, v)
-			lib.recvDestroy(r.native)
+			destroy(r)
 			return
 		}
 		if (err != null) {
