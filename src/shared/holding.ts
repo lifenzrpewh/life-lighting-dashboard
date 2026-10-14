@@ -1289,10 +1289,10 @@ export function explainPlan(
 						: s.why === 'on-layer'
 							? `no column of its own; already in ${where}`
 							: s.why === 'leave'
-								? `${where} is Leave alone (Settings › Holding)`
+								? `${where} is Leave alone (Settings › Holding map)`
 								: s.why === 'fixed'
-									? `${where} holds a fixed code (Settings › Holding)`
-									: `${where} takes the normal background (Settings › Holding)`
+									? `${where} holds a fixed code (Settings › Holding map)`
+									: `${where} takes the normal background (Settings › Holding map)`
 			if (old !== null) return { code, tone: 'do', words: `${settledWords}; ${old}`, clipId: update[0] ?? null }
 			const sure = confirmed.has(code) ? '; confirmed the same by hand' : ''
 			return { code, tone: 'ok', words: `${settledWords}${sure}`, clipId: s?.clipId ?? null }

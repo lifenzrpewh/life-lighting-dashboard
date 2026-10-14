@@ -48,7 +48,7 @@ export function useMainMode(): Mode {
 
 /** `paneLastInputAt` is input inside the MA pane, the run order and embeds,
  *  which the renderer cannot see for itself: an LD working in the MA is not
- *  idle. `idleMs` is Settings › Admin's timeout. */
+ *  idle. `idleMs` is Settings › Screen and Admin's timeout. */
 export function useMode(now: number, paneLastInputAt: number | null, idleMs: number) {
 	const [mode, setMode] = useState<Mode>('volunteer')
 	const lastInput = useRef(Date.now())

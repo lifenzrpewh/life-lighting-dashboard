@@ -88,7 +88,7 @@ function groupsOf(o: FeedOptions, current: VideoChoice | null | undefined): Grou
 			title: 'NDI',
 			icon: Cast,
 			rows: o.ndi.map((s) => ({ feed: { kind: 'ndi', id: s.id }, name: s.name, detail: s.on ? s.source : 'turned off in Settings', off: !s.on })),
-			empty: 'None added. Admin adds them in Settings › Video sources.',
+			empty: 'None added. Admin adds them in Settings › Add a view.',
 		},
 		{
 			title: 'Capture',
@@ -99,7 +99,7 @@ function groupsOf(o: FeedOptions, current: VideoChoice | null | undefined): Grou
 				detail: c.on ? c.device : 'turned off in Settings',
 				off: !c.on,
 			})),
-			empty: 'None added. Admin adds them in Settings › Video sources.',
+			empty: 'None added. Admin adds them in Settings › Add a view.',
 		},
 	]
 }

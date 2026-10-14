@@ -176,7 +176,7 @@ export function StatusBar({
 	/** The passcode sheet is open. */
 	asking: boolean
 	connectionsOpen: boolean
-	/** Settings › Top bar › Testing (../barItems.ts): Mark is on the bar. */
+	/** Settings › Screen and Admin › Testing (../barItems.ts): Mark is on the bar. */
 	testing: boolean
 	/** "Mark this moment": a line in the log for a tester. Answers which mark,
 	 *  or null when it could not be written. */
@@ -212,7 +212,7 @@ export function StatusBar({
 	/** Into Show mode: anyone. */
 	onShow: () => void
 	/** Out of Show mode: Admin's passcode, whatever the mode, unless
-	 *  `showLocked` is off (Settings › Admin), when it is a tap. */
+	 *  `showLocked` is off (Settings › Screen and Admin), when it is a tap. */
 	onLeaveShow: () => void
 	showLocked: boolean
 }) {

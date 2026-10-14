@@ -35,15 +35,18 @@ install, and the installer never touches it, uninstalling included. It belongs
 to the Windows user, so another user on the same PC starts from nothing.
 
 **Getting out:** Alt+F4 on Windows, Cmd+Q on a Mac. It runs full screen; on a
-laptop, **Settings › This computer › Window** (Admin) gives it a window.
+laptop, **Settings › Screen and Admin › Screen › Window** (Admin) gives it a window.
 
 ## First run
 
 Everything starts off. Tap **Volunteer** (top right) for Admin: with no
 passcode set yet it opens at once. Then the gear, **Settings**, and tap a
-connection to give it an address: the Console first, then Arena, OnTime and
-ProPresenter if the booth has them. Set a passcode in **Settings › Admin**
-before the booth is left with volunteers. The Cue Manager signs in from its own
+program under **Programs** to give it an address: the Console first, then Arena (its
+**Find** looks on this computer), OnTime and ProPresenter if the booth has them; the
+folders are under **Media and folders**. Another booth already set up? Its
+**Settings › Updates and setup file › To a file**, then **From a file** here, sets this one up
+in one go (the MA passwords are typed again). Set a passcode in **Settings › Screen and
+Admin** before the booth is left with volunteers. The Cue Manager signs in from its own
 column, by QR, approved as this campus's booth device. **Connections** on the
 bar is the list anyone can read: what is up, what is down.
 
@@ -53,7 +56,7 @@ Admin (called operator mode before 0.2.6) is for changing
 settings, layouts and the show. Tap **Volunteer** and enter the passcode, on
 Pāua's own keypad or, for one with letters, after **Keyboard**. One tap on
 **Admin** goes back. Admin also goes back by itself after a while with nobody
-touching anything: 15 minutes unless **Settings › Admin** says 2, 5, 10, 30 or
+touching anything: 15 minutes unless **Settings › Screen and Admin** says 2, 5, 10, 30 or
 60. Five wrong tries make the screen wait 30 seconds; it says so.
 
 **Forgotten the passcode?** Quit Pāua (Alt+F4, or Cmd+Q). Open `settings.json`
@@ -61,7 +64,9 @@ in the data folder (`%APPDATA%\paua\settings.json` on Windows,
 `~/Library/Application Support/paua/settings.json` on a Mac) in Notepad or
 TextEdit, delete the `"adminPasscode": { … }` entry and the comma before it,
 save, and start Pāua again. Admin then opens with a tap; set a new passcode in
-Settings › Admin. Touch nothing else in that file: it holds the booth's
+Settings › Screen and Admin. (A file that no longer reads, a stray comma say, is kept
+beside it as `settings.json.unreadable-…` and Pāua starts on defaults: put it right
+and copy it back.) Touch nothing else in that file: it holds the booth's
 addresses and its sealed MA passwords.
 
 ## The log
@@ -87,6 +92,31 @@ more than a description of it.
 ## What to check
 
 Tick what you saw; anything odd is worth a line.
+
+**1.6.0** (2026-10-15): the review's fixes, Settings laid out again, start at login, the setup
+file. Reads updates from this repo; publish it on `paua-releases` too for booths still on 1.1.0
+to 1.4.0 (the bridge).
+
+**Settings, laid out again** (1.6.0)
+- [ ] The list in three groups: Programs (dot and address), Views you added (and Add a view), This booth
+- [ ] A page is its fields only; **?** shows the help under each, and again hides it
+- [ ] Type in a field: a bar at the foot says "1 change: …" with **Revert** and **Save**; Revert puts it back, Save keeps it and says Saved
+- [ ] A connection's **On/Off** switch is in its header, and takes effect at once
+- [ ] Console: the box under it says what to set in the console's OSC row, with this computer's address as the destination
+- [ ] Console address `127.0.0.1` (onPC here) saves with the reply port blank: "replies on 8004", worked out
+- [ ] Arena › **Find** with Arena running here fills its address and port; with it closed, says so
+- [ ] Media and folders: the graphics, local and announcements folders and the playlists, on one page
+- [ ] `paua.log` has `[settings] saved in Admin:` with each field changed, and no password
+- [ ] **Start at login** (Screen and Admin, the installed app): On, log out and in: Pāua opens. If the box says this computer did not keep it, note it
+- [ ] **Setup file**: To a file on one booth, From a file on another: it lists what it would change before Apply; after Apply the screen starts again with the layouts and Holding map; the MA passwords need typing again
+
+**The review's fixes** (1.6.0)
+- [ ] Drag a picture from Explorer onto Pāua by mistake: nothing happens (the log says it was kept from opening)
+- [ ] Rename the ProPresenter timer in Settings with the MA on screen: the MA does not reload
+- [ ] In Admin, tap Show mode: the lock says Show mode, and the Lookbook shows no Load buttons
+- [ ] Open Connections and close it with a camera or NDI on screen: the picture carries on, not restarting
+- [ ] Two fingers in Edit layout, one on a window's edge: only the first drag moves
+- [ ] The Lookbook in a pop-out and in a window: a moment placed by hand in one shows placed in the other at once
 
 **1.5.0** (2026-10-14): 1.4.1 with **parts** (pick BG, FG or A within a moment) and the one-line
 confirmation (§ One Lookbook). Reads updates from this repo, like 1.4.1; publish it on

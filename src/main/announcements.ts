@@ -52,7 +52,7 @@ async function readOne(base: string, kind: 'playlist' | 'media/playlist', name: 
 
 /** The announcements folder's pictures. */
 async function readFolder(s: Settings): Promise<FolderRead> {
-	if (s.announcementsFolder === null) return { ok: false, detail: 'No announcements folder: Settings › ProPresenter › Announcements', at: Date.now() }
+	if (s.announcementsFolder === null) return { ok: false, detail: 'No announcements folder: Settings › Media and folders', at: Date.now() }
 	try {
 		return { ok: true, names: await listPictures(s.announcementsFolder), at: Date.now() }
 	} catch (e) {
@@ -81,8 +81,8 @@ const isCopy = (file: string) => /(?:[\s_-]+copy(?:\s*\(\d+\))?|\s*\(\d+\))$/i.t
 /** Copy `codes`, in the playlist's order, into the folder, numbered; set last
  *  week's aside. */
 export async function copyAnnouncements(s: Settings, codes: readonly string[]): Promise<{ ok: true; outcomes: CopyOutcome[]; setAside: string[] } | { ok: false; detail: string }> {
-	if (s.announcementsFolder === null) return { ok: false, detail: 'No announcements folder: Settings › ProPresenter › Announcements' }
-	if (s.graphicsFolder === null) return { ok: false, detail: 'No graphics folder to copy from: Settings › Arena' }
+	if (s.announcementsFolder === null) return { ok: false, detail: 'No announcements folder: Settings › Media and folders' }
+	if (s.graphicsFolder === null) return { ok: false, detail: 'No graphics folder to copy from: Settings › Media and folders' }
 	const dir = s.announcementsFolder
 	const outcomes: CopyOutcome[] = []
 	const keep = new Set<string>()

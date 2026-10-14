@@ -53,7 +53,7 @@ export function viewIsOn(
 	embeds: readonly Embed[],
 	ndi: readonly NdiSource[] = [],
 	capture: readonly CaptureInput[] = [],
-	/** Settings › ProPresenter › Announcements: off hides the view. */
+	/** Settings › Media and folders › Announcements: off hides the view. */
 	announcementsOn = true,
 ): boolean {
 	const captureId = captureIdOf(view)
