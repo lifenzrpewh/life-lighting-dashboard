@@ -324,6 +324,14 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-14, later that evening: v1.3.0 tagged** at the owner's ask, with `announcements-load`
+merged: the Holding fixes, Show mode, and Announcements (the check and Load, Load run once into
+PAUA TEST AM at Central from this Mac). The owner tries a real run next. Its draft on
+`paua-releases` is what offers it to the booths once published (`docs/FIELD_TEST.md` § 1.3.0).
+This Mac's settings still hold the test's (ProPresenter 10.11.60.7, the Central graphics folder,
+the Smart Folder, Output playlist `PAUA TEST`, so a Write here goes to PAUA TEST AM); before
+that, its ProPresenter address and graphics folder were blank.
+
 **Where things stand (2026-10-14, evening, at home on the Mac).** ProPresenter announcements:
 the **check** is on main (the Announcements view); **Load** is built on branch
 **`announcements-load`** (`d2d9304`, pushed, not merged), 376 tests and 256 Lua checks green.

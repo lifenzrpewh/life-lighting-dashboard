@@ -88,6 +88,10 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.3.0** (2026-10-14): comes as an update on 1.1.0 or 1.2.0, once its draft on `paua-releases` is
+published. In it: the Holding fixes, Show mode, and Announcements (the check, and Load), the
+sections below.
+
 **Holding fixes** (2026-10-13, merged; in the next build after 1.2.0; `docs/VISUALS_DASHBOARD.md` § The owner's fixes, 2026-10-13)
 - [ ] Holding's **Plan** panel says, for every code, where it goes or why not; a tap opens its clip
 - [ ] After **Update all**, the line under the header stays ("n loaded · n failed · n already there"), and **Each code** says why a failure failed; `paua.log` has the same as `[holding]` lines
@@ -98,11 +102,20 @@ Tick what you saw; anything odd is worth a line.
 - [ ] **Place…** on a code in the plan: only its layer's free columns light; the confirmation names each layer; after Load the plan says "by hand", and Update all leaves it there
 - [ ] **Files to check**: each mismatch side by side with names, sizes and dates, versions in words; "on the graphics drive" lists the drive's files and which Fetch takes; **Load this one** asks first
 
-**Announcements** (branch `propresenter-announcements`, once merged and built)
+**Announcements** (1.3.0)
 - [ ] + › Announcements in a window: the service's name, and "n of m in -Announcements AM" (PM for an evening service, EVENT otherwise)
 - [ ] Each lower third (T code) of the run sheet with its picture: "In the playlist, item n" or "Not in the playlist"
 - [ ] Last week's promo still in the playlist is listed as "not on this run sheet"; headers are left out of it
 - [ ] Add the missing one in ProPresenter by hand: within 30 s (or Check again) it turns green
+
+**Announcements Load** (1.3.0; Admin; Settings › ProPresenter › Announcements: the folder as this
+computer reaches it, Arena's graphics folder set; first run at Central 2026-10-14 into PAUA TEST AM)
+- [ ] **Copy to the folder**: the week's T files land numbered (`01 CT108-…`); last week's go into `Old`; one with no file on the drive says so in orange
+- [ ] Each row's **Folder** ticks; one with no file says "No file in the folder: left out of the write"
+- [ ] Drag the new files from the folder in Finder or Explorer into the media playlist ("Paua"): **Media** ticks within 10 s, and step 2 says "All n in "Paua""
+- [ ] Last week's entries left in "Paua" do not tick Media (only a file in the folder now counts)
+- [ ] **Write**: the confirmation names the headers it writes and anything left out; after it, "Written and read back: n items", and the playlist in ProPresenter in that order, pictures showing (not missing)
+- [ ] The first real Write on "-Announcements AM" replaces it whole (its hand-dragged pictures go): at a quiet time
 
 **Show mode** (the next build after 1.2.0)
 - [ ] The tray's Show mode button (four corners): the tab strips and the grips between windows go, and each page fills its window's full height
