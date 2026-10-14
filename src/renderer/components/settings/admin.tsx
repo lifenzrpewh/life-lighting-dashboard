@@ -19,6 +19,7 @@ export function AdminSettings({ view, save }: { view: SettingsView; save: Save }
 			<DetailHead title="Admin" />
 			<Passcode has={view.hasAdminPasscode} save={save} />
 			<Timeout minutes={view.adminTimeoutMin} save={save} />
+			<LeavingShow locked={view.showModeLocked} save={save} />
 		</>
 	)
 }
@@ -117,6 +118,35 @@ function Timeout({ minutes, save }: { minutes: number; save: Save }) {
 			</div>
 			<p className="text-sm text-booth-dim">
 				With no touch or key anywhere, the MA and the run order included, Admin goes back to volunteer by itself. On this computer only.
+			</p>
+			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
+		</Card>
+	)
+}
+
+/** Whether Show mode is a lock (../../showMode.ts): leaving it asks Admin's way
+ *  in, or is a tap for anyone. */
+function LeavingShow({ locked, save }: { locked: boolean; save: Save }) {
+	const [error, setError] = useState<string | null>(null)
+	return (
+		<Card>
+			<SectionTitle>Leaving Show mode</SectionTitle>
+			<div>
+				<Segmented
+					label="Leaving Show mode"
+					value={locked ? 'locked' : 'open'}
+					onChange={(v) => void save({ showModeLocked: v === 'locked' }).then((e) => setError(e === null ? null : (e.showModeLocked ?? e.form ?? 'Not saved.')))}
+					options={[
+						{ value: 'locked', label: "Admin's passcode" },
+						{ value: 'open', label: 'Anyone, with a tap' },
+					]}
+				/>
+			</div>
+			<p className="text-sm text-booth-dim">
+				{locked
+					? 'Show mode is a lock: leaving it asks for the passcode (a tap if none is set) and lands in Admin.'
+					: 'Show mode only gives the windows the space: anyone leaves it with a tap, and the mode stays as it was.'}{' '}
+				On this computer only.
 			</p>
 			{error !== null && <p className="text-sm text-state-unreachable">{error}</p>}
 		</Card>

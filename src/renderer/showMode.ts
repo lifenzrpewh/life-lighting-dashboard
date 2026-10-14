@@ -11,9 +11,13 @@
 //   which mid-service is the screen changing under someone).
 //
 // IN: anyone, from the bar's tray. It only takes things away.
-// OUT: Admin's way in (./components/PasscodeSheet.tsx), whatever the mode: the
-// passcode if one is set, a tap if not. Leaving lands in Admin, as the passcode
-// always does. A lock anyone could undo with a tap would not be one.
+// OUT, locked (the default): Admin's way in (./components/PasscodeSheet.tsx),
+// whatever the mode: the passcode if one is set, a tap if not. Leaving lands in
+// Admin, as the passcode always does. A lock anyone could undo with a tap would
+// not be one.
+// OUT, unlocked (Settings › Admin › Leaving Show mode, the owner's to choose,
+// 2026-10-14): a tap, for anyone, the mode as it was. Show mode is then only
+// the space, not a lock.
 //
 // Remembered on this computer, so a restart mid-service (the watchdog's) comes
 // back as it was. The mode itself still boots volunteer (./mode.ts).

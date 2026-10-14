@@ -91,3 +91,14 @@ test('the waits and wrong tries are said in words', () => {
 	assert.equal(waitWords(1), 'Too many wrong tries. Try again in 1 second.')
 	assert.equal(wrongWords(1), 'Not the passcode. 1 try before a 30-second wait.')
 })
+
+test('admin: leaving Show mode asks for Admin by default; the owner may make it a tap', () => {
+	assert.equal(DEFAULT_SETTINGS.showModeLocked, true)
+	const open = applyPatch(DEFAULT_SETTINGS, { showModeLocked: false })
+	assert.equal(open.ok, true)
+	assert.equal(open.settings.showModeLocked, false)
+	assert.equal(fromDisk({ showModeLocked: false }).showModeLocked, false)
+	assert.equal(fromDisk({ showModeLocked: 'no' }).showModeLocked, true, 'a hand-edited odd value stays locked')
+	assert.equal(fromDisk({}).showModeLocked, true, 'a settings file from before it: locked, as it was')
+	assert.equal(patchFrom({ showModeLocked: 'no' }), null)
+})

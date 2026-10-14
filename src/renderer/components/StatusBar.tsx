@@ -164,6 +164,7 @@ export function StatusBar({
 	show,
 	onShow,
 	onLeaveShow,
+	showLocked,
 }: {
 	link: LinkState
 	/** False when the console is turned off in Settings: no link, no show. */
@@ -210,8 +211,10 @@ export function StatusBar({
 	show: boolean
 	/** Into Show mode: anyone. */
 	onShow: () => void
-	/** Out of Show mode: Admin's passcode, whatever the mode. */
+	/** Out of Show mode: Admin's passcode, whatever the mode, unless
+	 *  `showLocked` is off (Settings › Admin), when it is a tap. */
 	onLeaveShow: () => void
+	showLocked: boolean
 }) {
 	const admin = mode === 'operator'
 	const compact = collapsed
@@ -349,7 +352,7 @@ export function StatusBar({
 					{admin && !show && <Tool icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} compact={compact} />}
 					{/* Boots into volunteer, always, and never remembers otherwise. */}
 					{show ? (
-						<ShowButton admin={admin} asking={asking} onLeave={onLeaveShow} compact={compact} />
+						<ShowButton admin={admin} asking={asking} locked={showLocked} onLeave={onLeaveShow} compact={compact} />
 					) : (
 						<LockButton admin={admin} asking={asking} onEnter={onEnter} onLeave={onLeave} compact={compact} />
 					)}
@@ -434,20 +437,33 @@ function LockButton({
 /** In Show mode, where the lock was: says Show mode (and Admin, when it is),
  *  in the selected blue, seen from across the booth. A tap asks Admin's
  *  passcode, the way out; it never changes the mode by itself. */
-function ShowButton({ admin, asking, onLeave, compact }: { admin: boolean; asking: boolean; onLeave: () => void; compact: boolean }) {
+function ShowButton({
+	admin,
+	asking,
+	locked,
+	onLeave,
+	compact,
+}: {
+	admin: boolean
+	asking: boolean
+	locked: boolean
+	onLeave: () => void
+	compact: boolean
+}) {
 	const words = admin ? 'Show mode · Admin' : 'Show mode'
+	const LockIcon = locked ? Lock : Maximize
 	return (
 		<button
 			type="button"
 			onClick={onLeave}
-			aria-label={`${words}. Tap to leave; it asks for Admin's passcode.`}
+			aria-label={locked ? `${words}. Tap to leave; it asks for Admin's passcode.` : `${words}. Tap to leave.`}
 			aria-pressed={asking || undefined}
-			title="Leave Show mode (Admin's passcode)"
+			title={locked ? "Leave Show mode (Admin's passcode)" : 'Leave Show mode'}
 			className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-ctl bg-accent font-bold whitespace-nowrap text-accent-ink transition-transform duration-150 active:scale-90 ${
 				compact ? 'h-7 px-2 text-[13px]' : 'h-[42px] px-3.5 text-sm'
 			}`}
 		>
-			<Lock size={compact ? 16 : 20} strokeWidth={2} aria-hidden />
+			<LockIcon size={compact ? 16 : 20} strokeWidth={2} aria-hidden />
 			{words}
 		</button>
 	)

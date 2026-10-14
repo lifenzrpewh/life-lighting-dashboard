@@ -104,6 +104,10 @@ export type Settings = {
 	 *  ADMIN_TIMEOUTS_MIN (./admin.ts). How long an LD walks away for is a
 	 *  habit of the booth (the owner, 2026-10-08). */
 	adminTimeoutMin: number
+	/** Whether leaving Show mode asks Admin's way in (true, the default) or is
+	 *  a tap for anyone, the mode as it was (the owner's to choose, 2026-10-14;
+	 *  ../renderer/showMode.ts). */
+	showModeLocked: boolean
 }
 
 /** OnTime's own default (docs.getontime.no, HTTP API). */
@@ -155,6 +159,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	graphicsFolder: null,
 	localMediaFolder: null,
 	adminTimeoutMin: DEFAULT_ADMIN_TIMEOUT_MIN,
+	showModeLocked: true,
 }
 
 /** The settings main works from: a connection turned off is treated as one
@@ -342,6 +347,7 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		else next.off = off
 	}
 	if (patch.windowed !== undefined) next.windowed = patch.windowed
+	if (patch.showModeLocked !== undefined) next.showModeLocked = patch.showModeLocked
 	if (patch.announcementsOn !== undefined) next.announcementsOn = patch.announcementsOn
 	for (const key of ['announcementsMediaPlaylist', 'announcementsPlaylist'] as const) {
 		const v = patch[key]
@@ -434,6 +440,7 @@ export function fromDisk(raw: unknown): Settings {
 		if (typeof v === 'string' && isFolderPath(v)) out[key] = v
 	}
 	if (isAdminTimeout(r['adminTimeoutMin'])) out.adminTimeoutMin = r['adminTimeoutMin']
+	if (typeof r['showModeLocked'] === 'boolean') out.showModeLocked = r['showModeLocked']
 	return out
 }
 
@@ -477,6 +484,7 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		['operatorPassword', strOrNull],
 		['adminPasscode', strOrNull],
 		['adminTimeoutMin', num],
+		['showModeLocked', (v) => typeof v === 'boolean'],
 	]
 	for (const [key, ok] of checks) {
 		if (!(key in r)) continue

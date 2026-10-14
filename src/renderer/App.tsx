@@ -194,6 +194,8 @@ export function App() {
 	// Settings › ProPresenter › Announcements: off hides the Announcements view.
 	const [announcementsOn, setAnnouncementsOn] = useState(true)
 	const [adminIdleMs, setAdminIdleMs] = useState(DEFAULT_ADMIN_TIMEOUT_MIN * 60_000)
+	// Settings › Admin: whether leaving Show mode asks Admin's way in.
+	const [showLocked, setShowLocked] = useState(true)
 	const readOff = () =>
 		void window.life?.settings().then((s) => {
 			setOff(s.off)
@@ -201,6 +203,7 @@ export function App() {
 			setNdiSources(s.ndiSources)
 			setCaptureInputs(s.captureInputs)
 			setAdminIdleMs(s.adminTimeoutMin * 60_000)
+			setShowLocked(s.showModeLocked)
 			setAnnouncementsOn(s.announcementsOn)
 			setSettingsRead(true)
 		})
@@ -555,7 +558,8 @@ export function App() {
 		setLayoutsOpen(false)
 		setShow(true)
 	}
-	// Out of Show mode: Admin's way in, whatever the mode (./showMode.ts).
+	// Out of Show mode (./showMode.ts): Admin's way in, whatever the mode, or,
+	// unlocked, a tap and the mode as it was.
 	const outOfShow = () => {
 		enter()
 		setShow(false)
@@ -564,6 +568,10 @@ export function App() {
 	const leaveShow = async () => {
 		if (sheet === 'passcode') {
 			setSheet(null)
+			return setLeavingShow(false)
+		}
+		if (!showLocked) {
+			setShow(false)
 			return setLeavingShow(false)
 		}
 		const api = window.life
@@ -996,6 +1004,7 @@ export function App() {
 					show={show}
 					onShow={enterShow}
 					onLeaveShow={() => void leaveShow()}
+					showLocked={showLocked}
 				/>
 
 				{/* Above the windows, never over them: a native view cannot be overlaid.
