@@ -13,7 +13,6 @@
 
 import type { Channel, LinkState } from '../shared/reading.js'
 import { record, unread } from '../shared/reading.js'
-import type { Schedule, Service } from '../shared/service.js'
 import type { Showfile } from '../shared/showfile.js'
 
 export type Scenario = 'healthy' | 'stale' | 'silent' | 'unreachable' | 'cold'
@@ -27,27 +26,6 @@ export const SCENARIO_LABEL: Record<Scenario, string> = {
 	unreachable: 'desk unreachable',
 	cold: 'just booted — nothing read yet',
 }
-
-const SERVICE: Service = {
-	date: '2026-09-21',
-	campus: 'Mount Eden',
-	serviceType: 'Mount Eden 9:30am',
-	planTitle: 'Sunday Morning',
-	// The backend has no current item yet (src/shared/service.ts), so neither
-	// does the mock: it must not show a highlight the real thing cannot.
-	nowItemId: null,
-	items: [
-		{ pcoItemId: 'itm-1', title: 'Countdown', kind: 'media', lengthSec: 300, lightingNote: null },
-		{ pcoItemId: 'itm-2', title: 'Worship', kind: 'header', lengthSec: null, lightingNote: null },
-		{ pcoItemId: 'itm-3', title: 'Great Are You', kind: 'song', lengthSec: 270, lightingNote: 'band only, no movers' },
-		{ pcoItemId: 'itm-4', title: 'Welcome', kind: 'item', lengthSec: 420, lightingNote: null },
-		{ pcoItemId: 'itm-5', title: 'Message', kind: 'header', lengthSec: null, lightingNote: null },
-		{ pcoItemId: 'itm-6', title: 'Message', kind: 'item', lengthSec: null, lightingNote: 'flat and bright, hold through' },
-		{ pcoItemId: 'itm-7', title: 'Response', kind: 'song', lengthSec: 360, lightingNote: null },
-	],
-}
-
-const SCHEDULE: Schedule = { campus: 'Mount Eden', service: SERVICE }
 
 /** Mount Eden Base names itself as its base (docs/MA3_READ_MODEL.md § UserVars),
  *  so the healthy desk is the one where the chip is amber. */
@@ -65,7 +43,6 @@ const MINUTE = 60_000
 
 export type MockState = {
 	link: LinkState
-	schedule: Channel<Schedule>
 	showfile: Channel<Showfile>
 }
 
@@ -83,7 +60,6 @@ export function mockState(scenario: Scenario, now: number): MockState {
 		case 'healthy':
 			return {
 				link: live,
-				schedule: record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now }),
 				showfile: record(unread<Showfile>(), { ok: true, value: ON_BASE, at: now - MINUTE }),
 			}
 
@@ -93,37 +69,30 @@ export function mockState(scenario: Scenario, now: number): MockState {
 			// its threshold, as it would be on a console worked nonstop.
 			return {
 				link: live,
-				schedule: record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now - 4 * MINUTE }),
 				showfile: record(unread<Showfile>(), { ok: true, value: SERVICE_SHOW, at: now - 9 * MINUTE }),
 			}
 
 		case 'silent': {
 			// The case the Channel shape exists for: good read, then timeouts. The
 			// last known values are held and aged rather than blanked.
-			const svc = record(
-				record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now - 6 * MINUTE }),
-				{ ok: false, reason: 'timeout', at: now },
-			)
 			const show = record(
 				record(unread<Showfile>(), { ok: true, value: ON_BASE, at: now - 6 * MINUTE }),
 				{ ok: false, reason: 'timeout', at: now },
 			)
-			return { link: live, schedule: svc, showfile: show }
+			return { link: live, showfile: show }
 		}
 
 		case 'unreachable':
 			// Fresh values in hand, and every console reading drops to UNKNOWN
 			// anyway, together, because the link outranks the value's own
-			// freshness. The run order does not: it comes from the backend, which
-			// a dead console says nothing about, so it stays as read.
+			// freshness.
 			return {
 				link: dead,
-				schedule: record(unread<Schedule>(), { ok: true, value: SCHEDULE, at: now }),
 				showfile: record(unread<Showfile>(), { ok: true, value: ON_BASE, at: now }),
 			}
 
 		case 'cold':
-			// Boot. UNKNOWN, not off, not zero, not an empty run order.
+			// Boot. UNKNOWN, not off, not zero.
 			//
 			// Link LIVE on purpose: 'unreachable' outranks a value's own freshness,
 			// so a dead link masks every other unknown behind it. The only way to
@@ -131,6 +100,6 @@ export function mockState(scenario: Scenario, now: number): MockState {
 			// ("Boot state is UNKNOWN, not off") — is with the desk answering and
 			// the first snapshot still in flight. That is a real moment, every
 			// single boot, and it needs to be a moment you can look at.
-			return { link: live, schedule: unread<Schedule>(), showfile: unread<Showfile>() }
+			return { link: live, showfile: unread<Showfile>() }
 	}
 }

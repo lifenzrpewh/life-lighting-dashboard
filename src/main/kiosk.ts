@@ -28,8 +28,8 @@
 //
 // THE RUN ORDER is the visuals app itself, embedded (./cue-pane.ts), with its
 // own sign-in, cache and offline queue. The dashboard's own read-only run order
-// (./backend/) is retired from the screen as of 2026-10-02 and not started;
-// it stays in the tree until the embed has run a service.
+// was retired from the screen on 2026-10-02 and deleted on 2026-10-14 (git
+// history has it).
 //
 // THE COUNTDOWN (./timers.ts) is OnTime and ProPresenter, asked over HTTP on the
 // booth network. Nothing to do with the console: it is never sent there.

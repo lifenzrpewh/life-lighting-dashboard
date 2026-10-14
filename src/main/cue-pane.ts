@@ -20,11 +20,13 @@
 
 import { WebContentsView, session, type BrowserWindow, type Rectangle } from 'electron'
 
-import { BACKEND_URL } from '../backend/endpoint.js'
 import { KIOSK_USER_AGENT_MARK, planOf, type CuePaneReport, type CuePaneState } from '../shared/cue-pane.js'
 import { PANE_LOAD_TIMEOUT_MS, PANE_RETRY_MS, isWebRemote as sameOrigin, type PaneRect } from '../shared/ma-pane.js'
 import { clampToWindow } from './ma-pane.js'
 import { snapshotOf } from './pane-snapshot.js'
+
+/** The Cue Manager (visuals-song-comms), same-origin with its API behind Caddy. */
+const CUE_MANAGER_URL = 'https://visuals.prodapps.life'
 
 const ERR_ABORTED = -3
 const ACTIVITY = new Set(['mouseDown', 'mouseWheel', 'rawKeyDown', 'keyDown', 'touchStart', 'gestureTap'])
@@ -48,7 +50,7 @@ export type CuePane = {
 }
 
 export function createCuePane(window: BrowserWindow): CuePane {
-	const home = `${BACKEND_URL}/`
+	const home = `${CUE_MANAGER_URL}/`
 	const ses = session.fromPartition('persist:cue-manager')
 	ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
 	ses.setPermissionCheckHandler(() => false)
