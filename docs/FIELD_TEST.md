@@ -88,6 +88,10 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.4.0** (2026-10-14): comes as an update on 1.1.0 to 1.3.0 once its draft on `paua-releases` is
+published. New since 1.3.0: **One Lookbook** (Holding merged in) and Settings › Admin › **Leaving
+Show mode** (the sections below).
+
 **1.3.0** (2026-10-14): comes as an update on 1.1.0 or 1.2.0, once its draft on `paua-releases` is
 published. In it: the Holding fixes, Show mode, and Announcements (the check, and Load), the
 sections below.
@@ -108,7 +112,7 @@ sections below.
 - [ ] Last week's promo still in the playlist is listed as "not on this run sheet"; headers are left out of it
 - [ ] Add the missing one in ProPresenter by hand: within 30 s (or Check again) it turns green
 
-**One Lookbook** (after 1.3.0; Holding merged into it, 2026-10-14)
+**One Lookbook** (1.4.0; Holding merged into it, 2026-10-14)
 - [ ] A Holding tab from before is a Lookbook tab, in the same place; + has no Holding
 - [ ] The top line: "n of m in Arena", "n to load", and "n need you", which shows only those; tap again for all
 - [ ] The size buttons: Big, Two a row, Rows; the choice is kept after a restart
@@ -135,7 +139,7 @@ computer reaches it, Arena's graphics folder set; first run at Central 2026-10-1
 - [ ] Tap **Show mode**: "Leave Show mode" asks the Admin passcode (or leaves at once with none set); a wrong one is refused and it stays; the right one brings the strips back, in Admin
 - [ ] Quit and reopen Pāua in Show mode: it comes back in Show mode, as volunteer
 - [ ] Settings › Top bar › Show mode hides the way in; the way out still shows while it is on
-- [ ] Settings › Admin › Leaving Show mode › **Anyone, with a tap** (after 1.3.0): a volunteer taps Show mode and is out, still volunteer, no passcode asked; back to **Admin's passcode** and it asks again
+- [ ] Settings › Admin › Leaving Show mode › **Anyone, with a tap** (1.4.0): a volunteer taps Show mode and is out, still volunteer, no passcode asked; back to **Admin's passcode** and it asks again
 
 **1.2.0** (2026-10-11): comes as an update on 1.1.0 (the bar's "Pāua 1.2.0 is out", then Settings › This computer › Update). Then the section below.
 

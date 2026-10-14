@@ -324,6 +324,13 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-14, night: v1.4.0 tagged** at the owner's ask, with `lookbook-merge` merged: **one
+Lookbook** (Holding merged in, from the owner's interview; status row) and Settings › Admin ›
+**Leaving Show mode**. Checked on the Mac over CDP against the Arena stand-in only
+(`docs/FIELD_TEST.md` § 1.4.0). This Mac's kiosk was left running in Admin against the stand-in
+(`spikes/arena-stand-in.mjs` on 8090; Arena's setting was blank before) with the ProPresenter
+test settings below.
+
 **2026-10-14, later that evening: v1.3.0 tagged** at the owner's ask, with `announcements-load`
 merged: the Holding fixes, Show mode, and Announcements (the check and Load, Load run once into
 PAUA TEST AM at Central from this Mac). The owner tries a real run next. Its draft on
