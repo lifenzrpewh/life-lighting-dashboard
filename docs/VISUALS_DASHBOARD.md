@@ -1193,9 +1193,8 @@ and not in Pāua's code. Watch for it on a Mac.
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
-- **ProPresenter announcements, loading**: the check is built, and ProPresenter will not take a
-  playlist of pictures over its API (§ ProPresenter announcements, ❌ the write). Which route
-  instead is the owner's to choose.
+- **ProPresenter announcements**: a trial of every lower third in run-sheet order (the owner,
+  2026-10-14: "I want to trial doing them all in order", today's pattern for now). Not built.
 
 ## ProPresenter announcements (2026-10-14)
 
@@ -1286,7 +1285,28 @@ exactly so. So a week's loading is: Pāua copies the T files into the Smart Fold
 them); **one drag by a person** from the Smart Playlist into Paua; Pāua writes the announcements
 playlist from Paua, headers and order, after a confirmation; the Announcements view checks it.
 
-**Routes left for loading, the owner's to choose** (as of the Smart Playlist refusal above):
+**✅ The owner chose, 2026-10-14, and Load is built** (branch `announcements-load`, `d2d9304`, not
+merged): the route above, one drag a week. Admin only. Settings › ProPresenter › **Announcements**:
+On/Off (off hides the view, for a campus that does not use them), Folder, Smart Playlist
+(`Paua Smart Folder`), Media playlist (`Paua`), Output playlist (`Announcements`, with AM, PM or
+EVENT added by the service's name). Order: NORMAL NOTICES (WTL, NSL, Bibles, WTG, by the run-sheet
+item's label), then PROMOS, everything else in run-sheet order; CT131 Altar Call is a promo. The
+view's three steps: **Copy to the folder** (each T code found on Arena's graphics folder by code,
+copied as `01 CT108-…` under `.part`, renamed, touched 1.5 s later; last week's moved into `Old`,
+never deleted), the drag (the view counts them into the media playlist), **Write** (confirmed;
+headers' colours kept; read back in order before "written"). Each lower third shows Folder, Media
+and the playlist. ⚠️ The code itself has not yet run against ProPresenter: each step was proven by
+hand on PAUA TEST only. A Finder-dragged picture in the output playlist cannot be kept by a
+write, so the first Write replaces Central's hand-made "-Announcements AM" whole.
+
+**What is left on Central's ProPresenter and the NAS from the tests (2026-10-14):** the presentation
+playlist **PAUA TEST** (NORMAL NOTICES and four pictures), the media playlists **Paua** (four
+pictures) and **Paua Smart Folder** (a Smart Playlist on
+`\\10.0.0.71\graphics\Other Media\Paua Smart Folder`), and in that folder `01 CT108…`,
+`02 CT003…`, `03 CT109…`, `04 CT110…`, all Central's own lower thirds. "-Announcements AM" and PM
+were never written to. The owner's to keep or clear.
+
+**Routes that were weighed** (before the owner chose):
 - **An ordinary media playlist**, filled by hand: the standing notices (CT108, CT003, CT110,
   CT109, CT131) imported into it once, each week's promos dragged in as they come; Pāua then
   writes "-Announcements AM" from it in the pattern, headers and all. Half the hand work, and
