@@ -1193,11 +1193,9 @@ and not in Pāua's code. Watch for it on a Mac.
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
-- **ProPresenter announcements, loading**: the check is built (§ ProPresenter announcements).
-  Open for the load: the order the playlist should take (today the standing notices WTL, NSL,
-  Bibles, WTG first, then promos: hold it to that?); whether CT131 Altar Call, in the PM
-  playlist but on no run sheet, is a standing item to leave; and the NAS folder both machines
-  reach, for a Smart Playlist.
+- **ProPresenter announcements, loading**: the check is built, and ProPresenter will not take a
+  playlist of pictures over its API (§ ProPresenter announcements, ❌ the write). Which route
+  instead is the owner's to choose.
 
 ## ProPresenter announcements (2026-10-14)
 
@@ -1225,13 +1223,31 @@ What the real data changed from the owner's first answers:
 missing**, CT290 still in; PM lacks CT110 and CT299 and holds CT290 and CT131 Altar Call. Seen in
 the dev kiosk on the Mac (this Mac's ProPresenter address set to the booth's, then cleared).
 
-**Loading, the plan (not built):** a folder on the NAS (a setting) that a Smart Playlist in
-ProPresenter's Media Bin follows; Pāua copies each missing T code's file into it, found on the
-drive by code as Holding does, or the lookbook's after asking, and moves last week's aside; then
-PUTs the playlist: its headers and other items kept, the pictures in place, after a confirmation.
-Unknowns: whether ProPresenter 18 takes the PUT (`spikes/propresenter-playlist.mjs append …
---write`, at a quiet moment, on a copy of the playlist), whether a Smart Playlist on the NAS
-notices new files promptly, and the order rule.
+**The owner's answers for loading, 2026-10-14:** keep today's pattern for now (NORMAL NOTICES
+in their fixed order, then PROMOS in run-sheet order; a trial of all in run-sheet order later).
+CT131 Altar Call is a normal weekly announcement and belongs on the run sheet: its absence from
+the lookbook was most likely missed there, so it is rightly said. The folder:
+`smb://10.0.0.71/graphics/Other Media/Paua Smart Folder` (the graphics share; on this Mac
+`/Volumes/graphics/Other Media/Paua Smart Folder`, empty, made by the owner).
+
+**❌ The write, 2026-10-14, at the owner's go, on the owner's test playlist "PAUA TEST" at
+Central** (one picture, CT292): `PUT /v1/playlist/<uuid>` with a JSON list answers **404** for
+every shape tried (the spike's `append` adding CT108; the playlist written back unchanged with
+`id, type, is_hidden, is_pco`, with `id, type`, and with the uuid alone), and **400** "expected a
+sequence" for `{ items }`, so the endpoint is there and reads the body. Nothing changed (read
+back each time), and ProPresenter kept answering. The pictures are not in the Media Bin (its only
+media playlists are Background, holding a test card, and Foreground, empty): they were dragged
+into the playlist, so there is no Media Bin id to try instead. Most likely the PUT takes
+presentations only, or this version (not reported: `/v1/version` is 404) has a bug. Not tried: a
+playlist of presentations, and a newer ProPresenter.
+
+**Routes left for loading, the owner's to choose:**
+- **The folder only**: Pāua copies the week's T files into the Paua Smart Folder, named in the
+  pattern's order (`01 CT108 …`), last week's moved aside; a Smart Playlist in ProPresenter's
+  Media Bin follows it, and the operator fires from there, or drags them into the announcements
+  playlist (a person still places them, but the right files, in order, in one place).
+- **Check only**: keep the Announcements view as the safety net, the playlist put in by hand.
+- **Ask Renewed Vision** whether the PUT can take media items (or try a newer ProPresenter).
 
 ## The first spike
 
