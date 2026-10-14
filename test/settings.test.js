@@ -153,3 +153,14 @@ test('the off list: unknown ids are refused in a patch, and dropped whole off di
 	assert.deepEqual(fromDisk({ off: ['nope'] }).off, [])
 	assert.deepEqual(fromDisk({}).off, [], 'a settings file from before the switch has everything on')
 })
+
+test('one unreadable embed on disk costs that embed, not the list (and its sign-ins)', () => {
+	const sheet = { id: 'abc123', name: 'Run sheet', url: 'https://docs.google.com/spreadsheets/d/x', on: true }
+	const brief = { id: 'def456', name: 'Brief', url: 'https://example.org/brief', on: false }
+	const tooLong = { id: 'ghi789', name: 'x'.repeat(80), url: 'https://example.org/', on: true }
+	const s = fromDisk({ embeds: [sheet, tooLong, brief, { ...sheet }] })
+	assert.deepEqual(s.embeds, [sheet, brief], 'the bad one and the duplicate dropped, the rest kept in order')
+	assert.deepEqual(fromDisk({ embeds: 'nonsense' }).embeds, [])
+	const patched = applyPatch(DEFAULT_SETTINGS, { embeds: [sheet, tooLong] })
+	assert.equal(patched.ok, false, 'a patch from the panel is still all or nothing')
+})

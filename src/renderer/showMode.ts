@@ -6,17 +6,17 @@
 //   window shows the tab that was showing, and its page takes the strip's room.
 // - The layout holds: no Edit layout, no Layouts, no edge to drag between
 //   windows.
-// - The mode holds: the lock gives way to Show mode's own button, and Admin's
-//   idle drop waits (a drop logs the MA pane in again as the volunteer user,
-//   which mid-service is the screen changing under someone).
+// - The mode is volunteer: going in leaves Admin (the owner, 2026-10-14), so
+//   a screen left in Show mode never holds Admin's loads and writes for
+//   whoever comes by. The lock gives way to Show mode's own button.
 //
-// IN: anyone, from the bar's tray. It only takes things away.
+// IN: anyone, from the bar's tray. It only takes things away, Admin included.
 // OUT, locked (the default): Admin's way in (./components/PasscodeSheet.tsx),
 // whatever the mode: the passcode if one is set, a tap if not. Leaving lands in
 // Admin, as the passcode always does. A lock anyone could undo with a tap would
 // not be one.
 // OUT, unlocked (Settings › Admin › Leaving Show mode, the owner's to choose,
-// 2026-10-14): a tap, for anyone, the mode as it was. Show mode is then only
+// 2026-10-14): a tap, for anyone, back to volunteer. Show mode is then only
 // the space, not a lock.
 //
 // Remembered on this computer, so a restart mid-service (the watchdog's) comes

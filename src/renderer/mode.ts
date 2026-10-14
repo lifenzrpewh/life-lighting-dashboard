@@ -48,9 +48,8 @@ export function useMainMode(): Mode {
 
 /** `paneLastInputAt` is input inside the MA pane, the run order and embeds,
  *  which the renderer cannot see for itself: an LD working in the MA is not
- *  idle. `idleMs` is Settings › Admin's timeout. `hold` (Show mode,
- *  ./showMode.ts) keeps the mode as it is: no idle drop. */
-export function useMode(now: number, paneLastInputAt: number | null, idleMs: number, hold = false) {
+ *  idle. `idleMs` is Settings › Admin's timeout. */
+export function useMode(now: number, paneLastInputAt: number | null, idleMs: number) {
 	const [mode, setMode] = useState<Mode>('volunteer')
 	const lastInput = useRef(Date.now())
 
@@ -68,9 +67,9 @@ export function useMode(now: number, paneLastInputAt: number | null, idleMs: num
 
 	// Checked on the 1 s clock, so the drop needs nothing to happen to arrive.
 	useEffect(() => {
-		if (mode !== 'operator' || hold) return
+		if (mode !== 'operator') return
 		if (operatorExpired(Math.max(lastInput.current, paneLastInputAt ?? 0), now, idleMs)) setMode('volunteer')
-	}, [mode, now, paneLastInputAt, idleMs, hold])
+	}, [mode, now, paneLastInputAt, idleMs])
 
 	return {
 		mode,

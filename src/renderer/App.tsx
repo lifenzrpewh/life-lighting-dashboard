@@ -532,7 +532,7 @@ export function App() {
 	const inputs = [pane?.lastInputAt ?? null, cue?.lastInputAt ?? null, ...embedReports.map((r) => r.lastInputAt)].filter(
 		(t): t is number => t !== null,
 	)
-	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs), adminIdleMs, show)
+	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs), adminIdleMs)
 	// Volunteer tapped (../shared/admin.ts): the passcode sheet, or straight in
 	// when none is set. Main decides either way; the screen follows. Outside
 	// the kiosk (a browser on the renderer alone) there is no main to ask.
@@ -550,15 +550,19 @@ export function App() {
 		const r = await api.unlockAdmin(null)
 		if (r?.ok === true) enter()
 	}
-	// Into Show mode: anyone, at once. Whatever stood over the windows goes.
+	// Into Show mode: anyone, at once. Whatever stood over the windows goes,
+	// and so does Admin (the owner, 2026-10-14: "showmode should just knock you
+	// out of admin when it locks it"): a screen left in Show mode is a
+	// volunteer's, its loads and writes with it, however long it stands.
 	const enterShow = () => {
 		setSheet(null)
 		setEditing(false)
 		setLayoutsOpen(false)
+		if (mode === 'operator') leave()
 		setShow(true)
 	}
 	// Out of Show mode (./showMode.ts): Admin's way in, whatever the mode, or,
-	// unlocked, a tap and the mode as it was.
+	// unlocked, a tap, back to volunteer.
 	const outOfShow = () => {
 		enter()
 		setShow(false)
@@ -766,7 +770,18 @@ export function App() {
 
 	const bodyOf = (win: GridWindow, tab: Tab) => {
 		const view = tabView(tab)
-		if (tab.view === 'video' && tab.feed == null) return <FeedChooser options={feedOptions} onPick={(f) => pickFeed(win, tab, f)} />
+		// Show mode holds the layout (./showMode.ts): what a tab shows is not
+		// chosen or moved from inside it either.
+		if (tab.view === 'video' && tab.feed == null) {
+			if (show) {
+				return (
+					<Centered>
+						<Placeholder icon={SquareStack} head="No video feed chosen" body="Leave Show mode to pick one." />
+					</Centered>
+				)
+			}
+			return <FeedChooser options={feedOptions} onPick={(f) => pickFeed(win, tab, f)} />
+		}
 		// The tab keeps the view's place while it is out (../shared/popout.ts).
 		if (popped.has(view)) {
 			// Every Spout or Syphon tab shares the one picture (and its window):
@@ -799,9 +814,11 @@ export function App() {
 			return (
 				<Centered>
 					<Placeholder icon={SquareStack} head={`${label(view)} is showing in another window`} body="It can be in one place at a time.">
-						<Button icon={ArrowLeftRight} className="mt-6" onClick={() => update((l) => makeHome(l, view, tab.id))}>
-							Move it here
-						</Button>
+						{!show && (
+							<Button icon={ArrowLeftRight} className="mt-6" onClick={() => update((l) => makeHome(l, view, tab.id))}>
+								Move it here
+							</Button>
+						)}
 					</Placeholder>
 				</Centered>
 			)
