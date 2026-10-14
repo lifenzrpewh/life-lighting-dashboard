@@ -15,6 +15,10 @@
 // - Load: tick cards and Load n, one confirmation for all of them; or Update
 //   all, as before. A card changes in place as its files load; the top count is
 //   the result.
+// - Which parts (the owner, 2026-10-14: "choose which PART of it you load, but
+//   keeping it clean"): the chips are the switches. Ticking a card lights every
+//   part with something to load; a tap on a chip leaves that part out, or, on a
+//   card not ticked, picks just that part. Nothing else on screen.
 // - No grid: Choose a slot opens that layer's clips only, to tap one.
 // - Card size is a zoom, per computer: Big (as the Lookbook was), Two a row,
 //   or Rows.
@@ -27,7 +31,7 @@
 // as Update all's, never a second guess.
 
 import { useEffect, useState } from 'react'
-import { Check, FileX, LayoutGrid, Rows3, Square, RefreshCw, X } from 'lucide-react'
+import { Check, FileX, LayoutGrid, Minus, Rows3, Square, RefreshCw, X } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaLayer, type ArenaStatus } from '../../shared/arena.js'
 import { checkAnnouncements, sessionOf, wantedAnnouncements } from '../../shared/announcements.js'
@@ -96,7 +100,8 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 		}
 	}
 	const [onlyNeeds, setOnlyNeeds] = useState(false)
-	const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
+	// The parts picked to load, by moment: each a set of codes.
+	const [picked, setPicked] = useState<ReadonlyMap<number, ReadonlySet<string>>>(new Map())
 	const lowerThirds = useLowerThirds(m)
 
 	const items = m.runSheet ?? []
@@ -116,22 +121,41 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 	const toLoad = count('load')
 	const needs = count('needs')
 	const loading = count('loading')
-	// Ticks hold only while the card can be loaded.
-	const loadable = (i: number) => operator && states.get(i) === 'load'
-	const ticked = [...selected].filter(loadable)
+	// A part can be picked while its moment has a step for it: Admin, not loading.
+	const loadableCodes = (i: number): string[] =>
+		!operator || states.get(i) === 'loading' ? [] : [...new Set((stepsOf.get(i) ?? []).map((st) => st.request.code))]
+	// Picks hold only while their part can still be loaded.
+	const pickedOf = (i: number): string[] => {
+		const can = loadableCodes(i)
+		return [...(picked.get(i) ?? [])].filter((c) => can.includes(c))
+	}
+	const pickedItems = looks.map((l) => l.item).filter((i) => pickedOf(i).length > 0)
+	const parts = pickedItems.reduce((n, i) => n + pickedOf(i).length, 0)
 	useEffect(() => {
 		if (onlyNeeds && needs === 0) setOnlyNeeds(false)
 	}, [onlyNeeds, needs])
-	const toggle = (i: number) => {
-		const next = new Set(selected)
-		if (next.has(i)) next.delete(i)
-		else next.add(i)
-		setSelected(next)
+	const setPicks = (i: number, codes: string[]) => {
+		const next = new Map(picked)
+		if (codes.length === 0) next.delete(i)
+		else next.set(i, new Set(codes))
+		setPicked(next)
 	}
-	const loadTicked = () => {
-		const steps = mergeSteps(ticked.flatMap((i) => stepsOf.get(i) ?? []))
+	/** The card's tick: everything it can load, or nothing. */
+	const tickCard = (i: number) => setPicks(i, pickedOf(i).length > 0 ? [] : loadableCodes(i))
+	/** A chip: in or out. */
+	const tickPart = (i: number, code: string) => {
+		const now = pickedOf(i)
+		setPicks(i, now.includes(code) ? now.filter((c) => c !== code) : [...now, code])
+	}
+	const stepsPicked = (i: number) => {
+		const codes = pickedOf(i)
+		return (stepsOf.get(i) ?? []).filter((st) => codes.includes(st.request.code))
+	}
+	const loadPicked = () => {
+		const steps = mergeSteps(pickedItems.flatMap(stepsPicked))
 		if (steps.length === 0) return
-		m.ask(`Load ${ticked.length === 1 ? (items[ticked[0] as number]?.title ?? '1 moment') : `${ticked.length} moments`}`, steps, [], [], () => setSelected(new Set()))
+		const one = pickedItems.length === 1 ? items[pickedItems[0] as number] : undefined
+		m.ask(`Load ${one !== undefined ? one.title : `${pickedItems.length} moments`}`, steps, [], [], () => setPicked(new Map()))
 	}
 	const holding = holdingLayers(status)[0]
 	const headerNames = holding === undefined ? status.columns.map((c) => c.name) : columnNamesOf(holding, status)
@@ -172,9 +196,9 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 					)}
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						<SizeSwitch size={size} onSize={setSize} />
-						{operator && ticked.length > 0 && (
-							<Button variant="primary" size="sm" onClick={loadTicked}>
-								Load {ticked.length}
+						{operator && parts > 0 && (
+							<Button variant="primary" size="sm" onClick={loadPicked}>
+								Load {parts} {parts === 1 ? 'part' : 'parts'}
 							</Button>
 						)}
 						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
@@ -213,10 +237,16 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 							item={items[look.item] as LookbookItem}
 							look={look}
 							state={states.get(look.item) ?? 'other'}
-							steps={stepsOf.get(look.item) ?? []}
 							size={size}
-							ticked={selected.has(look.item) && loadable(look.item)}
-							onTick={loadable(look.item) ? () => toggle(look.item) : null}
+							loadable={loadableCodes(look.item)}
+							picked={pickedOf(look.item)}
+							onTick={() => tickCard(look.item)}
+							onPart={(code) => tickPart(look.item, code)}
+							onLoad={() => {
+								const chosen = stepsPicked(look.item)
+								const steps = chosen.length > 0 ? chosen : (stepsOf.get(look.item) ?? [])
+								m.ask(`Load ${items[look.item]?.title ?? ''}`, steps, [], [], () => setPicks(look.item, []))
+							}}
 							lowerThirds={lowerThirds}
 						/>
 					))}
@@ -304,10 +334,12 @@ function Card({
 	item,
 	look,
 	state,
-	steps,
 	size,
-	ticked,
+	loadable,
+	picked,
 	onTick,
+	onPart,
+	onLoad,
 	lowerThirds,
 }: {
 	m: MediaCheckState
@@ -316,11 +348,15 @@ function Card({
 	item: LookbookItem
 	look: Look
 	state: CardState
-	steps: UpdateStep[]
 	size: Size
-	ticked: boolean
-	/** Admin, and the card has something to load: tick it for Load n. */
-	onTick: (() => void) | null
+	/** Its parts with something to load, for Admin: what may be picked. */
+	loadable: string[]
+	/** Its parts picked for Load n. */
+	picked: string[]
+	onTick: () => void
+	onPart: (code: string) => void
+	/** Load this card: its picked parts, or all of it. */
+	onLoad: () => void
 	lowerThirds: ReadonlyMap<string, 'there' | 'missing'>
 }) {
 	// What is open under the card: a code's files compared, or a slot to choose.
@@ -333,7 +369,10 @@ function Card({
 	const problems = problemsOf(look, m)
 	const pinned = m.pins.some((p) => p.item === look.item)
 	const big = size === 'big'
-	const ring = look.live ? 'ring-4 ring-state-live' : state === 'needs' ? 'ring-2 ring-warn' : ticked ? 'ring-2 ring-accent-hi' : ''
+	const ring = look.live ? 'ring-4 ring-state-live' : state === 'needs' ? 'ring-2 ring-warn' : picked.length > 0 ? 'ring-2 ring-accent-hi' : ''
+	const typeOf = (code: string) => TYPE_SHORT[look.codes.find((c) => c.code === code)?.type ?? ''] ?? code
+	// Load says what it loads when only some parts are picked: "Load BG".
+	const loadWords = picked.length > 0 && picked.length < loadable.length ? `Load ${picked.map(typeOf).join(', ')}` : 'Load'
 	const firstArena = look.codes.find((c) => c.state !== 'not-arena' && c.state !== 'no-file' && item.files[c.code] !== undefined)
 
 	const picture = (
@@ -355,7 +394,7 @@ function Card({
 	const words = (
 		<div className="flex min-w-0 flex-1 flex-col gap-2">
 			<div className="flex min-w-0 items-start gap-3">
-				{onTick !== null && <Tick on={ticked} onClick={onTick} />}
+				{loadable.length > 0 && <Tick on={picked.length === 0 ? false : picked.length === loadable.length ? true : 'some'} onClick={onTick} />}
 				<div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3">
 					<h3 className={`min-w-0 font-extrabold tracking-tight ${big ? 'text-3xl' : 'text-lg'}`}>{item.title}</h3>
 					{item.label !== null && <span className={`min-w-0 text-booth-dim ${big ? 'text-xl' : 'text-sm'}`}>{item.label}</span>}
@@ -364,7 +403,16 @@ function Card({
 			</div>
 			<div className="flex flex-wrap gap-1.5">
 				{look.codes.map((c) => (
-					<Piece key={c.code} m={m} item={look.item} code={c.code} type={c.type} state={c.state} lowerThird={lowerThirds.get(c.code)} />
+					<Piece
+						key={c.code}
+						m={m}
+						item={look.item}
+						code={c.code}
+						type={c.type}
+						state={c.state}
+						lowerThird={lowerThirds.get(c.code)}
+						pick={loadable.includes(c.code) ? { on: picked.includes(c.code), any: picked.length > 0, onTap: () => onPart(c.code) } : null}
+					/>
 				))}
 			</div>
 			{problems.length > 0 && (
@@ -383,11 +431,11 @@ function Card({
 					))}
 				</div>
 			)}
-			{operator && (state === 'load' || pinned || (state === 'ready' && firstArena !== undefined)) && (
+			{operator && (loadable.length > 0 || pinned || (state === 'ready' && firstArena !== undefined)) && (
 				<div className="flex flex-wrap items-center gap-2">
-					{state === 'load' && steps.length > 0 && (
-						<Button variant="primary" size="sm" onClick={() => m.ask(`Load ${item.title}`, steps)}>
-							Load
+					{loadable.length > 0 && (
+						<Button variant="primary" size="sm" onClick={onLoad}>
+							{loadWords}
 						</Button>
 					)}
 					{pinned ? (
@@ -447,17 +495,19 @@ function Card({
 	)
 }
 
-function Tick({ on, onClick }: { on: boolean; onClick: () => void }) {
+/** The card's tick: all its parts, some (a dash), or none. */
+function Tick({ on, onClick }: { on: boolean | 'some'; onClick: () => void }) {
 	return (
 		<button
 			type="button"
 			role="checkbox"
-			aria-checked={on}
+			aria-checked={on === 'some' ? 'mixed' : on}
 			aria-label="Tick to load with others"
 			onClick={onClick}
-			className={`grid size-8 shrink-0 place-items-center rounded-ctl border-2 ${on ? 'border-accent-hi bg-accent-hi text-black' : 'border-booth-edge hover:border-booth-ink'}`}
+			className={`grid size-8 shrink-0 place-items-center rounded-ctl border-2 ${on !== false ? 'border-accent-hi bg-accent-hi text-black' : 'border-booth-edge hover:border-booth-ink'}`}
 		>
-			{on && <Check size={18} strokeWidth={3} aria-hidden />}
+			{on === true && <Check size={18} strokeWidth={3} aria-hidden />}
+			{on === 'some' && <Minus size={18} strokeWidth={3} aria-hidden />}
 		</button>
 	)
 }
@@ -484,7 +534,8 @@ function StateBadge({ state, live, big }: { state: CardState; live: boolean; big
 }
 
 /** One piece of a moment: its kind and code, and a word only when it is not
- *  simply right. */
+ *  simply right. A part with something to load is a switch for Admin (`pick`):
+ *  lit while picked, faded while its card has other parts picked and not it. */
 function Piece({
 	m,
 	item,
@@ -492,6 +543,7 @@ function Piece({
 	type,
 	state,
 	lowerThird,
+	pick,
 }: {
 	m: MediaCheckState
 	item: number
@@ -499,6 +551,7 @@ function Piece({
 	type: string
 	state: CodeState
 	lowerThird: 'there' | 'missing' | undefined
+	pick: { on: boolean; any: boolean; onTap: () => void } | null
 }) {
 	const fetch = m.fetches[code]
 	const going = under(fetch)
@@ -522,13 +575,28 @@ function Piece({
 					'no-place': ['bg-warn/15 text-warn', 'no column'],
 					'no-file': ['text-booth-faint', 'no file in the lookbook'],
 				} as const)[state]
-	return (
-		<span className={`inline-flex h-8 items-center gap-1.5 rounded-ctl px-2 text-sm ${tone}`}>
+	const inner = (
+		<>
 			<span className="text-xs font-bold opacity-70">{TYPE_SHORT[type] ?? type}</span>
 			<span className="font-mono">{code}</span>
 			{state === 'missing' && !going && <FileX size={12} aria-hidden />}
 			{word !== '' && <span>{word}</span>}
-		</span>
+		</>
+	)
+	if (pick === null) return <span className={`inline-flex h-8 items-center gap-1.5 rounded-ctl px-2 text-sm ${tone}`}>{inner}</span>
+	return (
+		<button
+			type="button"
+			role="checkbox"
+			aria-checked={pick.on}
+			aria-label={`${TYPE_SHORT[type] ?? type} ${code}: ${pick.on ? 'will load; tap to leave it out' : 'tap to load it'}`}
+			onClick={pick.onTap}
+			className={`inline-flex h-8 items-center gap-1.5 rounded-ctl px-2 text-sm transition-opacity active:scale-95 ${
+				pick.on ? 'bg-accent-hi font-medium text-black' : `${tone} ${pick.any ? 'opacity-45' : ''}`
+			}`}
+		>
+			{inner}
+		</button>
 	)
 }
 

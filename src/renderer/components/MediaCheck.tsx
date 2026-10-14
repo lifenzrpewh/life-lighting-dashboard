@@ -147,17 +147,24 @@ function ServicePicker({
  *  are asked apart, each off until ticked: a file only the lookbook has, and a
  *  clip on screen now. A third, when there are any: old foregrounds this run
  *  sheet does not use, to clear (the owner, 2026-10-05); on its own (Clear old
- *  FGs) it is the whole question. */
+ *  FGs) it is the whole question. Said in one line, how many files and from
+ *  where, with each step a tap away (Show each): the owner, 2026-10-14. */
 export function Confirm({ m }: { m: MediaCheckState }) {
 	const [lookbook, setLookbook] = useState(false)
 	const [live, setLive] = useState(false)
 	const [clear, setClear] = useState(false)
+	// Each step, its place and its source: a tap away (the owner, 2026-10-14: "I
+	// like the info, just the way it shows feels cluttered and full").
+	const [each, setEach] = useState(false)
 	if (m.asking === null) return null
 	const { title, steps, unplaced, sources, clears } = m.asking
 	// A confirmation that is only a clear asks nothing else.
 	const onlyClear = steps.length === 0 && clears.length > 0
 	const clearing = onlyClear || (clear && clears.length > 0)
-	const fromLookbook = sources === null ? 0 : steps.filter((s) => sources[s.request.code]?.from === 'lookbook').length
+	const fromOf = (code: string) => sources?.[code]?.from
+	const drive = steps.filter((s) => fromOf(s.request.code) === 'drive').length
+	const lookbookCodes = steps.filter((s) => fromOf(s.request.code) === 'lookbook').map((s) => s.request.code)
+	const nowhere = steps.filter((s) => fromOf(s.request.code) === 'none').length
 	const onScreen = steps.flatMap((s) => m.onScreen(s).map((c) => ({ code: s.request.code, where: c.where })))
 	const sending = m.toSend({ lookbook, live })
 	const done = (answers: { lookbook: boolean; live: boolean; clear: boolean } | null) => {
@@ -166,67 +173,76 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 		setLookbook(false)
 		setLive(false)
 		setClear(false)
+		setEach(false)
 	}
-	const oldWords = clears.map((c) => `${c.code} in ${c.columnName}`).join(', ')
-	// More than the named columns and the empty clips past them take (the owner, 2026-10-08).
-	const didntFit = unplaced.filter((u) => u.didntFit === true).length
+	const oldWords = clears.map((c) => c.code).join(', ')
+	// What has no place, said in the count; each one under Show each.
+	const leftOut = unplaced.filter((u) => u.kind !== 'unnamed' && u.kind !== 'no-file')
+	const files = (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`
+	const head = title.replace(/:.*$/, '')
 	return (
 		<div className="my-2 flex flex-col gap-2 rounded-ctl bg-booth-raise p-3 text-sm ring-1 ring-warn/60 ring-inset">
-			<p className="font-medium">{title}</p>
-			<ul className="flex flex-col gap-0.5 text-xs">
-				{steps.map((s) => {
-					const src = sources?.[s.request.code]
-					return (
-						<li key={s.request.code} className="flex min-w-0 items-baseline gap-2">
-							<span className="min-w-0 flex-1 break-words">{s.what}</span>
-							<span className={`max-w-[40%] shrink-0 truncate ${src?.from === 'drive' ? 'text-booth-dim' : 'text-warn'}`} title={src?.from === 'none' ? src.detail : undefined}>
-								{src === undefined
-									? sources === null
-										? 'looking on the drive…'
-										: 'not checked'
-									: src.from === 'drive'
-										? 'from the drive'
-										: src.from === 'lookbook'
-											? 'only in the lookbook'
-											: `left out: ${src.detail}`}
-							</span>
-						</li>
-					)
-				})}
-				{didntFit > 0 && (
-					<li className="text-warn">
-						{didntFit} didn&rsquo;t fit: no empty clip left past the named columns. {didntFit === 1 ? 'It waits' : 'They wait'} in No column, to place by hand.
-					</li>
-				)}
-				{unplaced
-					.filter((u) => u.kind !== 'unnamed' && u.kind !== 'no-file')
-					.map((u) => (
-						<li key={`${u.item}:${u.code}`} className="truncate text-booth-dim">
+			<p>
+				<span className="font-bold">{head}</span>
+				{steps.length > 0 && <span>: {files(steps.length)} into Arena</span>}
+				{onlyClear && <span>: empty {clears.length === 1 ? 'a slot' : `${clears.length} slots`} on {clears[0]?.layer}</span>}
+			</p>
+			{steps.length > 0 && (
+				<p className="flex flex-wrap gap-x-3 text-xs text-booth-dim">
+					{sources === null ? (
+						<span>Looking on the graphics drive…</span>
+					) : (
+						<>
+							{drive > 0 && <span>{drive} from the graphics drive</span>}
+							{lookbookCodes.length > 0 && <span className="text-warn">{lookbookCodes.length} only in the lookbook</span>}
+							{nowhere > 0 && <span className="text-warn">{nowhere} found nowhere: left out</span>}
+						</>
+					)}
+					{leftOut.length > 0 && <span className="text-warn">{leftOut.length} with no column: left out</span>}
+				</p>
+			)}
+			{onlyClear && <p className="text-xs text-warn">Not used by this service: {oldWords}. Each slot loses its file and settings.</p>}
+			{each && (
+				<ul className="flex flex-col gap-0.5 border-t border-booth-edge/60 pt-2 text-xs">
+					{steps.map((s) => {
+						const src = sources?.[s.request.code]
+						return (
+							<li key={s.request.code} className="flex min-w-0 items-baseline gap-2">
+								<span className="min-w-0 flex-1 break-words">{s.what}</span>
+								<span className={`max-w-[40%] shrink-0 truncate ${src?.from === 'drive' ? 'text-booth-dim' : 'text-warn'}`} title={src?.from === 'none' ? src.detail : undefined}>
+									{src === undefined
+										? sources === null
+											? 'looking…'
+											: 'not checked'
+										: src.from === 'drive'
+											? 'drive'
+											: src.from === 'lookbook'
+												? 'lookbook only'
+												: `left out: ${src.detail}`}
+								</span>
+							</li>
+						)
+					})}
+					{leftOut.map((u) => (
+						<li key={`${u.item}:${u.code}`} className="text-booth-dim">
 							{u.code} ({u.label ?? u.title}): left out, {u.detail}
 						</li>
 					))}
-			</ul>
-			{fromLookbook > 0 && (
+				</ul>
+			)}
+			{lookbookCodes.length > 0 && (
 				<Tick on={lookbook} onChange={setLookbook} tone="warn">
-					Download {fromLookbook} from the lookbook: not on the graphics drive as the lookbook has {fromLookbook === 1 ? 'it' : 'them'}
+					Download {lookbookCodes.join(', ')} from the lookbook (not on the graphics drive)
 				</Tick>
 			)}
-			{onlyClear ? (
-				<p className="text-xs text-warn">
-					Empty {clears.length === 1 ? 'this slot' : `these ${clears.length} slots`} on {clears[0]?.layer}, not used by this service: {oldWords}. Each slot loses its file and
-					settings.
-				</p>
-			) : (
-				clears.length > 0 && (
-					<Tick on={clear} onChange={setClear} tone="warn">
-						Also clear {clears.length === 1 ? 'an old foreground' : `${clears.length} old foregrounds`} this service does not use ({oldWords})
-					</Tick>
-				)
+			{!onlyClear && clears.length > 0 && (
+				<Tick on={clear} onChange={setClear} tone="warn">
+					Also clear {clears.length === 1 ? 'an old foreground' : `${clears.length} old foregrounds`} ({oldWords})
+				</Tick>
 			)}
 			{onScreen.length > 0 && (
 				<Tick on={live} onChange={setLive} tone="live">
-					Replace {onScreen.length === 1 ? 'a clip' : `${onScreen.length} clips`} on screen now ({[...new Set(onScreen.map((c) => `${c.code} in ${c.where}`))].join(', ')}): the
-					audience sees it change
+					Replace {onScreen.length === 1 ? 'a clip' : `${onScreen.length} clips`} on screen now ({[...new Set(onScreen.map((c) => c.code))].join(', ')}): the audience sees it change
 				</Tick>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
@@ -235,14 +251,20 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 				) : sources === null ? (
 					<span className="flex h-10 items-center text-xs text-booth-dim">Looking on the drive…</span>
 				) : sending.length === 0 && !clearing ? (
-					<span className="flex h-10 items-center text-xs text-booth-dim">Nothing to load{fromLookbook + onScreen.length > 0 ? ' unless ticked' : ''}</span>
+					<span className="flex h-10 items-center text-xs text-booth-dim">Nothing to load{lookbookCodes.length + onScreen.length > 0 ? ' unless ticked' : ''}</span>
 				) : (
 					<SmallButton onClick={() => done({ lookbook, live, clear: clearing })} tone={live && onScreen.length > 0 ? 'live' : 'plain'}>
-						{live && onScreen.length > 0 ? `Load, replacing ${onScreen.length} on screen` : sending.length === 0 ? 'Clear only' : `Load ${sending.length === 1 ? '1' : sending.length}`}
+						{live && onScreen.length > 0 ? `Load, replacing ${onScreen.length} on screen` : sending.length === 0 ? 'Clear only' : `Load ${sending.length}`}
 						{clearing && sending.length > 0 ? `, clear ${clears.length}` : ''}
 					</SmallButton>
 				)}
 				<SmallButton onClick={() => done(null)}>Cancel</SmallButton>
+				{(steps.length > 0 || leftOut.length > 0) && (
+					<button type="button" onClick={() => setEach(!each)} aria-expanded={each} className="ml-auto flex h-10 items-center gap-1 rounded-ctl px-2 text-xs text-booth-dim hover:bg-booth-hover hover:text-booth-ink">
+						{each ? 'Hide each' : 'Show each'}
+						<ChevronRight size={14} aria-hidden className={each ? 'rotate-90' : ''} />
+					</button>
+				)}
 			</div>
 		</div>
 	)

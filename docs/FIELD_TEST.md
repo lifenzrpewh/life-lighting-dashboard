@@ -88,6 +88,10 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.5.0** (2026-10-14): 1.4.1 with **parts** (pick BG, FG or A within a moment) and the one-line
+confirmation (§ One Lookbook). Reads updates from this repo, like 1.4.1; publish it on
+`paua-releases` too for booths still on 1.1.0 to 1.4.0 (the bridge).
+
 **1.4.1** (2026-10-14): 1.4.0 with the updater reading this repo's releases. Booths on 1.1.0 to
 1.4.0 are offered it once it is published on `paua-releases` (the bridge); from then on, publishing
 a release here is what offers it. 1.4.0 itself: skip. New since 1.3.0: **One Lookbook** (Holding merged in) and Settings › Admin › **Leaving
@@ -122,6 +126,9 @@ sections below.
 - [ ] A file that differs: **Compare** on its card shows Arena's beside the lookbook's
 - [ ] Lower thirds (with ProPresenter set up): `LT CT108 in ProPresenter`, or amber "not in ProPresenter"
 - [ ] As a volunteer: no ticks or buttons, the states and chips still there
+- [ ] **Parts** (1.5.0): tick a card, tap its BG chip: the BG fades, the tick shows a dash, the button says **Load FG**; the top says **Load n parts**, and the confirmation lists only those
+- [ ] On a card not ticked, tap one chip: just that part is picked
+- [ ] The confirmation (1.5.0): one line of how many files and from where, the questions, **Show each** for every step
 
 **Announcements Load** (1.3.0; Admin; Settings › ProPresenter › Announcements: the folder as this
 computer reaches it, Arena's graphics folder set; first run at Central 2026-10-14 into PAUA TEST AM)

@@ -324,6 +324,11 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-14, night: v1.5.0 tagged** at the owner's ask: in the Lookbook, **parts** (the chips are
+switches: pick BG, FG or A within a moment) and the **one-line confirmation** with Show each (the
+owner's picks; `docs/VISUALS_DASHBOARD.md` § One Lookbook). Checked on the Mac over CDP against the
+stand-in. Any version from 1.4.1 serves as the bridge: publish 1.5.0 here and on `paua-releases`.
+
 **2026-10-14, night: v1.4.1 tagged**: the updater reads this repo's releases (the booths never
 moved past 1.1.0: `paua-releases` held only drafts after it). Publish 1.4.1 here **and on
 `paua-releases`** once, the bridge (TODO, top). 1.4.0 is the same app with the old feed: skip it.
@@ -680,7 +685,7 @@ Later, not tonight:
    replaces it whole). `docs/VISUALS_DASHBOARD.md` § ProPresenter announcements.
 0. **Updates from this repo: the bridge** (switched in 1.4.1, 2026-10-14, the owner's ask: the
    booths sat on 1.1.0 because `paua-releases` had only drafts after it, while the releases
-   published here were never read). Publish **1.4.1 on `paua-releases` too**, once: that moves
+   published here were never read). Publish **1.4.1 or later (1.5.0) on `paua-releases` too**, once: that moves
    booths on 1.1.0 to 1.4.0 onto this repo's releases. After every booth is past 1.4.0, drop the
    release workflow's paua-releases step and the `RELEASES_TOKEN` secret. ⚠️ If this repo is
    renamed to `paua`, the feed baked into 1.4.1 names the old one: GitHub redirects a renamed
