@@ -4,17 +4,17 @@
 // write-only: a row is told whether one is set, never what it is, so a blank
 // password box means "leave it as it is", and Remove is its own button.
 
-import { useState } from 'react'
-import { RotateCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { RotateCw, Search } from 'lucide-react'
 
 import type { DeskState } from '../../../shared/desk.js'
-import { replyPortOf, type SettingsPatch, type SettingsView } from '../../../shared/settings.js'
+import { DEFAULT_SETTINGS, replyPortOf, sameReplyPortOf, type SettingsPatch, type SettingsView } from '../../../shared/settings.js'
 
 import { CueManagerSettings } from '../CueManagerSettings.js'
 import { Field, Input, Select, User, portOf, useProPresenterNames } from '../form.js'
 import { Button, Segmented } from '../ui.js'
 import { formatAge } from '../vocabulary.js'
-import { Editor, FolderInput, HostPort, type Save } from './parts.js'
+import { Advanced, Editor, FolderInput, HostPort, type Save } from './parts.js'
 
 export function OnTimeEditor({ view, save }: { view: SettingsView; save: Save }) {
 	const [host, setHost] = useState(view.onTimeHost ?? '')
@@ -34,6 +34,7 @@ export function OnTimeEditor({ view, save }: { view: SettingsView; save: Save })
 						portField="onTimePort"
 						hostLabel="OnTime address"
 						portHint="4001 unless OnTime says otherwise."
+						defaultPort={DEFAULT_SETTINGS.onTimePort}
 					/>
 				</>
 			)}
@@ -78,6 +79,7 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 						portField="proPresenterPort"
 						hostLabel="ProPresenter address"
 						portHint="1025 unless ProPresenter › Settings › Network says otherwise (Enable Network on)."
+						defaultPort={DEFAULT_SETTINGS.proPresenterPort}
 					/>
 					<Field
 						label="Timer"
@@ -127,14 +129,20 @@ export function ProPresenterEditor({ view, save }: { view: SettingsView; save: S
 							<Field label="Folder" error={err('announcementsFolder')} hint="As this computer reaches it, and ProPresenter's computer too.">
 								<FolderInput value={annFolder} onChange={setAnnFolder} placeholder="\\10.0.0.71\graphics\Other Media\Paua Smart Folder" />
 							</Field>
-							<div className="grid grid-cols-2 gap-4">
-								<Field label="Media playlist" error={err('announcementsMediaPlaylist')} hint="In the Media Bin; they are dragged into it.">
-									<Input value={annMedia} onChange={setAnnMedia} />
-								</Field>
-								<Field label="Output playlist" error={err('announcementsPlaylist')} hint="Without AM, PM or EVENT.">
-									<Input value={annOutput} onChange={setAnnOutput} />
-								</Field>
-							</div>
+							<Advanced
+								summary={`playlists “${annMedia}” and “${annOutput} AM/PM/EVENT”`}
+								changed={annMedia !== DEFAULT_SETTINGS.announcementsMediaPlaylist || annOutput !== DEFAULT_SETTINGS.announcementsPlaylist}
+								errors={[err('announcementsMediaPlaylist'), err('announcementsPlaylist')]}
+							>
+								<div className="grid grid-cols-2 gap-4">
+									<Field label="Media playlist" error={err('announcementsMediaPlaylist')} hint="In the Media Bin; they are dragged into it.">
+										<Input value={annMedia} onChange={setAnnMedia} />
+									</Field>
+									<Field label="Output playlist" error={err('announcementsPlaylist')} hint="Without AM, PM or EVENT.">
+										<Input value={annOutput} onChange={setAnnOutput} />
+									</Field>
+								</div>
+							</Advanced>
 						</>
 					)}
 				</>
@@ -148,6 +156,18 @@ export function ArenaEditor({ view, save }: { view: SettingsView; save: Save }) 
 	const [port, setPort] = useState(String(view.arenaPort))
 	const [graphics, setGraphics] = useState(view.graphicsFolder ?? '')
 	const [local, setLocal] = useState(view.localMediaFolder ?? '')
+	// Find: Arena on this computer, on the ports it is usually on. Fills the
+	// fields; Save keeps them.
+	const [finding, setFinding] = useState<'idle' | 'looking' | string>('idle')
+	const find = () => {
+		setFinding('looking')
+		void window.life?.findArena().then((found) => {
+			if (found === null) return setFinding('Arena is not answering on this computer (8080 or 8090). Is its web server on?')
+			setHost(found.host)
+			setPort(String(found.port))
+			setFinding(`Found ${found.version} on port ${found.port}. Save to keep it.`)
+		})
+	}
 	return (
 		<Editor
 			save={save}
@@ -174,7 +194,16 @@ export function ArenaEditor({ view, save }: { view: SettingsView; save: Save }) 
 						portField="arenaPort"
 						hostLabel="Arena address"
 						portHint="8080 unless Arena says otherwise."
+						defaultPort={DEFAULT_SETTINGS.arenaPort}
+						aside={
+							window.life !== undefined && (
+								<Button icon={Search} onClick={find} disabled={finding === 'looking'}>
+									Find
+								</Button>
+							)
+						}
 					/>
+					{finding !== 'idle' && <p className="text-sm text-booth-dim">{finding === 'looking' ? 'Looking on this computer…' : finding}</p>}
 					<p className="text-sm text-booth-dim">
 						For the media check's Fetch: the lookbook's file is found by name in the graphics folder (only ever read),
 						copied into the local folder, and loaded into Arena's clip. Never into a clip that is playing, and nothing is
@@ -206,6 +235,11 @@ export function ConsoleEditor({ view, save }: { view: SettingsView; save: Save }
 	const [removeVolunteer, setRemoveVolunteer] = useState(false)
 	const [removeOperator, setRemoveOperator] = useState(false)
 	const [campus, setCampus] = useState(view.campus ?? '')
+	// This computer's addresses: where the console's OSC row must send.
+	const [here, setHere] = useState<string[] | null>(null)
+	useEffect(() => void window.life?.hereAddresses().then(setHere), [])
+	const oscNow = portOf(oscPort) ?? view.oscPort
+	const worked = sameReplyPortOf({ consoleHost: host.trim() === '' ? null : host.trim(), oscPort: oscNow })
 
 	const patch = (): SettingsPatch => {
 		const p: SettingsPatch = {
@@ -232,32 +266,38 @@ export function ConsoleEditor({ view, save }: { view: SettingsView; save: Save }
 						<Field label="Console address" error={err('consoleHost')}>
 							<Input value={host} onChange={setHost} placeholder="10.11.60.40" mono />
 						</Field>
-						<Field label="Web remote port" error={err('webRemotePort')} hint="8080 unless the console says otherwise.">
-							<Input value={webPort} onChange={setWebPort} inputMode="numeric" />
-						</Field>
-						<Field label="OSC port on the console" error={err('oscPort')} hint="The Port of the console's OSC entry, prefix life.">
-							<Input value={oscPort} onChange={setOscPort} inputMode="numeric" />
-						</Field>
-						<Field
-							label="Replies come back on"
-							error={err('replyPort')}
-							hint="Blank for the same port. Only grandMA3 onPC on this computer needs another."
-						>
-							<Input
-								value={replyPort}
-								onChange={setReplyPort}
-								inputMode="numeric"
-								placeholder={`same (${oscPort.trim() || view.oscPort})`}
-							/>
-						</Field>
 						<Field label="Campus" error={err('campus')} hint="Save As names begin with it, then the date and time.">
 							<Input value={campus} onChange={setCampus} placeholder="Central" />
 						</Field>
 					</div>
-					<p className="text-sm text-booth-dim">
-						Listening on {replyPortOf(view)} now. The link is checked by asking the console to echo a message after 15 s of
-						quiet, which puts one SendOSC line on its command line.
-					</p>
+					<OscRowCard here={here} oscPort={oscNow} replyPort={replyPort.trim() === '' ? worked : (portOf(replyPort) ?? worked)} loopback={worked !== oscNow} />
+					<Advanced
+						summary={`web remote ${webPort.trim() || view.webRemotePort} · OSC ${oscPort.trim() || view.oscPort}${replyPort.trim() === '' ? '' : ` · replies ${replyPort.trim()}`}`}
+						changed={
+							webPort.trim() !== String(DEFAULT_SETTINGS.webRemotePort) || oscPort.trim() !== String(DEFAULT_SETTINGS.oscPort) || replyPort.trim() !== ''
+						}
+						errors={[err('webRemotePort'), err('oscPort'), err('replyPort')]}
+					>
+						<div className="grid grid-cols-2 gap-4">
+							<Field label="Web remote port" error={err('webRemotePort')} hint="8080 unless the console says otherwise.">
+								<Input value={webPort} onChange={setWebPort} inputMode="numeric" />
+							</Field>
+							<Field label="OSC port on the console" error={err('oscPort')} hint="The Port of the console's OSC entry, prefix life.">
+								<Input value={oscPort} onChange={setOscPort} inputMode="numeric" />
+							</Field>
+							<Field
+								label="Replies come back on"
+								error={err('replyPort')}
+								hint="Blank works it out: the same port, or the next one up for grandMA3 onPC on this computer."
+							>
+								<Input value={replyPort} onChange={setReplyPort} inputMode="numeric" placeholder={`worked out (${worked})`} />
+							</Field>
+						</div>
+						<p className="text-sm text-booth-dim">
+							Listening on {replyPortOf(view)} now. The link is checked by asking the console to echo a message after 15 s of
+							quiet, which puts one SendOSC line on its command line.
+						</p>
+					</Advanced>
 					<p className="text-sm text-booth-dim">
 						What each mode may do is set on the console, in these users’ rights. Admin, Guest and 3D users cannot log in
 						to a web remote.
@@ -303,6 +343,44 @@ export function ConsoleEditor({ view, save }: { view: SettingsView; save: Save }
 				</>
 			)}
 		</Editor>
+	)
+}
+
+/** What to set in the console's OSC row for this computer: the destination
+ *  is per machine, and one copied from another booth (or the broadcast
+ *  address, which lagged the desk) is the fault that has cost the most here. */
+function OscRowCard({ here, oscPort, replyPort, loopback }: { here: string[] | null; oscPort: number; replyPort: number; loopback: boolean }) {
+	const to = loopback ? ['127.0.0.1'] : (here ?? [])
+	return (
+		<div className="flex flex-col gap-1 rounded-ctl bg-booth-raise p-3 text-sm">
+			<span className="font-bold">On the console: Menu › In &amp; Out › OSC, one row</span>
+			<span className="text-booth-dim">
+				Prefix <span className="font-mono text-booth-ink">life</span> · Port <span className="font-mono text-booth-ink">{oscPort}</span> ·
+				Receive, Receive Command, Send and Send Command all Yes
+			</span>
+			<span className="text-booth-dim">
+				Destination{' '}
+				{to.length === 0 ? (
+					here === null ? (
+						'this computer’s address'
+					) : (
+						<span className="text-warn">this computer has no network address now</span>
+					)
+				) : (
+					<>
+						<span className="font-mono text-booth-ink">{to.join(' or ')}</span>
+						{to.length > 1 ? ' (whichever the console reaches)' : ''}
+					</>
+				)}
+				{replyPort !== oscPort && (
+					<>
+						{' '}
+						on port <span className="font-mono text-booth-ink">{replyPort}</span>
+					</>
+				)}
+				. Never the broadcast address.
+			</span>
+		</div>
 	)
 }
 

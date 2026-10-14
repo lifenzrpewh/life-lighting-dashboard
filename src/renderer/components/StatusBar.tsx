@@ -332,22 +332,20 @@ export function StatusBar({
 					</span>
 				)}
 				<span className="flex shrink-0 items-center gap-0.5">
-					{shows('connections') && (
-						<Tool icon={Activity} label="Connections" onClick={onConnections} pressed={connectionsOpen} compact={compact}>
-							<span
-								className={`absolute grid place-items-center rounded-full ${compact ? 'top-0.5 right-0.5 size-2.5' : 'top-1.5 right-1.5 size-3'} ${
-									connectionsOpen ? 'bg-accent' : 'bg-booth-bg group-hover:bg-booth-raise'
-								}`}
-							>
-								<Dot tone={worstTone(rows)} size="sm" />
-							</span>
-						</Tool>
-					)}
+					<Tool icon={Activity} label="Connections" onClick={onConnections} pressed={connectionsOpen} compact={compact}>
+						<span
+							className={`absolute grid place-items-center rounded-full ${compact ? 'top-0.5 right-0.5 size-2.5' : 'top-1.5 right-1.5 size-3'} ${
+								connectionsOpen ? 'bg-accent' : 'bg-booth-bg group-hover:bg-booth-raise'
+							}`}
+						>
+							<Dot tone={worstTone(rows)} size="sm" />
+						</span>
+					</Tool>
 					{testing && (
 						<Tool icon={Flag} label="Mark this moment in the log" onClick={() => void onMark().then(setMarked)} compact={compact} />
 					)}
 					{shows('show') && !show && (
-						<Tool icon={Maximize} label="Show mode: no tab strips, the layout and mode held" onClick={onShow} compact={compact} />
+						<Tool icon={Maximize} label="Show mode: no tab strips, the layout held, back to volunteer" onClick={onShow} compact={compact} />
 					)}
 					{admin && !show && <Tool icon={Settings} label="Settings" onClick={onSettings} pressed={settingsOpen} compact={compact} />}
 					{/* Boots into volunteer, always, and never remembers otherwise. */}

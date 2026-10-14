@@ -4,7 +4,7 @@
 // list everyone reads and Settings the place Admin changes things.
 
 import { useState, type ReactNode } from 'react'
-import { FolderOpen, Save as SaveIcon } from 'lucide-react'
+import { ChevronRight, FolderOpen, Save as SaveIcon } from 'lucide-react'
 
 import type { Tone } from '../../../shared/connections.js'
 import type { SettingsField, SettingsPatch } from '../../../shared/settings.js'
@@ -146,6 +146,44 @@ export function Editor({
 
 export type Err = (field: SettingsField) => string | undefined
 
+/** The fields a booth rarely changes (ports, MA's own names), folded away
+ *  under one line that says what they hold. Opens by itself when one of them
+ *  is not the usual, or the last Save found fault with one, so nothing set
+ *  differently is ever out of sight. */
+export function Advanced({
+	summary,
+	changed,
+	errors,
+	children,
+}: {
+	/** What the fields hold now, in a few words: shown folded. */
+	summary: string
+	/** One of them is not its usual value. */
+	changed: boolean
+	errors: ReadonlyArray<string | undefined>
+	children: ReactNode
+}) {
+	const [open, setOpen] = useState(changed)
+	const shown = open || errors.some((e) => e !== undefined)
+	return (
+		<div className="flex flex-col gap-3">
+			<button
+				type="button"
+				onClick={() => setOpen(!shown)}
+				aria-expanded={shown}
+				className="flex min-h-10 items-center gap-2 self-start text-sm font-bold text-booth-dim hover:text-booth-ink"
+			>
+				<ChevronRight size={16} aria-hidden className={`transition-transform ${shown ? 'rotate-90' : ''}`} />
+				Advanced
+				<span className="font-normal">{summary}</span>
+			</button>
+			{shown && <div className="flex flex-col gap-4 border-l-2 border-booth-edge pl-4">{children}</div>}
+		</div>
+	)
+}
+
+/** An address, and its port folded under Advanced: the port is the program's
+ *  own default nearly everywhere. */
 export function HostPort(p: {
 	err: Err
 	host: string
@@ -156,17 +194,27 @@ export function HostPort(p: {
 	portField: SettingsField
 	hostLabel: string
 	portHint: string
+	defaultPort: number
 	placeholder?: string
+	/** Beside the address: a Find, say. */
+	aside?: ReactNode
 }) {
 	return (
-		<div className="grid grid-cols-2 gap-4">
+		<>
 			<Field label={p.hostLabel} error={p.err(p.hostField)}>
-				<Input value={p.host} onChange={p.onHost} placeholder={p.placeholder ?? 'not used'} mono />
+				<span className="flex min-w-0 gap-2">
+					<span className="min-w-0 flex-1">
+						<Input value={p.host} onChange={p.onHost} placeholder={p.placeholder ?? 'not used'} mono />
+					</span>
+					{p.aside}
+				</span>
 			</Field>
-			<Field label="Port" error={p.err(p.portField)} hint={p.portHint}>
-				<Input value={p.port} onChange={p.onPort} inputMode="numeric" />
-			</Field>
-		</div>
+			<Advanced summary={`port ${p.port.trim() || p.defaultPort}`} changed={p.port.trim() !== String(p.defaultPort)} errors={[p.err(p.portField)]}>
+				<Field label="Port" error={p.err(p.portField)} hint={p.portHint}>
+					<Input value={p.port} onChange={p.onPort} inputMode="numeric" />
+				</Field>
+			</Advanced>
+		</>
 	)
 }
 

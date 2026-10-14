@@ -117,16 +117,24 @@ test('a bad OSC port rejects the patch and says which', () => {
 	assert.deepEqual(Object.keys(r.errors).sort(), ['oscPort', 'replyPort'])
 })
 
-test('onPC on this computer with replies on its own port is refused, and says why', () => {
+test('onPC on this computer: replies on the next port up unless set, and one shared port refused', () => {
 	// ✅ 2026-09-30: onPC holds every row's port, and the reply socket sits beside
 	// it on 127.0.0.1, so one shared port would hand the dashboard its own commands.
 	for (const host of ['127.0.0.1', 'localhost', '127.0.0.2']) {
 		const r = applyPatch(DEFAULT_SETTINGS, { consoleHost: host })
-		assert.ok(!r.ok, host)
-		assert.match(r.errors.replyPort, /this computer/)
+		assert.ok(r.ok, host)
+		assert.equal(r.settings.replyPort, null, 'worked out, not stored')
+		assert.equal(replyPortOf(r.settings), 8004)
+		const shared = applyPatch(DEFAULT_SETTINGS, { consoleHost: host, replyPort: 8003 })
+		assert.ok(!shared.ok, host)
+		assert.match(shared.errors.replyPort, /this computer/)
 	}
-	assert.ok(applyPatch(DEFAULT_SETTINGS, { consoleHost: '127.0.0.1', replyPort: 8004 }).ok)
-	assert.ok(applyPatch(DEFAULT_SETTINGS, { consoleHost: '10.11.60.40' }).ok, 'a console elsewhere shares one port, as MA intends')
+	const set = applyPatch(DEFAULT_SETTINGS, { consoleHost: '127.0.0.1', replyPort: 8004 })
+	assert.ok(set.ok)
+	assert.equal(set.settings.replyPort, null, 'the same as worked out is stored as that')
+	const away = applyPatch(set.settings, { consoleHost: '10.11.60.40' })
+	assert.ok(away.ok)
+	assert.equal(replyPortOf(away.settings), 8003, 'a console elsewhere shares one port, as MA intends')
 	assert.equal(isLoopback('127.0.0.1.example'), false)
 	assert.equal(isLoopback('10.11.60.40'), false)
 })

@@ -4,22 +4,22 @@
 // (`paua.barCollapsed`), so a machine that keeps nothing shows everything.
 //
 // Not hideable: the mode lock (or nobody could reach Admin to show anything
-// again), Settings (Admin's only, and the way back to this list) and the
-// fold handle. Since the 2026-10-08 look the console card has gone (the show
+// again), Settings (Admin's only, and the way back to this list), the fold
+// handle, and Connections (since 2026-10-14: it is where a volunteer sees
+// what is down, and its dot the one sign on the bar that something is). Since the 2026-10-08 look the console card has gone (the show
 // is on the console itself and on Connections' Console row, the bar speaking
 // up only for the base show or a console not answering), the Guide is a view
 // for a window, and Mark is on the bar only while Testing is on.
 
 import { useState } from 'react'
 
-export const BAR_ITEMS = ['countdown', 'clock', 'layouts', 'connections', 'show'] as const
+export const BAR_ITEMS = ['countdown', 'clock', 'layouts', 'show'] as const
 export type BarItem = (typeof BAR_ITEMS)[number]
 
 export const BAR_ITEM_LABEL: Record<BarItem, { name: string; what: string }> = {
 	countdown: { name: 'Countdown', what: 'OnTime’s or ProPresenter’s timer' },
 	clock: { name: 'Clock', what: 'The time and date' },
 	layouts: { name: 'Layouts', what: 'Switch between saved layouts' },
-	connections: { name: 'Connections', what: 'What is up and what is down, and its dot' },
 	show: { name: 'Show mode', what: 'The way into Show mode. The way out always stays' },
 }
 

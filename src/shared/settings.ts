@@ -123,7 +123,15 @@ export const DEFAULT_OSC_PORT = 8003
 
 /** The port this computer actually listens on. */
 export function replyPortOf(s: Settings): number {
-	return s.replyPort ?? s.oscPort
+	return s.replyPort ?? sameReplyPortOf(s)
+}
+
+/** The reply port when none is set: the console's own, as MA intends, except
+ *  for onPC on this computer, which holds that port itself, so the next one up
+ *  (the setup every onPC test here has used). Worked out, not asked for. */
+export function sameReplyPortOf(s: Pick<Settings, 'consoleHost' | 'oscPort'>): number {
+	if (s.consoleHost !== null && isLoopback(s.consoleHost)) return s.oscPort < 65535 ? s.oscPort + 1 : s.oscPort - 1
+	return s.oscPort
 }
 
 /** True when the console address is this computer: onPC running beside the
@@ -268,9 +276,9 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Checked {
 		if (patch.replyPort === null || isPort(patch.replyPort)) next.replyPort = patch.replyPort
 		else errors.replyPort = 'A whole number from 1 to 65535, or blank for the same port as the console.'
 	}
-	// Stored as "same" rather than as a copy, so a later change to the console's
-	// port carries the replies with it.
-	if (next.replyPort === next.oscPort) next.replyPort = null
+	// Stored as "as worked out" rather than as a copy, so a later change to the
+	// console's port (or address) carries the replies with it.
+	if (next.replyPort === sameReplyPortOf(next)) next.replyPort = null
 	// The one layout known to fail. onPC on this computer holds its rows'
 	// ports, and the reply socket sits beside it on 127.0.0.1 exactly, so a
 	// shared port would carry the dashboard's own commands straight back to it.

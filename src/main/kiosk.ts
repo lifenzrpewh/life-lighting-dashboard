@@ -68,7 +68,10 @@ import { localAddresses, startChannelB, OSC_PREFIX, type ChannelBHandle } from '
 import { startLink, type LinkHandle } from './bridge/link.js'
 import { startTimers, type TimersHandle } from './timers.js'
 import { startArena, type ArenaHandle } from './arena.js'
+import { getJson } from './http-poll.js'
+import { decodeArenaProduct } from '../bridge/arena.js'
 import type { ArenaCommandResult, ArenaSource, ArenaStatus } from '../shared/arena.js'
+import { arenaVersion } from '../shared/arena.js'
 import type { ShowList, ShowWriteResult } from '../shared/showfile-write.js'
 import { registerThumbnailScheme, serveLookbookThumbnails, serveThumbnails } from './arena-thumbnails.js'
 import { lookbookFileSize, lookbookFileUrl, lookbookItems, lookbookServiceForPlan, lookbookServices } from './lookbook.js'
@@ -151,6 +154,9 @@ let videoFeed: VideoFeed | null = null
 let ndi: Ndi | null = null
 let updates: Updates | null = null
 const BOOTED_AT = Date.now()
+/** Where Arena's web server usually is: its default, and 8090, where it moves
+ *  when the MA web remote has 8080 on the same computer. */
+const ARENA_PORTS = [8080, 8090]
 
 // Must precede ready: Electron fixes scheme privileges at startup.
 registerThumbnailScheme()
@@ -534,6 +540,23 @@ app.whenReady().then(() => {
 	})
 	// Browse for a folder (the Arena row's two folders): Windows' own picker,
 	// over the window that asked. Only the path comes back; Save keeps it.
+	// This computer's own addresses, for Settings › Console to say where the
+	// console's OSC row must send (the destination is per machine, and a wrong
+	// one is the setup fault that cost the most here; CLAUDE.md § Status).
+	ipcMain.handle('net:here', (e): string[] => (fromOurs(e) ? localAddresses().filter((a) => a !== '127.0.0.1') : []))
+	// Arena on this computer, found rather than typed: its product reply on the
+	// ports it is usually moved to. Anything else answering (the MA web remote
+	// on 8080) fails the decode and is not offered.
+	ipcMain.handle('arena:find', async (e): Promise<{ host: string; port: number; version: string } | null> => {
+		if (operatorOnly(e) !== null) return null
+		for (const port of ARENA_PORTS) {
+			const r = await getJson(`http://127.0.0.1:${port}/api/v1/product`, 1_000)
+			if (!r.ok) continue
+			const d = decodeArenaProduct(r.body)
+			if (d.ok) return { host: '127.0.0.1', port, version: arenaVersion(d.value) }
+		}
+		return null
+	})
 	ipcMain.handle('folder:choose', async (e, start: unknown): Promise<string | null> => {
 		if (operatorOnly(e) !== null) return null
 		const owner = BrowserWindow.fromWebContents(e.sender)
