@@ -1,70 +1,77 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PLAYLIST_AM, PLAYLIST_PM, checkAnnouncements, playlistFor, wantedAnnouncements } from '../dist/src/shared/announcements.js'
+import { readFileSync } from 'node:fs'
+
+import { PLAYLIST_AM, PLAYLIST_EVENT, PLAYLIST_PM, checkAnnouncements, playlistFor, wantedAnnouncements } from '../dist/src/shared/announcements.js'
+/** Central's "-Announcements AM", read from its ProPresenter on 2026-10-14. */
+const REAL_AM = JSON.parse(readFileSync(new URL('./fixtures/propresenter-announcements-am.json', import.meta.url), 'utf8'))
 
 const item = (title, codes, label = null) => ({ title, label, codes, files: Object.fromEntries(codes.map((c) => [c, `/storage/library/C/${c}-x.png`])), missingCodes: [] })
 const media = (name, uuid = name) => ({ uuid, name, type: 'media', hidden: false })
 
+// Central AM, 11 October 2026, as the lookbook had it (codes only).
 const RUN_SHEET = [
-	item('Walk In', ['CB001', 'CT900'], 'Walk In'),
-	item('Announcements', ['CF100', 'CT100', 'CT101'], 'Announcements'),
-	item('Worship', ['CB002']),
-	item('Youth Camp promo', ['CF102', 'CT102']),
-	item('Announcements', ['CT100']),
+	item('Doors Open // 9am', ['CB100', 'CA301'], 'Walk In'),
+	item('Welcome', ['CB101', 'CF445', 'CT108'], 'WTL'),
+	item('Welcome', ['CB101', 'CF464', 'CT003'], 'NSL'),
+	item('Welcome', ['CB101', 'CF546', 'CT109'], 'WTG'),
+	item('Announcement', ['CB101', 'CF593', 'CT290'], 'Prayer & Fasting'),
+	item('EOS Announcements', ['CB101', 'CF449', 'CT110', 'CT108'], 'Bibles'),
+	item('End', ['CB100', 'CA302'], 'Walk Out'),
 ]
 
-test('announcements: the T codes of announcement items, in run-sheet order, each once', () => {
+test('announcements: every T code on the run sheet, in its order, each once', () => {
 	assert.deepEqual(
 		wantedAnnouncements(RUN_SHEET).map((w) => [w.code, w.title]),
 		[
-			['CT100', 'Announcements'],
-			['CT101', 'Announcements'],
-			['CT102', 'Youth Camp promo'],
+			['CT108', 'Welcome'],
+			['CT003', 'Welcome'],
+			['CT109', 'Welcome'],
+			['CT290', 'Announcement'],
+			['CT110', 'EOS Announcements'],
 		],
 	)
-	// A walk-in's lower third is not an announcement; nor is an F code.
-	assert.equal(wantedAnnouncements(RUN_SHEET)[0].file, '/storage/library/C/CT100-x.png')
+	assert.equal(wantedAnnouncements(RUN_SHEET)[0].file, '/storage/library/C/CT108-x.png')
 })
 
-test('announcements: AM or PM from the name, else the start time', () => {
-	assert.equal(playlistFor({ name: 'Central AM 4th October', time: '18:00' }), PLAYLIST_AM)
-	assert.equal(playlistFor({ name: 'Central PM 4th October', time: '09:00' }), PLAYLIST_PM)
-	assert.equal(playlistFor({ name: 'Central 4th October', time: '09:30' }), PLAYLIST_AM)
-	assert.equal(playlistFor({ name: 'Central 4th October', time: '18:30' }), PLAYLIST_PM)
-	assert.equal(playlistFor({ name: 'Central 4th October', time: null }), null)
-	assert.equal(playlistFor({ name: 'Camp', time: 'soon' }), null)
+test('announcements: AM or PM by the service\'s name, else EVENT', () => {
+	assert.equal(playlistFor({ name: 'Central AM 18th October' }), PLAYLIST_AM)
+	assert.equal(playlistFor({ name: 'Central PM 18th October' }), PLAYLIST_PM)
+	assert.equal(playlistFor({ name: 'Central Team Night' }), PLAYLIST_EVENT)
 })
 
-test('announcements: everything there, in order, is ok; headers and others are left alone', () => {
-	const want = wantedAnnouncements(RUN_SHEET)
-	const items = [{ uuid: 'h', name: 'Before service', type: 'header', hidden: false }, media('CT100 Welcome.png'), media('CT101 Baptisms.jpg'), media('Countdown.mov'), media('CT102 Youth Camp.png')]
-	const r = checkAnnouncements(PLAYLIST_AM, want, items)
+test('announcements: Central\'s real playlist against its 11 October run sheet: all there, headers left alone', () => {
+	const read = decodePlaylist(REAL_AM)
+	assert.equal(read.ok, true)
+	const r = checkAnnouncements(PLAYLIST_AM, wantedAnnouncements(RUN_SHEET), read.value)
 	assert.equal(r.ok, true)
-	assert.equal(r.others, 2)
-	assert.deepEqual(r.rows.map((x) => [x.code, x.state, x.at]), [
-		['CT100', 'there', 1],
-		['CT101', 'there', 2],
-		['CT102', 'there', 4],
+	assert.equal(r.others, 2) // NORMAL NOTICES and PROMOS
+	// Not in run-sheet order (Bibles before Ways to Give), and that is not a fault.
+	assert.deepEqual(r.rows.map((x) => [x.code, x.at]), [
+		['CT108', 1],
+		['CT003', 2],
+		['CT109', 4],
+		['CT290', 6],
+		['CT110', 3],
 	])
 })
 
-test('announcements: missing, last week\'s, a second copy and out of order are each said', () => {
-	const want = wantedAnnouncements(RUN_SHEET)
-	const r = checkAnnouncements(PLAYLIST_AM, want, [media('CT101 Baptisms.jpg'), media('CT100 Welcome.png'), media('CT099 Last week.png'), media('CT100 Welcome copy.png', 'u2')])
+test('announcements: the next week against last week\'s playlist: the new promo missing, the old one extra', () => {
+	const next = RUN_SHEET.filter((i) => i.label !== 'Prayer & Fasting').concat([item('EOS Announcements', ['CB101', 'CF603', 'CT299'], 'Value Your Vote')])
+	const r = checkAnnouncements(PLAYLIST_AM, wantedAnnouncements(next), decodePlaylist(REAL_AM).value)
 	assert.equal(r.ok, false)
-	assert.equal(r.ordered, false)
-	assert.deepEqual(r.rows.find((x) => x.code === 'CT102'), { code: 'CT102', title: 'Youth Camp promo', state: 'missing', file: '/storage/library/C/CT102-x.png' })
-	assert.deepEqual(r.extras.map((e) => e.code), ['CT099', 'CT100'])
+	assert.deepEqual(r.rows.filter((x) => x.state === 'missing').map((x) => x.code), ['CT299'])
+	assert.deepEqual(r.extras.map((e) => [e.code, e.name]), [['CT290', 'CT290-Sunday-Prayer&Fasting-Oct']])
 })
 
-test('announcements: a run sheet with no announcement T codes is never ok', () => {
-	const r = checkAnnouncements(PLAYLIST_AM, [], [media('CT100 Welcome.png')])
-	assert.equal(r.ok, false)
-	assert.deepEqual(r.extras.map((e) => e.code), ['CT100'])
+test('announcements: a second copy is extra; a run sheet with no T codes is never ok', () => {
+	const r = checkAnnouncements(PLAYLIST_AM, wantedAnnouncements(RUN_SHEET), [...decodePlaylist(REAL_AM).value, media('CT108-Sunday-ConnectWithUs', 'dup')])
+	assert.deepEqual(r.extras.map((e) => e.code), ['CT108'])
+	assert.equal(checkAnnouncements(PLAYLIST_AM, [], [media('CT100 Welcome')]).ok, false)
 })
 
-// --- ProPresenter's replies (openapi.propresenter.com's shapes; ⚠️ not yet seen live) ---
+// --- ProPresenter's replies ---
 
 import { decodePlaylist, decodePlaylistTree, findPlaylist } from '../dist/src/bridge/propresenter-playlist.js'
 
@@ -72,12 +79,13 @@ const id = (name, uuid = `u-${name}`) => ({ uuid, name, index: 0 })
 
 test('ProPresenter: playlists in groups are found by name, case and spaces aside', () => {
 	const tree = [
-		{ id: id('Sunday'), field_type: 'group', children: [{ id: id('Announcements AM'), field_type: 'playlist' }, { id: id('Announcements  pm'), field_type: 'playlist' }] },
+		{ id: id('Sunday'), field_type: 'group', children: [{ id: id('-Announcements AM'), field_type: 'playlist' }, { id: id('Announcements  pm'), field_type: 'playlist' }] },
 		{ id: id('Songs'), field_type: 'playlist' },
 	]
 	const all = decodePlaylistTree(tree)
 	assert.equal(all.ok, true)
-	assert.deepEqual(all.value.map((p) => p.name), ['Announcements AM', 'Announcements  pm', 'Songs'])
+	assert.deepEqual(all.value.map((p) => p.name), ['-Announcements AM', 'Announcements  pm', 'Songs'])
+	assert.equal(findPlaylist(all.value, 'Announcements AM').value.uuid, 'u--Announcements AM')
 	assert.equal(findPlaylist(all.value, 'Announcements PM').value.uuid, 'u-Announcements  pm')
 	assert.equal(findPlaylist(all.value, 'Announcements X').ok, false)
 	assert.match(findPlaylist([...all.value, { uuid: 'z', name: 'Songs' }], 'Songs').detail, /2 playlists/)

@@ -1193,14 +1193,45 @@ and not in Pāua's code. Watch for it on a Mac.
 - **Briefs:** where should a brief's link live? The candidates were the item in the
   Cue Manager, PCO, sent from a phone on the day, or pasted at the booth. The owner is
   undecided. Until then, a plain web-page slot covers it.
-- **ProPresenter lower thirds** (the owner wants it built, 2026-10-13). Nothing built. The
-  lookbook's lower thirds are its `T` codes (`resolvedAssetPaths.lowerThird`), not Arena's.
-  The only plan so far was for announcements (CLAUDE.md, 2026-10-08:
-  `spikes/propresenter-playlist.mjs`, never run). Asked and unanswered: how lower thirds live in
-  ProPresenter today (media bin items, props, slides) and how they get there each week; whether
-  announcements are part of it; running the spike (read-only without `--write`) at a booth. A
-  route that may need no API writes: copy the service's T files, named in run order
-  (`03 CT123 …`), into a folder a Smart Playlist follows, sorted by name.
+- **ProPresenter announcements, loading**: the check is built (§ ProPresenter announcements).
+  Open for the load: the order the playlist should take (today the standing notices WTL, NSL,
+  Bibles, WTG first, then promos: hold it to that?); whether CT131 Altar Call, in the PM
+  playlist but on no run sheet, is a standing item to leave; and the NAS folder both machines
+  reach, for a Smart Playlist.
+
+## ProPresenter announcements (2026-10-14)
+
+**The check, built** (`src/shared/announcements.ts`, `src/bridge/propresenter-playlist.ts`,
+`src/main/propresenter-playlist.ts`, the **Announcements** view). The owner's answers: the
+playlists are "-Announcements AM", "-Announcements PM" and "-Announcements EVENT"; each item is
+a picture named by its file; someone puts them in by hand; the files are on the graphics drive
+and the NAS, which ProPresenter's computer (another machine) also reaches.
+
+✅ **Read from Central's ProPresenter** (10.11.60.7:1025, on the booth network) the same day:
+twelve playlists, no groups; "-Announcements AM" holds a header NORMAL NOTICES (CT108 Connect
+With Us, CT003 Next Steps Lounge, CT110 Bibles, CT109 Ways to Give), a header PROMOS, then
+CT290 Prayer & Fasting. A media item's name is its file's without the extension. The fixture is
+`test/fixtures/propresenter-announcements-am.json`.
+
+What the real data changed from the owner's first answers:
+- **Every T code on the run sheet** belongs, not only announcement items': on Central's 11 and 18
+  October run sheets the Welcome moments (WTL, NSL, WTG) carry T codes and all are in the
+  playlist. Speaker titles have their own playlist and no T code there.
+- **Order is not checked**: the playlist is not in run-sheet order (standing notices in a fixed
+  order, then promos).
+- **AM or PM by the service's name**, else EVENT (`Central Team Night`).
+
+✅ Against the live booth and the lookbook, 18 October: AM has 4 of 5, **CT299 Value Your Vote
+missing**, CT290 still in; PM lacks CT110 and CT299 and holds CT290 and CT131 Altar Call. Seen in
+the dev kiosk on the Mac (this Mac's ProPresenter address set to the booth's, then cleared).
+
+**Loading, the plan (not built):** a folder on the NAS (a setting) that a Smart Playlist in
+ProPresenter's Media Bin follows; Pāua copies each missing T code's file into it, found on the
+drive by code as Holding does, or the lookbook's after asking, and moves last week's aside; then
+PUTs the playlist: its headers and other items kept, the pictures in place, after a confirmation.
+Unknowns: whether ProPresenter 18 takes the PUT (`spikes/propresenter-playlist.mjs append …
+--write`, at a quiet moment, on a copy of the playlist), whether a Smart Playlist on the NAS
+notices new files promptly, and the order rule.
 
 ## The first spike
 

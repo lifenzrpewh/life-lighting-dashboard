@@ -1,0 +1,91 @@
+{
+ "id": {
+  "name": "-Announcements AM",
+  "index": 0,
+  "uuid": "E69CD4F2-2B6A-441E-94BE-A4970D66D890"
+ },
+ "items": [
+  {
+   "id": {
+    "name": "NORMAL NOTICES",
+    "index": 0,
+    "uuid": "050F2D65-9AF3-49C1-BE1F-CA2EAA06CC97"
+   },
+   "type": "header",
+   "is_hidden": false,
+   "is_pco": false,
+   "header_color": {
+    "red": 0.5,
+    "green": 0.5,
+    "blue": 0.5,
+    "alpha": 1
+   }
+  },
+  {
+   "id": {
+    "name": "CT108-Sunday-ConnectWithUs",
+    "index": 1,
+    "uuid": "3D52ED5E-678D-4BB7-BF28-F65043A831FE"
+   },
+   "type": "media",
+   "is_hidden": false,
+   "is_pco": false
+  },
+  {
+   "id": {
+    "name": "CT003-Sunday-NextStepsLounge",
+    "index": 2,
+    "uuid": "E69E0AAF-CD99-4C0A-A30C-E2D4E13FC820"
+   },
+   "type": "media",
+   "is_hidden": false,
+   "is_pco": false
+  },
+  {
+   "id": {
+    "name": "CT110-Sunday-Bibles",
+    "index": 3,
+    "uuid": "3D7EE9C1-DC37-40C2-996E-0EF4D89B4CA3"
+   },
+   "type": "media",
+   "is_hidden": false,
+   "is_pco": false
+  },
+  {
+   "id": {
+    "name": "CT109-Sunday-WaystoGive",
+    "index": 4,
+    "uuid": "B2048B3C-9DBC-45AB-A629-99A7AB7C5A6F"
+   },
+   "type": "media",
+   "is_hidden": false,
+   "is_pco": false
+  },
+  {
+   "id": {
+    "name": "PROMOS",
+    "index": 5,
+    "uuid": "901DD72B-3B95-4D03-8551-41371557834D"
+   },
+   "type": "header",
+   "is_hidden": false,
+   "is_pco": false,
+   "header_color": {
+    "red": 0.5,
+    "green": 0.5,
+    "blue": 0.5,
+    "alpha": 1
+   }
+  },
+  {
+   "id": {
+    "name": "CT290-Sunday-Prayer&Fasting-Oct",
+    "index": 6,
+    "uuid": "0F1A29DF-9A3B-4F39-8C7B-9878D43A8449"
+   },
+   "type": "media",
+   "is_hidden": false,
+   "is_pco": false
+  }
+ ]
+}

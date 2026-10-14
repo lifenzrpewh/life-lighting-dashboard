@@ -98,6 +98,12 @@ Tick what you saw; anything odd is worth a line.
 - [ ] **Place…** on a code in the plan: only its layer's free columns light; the confirmation names each layer; after Load the plan says "by hand", and Update all leaves it there
 - [ ] **Files to check**: each mismatch side by side with names, sizes and dates, versions in words; "on the graphics drive" lists the drive's files and which Fetch takes; **Load this one** asks first
 
+**Announcements** (branch `propresenter-announcements`, once merged and built)
+- [ ] + › Announcements in a window: the service's name, and "n of m in -Announcements AM" (PM for an evening service, EVENT otherwise)
+- [ ] Each lower third (T code) of the run sheet with its picture: "In the playlist, item n" or "Not in the playlist"
+- [ ] Last week's promo still in the playlist is listed as "not on this run sheet"; headers are left out of it
+- [ ] Add the missing one in ProPresenter by hand: within 30 s (or Check again) it turns green
+
 **Show mode** (the next build after 1.2.0)
 - [ ] The tray's Show mode button (four corners): the tab strips and the grips between windows go, and each page fills its window's full height
 - [ ] Layouts, Settings and the lock are gone; the lock's place says **Show mode** (or **Show mode · Admin**)

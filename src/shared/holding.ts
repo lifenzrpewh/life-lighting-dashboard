@@ -369,9 +369,7 @@ export function overflowSlots(
  *  HOLD FG and HOLD BG; an A-screen one-off still waits to be placed by hand). */
 const OVERFLOWS = new Set(['F', 'B'])
 
-/** An announcement or promo: PROMO's in Arena, and ProPresenter's announcement
- *  playlist's (./announcements.ts), one rule for both. */
-export const isPromo = (item: LookbookItem) => /announce|promo/i.test(`${item.title} ${item.label ?? ''}`)
+const isPromo = (item: LookbookItem) => /announce|promo/i.test(`${item.title} ${item.label ?? ''}`)
 const isPre = (item: LookbookItem) => /walk\s*in|doors?\s*open|^pre$/i.test(item.label ?? '') || /doors?\s*open/i.test(item.title)
 const isPost = (item: LookbookItem) => /walk\s*out|^post$/i.test(item.label ?? '') || /^\s*end\b/i.test(item.title)
 const isPrePost = (item: LookbookItem) => /pre\s*(?:&|and)\s*post/i.test(`${item.title} ${item.label ?? ''}`)

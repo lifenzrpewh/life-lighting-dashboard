@@ -1,13 +1,13 @@
 // ProPresenter's playlists, off its REST API, for the announcements check
 // (../shared/announcements.ts).
 //
-// ⚠️ UNVERIFIED: the shapes are openapi.propresenter.com's, as
-// spikes/propresenter-playlist.mjs reads them; not yet seen from a real
-// ProPresenter.
-// - `GET /v1/playlists` → a tree: `[{ id: { uuid, name, index }, field_type:
-//   'playlist' | 'group', children?: [...] }]`.
+// ✅ Read from Central's ProPresenter (10.11.60.7:1025), 2026-10-14:
+// - `GET /v1/playlists` → `[{ id: { uuid, name, index }, field_type:
+//   'playlist', … }]`; a group (`field_type: 'group'`, with `children`) as the
+//   OpenAPI has it, not seen there (Central has none).
 // - `GET /v1/playlist/<uuid>` → `{ id, items: [{ id: { uuid, name, index },
-//   type: 'media' | 'presentation' | 'header' | …, is_hidden, is_pco }] }`.
+//   type: 'header' | 'media', is_hidden, is_pco, header_color? }] }`. A media
+//   item's name is its file's, without the extension.
 //
 // THE RULE THIS FILE ENFORCES: a reply of the wrong shape fails whole. A
 // playlist half-read would say the missing half's announcements are missing.
@@ -61,10 +61,16 @@ export function decodePlaylist(body: unknown): Decoded<PlaylistItem[]> {
 	return { ok: true, value: out }
 }
 
-/** The playlist named `name` (case and spaces aside), or why not. Two of one
- *  name is said, never one picked: which the booth means is not known. */
+/** The playlist named `name`, case, spaces and leading marks aside (Central's
+ *  is "-Announcements AM"), or why not. Two of one name is said, never one
+ *  picked: which the booth means is not known. */
 export function findPlaylist(all: readonly { uuid: string; name: string }[], name: string): Decoded<{ uuid: string; name: string }> {
-	const key = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
+	const key = (s: string) =>
+		s
+			.trim()
+			.replace(/^[^A-Za-z0-9]+/, '')
+			.replace(/\s+/g, ' ')
+			.toLowerCase()
 	const hits = all.filter((p) => key(p.name) === key(name))
 	if (hits.length === 0) return { ok: false, detail: `ProPresenter has no playlist named "${name}"` }
 	if (hits.length > 1) return { ok: false, detail: `ProPresenter has ${hits.length} playlists named "${name}"` }

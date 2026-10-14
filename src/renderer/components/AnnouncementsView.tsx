@@ -1,7 +1,7 @@
 // The Announcements view (2026-10-14, the owner's ask: ProPresenter's lower
 // thirds checked, then loaded): ProPresenter's "Announcements AM" or "PM"
-// against the service the media check follows, one row per lower third the
-// run sheet calls for, in its order. The rules are ../../shared/announcements.ts.
+// (or EVENT) against the service the media check follows, one row per lower
+// third the run sheet calls for, in its order. Which are there, not their order. The rules are ../../shared/announcements.ts.
 //
 // Read-only for now: nothing here writes to ProPresenter. Loading is the next
 // step (docs/VISUALS_DASHBOARD.md § ProPresenter announcements).
@@ -55,13 +55,12 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 
 	const summary =
 		check === null ? null : want.length === 0 ? (
-			<span className="text-booth-dim">No lower thirds on this run sheet's announcements</span>
+			<span className="text-booth-dim">No lower thirds on this run sheet</span>
 		) : check.ok ? (
-			<span className="text-state-live">All in {check.playlist}, in order</span>
+			<span className="text-state-live">All in {check.playlist}</span>
 		) : (
 			<span className="text-warn">
 				{there} of {want.length} in {check.playlist}
-				{!check.ordered && ' · out of order'}
 				{check.extras.length > 0 && ` · ${check.extras.length} not on this run sheet`}
 			</span>
 		)
@@ -99,9 +98,6 @@ export function AnnouncementsView({ status, now }: { status: Channel<ArenaStatus
 				)}
 			</div>
 			<div className="min-h-0 flex-1 overflow-y-auto p-4">
-				{m.service !== null && playlist === null && (
-					<Said>Not known whether "{m.service.name}" is AM or PM, so not which playlist to check.</Said>
-				)}
 				{read?.ok === false && <Said tone="warn">{read.detail}</Said>}
 				{check !== null && (
 					<div className="mx-auto flex max-w-[1400px] flex-col gap-2">
