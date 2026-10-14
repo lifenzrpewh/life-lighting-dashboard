@@ -384,7 +384,7 @@ export function App() {
 			.filter((e) => e.on)
 			.map((e) => ({ view: embedView(e.id), send: (rect: PaneRect | null) => window.life?.placeEmbed(e.id, rect) })),
 	]
-	const pageHidden = (view: ViewId) => popped.has(view) || editing || layoutsOpen || (frozen && stills?.[view] != null)
+	const pageHidden = (view: ViewId) => popped.has(view) || editing || layoutsOpen || sheetUp || (frozen && stills?.[view] != null)
 	// Unmounting closes the MA connection. It happens when the renderer goes
 	// away, which main also covers, since a crashed renderer cannot say goodbye.
 	useEffect(
@@ -410,6 +410,12 @@ export function App() {
 		(t): t is number => t !== null,
 	)
 	const { mode, enter, leave } = useMode(now, inputs.length === 0 ? null : Math.max(...inputs), adminIdleMs)
+	// Which sheet stands in the windows' place, if any. Settings is Admin's,
+	// and not in Show mode; the passcode sheet is a volunteer's way in, or the
+	// way out of Show mode.
+	const settingsUp = settingsOpen && mode === 'operator' && !show
+	const passcodeUp = sheet === 'passcode' && (mode === 'volunteer' || leavingShow)
+	const sheetUp = connectionsOpen || settingsUp || passcodeUp || showfileOpen
 	// Volunteer tapped (../shared/admin.ts): the passcode sheet, or straight in
 	// when none is set. Main decides either way; the screen follows. Outside
 	// the kiosk (a browser on the renderer alone) there is no main to ask.
@@ -825,6 +831,11 @@ export function App() {
 	const newId = (prefix: 'w' | 't') => freshId(layout, prefix)
 	const [noRoom, setNoRoom] = useState(false)
 	const [fresh, setFresh] = useState<string | null>(null)
+	// Once the layout is done, a window added in it is not fresh any more: the
+	// next Edit layout does not open its Add menu again.
+	useEffect(() => {
+		if (!editing) setFresh(null)
+	}, [editing])
 	useEffect(() => {
 		if (!noRoom) return
 		const t = setTimeout(() => setNoRoom(false), 4_000)
@@ -945,7 +956,7 @@ export function App() {
 				    a rule someone has to remember. Connections and the showfile sheet
 				    stand in the grid's place; every page is hidden, not closed. */}
 				<main className="flex min-h-0 min-w-0 flex-1 flex-col">
-					{connectionsOpen ? (
+					{connectionsOpen && (
 						<ConnectionsPanel
 							rows={connections}
 							operator={mode === 'operator' && !show}
@@ -955,7 +966,8 @@ export function App() {
 							onOpen={(id) => openSettings(id)}
 							onClose={() => setSheet(null)}
 						/>
-					) : settingsOpen && mode === 'operator' && !show ? (
+					)}
+					{settingsUp && (
 						<SettingsPanel
 							rows={connections}
 							start={settingsStart}
@@ -971,7 +983,8 @@ export function App() {
 							updates={updates}
 							arena={arenaStatus?.lastOk?.value ?? null}
 						/>
-					) : sheet === 'passcode' && (mode === 'volunteer' || leavingShow) ? (
+					)}
+					{passcodeUp && (
 						<PasscodeSheet
 							now={now}
 							leaving={leavingShow}
@@ -981,7 +994,8 @@ export function App() {
 								setLeavingShow(false)
 							}}
 						/>
-					) : showfileOpen ? (
+					)}
+					{showfileOpen && (
 						<ShowfileSheet
 							showfile={showfile}
 							linkLive={sources.link.state === 'live'}
@@ -990,55 +1004,57 @@ export function App() {
 							now={now}
 							onClose={() => setSheet(null)}
 						/>
-					) : (
-						<div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-							<Grid
-								layout={layout}
-								editing={editing}
-								bare={show}
-								visible={visible}
-								labelOf={label}
-								nameOf={nameOf}
-								offer={offer}
-								body={bodyOf}
-								boxRef={(_win, tab) =>
-									isNative(tab.view) && !editing && homeOf(layout, tab.view, visible) === tab.id ? boxRefOf(tab.view) : undefined
-								}
-								actions={actionsOf}
-								onSelect={(w, t) => update((l) => selectTab(l, w, t))}
-								onEdit={startEditing}
-								onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
-								onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
-								onRenameTab={(w, t, name) => update((l) => renameTab(l, w, t, name))}
-								onMoveTab={(from, t, to, before) => update((l) => moveTab(l, from, t, to, before))}
-								onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
-								onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
-								fresh={fresh}
-								onResize={(l) => update(() => l)}
-								onSeamStart={startSeam}
-								onSeamEnd={endSeam}
-							/>
-							{layoutsOpen && (
-								<>
-									{/* A tap outside the dropdown closes it. */}
-									<button
-										type="button"
-										aria-label="Close Layouts"
-										onClick={() => setLayoutsOpen(false)}
-										className="absolute inset-0 z-20 cursor-default bg-black/30"
-									/>
-									<LayoutsPanel
-										layout={layout}
-										saved={saved}
-										onSwitch={(l) => update(() => l)}
-										onSaved={setSaved}
-										nameOf={nameOf}
-										onClose={() => setLayoutsOpen(false)}
-									/>
-								</>
-							)}
-						</div>
 					)}
+					{/* The windows stay mounted under a sheet, only hidden: their views
+					    keep what they hold (a camera open, an NDI watch, a confirmation
+					    half answered) rather than starting again when it closes. */}
+					<div className={`relative min-h-0 min-w-0 flex-1 flex-col ${sheetUp ? 'hidden' : 'flex'}`}>
+						<Grid
+							layout={layout}
+							editing={editing}
+							bare={show}
+							visible={visible}
+							labelOf={label}
+							nameOf={nameOf}
+							offer={offer}
+							body={bodyOf}
+							boxRef={(_win, tab) =>
+								isNative(tab.view) && !editing && homeOf(layout, tab.view, visible) === tab.id ? boxRefOf(tab.view) : undefined
+							}
+							actions={actionsOf}
+							onSelect={(w, t) => update((l) => selectTab(l, w, t))}
+							onEdit={startEditing}
+							onAddTab={(w, v) => update((l) => addTab(l, w, v, freshId(l, 't')))}
+							onRemoveTab={(w, t) => update((l) => removeTab(l, w, t))}
+							onRenameTab={(w, t, name) => update((l) => renameTab(l, w, t, name))}
+							onMoveTab={(from, t, to, before) => update((l) => moveTab(l, from, t, to, before))}
+							onRemoveWindow={(w) => update((l) => removeWindow(l, w))}
+							onPlace={(w, box) => update((l) => placeWindow(l, w, box))}
+							fresh={fresh}
+							onResize={(l) => update(() => l)}
+							onSeamStart={startSeam}
+							onSeamEnd={endSeam}
+						/>
+						{layoutsOpen && (
+							<>
+								{/* A tap outside the dropdown closes it. */}
+								<button
+									type="button"
+									aria-label="Close Layouts"
+									onClick={() => setLayoutsOpen(false)}
+									className="absolute inset-0 z-20 cursor-default bg-black/30"
+								/>
+								<LayoutsPanel
+									layout={layout}
+									saved={saved}
+									onSwitch={(l) => update(() => l)}
+									onSaved={setSaved}
+									nameOf={nameOf}
+									onClose={() => setLayoutsOpen(false)}
+								/>
+							</>
+						)}
+					</div>
 				</main>
 			</div>
 		</OperatorContext.Provider>
