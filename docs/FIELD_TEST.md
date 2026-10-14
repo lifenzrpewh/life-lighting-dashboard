@@ -108,6 +108,16 @@ sections below.
 - [ ] Last week's promo still in the playlist is listed as "not on this run sheet"; headers are left out of it
 - [ ] Add the missing one in ProPresenter by hand: within 30 s (or Check again) it turns green
 
+**One Lookbook** (after 1.3.0; Holding merged into it, 2026-10-14)
+- [ ] A Holding tab from before is a Lookbook tab, in the same place; + has no Holding
+- [ ] The top line: "n of m in Arena", "n to load", and "n need you", which shows only those; tap again for all
+- [ ] The size buttons: Big, Two a row, Rows; the choice is kept after a restart
+- [ ] Tick two cards, **Load 2**: one confirmation listing both, a shared background once; after Load, each card says Loading… then In Arena
+- [ ] A one-off with no column: "Choose a slot" shows its foreground layer, free columns lit; a tap asks, then it is placed (Placed by hand · Undo)
+- [ ] A file that differs: **Compare** on its card shows Arena's beside the lookbook's
+- [ ] Lower thirds (with ProPresenter set up): `LT CT108 in ProPresenter`, or amber "not in ProPresenter"
+- [ ] As a volunteer: no ticks or buttons, the states and chips still there
+
 **Announcements Load** (1.3.0; Admin; Settings › ProPresenter › Announcements: the folder as this
 computer reaches it, Arena's graphics folder set; first run at Central 2026-10-14 into PAUA TEST AM)
 - [ ] **Copy to the folder**: the week's T files land numbered (`01 CT108-…`); last week's go into `Old`; one with no file on the drive says so in orange

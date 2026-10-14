@@ -981,6 +981,36 @@ in this order, are in brackets. Each in the dev kiosk on the Mac over CDP, again
   is moved to its queue column: a pin is how to keep one. The old "older version first, then
   last week's, then empty" choice now serves only columns the Holding map shares.
 
+## One Lookbook (the owner's interview, 2026-10-14)
+
+Holding and the Lookbook are **one view, called Lookbook** (`src/renderer/components/LookbookView.tsx`);
+Holding's tabs come back as Lookbook tabs (`layoutFrom`), and the Arena view's Media line opens
+it. The owner's asks: multi-select to place several at once, and Holding "confusing and
+cluttered". The interview (two rounds of multiple choice) said:
+- **The job is all three, in order**: load, check, fix, every week.
+- **Keep Update all.** The grid, the dashed tiles and the plan: "not too fussed"; above all,
+  "easy to understand what is happening at a glance".
+- **Cluttered by**: the same thing in many places (grid, plan, tray, top counts, which did not
+  even agree), the plan's wording, too many buttons and marks, clips too small to see.
+- **Multi-select**: pick some, load those, one confirmation.
+- **Shape**: merged with the Lookbook, named Lookbook; card size a zoom, Big by default
+  (Big, Two a row, Rows); no grid, a slot picker when one is needed.
+- **Problems** on their card, the top's "n need you" showing only those; **results** in place
+  on each card, no separate result line (the owner took both recommendations).
+- **Lower thirds** belong here eventually (the lookbook pairs FGs and lower thirds for
+  announcements): shown read-only now, from the Announcements view's check; loading them from
+  here later.
+
+What a card holds: the composed picture, the A-screen or lower third beside it, the title and
+label, a state (In Arena, To load, Needs you, Loading…, On screen), a chip per piece (`BG CB101
+→ WTL`, `FG CF445 may differ`, `LT CT108 in ProPresenter`), each problem with its fix (Compare
+opens the side-by-side; Choose a slot opens the moment's foreground layer, its free columns lit;
+It's there after a failed load), and, in Admin, a tick, Load, and Move… once it is in Arena.
+Gone with Holding: the grid, the plan panel, the No column tray, the legend, the activity chips,
+the result line and Files to check (a card that needs a look says so; the filter gathers them).
+Update all, Clear old FGs (in its confirmation, or alone when nothing else is to load), pins
+and the Holding map are unchanged, and every rule is still `src/shared/holding.ts`.
+
 ## The Lookbook view (owner's ask, 2026-10-05; built the same day)
 
 The owner: another holding view that "mimics the lookbook idea, have the images BIG and

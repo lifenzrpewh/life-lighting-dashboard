@@ -27,7 +27,6 @@ import { CaptureStrip, CaptureView } from './components/CaptureView.js'
 import { useCameras } from './capture.js'
 import { ArenaView } from './components/ArenaView.js'
 import { ClipsView } from './components/ClipsView.js'
-import { HoldingView } from './components/HoldingView.js'
 import { LookbookView } from './components/LookbookView.js'
 import { AnnouncementsView } from './components/AnnouncementsView.js'
 import { VideoStrip, VideoView, type VideoSpace } from './components/VideoView.js'
@@ -70,7 +69,7 @@ export function PopOut({ view }: { view: ViewId }) {
 
 	const ma = usePolled<MaPaneReport>(view === 'ma' ? (api) => api.maPane() : null, 1000)
 	const cue = usePolled<CuePaneReport>(view === 'cue' ? (api) => api.cuePane() : null, 1000)
-	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' || view === 'holding' || view === 'lookbook' || view === 'announcements' ? (api) => api.arenaStatus() : null, 250)
+	const arena = usePolled<Channel<ArenaStatus> | null>(view === 'arena' || view === 'clips' || view === 'lookbook' || view === 'announcements' ? (api) => api.arenaStatus() : null, 250)
 	const video = usePolled<VideoFeedState | null>(view === 'video' ? (api) => api.videoFeed() : null, 500)
 	const timers = usePolled<TimerSources>(view === 'timer' ? (api) => api.timers() : null, 250)
 	// The Guide is an embed of main's own (../shared/guide.ts): its page is
@@ -171,8 +170,6 @@ export function PopOut({ view }: { view: ViewId }) {
 						<ArenaView status={arena} now={now} />
 					) : view === 'clips' ? (
 						<ClipsView status={arena} now={now} />
-					) : view === 'holding' ? (
-						<HoldingView status={arena} now={now} />
 					) : view === 'lookbook' ? (
 						<LookbookView status={arena} now={now} />
 					) : view === 'announcements' ? (
