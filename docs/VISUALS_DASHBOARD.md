@@ -1268,7 +1268,21 @@ with Media Bin ids (`GET /v1/media/playlist/<Smart Playlist>`), in no particular
 sets the order. macOS `cp` failed on the share copying extended attributes ("Result too large"):
 `cp -X`; Pāua on Windows copies no such attributes.
 
-**Routes left for loading, the owner's to choose:**
+**❌ But not from a Smart Playlist, 2026-10-14** (the owner's go, PAUA TEST only): a PUT of the four
+Smart Folder pictures by their Media Bin ids (`image` items, `4CE237E3…` and so on) answered
+**404**, with a header and without; the Background playlist's test card by its id answered
+**204** straight after, and **a header works** (`uuid: null`, with its `header_color`: 204, read
+back as `header NORMAL NOTICES` then the card). So the write takes pictures from an ordinary
+media playlist and refuses a Smart Playlist's; the API has no way to add a file to an ordinary
+one (every media playlist endpoint is GET). The ids of a Smart Playlist's items also change when it
+is re-added (01 CT108 was `A58399F2…`, then `4CE237E3…`). PAUA TEST was left as NORMAL NOTICES and
+the test card.
+
+**Routes left for loading, the owner's to choose** (as of the Smart Playlist refusal above):
+- **An ordinary media playlist**, filled by hand: the standing notices (CT108, CT003, CT110,
+  CT109, CT131) imported into it once, each week's promos dragged in as they come; Pāua then
+  writes "-Announcements AM" from it in the pattern, headers and all. Half the hand work, and
+  the write proven.
 - **The folder only**: Pāua copies the week's T files into the Paua Smart Folder, named in the
   pattern's order (`01 CT108 …`), last week's moved aside; a Smart Playlist in ProPresenter's
   Media Bin follows it, and the operator fires from there, or drags them into the announcements
