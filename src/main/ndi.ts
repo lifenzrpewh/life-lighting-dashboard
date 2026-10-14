@@ -44,6 +44,8 @@ export function createNdi(): Ndi {
 	let workerState: NdiState = { runtime: null, found: [], feeds: [] }
 	let sources: readonly NdiSource[] = []
 	const watches = new Map<string, Watch>()
+	/** The pages with a 'destroyed' listener of ours on them. */
+	const listening = new WeakSet<WebContents>()
 	const deaths: number[] = []
 	let stopped = false
 	let gaveUp: string | null = null
@@ -130,11 +132,20 @@ export function createNdi(): Ndi {
 			const key = keyOf(page, token)
 			const w = { page, id, token }
 			watches.set(key, w)
-			page.once('destroyed', () => {
-				if (watches.get(key) !== w) return
-				watches.delete(key)
-				worker?.postMessage({ type: 'unwatch', key })
-			})
+			// Once per page for its life, not once per watch: the kiosk's page
+			// lives all day and watches again on every tab switch and pop-out,
+			// as the video feed's (./video-feed.ts).
+			if (!listening.has(page)) {
+				listening.add(page)
+				page.once('destroyed', () => {
+					listening.delete(page)
+					for (const [k, x] of watches) {
+						if (x.page !== page) continue
+						watches.delete(k)
+						worker?.postMessage({ type: 'unwatch', key: k })
+					}
+				})
+			}
 			connect(w)
 		},
 		unwatch(page, token) {
