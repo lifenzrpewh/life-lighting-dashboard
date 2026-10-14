@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
 	DEFAULT_LAYOUT,
+	VIEWS,
 	HEIGHT,
 	MOVE,
 	WIDTH,
@@ -397,4 +398,21 @@ test('a stored feed that will not do asks again; the layout holds', () => {
 		assert.deepEqual(layoutFrom(JSON.stringify(stored)).windows[1].tabs[0], { id: 't2', view: 'video', feed: null })
 	}
 	assert.deepEqual(videoChoiceFrom({ kind: 'syphon', name: null }), { kind: 'syphon', name: null })
+})
+
+test('Holding became the Lookbook: an old Holding tab comes back as a Lookbook tab, name and place kept', () => {
+	// 2026-10-14, the owner's interview: one view, called Lookbook.
+	const old = {
+		windows: [
+			{ ...DEFAULT_LAYOUT.windows[0], tabs: [{ id: 't1', view: 'cue' }] },
+			{ ...DEFAULT_LAYOUT.windows[1], tabs: [{ id: 't2', view: 'ma' }, { id: 't3', view: 'holding', label: 'Prep' }], active: 't3' },
+		],
+		homes: {},
+		v: 2,
+	}
+	const l = layoutFrom(JSON.stringify(old))
+	assert.deepEqual(l.windows[1].tabs[1], { id: 't3', view: 'lookbook', label: 'Prep' })
+	assert.equal(l.windows[1].active, 't3')
+	assert.deepEqual(savedLayoutsFrom(JSON.stringify([{ name: 'Old', layout: old }]))[0].layout, l)
+	assert.equal(VIEWS.includes('holding'), false)
 })

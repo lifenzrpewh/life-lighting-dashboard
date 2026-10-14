@@ -1,5 +1,5 @@
-// The media check's state, shared by the Arena view's Media row and the Holding
-// view (./components/MediaCheck.tsx, ./components/HoldingView.tsx): which
+// The media check's state, shared by the Arena view's Media row and the
+// Lookbook view (./components/MediaCheck.tsx, ./components/LookbookView.tsx): which
 // service is checked, its run sheet, the "same" confirmations, fetches under way,
 // and the actions. Both read the same rules, so a fix made in one shows in the
 // other at Arena's next push.

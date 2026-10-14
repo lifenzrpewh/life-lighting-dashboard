@@ -1,12 +1,10 @@
 // The media check's pieces, shared by the Arena view's Media line and the
-// Holding view (./HoldingView.tsx), where the check is laid out as Arena's
-// columns and every fix is made. The state is ../useMediaCheck.ts; the rules
+// Lookbook view (./LookbookView.tsx), where every fix is made. The state is ../useMediaCheck.ts; the rules
 // are ../../shared/media-check.ts and ../../shared/holding.ts.
 //
 // The Media line is one line (the owner, 2026-10-05: "feels very wall of
-// texty"): the service and how many need a look. A tap opens the Holding view
-// in the Arena view's place; the per-code list it used to open is gone, since
-// the Holding view shows the same answers as pictures.
+// texty"): the service and how many need a look. A tap opens the Lookbook
+// in the Arena view's place (Holding until 2026-10-14).
 
 import { useState } from 'react'
 import { ChevronRight, TriangleAlert } from 'lucide-react'

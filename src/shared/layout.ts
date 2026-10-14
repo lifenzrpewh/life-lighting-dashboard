@@ -34,7 +34,7 @@ import { isNdiId, ndiIdOf, ndiView, type NdiSource, type NdiView } from './ndi.j
 import { captureIdOf, captureView, isCaptureId, type CaptureInput, type CaptureView } from './capture.js'
 
 /** The views that come with Pāua. */
-export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'holding' | 'lookbook' | 'announcements' | 'video' | 'timer' | 'guide'
+export type BuiltInView = 'cue' | 'ma' | 'arena' | 'clips' | 'lookbook' | 'announcements' | 'video' | 'timer' | 'guide'
 
 /** A built-in view, or an embed, NDI source or capture input someone added in
  *  Settings (./embeds.ts, ./ndi.ts, ./capture.ts). Since 2026-10-08 a tab
@@ -82,7 +82,7 @@ export function sameChoice(a: VideoChoice | null | undefined, b: VideoChoice | n
 }
 
 /** Every built-in view, in the + menu's order. Embeds follow, in theirs. */
-export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'holding', 'lookbook', 'announcements', 'video', 'timer', 'guide']
+export const VIEWS: readonly BuiltInView[] = ['cue', 'ma', 'arena', 'clips', 'lookbook', 'announcements', 'video', 'timer', 'guide']
 
 export const VIEW_LABEL: Record<BuiltInView, string> = {
 	cue: 'Run order',
@@ -90,9 +90,9 @@ export const VIEW_LABEL: Record<BuiltInView, string> = {
 	arena: 'Arena',
 	/** Arena's clip grid, to fire from (./components/ClipsView.tsx). */
 	clips: 'Clips',
-	/** The holding layers against today's run sheet, to prepare (./components/HoldingView.tsx). */
-	holding: 'Holding',
-	/** The run sheet's moments as the lookbook draws them, big, against Arena (./components/LookbookView.tsx). */
+	/** The service's media, one card a moment, against Arena and ProPresenter, to
+	 *  load, check and fix (./components/LookbookView.tsx; Holding merged into it,
+	 *  2026-10-14). */
 	lookbook: 'Lookbook',
 	/** ProPresenter's announcement playlist against the run sheet (./components/AnnouncementsView.tsx, 2026-10-14). */
 	announcements: 'Announcements',
@@ -495,12 +495,14 @@ function windowFrom(v: unknown, scale: number): GridWindow | null {
 	for (const t of tabs) {
 		const tr = t as Record<string, unknown> | null
 		if (typeof tr !== 'object' || tr === null) return null
-		if (typeof tr['id'] !== 'string' || !ID.test(tr['id']) || !isViewId(tr['view'])) return null
+		// Holding became the Lookbook (2026-10-14): its tabs come back as Lookbook tabs.
+		const view = tr['view'] === 'holding' ? 'lookbook' : tr['view']
+		if (typeof tr['id'] !== 'string' || !ID.test(tr['id']) || !isViewId(view)) return null
 		// A tab's own name (2026-10-08): one that will not do is let go, not the
 		// layout, since the view's own name stands in for it.
 		const label = tr['label']
 		const named = typeof label === 'string' && label.trim() !== '' && tabLabelError(label) === null
-		const tab: Tab = { id: tr['id'], view: tr['view'], ...(named ? { label: label.trim() } : {}) }
+		const tab: Tab = { id: tr['id'], view, ...(named ? { label: label.trim() } : {}) }
 		// One Video view for every feed (2026-10-08): an NDI source's or capture
 		// input's tab is a Video tab with that feed, keeping its id, so a layout
 		// saved before keeps its windows and tabs. A Video tab from before had

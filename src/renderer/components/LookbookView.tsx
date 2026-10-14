@@ -1,31 +1,43 @@
-// The Lookbook view (the owner, 2026-10-05: "mimics the lookbook idea, have the
-// images BIG and obvious", beside the Holding view, not instead of it, and not
-// the lookbook embedded, so the looks can still be loaded).
+// The Lookbook view: the service's media, one card per moment of the run
+// sheet, as the lookbook composes it, against Arena and ProPresenter, to get a
+// service ready: load, check, fix.
 //
-// Holding is Arena's shape: layers by columns, every clip. This is the
-// service's: one card per moment of the run sheet, in order, its picture as
-// the lookbook composes it (background and foreground together) and its
-// A-screen or lower third beside, so the booth sees what each moment will look
-// like and whether Arena has it. Both read the same check
-// (../../shared/holding.ts, `looksOf`), so they never disagree, and both load
-// through the same confirmation.
+// One view since 2026-10-14 (the owner's interview, that evening): Holding
+// (Arena's grid, its plan beside it, a tray, a legend, a result line) and the
+// Lookbook (one big card a moment) said the same things in five places, and
+// the owner wanted "easy to understand what is happening at a glance". So:
+// - One card per moment, in service order, with a state anyone reads from
+//   across the booth: In Arena, To load, Needs you, Loading, On screen.
+// - Its pieces as chips (BG, FG, A, LT), each saying where it goes or what is
+//   wrong in a word; nothing said about a piece that is right but its code.
+// - A problem sits on its own card with its fix there (Compare, Choose a slot,
+//   It's there), and the top line's "n need you" shows only those.
+// - Load: tick cards and Load n, one confirmation for all of them; or Update
+//   all, as before. A card changes in place as its files load; the top count is
+//   the result.
+// - No grid: Choose a slot opens that layer's clips only, to tap one.
+// - Card size is a zoom, per computer: Big (as the Lookbook was), Two a row,
+//   or Rows.
+// - Lower thirds read-only from ProPresenter's announcement playlist (the
+//   Announcements view's check); loading them from here is for later.
 //
-// Pictures over words: a moment that is all there says nothing but its codes.
-// One that is not has an amber ring and a Load button; one on screen in Arena
-// a green ring. A one-off with no column says to place it in Holding, where
-// its slot is chosen. Load and Load all are operator mode's and not drawn in
-// volunteer mode (the owner, 2026-10-06).
+// Every change asks first (Confirm) and is Admin's: main refuses otherwise, and
+// for a volunteer the buttons are not drawn (the owner, 2026-10-06). The rules
+// are ../../shared/holding.ts (`looksOf`, `lookSteps`, `pinTargets`), the same
+// as Update all's, never a second guess.
 
-import { useState } from 'react'
-import { Check, FileX, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, FileX, LayoutGrid, Rows3, Square, RefreshCw, X } from 'lucide-react'
 
-import type { ArenaStatus } from '../../shared/arena.js'
-import { lookSteps, looksOf, type CodeState, type Look } from '../../shared/holding.js'
+import { thumbnailUrl, type ArenaLayer, type ArenaStatus } from '../../shared/arena.js'
+import { checkAnnouncements, sessionOf, wantedAnnouncements } from '../../shared/announcements.js'
+import { COLUMN_NAMES, codesOn, columnNamesOf, holdingLayers, lookSteps, looksOf, slotCode, slotMark, type CodeState, type Look, type UpdateStep } from '../../shared/holding.js'
 import { lookbookThumbUrl, mediaCodeOf, type LookbookItem } from '../../shared/media-check.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
 import { useOperator } from '../mode.js'
 import { ArenaReading } from './ArenaView.js'
+import { FileCompare, ThereButton, needsLook } from './FileCompare.js'
 import { Confirm, FetchWords, ServiceLine, SmallButton, fetchShort, under } from './MediaCheck.js'
 import { Button } from './ui.js'
 import { chipLabel, formatAge, staleContent } from './vocabulary.js'
@@ -34,29 +46,139 @@ export function LookbookView({ status, now }: { status: Channel<ArenaStatus> | n
 	return <ArenaReading status={status} now={now} render={(s, ageMs) => <Lookbook status={s} ageMs={ageMs} now={now} />} />
 }
 
-function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number | null; now: number }) {
+/** How big a card is: the owner's zoom (2026-10-14), Big by default. */
+type Size = 'big' | 'two' | 'rows'
+const SIZE_KEY = 'paua.lookbook.size'
+function storedSize(): Size {
+	try {
+		const v = localStorage.getItem(SIZE_KEY)
+		return v === 'two' || v === 'rows' ? v : 'big'
+	} catch {
+		return 'big'
+	}
+}
+
+const unnamedColumn = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
+
+/** A moment's code to put somewhere by hand, as `pinTargets` and `askPlaceAt` take it. */
+type Choosing = { item: number; code: string }
+
+/** Each step once per code: two moments sharing a background load it once,
+ *  into every clip either asked for. */
+function mergeSteps(steps: UpdateStep[]): UpdateStep[] {
+	const out = new Map<string, UpdateStep>()
+	for (const s of steps) {
+		const had = out.get(s.request.code)
+		if (had === undefined) out.set(s.request.code, s)
+		else
+			out.set(s.request.code, {
+				request: { ...had.request, clipIds: [...new Set([...had.request.clipIds, ...s.request.clipIds])] },
+				what: had.what === s.what ? had.what : `${had.what}; ${s.what}`,
+			})
+	}
+	return [...out.values()]
+}
+
+/** What a card says from across the booth. */
+type CardState = 'loading' | 'needs' | 'load' | 'ready' | 'other'
+
+export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; ageMs: number | null; now: number; onBack?: () => void }) {
 	const m = useMediaCheck(status, now, true)
 	const operator = useOperator()
 	const [details, setDetails] = useState(false)
+	const [size, setSizeState] = useState<Size>(storedSize)
+	const setSize = (s: Size) => {
+		setSizeState(s)
+		try {
+			localStorage.setItem(SIZE_KEY, s)
+		} catch {
+			// Kept for this view only.
+		}
+	}
+	const [onlyNeeds, setOnlyNeeds] = useState(false)
+	const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
+	const lowerThirds = useLowerThirds(m)
+
 	const items = m.runSheet ?? []
-	const looks = looksOf(items, status, m.same, m.sizes, m.map, m.pins).filter((l) => (items[l.item]?.codes.length ?? 0) > 0)
-	const ready = looks.filter((l) => l.ready).length
+	const looks = looksOf(items, status, m.same, m.sizes, m.map, m.pins).filter((l) => l.codes.length > 0)
+	const stepsOf = new Map(looks.map((l) => [l.item, l.ready ? [] : lookSteps(l.item, items, status, m.same, m.sizes, m.map, m.pins)]))
+	const stateOf = (look: Look): CardState => {
+		if (look.codes.some((c) => under(m.fetches[c.code]))) return 'loading'
+		if (problemsOf(look, m).length > 0) return 'needs'
+		if ((stepsOf.get(look.item) ?? []).length > 0) return 'load'
+		if (look.codes.every((c) => c.state === 'not-arena')) return 'other'
+		return 'ready'
+	}
+	const states = new Map(looks.map((l) => [l.item, stateOf(l)]))
+	const count = (s: CardState) => [...states.values()].filter((x) => x === s).length
+	const arenaLooks = looks.filter((l) => states.get(l.item) !== 'other')
+	const ready = count('ready')
+	const toLoad = count('load')
+	const needs = count('needs')
+	const loading = count('loading')
+	// Ticks hold only while the card can be loaded.
+	const loadable = (i: number) => operator && states.get(i) === 'load'
+	const ticked = [...selected].filter(loadable)
+	useEffect(() => {
+		if (onlyNeeds && needs === 0) setOnlyNeeds(false)
+	}, [onlyNeeds, needs])
+	const toggle = (i: number) => {
+		const next = new Set(selected)
+		if (next.has(i)) next.delete(i)
+		else next.add(i)
+		setSelected(next)
+	}
+	const loadTicked = () => {
+		const steps = mergeSteps(ticked.flatMap((i) => stepsOf.get(i) ?? []))
+		if (steps.length === 0) return
+		m.ask(`Load ${ticked.length === 1 ? (items[ticked[0] as number]?.title ?? '1 moment') : `${ticked.length} moments`}`, steps, [], [], () => setSelected(new Set()))
+	}
+	const holding = holdingLayers(status)[0]
+	const headerNames = holding === undefined ? status.columns.map((c) => c.name) : columnNamesOf(holding, status)
+	const named = headerNames.some((n) => !unnamedColumn(n))
+	const shown = onlyNeeds ? looks.filter((l) => states.get(l.item) === 'needs') : looks
+
 	return (
 		<div className="flex min-w-0 flex-1 flex-col">
 			<div className="max-h-[55%] shrink-0 overflow-y-auto border-b border-booth-edge px-4">
-				<div className="flex h-12 min-w-0 items-center gap-3 text-sm">
+				<div className="flex min-h-12 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 py-1 text-sm">
+					{onBack !== undefined && (
+						<button type="button" onClick={onBack} className="-ml-2 h-10 shrink-0 rounded-ctl px-2 text-booth-dim hover:bg-booth-hover">
+							← Arena
+						</button>
+					)}
 					<span className={chipLabel}>Lookbook</span>
 					<button type="button" onClick={() => setDetails(!details)} className="min-w-0 truncate rounded-ctl px-1 text-booth-dim hover:text-booth-ink">
 						{m.service !== null ? `${m.service.name}${m.byHand ? ' (picked)' : ''}` : 'Which service?'}
 					</button>
-					{m.runSheet !== null && (
-						<span className={`shrink-0 tabular-nums ${ready === looks.length ? 'text-state-live' : 'text-warn'}`}>
-							{ready === looks.length ? 'All in Arena' : `${ready} of ${looks.length} in Arena`}
+					{m.runSheet !== null && arenaLooks.length > 0 && (
+						<span className="flex shrink-0 items-center gap-3 tabular-nums">
+							<span className={ready === arenaLooks.length ? 'font-bold text-state-live' : ''}>
+								{ready === arenaLooks.length ? 'All in Arena' : `${ready} of ${arenaLooks.length} in Arena`}
+							</span>
+							{loading > 0 && <span className="text-accent-hi">{loading} loading…</span>}
+							{toLoad > 0 && <span className="text-accent-hi">{toLoad} to load</span>}
+							{needs > 0 && (
+								<button
+									type="button"
+									onClick={() => setOnlyNeeds(!onlyNeeds)}
+									aria-pressed={onlyNeeds}
+									className={`h-8 rounded-ctl px-2.5 font-bold ${onlyNeeds ? 'bg-warn text-black' : 'bg-warn/15 text-warn hover:bg-warn/25'}`}
+								>
+									{needs} need{needs === 1 ? 's' : ''} you{onlyNeeds ? ' · show all' : ''}
+								</button>
+							)}
 						</span>
 					)}
 					<span className="ml-auto flex shrink-0 items-center gap-2">
-						{operator && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
-						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Load all</SmallButton>}
+						<SizeSwitch size={size} onSize={setSize} />
+						{operator && ticked.length > 0 && (
+							<Button variant="primary" size="sm" onClick={loadTicked}>
+								Load {ticked.length}
+							</Button>
+						)}
+						{operator && m.plannedUpdate.steps.length > 0 && <SmallButton onClick={m.askUpdateAll}>Update all</SmallButton>}
+						{operator && m.plannedUpdate.steps.length === 0 && m.oldFgs.length > 0 && <SmallButton onClick={m.askClearOld}>Clear old FGs ({m.oldFgs.length})</SmallButton>}
 						<button type="button" onClick={m.readItemsAgain} aria-label="Check again" title="Check again" className="grid size-10 place-items-center rounded-ctl bg-booth-raise hover:bg-booth-hover">
 							<RefreshCw size={16} aria-hidden />
 						</button>
@@ -73,12 +195,30 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
 						)}
 					</div>
 				)}
+				{!named && m.runSheet !== null && (
+					<p className="mb-2 rounded-ctl bg-booth-raise p-3 text-sm">
+						Name Arena&rsquo;s columns <b>{COLUMN_NAMES}</b> to place by column. Until then nothing is placed.
+					</p>
+				)}
 				<Confirm key={m.asking?.id} m={m} />
 			</div>
-			<div className={`min-h-0 flex-1 snap-y snap-proximity overflow-y-auto p-4 ${ageMs !== null ? staleContent : ''}`}>
-				<div className="mx-auto flex max-w-[2200px] flex-col gap-6">
-					{looks.map((look) => (
-						<Card key={look.item} m={m} status={status} operator={operator} item={items[look.item] as LookbookItem} look={look} order={look.item + 1} />
+			<div className={`@container min-h-0 flex-1 overflow-y-auto p-4 ${ageMs !== null ? staleContent : ''}`}>
+				<div className={size === 'two' ? 'mx-auto grid max-w-[2200px] grid-cols-1 gap-4 @3xl:grid-cols-2' : `mx-auto flex max-w-[2200px] flex-col ${size === 'big' ? 'gap-6' : 'gap-2'}`}>
+					{shown.map((look) => (
+						<Card
+							key={look.item}
+							m={m}
+							status={status}
+							operator={operator}
+							item={items[look.item] as LookbookItem}
+							look={look}
+							state={states.get(look.item) ?? 'other'}
+							steps={stepsOf.get(look.item) ?? []}
+							size={size}
+							ticked={selected.has(look.item) && loadable(look.item)}
+							onTick={loadable(look.item) ? () => toggle(look.item) : null}
+							lowerThirds={lowerThirds}
+						/>
 					))}
 				</div>
 				{m.runSheet !== null && looks.length === 0 && <p className="p-6 text-center text-booth-dim">This run sheet has no media.</p>}
@@ -87,119 +227,420 @@ function Lookbook({ status, ageMs, now }: { status: ArenaStatus; ageMs: number |
 	)
 }
 
-/** One moment, a row of its own as wide as the view (the owner, 2026-10-05:
- *  "single announcement/look per that fills the screen"): its picture across
- *  the top, its A-screen or lower third big under it beside its name, its
- *  codes, and Load when Arena lacks any of it. */
+/** The zoom: three sizes of card. */
+function SizeSwitch({ size, onSize }: { size: Size; onSize: (s: Size) => void }) {
+	const options: { value: Size; label: string; icon: typeof Square }[] = [
+		{ value: 'big', label: 'Big', icon: Square },
+		{ value: 'two', label: 'Two a row', icon: LayoutGrid },
+		{ value: 'rows', label: 'Rows', icon: Rows3 },
+	]
+	return (
+		<span role="radiogroup" aria-label="Card size" className="inline-flex rounded-ctl bg-booth-raise p-1">
+			{options.map((o) => (
+				<button
+					key={o.value}
+					type="button"
+					role="radio"
+					aria-checked={o.value === size}
+					aria-label={o.label}
+					title={o.label}
+					onClick={() => onSize(o.value)}
+					className={`grid size-8 place-items-center rounded-[3px] ${o.value === size ? 'bg-accent text-accent-ink' : 'text-booth-dim hover:text-booth-ink'}`}
+				>
+					<o.icon size={16} aria-hidden />
+				</button>
+			))}
+		</span>
+	)
+}
+
+/** What on a card needs a person: a code whose file differs or is missing,
+ *  one with no column, a load that failed or was refused. */
+function problemsOf(look: Look, m: MediaCheckState): { code: string; kind: 'look' | 'missing' | 'no-place' | 'failed' }[] {
+	const out: { code: string; kind: 'look' | 'missing' | 'no-place' | 'failed' }[] = []
+	for (const c of look.codes) {
+		const f = m.fetches[c.code]
+		if (f?.state === 'failed' || m.refused[c.code] !== undefined) out.push({ code: c.code, kind: 'failed' })
+		else if (c.state === 'look' || c.state === 'missing' || c.state === 'no-place') out.push({ code: c.code, kind: c.state })
+	}
+	return out
+}
+
+const TYPE_SHORT: Record<string, string> = { B: 'BG', F: 'FG', A: 'A', T: 'LT', D: 'CD' }
+
+/** Lower thirds as ProPresenter's announcement playlist has them, by code:
+ *  read-only, the Announcements view's own check, asked every 30 s while shown.
+ *  Empty when there is no ProPresenter, no service or no playlist. */
+function useLowerThirds(m: MediaCheckState): ReadonlyMap<string, 'there' | 'missing'> {
+	const [found, setFound] = useState<ReadonlyMap<string, 'there' | 'missing'>>(new Map())
+	const session = m.service === null ? null : sessionOf(m.service)
+	const want = wantedAnnouncements(m.runSheet ?? [])
+	const key = `${session}|${want.map((w) => w.code).join(',')}`
+	useEffect(() => {
+		const api = window.life
+		if (session === null || api === undefined || want.length === 0) return setFound(new Map())
+		let alive = true
+		const ask = () =>
+			void api.announcements(session).then((r) => {
+				if (!alive) return
+				if (r === undefined || !r.output.ok) return setFound(new Map())
+				const check = checkAnnouncements(r.output.name, want, r.output.items)
+				setFound(new Map(check.rows.map((row) => [row.code, row.state])))
+			})
+		ask()
+		const id = setInterval(ask, 30_000)
+		return () => {
+			alive = false
+			clearInterval(id)
+		}
+	}, [key])
+	return found
+}
+
 function Card({
 	m,
 	status,
 	operator,
 	item,
 	look,
-	order,
+	state,
+	steps,
+	size,
+	ticked,
+	onTick,
+	lowerThirds,
 }: {
 	m: MediaCheckState
 	status: ArenaStatus
 	operator: boolean
 	item: LookbookItem
 	look: Look
-	order: number
+	state: CardState
+	steps: UpdateStep[]
+	size: Size
+	ticked: boolean
+	/** Admin, and the card has something to load: tick it for Load n. */
+	onTick: (() => void) | null
+	lowerThirds: ReadonlyMap<string, 'there' | 'missing'>
 }) {
+	// What is open under the card: a code's files compared, or a slot to choose.
+	const [open, setOpen] = useState<{ kind: 'compare' | 'slot'; code: string } | null>(null)
 	const fileOf = (type: string) => look.codes.find((c) => c.type === type && item.files[c.code] !== undefined)
 	// The lookbook's composed picture; else its foreground or background alone.
 	const main = item.preview ?? item.files[fileOf('F')?.code ?? ''] ?? item.files[fileOf('B')?.code ?? ''] ?? null
 	const side = fileOf('A') ?? fileOf('T')
 	const sideFile = side === undefined ? null : (item.files[side.code] ?? null)
-	const steps = look.ready ? [] : lookSteps(look.item, m.runSheet ?? [], status, m.same, m.sizes, m.map, m.pins)
-	const busy = look.codes.filter((c) => under(m.fetches[c.code]))
-	const failed = look.codes.find((c) => m.fetches[c.code]?.state === 'failed' || m.refused[c.code] !== undefined)
-	const ring = look.live ? 'ring-4 ring-state-live' : look.ready ? '' : 'ring-4 ring-warn'
-	return (
-		<article className={`flex min-w-0 snap-start flex-col overflow-hidden rounded-win bg-booth-panel ${ring}`}>
-			<div className="relative w-full bg-black" style={{ aspectRatio: '5800 / 2037' }}>
-				<Picture url={main === null ? null : lookbookThumbUrl(main, 'large')} />
-				<span className="absolute top-3 left-3 rounded-ctl bg-black/70 px-2.5 py-1 text-lg tabular-nums">{order}</span>
-				{look.live && <span className="absolute top-3 left-16 rounded-ctl bg-state-live px-2.5 py-1 text-lg font-extrabold text-black">On screen</span>}
-				{look.ready && (
-					<span className="absolute top-3 right-3 grid size-10 place-items-center rounded-full bg-black/70 text-state-live" aria-label="All in Arena">
-						<Check size={22} aria-hidden />
-					</span>
-				)}
+	const problems = problemsOf(look, m)
+	const pinned = m.pins.some((p) => p.item === look.item)
+	const big = size === 'big'
+	const ring = look.live ? 'ring-4 ring-state-live' : state === 'needs' ? 'ring-2 ring-warn' : ticked ? 'ring-2 ring-accent-hi' : ''
+	const firstArena = look.codes.find((c) => c.state !== 'not-arena' && c.state !== 'no-file' && item.files[c.code] !== undefined)
+
+	const picture = (
+		<div className={`relative w-full overflow-hidden bg-black ${size === 'rows' ? 'rounded-ctl' : ''}`} style={{ aspectRatio: '5800 / 2037' }}>
+			<Img url={main === null ? null : lookbookThumbUrl(main, size === 'rows' ? 'thumbnail' : 'large')} />
+			<span className={`absolute top-2 left-2 rounded-ctl bg-black/70 px-2 tabular-nums ${big ? 'py-1 text-lg' : 'text-sm'}`}>{look.item + 1}</span>
+		</div>
+	)
+	const sidePicture =
+		sideFile === null || side === undefined ? null : (
+			<figure className={big ? 'w-[38%] max-w-[720px] shrink-0' : 'w-28 shrink-0'}>
+				{/* A lower third is white words on nothing: on grey, as the lookbook shows it. */}
+				<div className={`relative aspect-video w-full overflow-hidden rounded-ctl ${side.type === 'T' ? 'bg-neutral-600' : 'bg-black'}`}>
+					<Img url={lookbookThumbUrl(sideFile, big ? 'large' : 'thumbnail')} />
+				</div>
+				{big && <figcaption className="mt-1.5 truncate text-sm text-booth-dim">{side.type === 'A' ? 'A-screen' : 'Lower third'}</figcaption>}
+			</figure>
+		)
+	const words = (
+		<div className="flex min-w-0 flex-1 flex-col gap-2">
+			<div className="flex min-w-0 items-start gap-3">
+				{onTick !== null && <Tick on={ticked} onClick={onTick} />}
+				<div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3">
+					<h3 className={`min-w-0 font-extrabold tracking-tight ${big ? 'text-3xl' : 'text-lg'}`}>{item.title}</h3>
+					{item.label !== null && <span className={`min-w-0 text-booth-dim ${big ? 'text-xl' : 'text-sm'}`}>{item.label}</span>}
+				</div>
+				<StateBadge state={state} live={look.live} big={big} />
 			</div>
-			<div className="flex min-w-0 gap-5 p-4">
-				{sideFile !== null && side !== undefined && (
-					<figure className="w-[38%] max-w-[720px] shrink-0">
-						{/* A lower third is white words on nothing: on grey, as the lookbook shows it. */}
-						<div className={`relative aspect-video w-full overflow-hidden rounded-ctl ${side.type === 'T' ? 'bg-neutral-600' : 'bg-black'}`}>
-							<Picture url={lookbookThumbUrl(sideFile, 'large')} />
-						</div>
-						<figcaption className="mt-1.5 truncate text-sm text-booth-dim">{side.type === 'A' ? 'A-screen' : 'Lower third'}</figcaption>
-					</figure>
-				)}
-				<div className="flex min-w-0 flex-1 flex-col gap-3">
-					<div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-						<h3 className="min-w-0 text-3xl font-extrabold tracking-tight">{item.title}</h3>
-						{item.label !== null && <span className="min-w-0 text-xl text-booth-dim">{item.label}</span>}
-					</div>
-					{look.column !== null && look.column.name !== '' && (
-						<span className="self-start rounded-ctl bg-booth-raise px-2 py-1 text-sm text-booth-dim">Column {look.column.name}</span>
+			<div className="flex flex-wrap gap-1.5">
+				{look.codes.map((c) => (
+					<Piece key={c.code} m={m} item={look.item} code={c.code} type={c.type} state={c.state} lowerThird={lowerThirds.get(c.code)} />
+				))}
+			</div>
+			{problems.length > 0 && (
+				<div className="flex flex-col gap-1.5">
+					{/* No column is the moment's, not a code's: one line, one Choose a slot, the rest following. */}
+					{groupProblems(problems).map((p) => (
+						<Problem
+							key={p.codes.join(' ')}
+							m={m}
+							codes={p.codes}
+							kind={p.kind}
+							operator={operator}
+							onCompare={() => setOpen({ kind: 'compare', code: p.codes[0] as string })}
+							onSlot={() => setOpen({ kind: 'slot', code: p.codes[0] as string })}
+						/>
+					))}
+				</div>
+			)}
+			{operator && (state === 'load' || pinned || (state === 'ready' && firstArena !== undefined)) && (
+				<div className="flex flex-wrap items-center gap-2">
+					{state === 'load' && steps.length > 0 && (
+						<Button variant="primary" size="sm" onClick={() => m.ask(`Load ${item.title}`, steps)}>
+							Load
+						</Button>
 					)}
-					<div className="flex flex-wrap gap-2">
-						{look.codes.map((c) => (
-							<CodeChip key={c.code} code={c.code} state={c.state} fetch={m.fetches[c.code]} />
-						))}
-					</div>
-					{!look.ready && (
-						<div className="flex min-w-0 flex-wrap items-center gap-3">
-							{operator && steps.length > 0 && busy.length === 0 && (
-								<Button variant="primary" onClick={() => m.ask(`Load ${item.label ?? item.title}`, steps)}>
-									Load
-								</Button>
-							)}
-							{look.codes.some((c) => c.state === 'no-place') && <span className="text-sm text-booth-dim">No column of its own{operator ? ': choose its slot in Holding' : ''}</span>}
-							{failed !== undefined && <FetchWords fetch={m.fetches[failed.code]} refused={m.refused[failed.code]} />}
-						</div>
+					{pinned ? (
+						<span className="text-xs text-booth-dim">
+							Placed by hand ·{' '}
+							<button type="button" onClick={() => m.unpin(look.item)} className="underline hover:text-booth-ink">
+								Undo
+							</button>
+						</span>
+					) : (
+						state === 'ready' &&
+						firstArena !== undefined &&
+						look.column !== null && (
+							<button type="button" onClick={() => setOpen({ kind: 'slot', code: firstArena.code })} className="h-8 rounded-ctl px-2 text-xs text-booth-dim hover:bg-booth-hover hover:text-booth-ink">
+								Move…
+							</button>
+						)
 					)}
 				</div>
-			</div>
+			)}
+		</div>
+	)
+
+	return (
+		<article className={`flex min-w-0 flex-col overflow-hidden rounded-win bg-booth-panel ${ring}`}>
+			{size === 'rows' ? (
+				<div className="flex min-w-0 items-start gap-4 p-2">
+					<div className="w-[34%] max-w-[560px] shrink-0">{picture}</div>
+					{sidePicture}
+					{words}
+				</div>
+			) : (
+				<>
+					{picture}
+					<div className={`flex min-w-0 ${big ? 'gap-5 p-4' : 'gap-3 p-3'}`}>
+						{sidePicture}
+						{words}
+					</div>
+				</>
+			)}
+			{open !== null && (
+				<div className="border-t border-booth-edge/60 p-3">
+					<div className="mb-2 flex items-center gap-2 text-sm">
+						<span className="font-medium">{open.kind === 'compare' ? `${open.code}: Arena's file and the lookbook's` : `Where ${open.code} goes, for this service`}</span>
+						<button type="button" onClick={() => setOpen(null)} aria-label="Close" className="ml-auto grid size-9 place-items-center rounded-ctl hover:bg-booth-hover">
+							<X size={16} aria-hidden />
+						</button>
+					</div>
+					{open.kind === 'compare' ? (
+						<Compare m={m} status={status} operator={operator} code={open.code} />
+					) : (
+						<SlotPicker m={m} status={status} what={{ item: look.item, code: open.code }} onDone={() => setOpen(null)} />
+					)}
+				</div>
+			)}
 		</article>
 	)
 }
 
-/** A code, quiet when it is right; marked only when it needs something. */
-function CodeChip({ code, state, fetch }: { code: string; state: CodeState; fetch: MediaCheckState['fetches'][string] | undefined }) {
-	const going = under(fetch)
-	const style: Record<CodeState, string> = {
-		ready: 'bg-booth-raise text-booth-ink',
-		place: 'border border-dashed border-accent-hi/80 text-accent-hi',
-		look: 'bg-warn/15 text-warn',
-		missing: 'bg-warn/15 text-warn',
-		'no-place': 'border border-dashed border-booth-edge text-booth-dim',
-		'no-file': 'text-booth-faint line-through',
-		'not-arena': 'text-booth-faint',
-	}
-	const title: Record<CodeState, string> = {
-		ready: 'In its column, the lookbook’s file',
-		place: 'Not in its column yet',
-		look: 'Arena’s file may differ from the lookbook’s',
-		missing: 'Arena cannot find its file on this computer',
-		'no-place': 'No column of its own',
-		'no-file': 'The lookbook has no file for it',
-		'not-arena': `Not Arena’s (${mediaCodeOf(code)?.type === 'T' ? 'a lower third' : 'another program’s'})`,
-	}
+function Tick({ on, onClick }: { on: boolean; onClick: () => void }) {
 	return (
-		<span title={title[state]} className={`inline-flex h-9 items-center gap-1.5 rounded-ctl px-2.5 font-mono text-sm ${style[state]}`}>
-			{state === 'missing' && <FileX size={12} aria-hidden />}
-			{state === 'place' && !going && '+'}
-			{code}
-			{going && fetch !== undefined && <span className="font-sans text-booth-dim">{fetchShort(fetch)}</span>}
+		<button
+			type="button"
+			role="checkbox"
+			aria-checked={on}
+			aria-label="Tick to load with others"
+			onClick={onClick}
+			className={`grid size-8 shrink-0 place-items-center rounded-ctl border-2 ${on ? 'border-accent-hi bg-accent-hi text-black' : 'border-booth-edge hover:border-booth-ink'}`}
+		>
+			{on && <Check size={18} strokeWidth={3} aria-hidden />}
+		</button>
+	)
+}
+
+function StateBadge({ state, live, big }: { state: CardState; live: boolean; big: boolean }) {
+	const text = big ? 'text-base px-3 h-9' : 'text-xs px-2 h-7'
+	if (live) return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-state-live font-extrabold text-black ${text}`}>On screen</span>
+	switch (state) {
+		case 'ready':
+			return (
+				<span className={`inline-flex shrink-0 items-center gap-1 font-bold text-state-live ${text}`}>
+					<Check size={big ? 18 : 14} aria-hidden /> In Arena
+				</span>
+			)
+		case 'load':
+			return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-accent-hi/15 font-bold text-accent-hi ${text}`}>To load</span>
+		case 'needs':
+			return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-warn font-bold text-black ${text}`}>Needs you</span>
+		case 'loading':
+			return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-booth-raise font-bold text-accent-hi ${text}`}>Loading…</span>
+		case 'other':
+			return null
+	}
+}
+
+/** One piece of a moment: its kind and code, and a word only when it is not
+ *  simply right. */
+function Piece({
+	m,
+	item,
+	code,
+	type,
+	state,
+	lowerThird,
+}: {
+	m: MediaCheckState
+	item: number
+	code: string
+	type: string
+	state: CodeState
+	lowerThird: 'there' | 'missing' | undefined
+}) {
+	const fetch = m.fetches[code]
+	const going = under(fetch)
+	const placement = m.placements.find((p) => p.item === item && p.code === code)
+	const where = placement === undefined ? null : unnamedColumn(placement.columnName) ? `column ${placement.column}` : placement.columnName
+	const [tone, word] = going
+		? ['bg-booth-raise text-accent-hi', fetch === undefined ? '' : fetchShort(fetch)]
+		: state === 'not-arena'
+			? type === 'T'
+				? lowerThird === 'there'
+					? ['bg-booth-raise text-booth-ink', 'in ProPresenter']
+					: lowerThird === 'missing'
+						? ['bg-warn/15 text-warn', 'not in ProPresenter']
+						: ['text-booth-dim', '']
+				: ['text-booth-faint', 'not Arena’s']
+			: ({
+					ready: ['bg-booth-raise text-booth-ink', ''],
+					place: ['border border-dashed border-accent-hi/80 text-accent-hi', where === null ? 'to load' : `→ ${where}`],
+					look: ['bg-warn/15 text-warn', 'may differ'],
+					missing: ['bg-warn/15 text-warn', 'file missing'],
+					'no-place': ['bg-warn/15 text-warn', 'no column'],
+					'no-file': ['text-booth-faint', 'no file in the lookbook'],
+				} as const)[state]
+	return (
+		<span className={`inline-flex h-8 items-center gap-1.5 rounded-ctl px-2 text-sm ${tone}`}>
+			<span className="text-xs font-bold opacity-70">{TYPE_SHORT[type] ?? type}</span>
+			<span className="font-mono">{code}</span>
+			{state === 'missing' && !going && <FileX size={12} aria-hidden />}
+			{word !== '' && <span>{word}</span>}
 		</span>
 	)
 }
 
-function Picture({ url }: { url: string | null }) {
+type Trouble = { codes: string[]; kind: 'look' | 'missing' | 'no-place' | 'failed' }
+
+/** A card's problems as lines: each code its own, but every code with no
+ *  column together. */
+function groupProblems(problems: { code: string; kind: Trouble['kind'] }[]): Trouble[] {
+	// Chosen by its foreground first: the background follows it into the column (Holding's rule).
+	const rank = (code: string) => ['F', 'A', 'B'].indexOf(mediaCodeOf(code)?.type ?? '') >>> 0
+	const noPlace = problems
+		.filter((p) => p.kind === 'no-place')
+		.map((p) => p.code)
+		.sort((a, b) => rank(a) - rank(b))
+	return [...problems.filter((p) => p.kind !== 'no-place').map((p) => ({ codes: [p.code], kind: p.kind })), ...(noPlace.length > 0 ? [{ codes: noPlace, kind: 'no-place' as const }] : [])]
+}
+
+/** A problem on its card, in words, with its fix. */
+function Problem({
+	m,
+	codes,
+	kind,
+	operator,
+	onCompare,
+	onSlot,
+}: {
+	m: MediaCheckState
+	codes: string[]
+	kind: Trouble['kind']
+	operator: boolean
+	onCompare: () => void
+	onSlot: () => void
+}) {
+	const code = codes[0] as string
+	return (
+		<div className="flex min-w-0 flex-wrap items-center gap-2 rounded-ctl bg-warn/10 px-2.5 py-1.5 text-sm">
+			{kind !== 'no-place' && <span className="font-mono text-warn">{code}</span>}
+			{kind === 'failed' ? (
+				<FetchWords fetch={m.fetches[code]} refused={m.refused[code]} />
+			) : (
+				<span className="text-warn">
+					{kind === 'look' ? "Arena's file may not be the lookbook's" : kind === 'missing' ? 'Arena cannot find its file on this computer' : 'No column of its own, or none left: choose where it goes'}
+				</span>
+			)}
+			{operator && (
+				<span className="ml-auto flex items-center gap-2">
+					{(kind === 'look' || kind === 'missing') && <SmallButton onClick={onCompare}>Compare</SmallButton>}
+					{kind === 'no-place' && <SmallButton onClick={onSlot}>Choose a slot</SmallButton>}
+					{kind === 'failed' && <ThereButton onClick={() => m.itsThere(code)} />}
+				</span>
+			)}
+		</div>
+	)
+}
+
+/** A code's clips that need a look, each against the lookbook's file. */
+function Compare({ m, status, operator, code }: { m: MediaCheckState; status: ArenaStatus; operator: boolean; code: string }) {
+	const items = m.runSheet ?? []
+	const today = codesOn(items)
+	const slots = status.layers.flatMap((l) => l.slots.filter((s) => slotCode(s) === code && needsLook(slotMark(s, items, today, m.same, m.sizes))))
+	const first = slots[0]
+	if (first === undefined) return <p className="text-sm text-booth-dim">Nothing to compare now.</p>
+	return (
+		<div className="flex flex-col gap-2">
+			{slots.length > 1 && <p className="text-xs text-booth-dim">{slots.length} clips carry it; the first is shown, and the answer covers them all.</p>}
+			<FileCompare m={m} status={status} slot={first} operator={operator} />
+		</div>
+	)
+}
+
+/** Its layer's clips, to tap one: lit where the moment may go (`pinTargets`). */
+function SlotPicker({ m, status, what, onDone }: { m: MediaCheckState; status: ArenaStatus; what: Choosing; onDone: () => void }) {
+	const targets = m.pinTargets(what)
+	const layer: ArenaLayer | undefined = status.layers.find((l) => l.slots.some((s) => targets.has(s.id)))
+	if (layer === undefined) return <p className="text-sm text-booth-dim">No free slot on its layer: every column there is another moment&rsquo;s or kept for something.</p>
+	const names = columnNamesOf(layer, status)
+	return (
+		<div className="flex flex-col gap-2">
+			<p className="text-xs text-booth-dim">
+				{layer.name}: tap a lit slot. The rest of the moment follows into that column; it asks before loading.
+			</p>
+			<div className="flex gap-2 overflow-x-auto pb-1">
+				{layer.slots.map((slot, i) => {
+					const lit = targets.has(slot.id)
+					const name = names[i] ?? ''
+					const url = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
+					return (
+						<button
+							key={slot.id}
+							type="button"
+							disabled={!lit}
+							onClick={() => {
+								m.askPlaceAt(what, i + 1)
+								onDone()
+							}}
+							className={`flex w-28 shrink-0 flex-col gap-1 text-left ${lit ? '' : 'opacity-35'}`}
+						>
+							<span className={`relative block h-16 w-28 overflow-hidden rounded-ctl ${slot.state === 'empty' ? 'border border-dashed border-booth-edge' : 'bg-booth-raise'} ${lit ? 'ring-2 ring-accent-hi' : ''}`}>
+								{url !== null && <Img url={url} cover />}
+								{slot.state !== 'empty' && <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1.5 text-[11px]">{slotCode(slot) ?? slot.name}</span>}
+							</span>
+							<span className="truncate text-xs text-booth-dim">{unnamedColumn(name) ? `Column ${i + 1}` : name}</span>
+						</button>
+					)
+				})}
+			</div>
+		</div>
+	)
+}
+
+function Img({ url, cover = false }: { url: string | null; cover?: boolean }) {
 	const [failed, setFailed] = useState<string | null>(null)
 	if (url === null || failed === url) return <span className="absolute inset-0 bg-booth-raise" />
-	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className="absolute inset-0 size-full object-contain" />
+	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`absolute inset-0 size-full ${cover ? 'object-cover' : 'object-contain'}`} />
 }

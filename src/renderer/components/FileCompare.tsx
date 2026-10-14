@@ -1,6 +1,6 @@
 // Same code, different file (the owner, 2026-10-13: "give me some good ways to
 // navigate same code but different filename, I think that's causing some
-// problems"), for the Holding view (./HoldingView.tsx):
+// problems"), for the Lookbook view's Compare (./LookbookView.tsx):
 // - Side by side: Arena's picture and file beside the lookbook's, each with its
 //   name, size and date, and the side a version says is newer marked.
 // - Versions read from the names (`-v4`, `WalkInV2`): "Arena has v4; the
@@ -8,16 +8,17 @@
 // - The drive's files for the code: every one carrying it, which is the
 //   lookbook's (by size), which is a copy, and which Fetch would take; Admin may
 //   load another.
-// - Files to check: every code whose file needs a look, on one screen, each
-//   with the same comparison and answers.
 //
-// Every load asks first, as everywhere in Holding (./MediaCheck.tsx Confirm).
+// Every load asks first, as everywhere (./MediaCheck.tsx Confirm). Files to
+// check, every such code on one screen, left with the Holding view
+// (2026-10-14): a Lookbook card that needs a look says so, and "need you" shows
+// only those.
 
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Hand, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Hand } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaSlot, type ArenaStatus } from '../../shared/arena.js'
-import { clipsToUpdate, codesOn, columnNamesOf, slotCode, slotMark, type SlotMark } from '../../shared/holding.js'
+import { clipsToUpdate, codesOn, slotCode, slotMark, type SlotMark } from '../../shared/holding.js'
 import { fileVerdict, lookbookStem, lookbookThumbUrl, uploadedAt } from '../../shared/media-check.js'
 import type { DriveMatches, FetchRequest } from '../../shared/media-fetch.js'
 import type { MediaCheckState } from '../useMediaCheck.js'
@@ -230,50 +231,6 @@ function DriveFiles({
 
 function Tag({ tone, children }: { tone: 'good' | 'plain'; children: React.ReactNode }) {
 	return <span className={`rounded px-1.5 text-[11px] ${tone === 'good' ? 'bg-state-live/20 text-state-live' : 'bg-booth-edge/60 text-booth-dim'}`}>{children}</span>
-}
-
-/** Every code whose file needs a look, on one screen (the owner, 2026-10-13):
- *  one clip of each compared, the others counted. */
-export function FilesToCheck({ m, status, operator, onClose }: { m: MediaCheckState; status: ArenaStatus; operator: boolean; onClose: () => void }) {
-	const items = m.runSheet ?? []
-	const today = codesOn(items)
-	const byCode = new Map<string, { slot: ArenaSlot; where: string }[]>()
-	for (const layer of status.layers) {
-		const names = columnNamesOf(layer, status)
-		layer.slots.forEach((slot, i) => {
-			const code = slotCode(slot)
-			if (code === null || !needsLook(slotMark(slot, items, today, m.same, m.sizes))) return
-			const name = names[i] ?? ''
-			const where = `${layer.name} · ${/^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === '' ? `column ${i + 1}` : name}`
-			byCode.set(code, [...(byCode.get(code) ?? []), { slot, where }])
-		})
-	}
-	return (
-		<div className="flex flex-col gap-3 p-4">
-			<div className="flex items-center gap-3">
-				<h3 className="text-base font-bold">Files to check</h3>
-				<span className="text-sm text-booth-dim">
-					{byCode.size === 0 ? 'Every file on this run sheet is the lookbook’s, or said right by hand.' : `${byCode.size} ${byCode.size === 1 ? 'code' : 'codes'} whose file differs from the lookbook’s, or is missing`}
-				</span>
-				<button type="button" onClick={onClose} aria-label="Back to the grid" className="ml-auto grid size-10 place-items-center rounded-ctl hover:bg-booth-hover">
-					<X size={18} aria-hidden />
-				</button>
-			</div>
-			{[...byCode.entries()].map(([code, clips]) => (
-				<section key={code} className="flex flex-col gap-2 rounded-ctl bg-booth-panel p-4 ring-1 ring-booth-edge ring-inset">
-					<p className="text-sm">
-						<span className="font-mono font-medium">{code}</span>
-						<span className="text-booth-dim">
-							{' '}
-							· {clips[0]?.where}
-							{clips.length > 1 && ` and ${clips.length - 1} more ${clips.length === 2 ? 'clip' : 'clips'}`}
-						</span>
-					</p>
-					<FileCompare m={m} status={status} slot={(clips[0] as { slot: ArenaSlot }).slot} operator={operator} />
-				</section>
-			))}
-		</div>
-	)
 }
 
 export function Picture({ url, large = false, fill = false }: { url: string | null; large?: boolean; fill?: boolean }) {
