@@ -1256,6 +1256,18 @@ Playlist following it makes them Media Bin items; Pāua reads their Media Bin id
 standing ones in their order, PROMOS, the rest, after a confirmation. Next: a Smart Playlist set up
 on that ProPresenter on the Paua Smart Folder, and a header written once on PAUA TEST.
 
+**The Smart Folder, 2026-10-14** (the owner made a Media Bin Smart Playlist on that ProPresenter,
+"Paua Smart Folder", following `\\10.0.0.71\graphics\Other Media\Paua Smart Folder`; renaming it
+broke it, deleting and re-adding fixed it). A Smart Playlist reads the folder when it is added;
+after that, **a file that appears is not noticed, but a file modified after it lands is**, within
+10 s: four lower thirds copied in from this Mac (written as `.part`, renamed into place) stayed
+unseen for a minute, then all four came in 10 s after a `touch`. Files the owner copied by hand
+were seen at once (their creation date today; `cp -p` had kept the originals' January dates). So
+Pāua copies each file, then sets its modified time a moment later. They arrive as `image` items
+with Media Bin ids (`GET /v1/media/playlist/<Smart Playlist>`), in no particular order; the PUT
+sets the order. macOS `cp` failed on the share copying extended attributes ("Result too large"):
+`cp -X`; Pāua on Windows copies no such attributes.
+
 **Routes left for loading, the owner's to choose:**
 - **The folder only**: Pāua copies the week's T files into the Paua Smart Folder, named in the
   pattern's order (`01 CT108 …`), last week's moved aside; a Smart Playlist in ProPresenter's
