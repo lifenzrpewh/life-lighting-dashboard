@@ -76,7 +76,7 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 | ✅ `src/bridge/ontime.ts` · `src/bridge/propresenter.ts` · `src/main/timers.ts` | The countdown chip beside the clock: OnTime (`GET /api/poll`) whenever an event is running there, ProPresenter's timer, labelled by its stage message (`Wrap up: 3:38`, `/v1/timers/current`, `/v1/stage/message`), otherwise, one at a time. The rule is `chooseTimer` in `src/shared/timer.ts`. **Both shown correctly against the real programs, 2026-10-02, on the Windows box:** ProPresenter 18.2, and OnTime as LIFE runs it, **our own fork** (`lifenz-prod/ontime` v4.0.1, not upstream; its events carry extra `cue` and `custom` fields the decoder ignores). A ProPresenter countdown that may not overrun ends `00:00:00` `complete`; overrun states are still unseen. Which ProPresenter timer to follow is the ProPresenter row in Connections, by name, because a booth runs several at once; a named timer it does not have is said, never swapped for another. Past zero, either countdown goes red. ProPresenter's port is **1025** unless set otherwise (the owner, 2026-10-08). |
 | ⚠️ `src/renderer/components/TimerView.tsx` · `TimerChip.tsx` (`timerFace`) | **The Timer view** (2026-10-08, the owner's item 1): the bar's countdown as a view any window may hold, as many tabs as wanted, scaled to its window (container units), red past zero, stale held dimmed with its age, `?` in words; one `timerFace` draws both, so they cannot disagree, by `chooseTimer`'s rule (no source picker). On while OnTime or ProPresenter is. In the dev kiosk on this Mac over CDP against a stand-in OnTime: counting, overtime red, stale, popped out. ⚠️ Not against the real programs or by finger. **2026-10-11, the owner: no dotted `?` box.** A face with nothing to count (`idle`: not answering, or no event or timer running and no stage message) draws no chip on the bar, and the view says "No countdown running" with which program and why; a named ProPresenter timer that is missing is still said. Seen on the Mac against a stand-in OnTime (counting, stopped, gone). |
 | ⏸ `src/backend/` · `src/main/backend/` | The dashboard's own run order, **retired from the screen 2026-10-02** and not started. ✅ It did read the live backend first (pairing as a Central booth device, the plan shown). Delete once the Cue Manager has run a service. |
-| ✅ `src/shared/announcements.ts` · `src/bridge/propresenter-playlist.ts` · `src/main/propresenter-playlist.ts` · `src/renderer/components/AnnouncementsView.tsx` | **ProPresenter announcements, checked** (2026-10-14, branch `propresenter-announcements`, not merged): the **Announcements** view (on while ProPresenter is; no Arena needed) reads "-Announcements AM", "PM" or "EVENT" (by the service's name) and says which of the run sheet's T codes are in it, which are missing, and which T items are not on the run sheet; headers and uncoded items left alone; order not judged. Read-only, every 30 s while shown. ✅ Against Central's ProPresenter (10.11.60.7:1025) and the lookbook, 2026-10-14, in the dev kiosk on the Mac. Loading not built. `docs/VISUALS_DASHBOARD.md` § ProPresenter announcements. |
+| ✅ `src/shared/announcements.ts` · `src/bridge/propresenter-playlist.ts` · `src/main/announcements.ts` · `src/bridge/announcement-files.ts` · `src/renderer/components/AnnouncementsView.tsx` | **ProPresenter announcements, checked** (2026-10-14, merged; ⚠️ **Load** built on branch `announcements-load`, not merged: Copy to the folder, one drag, Write the playlist, Admin only, names and On/Off in Settings › ProPresenter; each step proven by hand at Central, the code not yet run against it): the **Announcements** view (on while ProPresenter is; no Arena needed) reads "-Announcements AM", "PM" or "EVENT" (by the service's name) and says which of the run sheet's T codes are in it, which are missing, and which T items are not on the run sheet; headers and uncoded items left alone; order not judged. Read-only, every 30 s while shown. ✅ Against Central's ProPresenter (10.11.60.7:1025) and the lookbook, 2026-10-14, in the dev kiosk on the Mac. Loading not built. `docs/VISUALS_DASHBOARD.md` § ProPresenter announcements. |
 | ⚠️ `src/shared/embeds.ts` · `src/main/embeds.ts` · `src/renderer/components/EmbedPane.tsx` | **Embeds** (2026-10-05): any web page, added by name and address in Connections (operator mode), is a view of its own with its own sign-in (a partition per embed), − / + zoom remembered per embed, Reload, Pop out, and a row saying loaded / loading / not loading that can be turned off. New windows open in the computer's browser; the user agent drops Electron's name, for Google. Removing one clears its session, and its folder at the next start. In the kiosk on the Windows box over CDP, 2026-10-05: added, placed over its slot, zoomed (saved, re-applied after a reload), popped out and back, off and on, renamed, removed. ⚠️ Not signed in to Google (its sign-in raised a Windows passkey dialog, cancelled); a new-window link not tried. |
 | ⚠️ `build/icon.svg` · `scripts/render-icon.cjs` · `src/main/kiosk.ts` (mark, windowed) | **The pāua icon, windowed mode, MARK** (2026-10-05). The icon is a drawn shell (`build/icon.svg`, rendered to `build/icon.png` and `assets/icon.png` by `npx electron scripts/render-icon.cjs`), for the installer, taskbar and Dock; ⚠️ not yet seen in an installed build. **This screen** in Connections (operator mode): Full screen or Window, at once, no restart (watched both ways in the kiosk). **MARK** in the status bar (a flag since the 2026-10-05 look), for anyone: a `[mark] ===== tester's mark N =====` line in the log with the mode, layout and views on screen, and the button says which number (watched). |
 | ⚠️ `src/shared/holding.ts` · `src/renderer/components/HoldingView.tsx` · `src/renderer/useMediaCheck.ts` | **The Holding view** (2026-10-05, the owner's idea): the holding layers as rows of thumbnails, each clip marked against the run sheet the media check follows; inspect only. **Pictures over words since the afternoon of 2026-10-05**: only what needs a look is marked, what belongs in a column stands there as a dashed "+ place" tile, one-offs wait in a No column tray and are placed per service, a clip on screen may be replaced after a red tick at the confirmation, and the Arena view's Media row is one line that opens Holding. **A column is one moment of the service across every layer, found by Arena's column names**: PRE, POST, WTL, NSL, BIBLES, WTG and PROMO (the owner's pattern for every campus, after a first version that guessed per layer placed the PM foregrounds wrongly, 2026-10-05); each item's codes into its column, announcements into PROMO, nothing placed while columns are unnamed. To place, Place or Choose; Update all; every write to Arena confirmed first; operator mode, and **not drawn in volunteer mode** (2026-10-06). **The normal background fills HOLD BG's gaps** up to the last PROMO in Update all (2026-10-06, `backgroundGaps`; ⚠️ not yet run against Arena); a column named PREACH takes the message's background. Names are the layer group's columns. **Files by code and size** (the lookbook's are the drive's byte for byte): the check says "different file" by size; the drive is searched by code; the lookbook's file is the backup, downloaded only when the confirmation's question gets a yes. ✅ Dry runs against the live composition, the drive and the lookbook; ✅ loads through the button (the owner's Place all), ✅ lookbook downloads through it (the owner's Update all, 11:12). ⚠️ Not by finger; the live tick not yet seen. **2026-10-13, branch `holding-fixes` (not merged):** a **Plan** panel and a result line that stays (`explainPlan`, `media:run`, `[holding]` in the log); a **one-off is one column** across its layers, its BG following; a refused load **looked at again**, Arena's words kept, and **It's there** (orange, `thereKey`); **place anywhere** on its layer, kept per service (`Pin`, `pinTargets`); **same code, different file** (side by side, versions, the drive's files, Files to check); announcements and one-off FGs **from PROMO 1 onwards** in run-sheet order. Dev kiosk on the Mac over CDP against the stand-in and the live lookbook; ⚠️ not against Arena or by finger. `docs/VISUALS_DASHBOARD.md` § The Holding view (§ The owner's fixes, 2026-10-13). |
@@ -324,21 +324,20 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
-**2026-10-14, at home:** the ProPresenter announcements **check** is built on branch
-`propresenter-announcements` (pushed, not merged), read against Central's real ProPresenter at
-10.11.60.7 (reachable from this Mac). Next: the owner's word on the order rule and the NAS
-folder: answered (keep today's pattern; `smb://10.0.0.71/graphics/Other Media/Paua Smart
-Folder`). ✅ **The playlist write works by Media Bin ids** (the 404s were playlist-entry ids; 204 on the
-owner's "PAUA TEST" with the test card's Media Bin id), but **not from a Smart Playlist**
-(404): ✅ proven instead through an ordinary media playlist **Paua**, one drag by a person from
-the Smart Folder's playlist, then Pāua writes the playlist with headers in the pattern (204 on
-PAUA TEST). Next: the owner's go to build Load (`docs/VISUALS_DASHBOARD.md`
-§ ProPresenter announcements). This Mac's own
-ProPresenter 18.4 crashes on launch in CoreMIDI (a buffer overflow, macOS 26.3): unplug MIDI
-gear or update it.
+**Where things stand (2026-10-14, evening, at home on the Mac).** ProPresenter announcements:
+the **check** is on main (the Announcements view); **Load** is built on branch
+**`announcements-load`** (`d2d9304`, pushed, not merged), 376 tests and 256 Lua checks green.
+How a week's load goes, and why it needs one drag by a person (ProPresenter's playlist write
+takes pictures only by Media Bin id and refuses a Smart Playlist's): `docs/VISUALS_DASHBOARD.md`
+§ ProPresenter announcements, every step proven by hand on the owner's PAUA TEST at Central.
+**Next:** run Load end to end against Central from the kiosk, with the owner (TODO, top), then
+merge. Central's ProPresenter (10.11.60.7:1025) answers from this Mac on the booth network;
+what the tests left on it and on the NAS is listed in that section. This Mac's own ProPresenter
+18.4 crashes on launch in CoreMIDI (a buffer overflow, macOS 26.3): unplug MIDI gear or update
+it. This Mac: no kiosk or Vite running; ProPresenter address blank in its settings (set to
+10.11.60.7 for a test, then cleared); the NAS is mounted at `/Volumes/graphics`.
 
 **Pick up here (handoff, 2026-10-13, evening; the owner continues at home).**
-- **ProPresenter lower thirds**: see 2026-10-14 above.
 - **On main, not in a build:** the Holding fixes and Show mode. A tag when the owner says; the
   build no longer hits the Actions storage limit (one-day artifacts, the old 57 deleted).
 - **1.2.0 is a draft on `paua-releases`** (and here): publishing it there is what offers it to
@@ -656,6 +655,15 @@ Later, not tonight:
 
 ### TODO, in order
 
+0. **Announcements Load, end to end at Central, with the owner** (branch `announcements-load`):
+   in the kiosk on the booth network, Settings › ProPresenter › Announcements (Folder
+   `/Volumes/graphics/Other Media/Paua Smart Folder` on this Mac, `\\10.0.0.71\graphics\…` on
+   Windows; Arena's graphics folder set, for the copy), then Copy, the drag, and Write, **first
+   into a test playlist**: the output is `<base> AM/PM/EVENT`, so rename PAUA TEST to
+   `PAUA TEST AM` and set the Output playlist to `PAUA TEST`. Only then the real
+   "-Announcements AM", at a quiet time: its Finder-dragged
+   pictures cannot be kept, so the write replaces it whole. Then merge. `docs/VISUALS_DASHBOARD.md`
+   § ProPresenter announcements.
 0. **Updates from this repo, not `paua-releases`** (the owner, 2026-10-13, noted, not started:
    "why not point the updater at the main repo"). `lifenzrpewh/life-lighting-dashboard` is
    **public** now, so the second repo's reason (a private repo) is gone. The change: `publish` in
@@ -674,8 +682,6 @@ Later, not tonight:
 0. **A build of main** (Holding fixes and Show mode, merged 2026-10-13) when the owner says; at a
    booth, the checks in `docs/FIELD_TEST.md` § Holding fixes and § Show mode, and the next real
    404's `[arena] POST` line.
-0. **ProPresenter lower thirds:** the owner's answers first (`docs/VISUALS_DASHBOARD.md`
-   § Open questions), and `spikes/propresenter-playlist.mjs` run at a booth.
 0. **v0.2.5 on GitHub** (the owner's): check its build on `release-build-log`, then publish the
    draft and delete the older drafts. `docs/FIELD_TEST.md` § Volunteer mode, Layouts,
    backgrounds (0.2.5) is new: operator-only buttons hidden in volunteer mode, Layouts as a
