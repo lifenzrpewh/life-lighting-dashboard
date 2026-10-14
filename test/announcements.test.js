@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 
 import { readFileSync } from 'node:fs'
 
-import { PLAYLIST_AM, PLAYLIST_EVENT, PLAYLIST_PM, checkAnnouncements, playlistFor, wantedAnnouncements } from '../dist/src/shared/announcements.js'
+import { PLAYLIST_AM, PLAYLIST_EVENT, PLAYLIST_PM, checkAnnouncements, isTCode, outputName, playlistBody, playlistFor, sameOrder, sessionOf, wantedAnnouncements } from '../dist/src/shared/announcements.js'
+import { DEFAULT_SETTINGS, applyPatch, fromDisk, patchFrom } from '../dist/src/shared/settings.js'
+import { viewIsOn } from '../dist/src/shared/connections.js'
 /** Central's "-Announcements AM", read from its ProPresenter on 2026-10-14. */
 const REAL_AM = JSON.parse(readFileSync(new URL('./fixtures/propresenter-announcements-am.json', import.meta.url), 'utf8'))
 
@@ -21,15 +23,15 @@ const RUN_SHEET = [
 	item('End', ['CB100', 'CA302'], 'Walk Out'),
 ]
 
-test('announcements: every T code on the run sheet, in its order, each once', () => {
+test('announcements: every T code once, the standing notices first in their order (WTL, NSL, Bibles, WTG), then the rest in run-sheet order', () => {
 	assert.deepEqual(
-		wantedAnnouncements(RUN_SHEET).map((w) => [w.code, w.title]),
+		wantedAnnouncements(RUN_SHEET).map((w) => [w.code, w.section]),
 		[
-			['CT108', 'Welcome'],
-			['CT003', 'Welcome'],
-			['CT109', 'Welcome'],
-			['CT290', 'Announcement'],
-			['CT110', 'EOS Announcements'],
+			['CT108', 'notices'],
+			['CT003', 'notices'],
+			['CT110', 'notices'],
+			['CT109', 'notices'],
+			['CT290', 'promos'],
 		],
 	)
 	assert.equal(wantedAnnouncements(RUN_SHEET)[0].file, '/storage/library/C/CT108-x.png')
@@ -39,6 +41,8 @@ test('announcements: AM or PM by the service\'s name, else EVENT', () => {
 	assert.equal(playlistFor({ name: 'Central AM 18th October' }), PLAYLIST_AM)
 	assert.equal(playlistFor({ name: 'Central PM 18th October' }), PLAYLIST_PM)
 	assert.equal(playlistFor({ name: 'Central Team Night' }), PLAYLIST_EVENT)
+	assert.equal(sessionOf({ name: 'Central PM 18th October' }), 'PM')
+	assert.equal(outputName('Notices ', 'AM'), 'Notices AM')
 })
 
 test('announcements: Central\'s real playlist against its 11 October run sheet: all there, headers left alone', () => {
@@ -48,12 +52,13 @@ test('announcements: Central\'s real playlist against its 11 October run sheet: 
 	assert.equal(r.ok, true)
 	assert.equal(r.others, 2) // NORMAL NOTICES and PROMOS
 	// Not in run-sheet order (Bibles before Ways to Give), and that is not a fault.
+	// Rows in the order the playlist takes them, which is the real playlist's order.
 	assert.deepEqual(r.rows.map((x) => [x.code, x.at]), [
 		['CT108', 1],
 		['CT003', 2],
+		['CT110', 3],
 		['CT109', 4],
 		['CT290', 6],
-		['CT110', 3],
 	])
 })
 
@@ -97,4 +102,56 @@ test('ProPresenter: a playlist\'s items in order; a wrong shape fails whole', ()
 	assert.equal(decodePlaylist({ items: [{ id: id('x'), type: 'media' }, { type: 'media' }] }).ok, false)
 	assert.equal(decodePlaylist([]).ok, false)
 	assert.equal(decodePlaylistTree({}).ok, false)
+})
+
+// --- Writing the output playlist ---
+
+const PAUA = [media('01 CT108-Sunday-ConnectWithUs', 'm108'), media('02 CT003-Sunday-NextStepsLounge', 'm003'), media('04 CT110-Sunday-Bibles', 'm110'), media('03 CT109-Sunday-WaystoGive', 'old109'), media('03 CT109-Sunday-WaystoGive', 'm109'), media('05 CT290-Sunday-Prayer&Fasting-Oct', 'm290')]
+
+test('announcements: the write sends each section\'s header and its pictures by their Media Bin ids, in order', () => {
+	const current = decodePlaylist(REAL_AM).value
+	const body = playlistBody(wantedAnnouncements(RUN_SHEET), PAUA, current)
+	assert.equal(body.ok, true)
+	assert.deepEqual(
+		body.items.map((i) => [i.type, i.id.uuid, i.id.name]),
+		[
+			['header', null, 'NORMAL NOTICES'],
+			['media', 'm108', '01 CT108-Sunday-ConnectWithUs'],
+			['media', 'm003', '02 CT003-Sunday-NextStepsLounge'],
+			['media', 'm110', '04 CT110-Sunday-Bibles'],
+			['media', 'm109', '03 CT109-Sunday-WaystoGive'], // the newest of two
+			['header', null, 'PROMOS'],
+			['media', 'm290', '05 CT290-Sunday-Prayer&Fasting-Oct'],
+		],
+	)
+	// The header keeps the playlist's own colour; indices run 0, 1, 2…
+	assert.deepEqual(body.items[0].header_color, { red: 0.5, green: 0.5, blue: 0.5, alpha: 1 })
+	assert.deepEqual(body.items.map((i) => i.id.index), [0, 1, 2, 3, 4, 5, 6])
+	// Read back with ProPresenter's own entry ids, the same order is the same.
+	const back = body.items.map((i, n) => ({ uuid: `e${n}`, name: i.id.name.replace(/^\d\d /, ''), type: i.type, hidden: false }))
+	assert.equal(sameOrder(body.items, back), true)
+	assert.equal(sameOrder(body.items, [back[0], back[2], back[1], ...back.slice(3)]), false)
+})
+
+test('announcements: nothing is written while one is missing from the media playlist, or with nothing wanted', () => {
+	const r = playlistBody(wantedAnnouncements(RUN_SHEET), PAUA.slice(0, 3), [])
+	assert.deepEqual(r, { ok: false, missing: ['CT109', 'CT290'] })
+	assert.deepEqual(playlistBody([], PAUA, []), { ok: false, missing: [] })
+	assert.equal(isTCode('CT108'), true)
+	assert.equal(isTCode('CF108'), false)
+	assert.equal(isTCode('ct108'), false)
+})
+
+test('announcements: the settings, on by default, named as Central named them, and off hides the view', () => {
+	assert.equal(DEFAULT_SETTINGS.announcementsOn, true)
+	assert.equal(DEFAULT_SETTINGS.announcementsMediaPlaylist, 'Paua')
+	const r = applyPatch(DEFAULT_SETTINGS, { announcementsOn: false, announcementsPlaylist: ' Notices ', announcementsFolder: '/Volumes/graphics/Other Media/Paua Smart Folder' })
+	assert.equal(r.ok, true)
+	assert.equal(r.settings.announcementsPlaylist, 'Notices')
+	assert.equal(applyPatch(DEFAULT_SETTINGS, { announcementsSmartPlaylist: '  ' }).ok, false)
+	assert.equal(fromDisk({ announcementsOn: false, announcementsMediaPlaylist: 'Bin' }).announcementsMediaPlaylist, 'Bin')
+	assert.equal(patchFrom({ announcementsOn: 'yes' }), null)
+	assert.equal(viewIsOn('announcements', [], [], [], [], false), false)
+	assert.equal(viewIsOn('announcements', [], [], [], [], true), true)
+	assert.equal(viewIsOn('announcements', ['propresenter'], [], [], [], true), false)
 })

@@ -21,9 +21,23 @@
 // - Someone puts them in by hand today. The files are on the graphics drive /
 //   the NAS, which the ProPresenter computer (another machine) also reaches.
 //
-// This file only compares. Reading the playlist is ../bridge/propresenter-playlist.ts;
-// putting the files in is a later step (docs/VISUALS_DASHBOARD.md
-// § ProPresenter announcements).
+// LOADING (2026-10-14, each step proven on Central's ProPresenter, PAUA TEST;
+// docs/VISUALS_DASHBOARD.md § ProPresenter announcements). ProPresenter's
+// playlist write takes pictures only by their Media Bin id, and refuses a Smart
+// Playlist's, so a week's load is:
+// 1. Pāua copies the T files into the announcements folder, numbered in the
+//    order below, and touches them: a Smart Playlist on a network folder
+//    notices a file once it is modified after landing.
+// 2. A person drags them from the Smart Playlist into an ordinary media
+//    playlist (the one step the API cannot do).
+// 3. Pāua writes the output playlist from that media playlist (`playlistBody`):
+//    NORMAL NOTICES, the standing ones in their fixed order, then PROMOS, the
+//    rest in run-sheet order (the owner, 2026-10-14). Admin only, confirmed.
+// Every name is a setting (Settings › ProPresenter › Announcements), and a
+// campus that does not use them turns them off there.
+//
+// Reading and writing are ../bridge/propresenter-playlist.ts and
+// ../main/announcements.ts; the files are ../bridge/announcement-files.ts.
 //
 // THE RULE THIS FILE ENFORCES: as in the media check, nothing unsettled is
 // "ok". A run sheet with no announcement T codes says so rather than reading as
@@ -32,16 +46,32 @@
 
 import { mediaCodeOf, type LookbookItem } from './media-check.js'
 
-/** One lower third the run sheet calls for, in its order. */
+/** NORMAL NOTICES: the standing notices, in this order, by the run-sheet
+ *  item's `Media No.` label (Central's real labels, 11 and 18 October). */
+export const STANDING_LABELS: readonly string[] = ['WTL', 'NSL', 'BIBLES', 'WTG']
+
+export type Section = 'notices' | 'promos'
+
+/** The headers Central's playlists carry, written as they are. */
+export const SECTION_HEADER: Record<Section, string> = { notices: 'NORMAL NOTICES', promos: 'PROMOS' }
+
+/** One lower third the run sheet calls for. */
 export type WantedAnnouncement = {
 	code: string
 	/** The run-sheet item it is on. */
 	title: string
+	/** Its `Media No.` label (`WTL`, `Prayer & Fasting`), or null. */
+	label: string | null
 	/** The lookbook's current file for it, or null when it has none. */
 	file: string | null
+	section: Section
 }
 
-/** Every T code on the run sheet, in its order, each once. */
+const standingIndex = (label: string | null) => (label === null ? -1 : STANDING_LABELS.indexOf(label.trim().toUpperCase()))
+
+/** Every T code on the run sheet, each once, in the order the playlist takes
+ *  them: the standing notices in their fixed order, then everything else in
+ *  run-sheet order. */
 export function wantedAnnouncements(items: readonly LookbookItem[]): WantedAnnouncement[] {
 	const out: WantedAnnouncement[] = []
 	const seen = new Set<string>()
@@ -50,32 +80,56 @@ export function wantedAnnouncements(items: readonly LookbookItem[]): WantedAnnou
 			const code = mediaCodeOf(raw)
 			if (code === null || code.type !== 'T' || seen.has(code.code)) continue
 			seen.add(code.code)
-			out.push({ code: code.code, title: item.title, file: item.files[code.code] ?? null })
+			const section: Section = standingIndex(item.label) >= 0 ? 'notices' : 'promos'
+			out.push({ code: code.code, title: item.title, label: item.label, file: item.files[code.code] ?? null, section })
 		}
 	}
-	return out
+	const rank = (w: WantedAnnouncement) => (w.section === 'notices' ? standingIndex(w.label) : STANDING_LABELS.length)
+	// Stable: promos keep their run-sheet order among themselves.
+	return out.map((w, i) => ({ w, i })).sort((a, b) => rank(a.w) - rank(b.w) || a.i - b.i).map(({ w }) => w)
 }
 
-export const PLAYLIST_AM = 'Announcements AM'
-export const PLAYLIST_PM = 'Announcements PM'
-export const PLAYLIST_EVENT = 'Announcements EVENT'
+/** Which of a booth's announcement playlists a service uses: its name's AM or
+ *  PM (`Central AM 18th October`), else EVENT (`Central Team Night`). */
+export type Session = 'AM' | 'PM' | 'EVENT'
+export const SESSIONS: readonly Session[] = ['AM', 'PM', 'EVENT']
 
-/** Which playlist a service's announcements are in: its name's AM or PM
- *  (`Central AM 18th October`), else EVENT (`Central Team Night`). */
-export function playlistFor(service: { name: string }): string {
-	if (/\bPM\b/i.test(service.name)) return PLAYLIST_PM
-	if (/\bAM\b/i.test(service.name)) return PLAYLIST_AM
-	return PLAYLIST_EVENT
+export function sessionOf(service: { name: string }): Session {
+	if (/\bPM\b/i.test(service.name)) return 'PM'
+	if (/\bAM\b/i.test(service.name)) return 'AM'
+	return 'EVENT'
 }
+
+/** The output playlist's name: the setting's base and the session
+ *  (`Announcements AM`; Central's "-Announcements AM" matches it, the dash aside). */
+export const outputName = (base: string, session: Session) => `${base.trim()} ${session}`
+
+export const DEFAULT_OUTPUT_BASE = 'Announcements'
+
+export const PLAYLIST_AM = outputName(DEFAULT_OUTPUT_BASE, 'AM')
+export const PLAYLIST_PM = outputName(DEFAULT_OUTPUT_BASE, 'PM')
+export const PLAYLIST_EVENT = outputName(DEFAULT_OUTPUT_BASE, 'EVENT')
+
+/** The default output playlist for a service. */
+export function playlistFor(service: { name: string }, base = DEFAULT_OUTPUT_BASE): string {
+	return outputName(base, sessionOf(service))
+}
+
+export type HeaderColor = { red: number; green: number; blue: number; alpha: number }
+
+/** Central's headers' grey, for a header the playlist does not have yet. */
+export const GREY: HeaderColor = { red: 0.5, green: 0.5, blue: 0.5, alpha: 1 }
 
 /** One item of a ProPresenter playlist, as ../bridge/propresenter-playlist.ts
  *  reads it. */
 export type PlaylistItem = {
 	uuid: string
 	name: string
-	/** ProPresenter's word: `media`, `presentation`, `header`, `placeholder`… */
+	/** ProPresenter's word: `media`, `image`, `presentation`, `header`… */
 	type: string
 	hidden: boolean
+	/** A header's colour. */
+	color?: HeaderColor
 }
 
 /** What became of one wanted lower third. `at` is the item's place in the
@@ -125,8 +179,76 @@ export function checkAnnouncements(playlist: string, want: readonly WantedAnnoun
 	return { playlist, rows, extras, others, ok }
 }
 
-/** Main's answer to the playlist ask: its items, or why not, and when. */
-export type PlaylistRead = { ok: true; name: string; items: PlaylistItem[]; at: number } | { ok: false; detail: string; at: number }
+/** Main's answer to a playlist ask: its items, or why not, and when. */
+export type PlaylistRead = { ok: true; name: string; uuid: string; items: PlaylistItem[]; at: number } | { ok: false; detail: string; at: number }
 
-/** Only these are asked for: main reads no playlist by a name the page makes up. */
-export const isAnnouncementPlaylist = (name: unknown): name is string => name === PLAYLIST_AM || name === PLAYLIST_PM || name === PLAYLIST_EVENT
+/** The newest item in a playlist carrying `code`: the last, since a picture
+ *  dragged in again lands at the end. */
+export function itemOf(items: readonly PlaylistItem[], code: string): PlaylistItem | null {
+	for (let i = items.length - 1; i >= 0; i--) if (mediaCodeOf(items[i]!.name)?.code === code) return items[i]!
+	return null
+}
+
+/** One item of ProPresenter's playlist write, as its spec and Central took it. */
+export type PutItem = {
+	id: { uuid: string | null; name: string; index: number }
+	type: 'header' | 'media'
+	header_color?: HeaderColor
+	is_hidden: false
+	is_pco: false
+}
+
+/** The output playlist's whole new list: each section's header (its colour
+ *  kept from the playlist now, else grey) and its pictures by their Media Bin
+ *  ids in `media`. Every wanted code must be there, or nothing is written. */
+export function playlistBody(
+	want: readonly WantedAnnouncement[],
+	media: readonly PlaylistItem[],
+	current: readonly PlaylistItem[],
+): { ok: true; items: PutItem[] } | { ok: false; missing: string[] } {
+	const missing = want.filter((w) => itemOf(media, w.code) === null).map((w) => w.code)
+	if (want.length === 0 || missing.length > 0) return { ok: false, missing }
+	const colorOf = (header: string) => current.find((i) => i.type === 'header' && i.name.trim().toUpperCase() === header)?.color ?? GREY
+	const items: PutItem[] = []
+	for (const section of ['notices', 'promos'] as const) {
+		const these = want.filter((w) => w.section === section)
+		if (these.length === 0) continue
+		const header = SECTION_HEADER[section]
+		items.push({ id: { uuid: null, name: header, index: items.length }, type: 'header', header_color: colorOf(header), is_hidden: false, is_pco: false })
+		for (const w of these) {
+			const it = itemOf(media, w.code)!
+			items.push({ id: { uuid: it.uuid, name: it.name, index: items.length }, type: 'media', is_hidden: false, is_pco: false })
+		}
+	}
+	return { ok: true, items }
+}
+
+/** Whether a playlist read back after a write holds what was written: the same
+ *  headers and lower thirds, in the same order (entry ids are ProPresenter's
+ *  own and change). */
+export function sameOrder(written: readonly PutItem[], read: readonly PlaylistItem[]): boolean {
+	const key = (type: string, name: string) => (type === 'header' ? `h:${name.trim().toUpperCase()}` : `t:${mediaCodeOf(name)?.code ?? name}`)
+	const a = written.map((i) => key(i.type, i.id.name))
+	const b = read.map((i) => key(i.type, i.name))
+	return a.length === b.length && a.every((k, i) => k === b[i])
+}
+
+/** What a copy into the folder did for one code. */
+export type CopyOutcome =
+	| { code: string; state: 'copied' | 'already'; name: string }
+	| { code: string; state: 'not-on-drive' | 'failed'; detail: string }
+
+/** Main's answer to the three reads the Announcements view needs. */
+export type AnnouncementsRead = {
+	/** The output playlist for the session asked. */
+	output: PlaylistRead
+	/** The ordinary media playlist the pictures are dragged into. */
+	media: PlaylistRead
+	/** The Smart Playlist on the folder. */
+	smart: PlaylistRead
+}
+
+export type WriteResult = { ok: true; items: number } | { ok: false; detail: string }
+
+/** A lower-third code the page may hand main: `CT108`. */
+export const isTCode = (v: unknown): v is string => typeof v === 'string' && /^[A-Z]T\d{3}$/.test(v)

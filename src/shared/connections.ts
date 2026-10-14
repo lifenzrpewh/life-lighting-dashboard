@@ -54,6 +54,8 @@ export function viewIsOn(
 	embeds: readonly Embed[],
 	ndi: readonly NdiSource[] = [],
 	capture: readonly CaptureInput[] = [],
+	/** Settings › ProPresenter › Announcements: off hides the view. */
+	announcementsOn = true,
 ): boolean {
 	const captureId = captureIdOf(view)
 	if (captureId !== null) return capture.some((c) => c.id === captureId && c.on)
@@ -66,6 +68,7 @@ export function viewIsOn(
 	if (view === 'timer') return !off.includes('ontime') || !off.includes('propresenter')
 	// The Guide is a page of LIFE's, not a connection: always there to read.
 	if (view === 'guide') return true
+	if (view === 'announcements' && !announcementsOn) return false
 	return !off.includes(CONNECTION_OF_VIEW[view as Exclude<BuiltInView, 'timer' | 'guide'>])
 }
 

@@ -9,6 +9,12 @@
 //   type: 'header' | 'media', is_hidden, is_pco, header_color? }] }`. A media
 //   item's name is its file's, without the extension.
 //
+// - `GET /v1/media/playlists` → the same shape, the Media Bin's playlists
+//   (Smart Playlists among them); `GET /v1/media/playlist/<uuid>` → `{ id,
+//   items: [{ id, type: 'image', duration, … }] }`, each id the picture's Media
+//   Bin id, which is what the playlist write takes. A presentation playlist's
+//   entry ids are its own, not the pictures'.
+//
 // THE RULE THIS FILE ENFORCES: a reply of the wrong shape fails whole. A
 // playlist half-read would say the missing half's announcements are missing.
 
@@ -56,7 +62,12 @@ export function decodePlaylist(body: unknown): Decoded<PlaylistItem[]> {
 		if (id === null) return { ok: false, detail: `item ${i + 1} has no id` }
 		const type = raw['type']
 		if (typeof type !== 'string') return { ok: false, detail: `item "${id.name}" has no type` }
-		out.push({ uuid: id.uuid, name: id.name.trim(), type, hidden: raw['is_hidden'] === true })
+		const c = raw['header_color']
+		const color =
+			isObject(c) && [c['red'], c['green'], c['blue'], c['alpha']].every((n) => typeof n === 'number')
+				? { red: c['red'] as number, green: c['green'] as number, blue: c['blue'] as number, alpha: c['alpha'] as number }
+				: undefined
+		out.push({ uuid: id.uuid, name: id.name.trim(), type, hidden: raw['is_hidden'] === true, ...(color === undefined ? {} : { color }) })
 	}
 	return { ok: true, value: out }
 }
