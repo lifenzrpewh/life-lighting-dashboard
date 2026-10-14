@@ -56,7 +56,14 @@ export function poll<T>(options: {
 	}
 
 	const tick = async () => {
-		const outcome = await options.read()
+		// A read that throws is an error reading, and the next ask still comes:
+		// before, it ended the loop for good, the source frozen on its last read.
+		let outcome: Polled<T>
+		try {
+			outcome = await options.read()
+		} catch (e) {
+			outcome = { ok: false, timeout: false, detail: `the read failed: ${(e as Error)?.message ?? String(e)}` }
+		}
 		if (stopped) return
 		const at = Date.now()
 		if (!outcome.ok) put(outcome.timeout ? { ok: false, reason: 'timeout', at } : { ok: false, reason: 'error', at, detail: outcome.detail })

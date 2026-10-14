@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { copyInto, downloadInto, fileUrlOf, findByCode, findMedia, pickBySize } from '../dist/src/bridge/media-files.js'
+import { codesIn, copyInto, downloadInto, fileUrlOf, findByCode, findByCodeIndexed, findMedia, pickBySize } from '../dist/src/bridge/media-files.js'
 import http from 'node:http'
 import { fetchRequestFrom, isFolderPath, isPlainName, runCounts, runRequestFrom } from '../dist/src/shared/media-fetch.js'
 import { openWire } from '../dist/src/bridge/arena-control.js'
@@ -147,6 +147,46 @@ test('on the drive, a code is found anywhere in a name; the one of the lookbook\
 	assert.deepEqual(pickBySize((await findByCode(root, 'CB095')).found, 19), { pick: null, why: 'other-version' })
 	assert.deepEqual(pickBySize((await findByCode(root, 'CF464')).found, 10), { pick: null, why: 'not-there' })
 	assert.equal((await findByCode(root, 'C.*')).ok, false)
+})
+
+test('one walk of the drive serves a batch of codes, finding what the single walk finds', async () => {
+	const root = temp()
+	fs.mkdirSync(path.join(root, '1. Central', 'deep'), { recursive: true })
+	fs.mkdirSync(path.join(root, '@eaDir'))
+	const put = (name, bytes) => fs.writeFileSync(path.join(root, '1. Central', name), 'x'.repeat(bytes))
+	put('CF449-Sunday-Bibles.png', 10)
+	put('CF449-Sunday-Bibles - Copy.png', 10)
+	put('Bibles cf449 old.png', 7)
+	put('CF4491-other.png', 10)
+	put('XCF449-not.png', 10)
+	put('CB095 and CF449 together.jpg', 20)
+	put('deep/CB095-v4.mov', 5)
+	put('CB095-notes.txt', 5)
+	fs.writeFileSync(path.join(root, '@eaDir', 'CF449-thumb.png'), 'x')
+	const sorted = (r) => r.found.map((f) => f.path).sort()
+	for (const code of ['CF449', 'cb095', 'CF464']) {
+		const single = await findByCode(root, code)
+		const indexed = await findByCodeIndexed(root, code)
+		assert.ok(single.ok && indexed.ok)
+		assert.deepEqual(sorted(indexed), sorted(single), code)
+		assert.equal(indexed.looked, single.looked)
+	}
+	assert.equal((await findByCodeIndexed(root, 'CF449')).found.length, 4)
+	assert.deepEqual(codesIn('CB095 and cf449, CF4491, XCF450'), ['CB095', 'CF449'])
+	assert.equal((await findByCodeIndexed(root, 'C.*')).ok, false)
+
+	// Kept a while: a file added since is not seen by a batch's walk, and is
+	// by one asked to be fresh.
+	put('CF464-new.png', 3)
+	assert.equal((await findByCodeIndexed(root, 'CF464')).found.length, 0)
+	assert.equal((await findByCodeIndexed(root, 'CF464', { maxAgeMs: 0 })).found.length, 1)
+
+	// A folder that cannot be reached says so, and is not kept.
+	const gone = path.join(root, 'not here')
+	assert.equal((await findByCodeIndexed(gone, 'CF449')).ok, false)
+	fs.mkdirSync(gone)
+	fs.writeFileSync(path.join(gone, 'CF449.png'), 'x')
+	assert.equal((await findByCodeIndexed(gone, 'CF449')).found.length, 1)
 })
 
 test('a lookbook download is whole or not at all, and never overwrites', async () => {

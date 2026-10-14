@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { LOG_NAME, OLD_LOG_NAME, formatLine, openLogFile, stamp } from '../dist/src/bridge/log-file.js'
+import { LOG_NAME, OLD_LOG_NAME, ROTATE_RETRY_MS, formatLine, openLogFile, stamp } from '../dist/src/bridge/log-file.js'
 
 const dir = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'paua-log-')), 'paua')
 const at = new Date(2026, 9, 4, 9, 5, 7, 42)
@@ -74,4 +74,53 @@ test('a log that cannot be written never throws into the app', () => {
 		process.stderr.write = stderr
 	}
 	assert.equal(said.split('\n').filter(Boolean).length, 1)
+})
+
+test('two writers of one log (the app and its watchdog) share its size and follow its move aside', () => {
+	const d = dir()
+	const app = openLogFile(d, { limit: 300, now: () => at })
+	const watchdog = openLogFile(d, { limit: 300, now: () => at })
+	for (let i = 0; i < 4; i++) app.write('info', `app ${i} ${'x'.repeat(20)}`)
+	// The watchdog's own count is nothing, but the file is near the limit.
+	watchdog.write('info', 'watchdog 0 ' + 'x'.repeat(20))
+	watchdog.write('info', 'watchdog 1 ' + 'x'.repeat(20))
+	assert.ok(fs.statSync(path.join(d, LOG_NAME)).size <= 300)
+	assert.match(fs.readFileSync(path.join(d, LOG_NAME), 'utf8'), /watchdog 1/)
+	// The app moves it aside on its next line; the watchdog's next goes to the fresh one.
+	for (let i = 4; i < 8; i++) app.write('info', `app ${i} ${'x'.repeat(20)}`)
+	watchdog.write('info', 'watchdog 2')
+	app.close()
+	watchdog.close()
+	assert.match(fs.readFileSync(path.join(d, LOG_NAME), 'utf8'), /watchdog 2/)
+	assert.doesNotMatch(fs.readFileSync(path.join(d, OLD_LOG_NAME), 'utf8'), /watchdog 2/)
+	assert.ok(fs.statSync(path.join(d, LOG_NAME)).size <= 300)
+})
+
+test('a move aside that fails writes on in the same file, and is tried again later', () => {
+	const d = dir()
+	fs.mkdirSync(d, { recursive: true })
+	// A folder that is not empty where the old log goes: the move cannot happen.
+	fs.mkdirSync(path.join(d, OLD_LOG_NAME, 'in the way'), { recursive: true })
+	let clock = 1_000_000
+	const stderr = process.stderr.write
+	let said = ''
+	process.stderr.write = (s) => ((said += s), true)
+	try {
+		const log = openLogFile(d, { limit: 200, now: () => at, clock: () => clock })
+		for (let i = 0; i < 12; i++) log.write('info', `line ${i} ${'x'.repeat(20)}`)
+		const text = fs.readFileSync(path.join(d, LOG_NAME), 'utf8')
+		assert.match(text, /line 0 [\s\S]*line 11 /, 'nothing lost, all in the one file')
+		assert.equal(said.split('\n').filter(Boolean).length, 1, 'said once')
+		// Out of the way, and later: the next line moves it aside.
+		fs.rmSync(path.join(d, OLD_LOG_NAME), { recursive: true })
+		log.write('info', 'too soon')
+		assert.equal(fs.existsSync(path.join(d, OLD_LOG_NAME)), false)
+		clock += ROTATE_RETRY_MS
+		log.write('info', 'moved')
+		log.close()
+	} finally {
+		process.stderr.write = stderr
+	}
+	assert.match(fs.readFileSync(path.join(d, OLD_LOG_NAME), 'utf8'), /line 11 [\s\S]*too soon/)
+	assert.match(fs.readFileSync(path.join(d, LOG_NAME), 'utf8'), /^2026.*moved\n$/)
 })

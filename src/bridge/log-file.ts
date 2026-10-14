@@ -14,11 +14,13 @@
 // before) and a fresh one starts, so a booth PC left running for months holds
 // at most two files' worth. Appended across runs, not started fresh on each,
 // because kiosk.cmd restarts a crashed app: a fresh file per run would keep
-// only the run after the crash.
+// only the run after the crash. The installed app's watchdog writes the same
+// file from its own process, so the size is read from the file, not counted.
 //
 // NEVER THROWS: a log that cannot be written (a full disk, a folder gone)
 // stops writing and says so once on stderr. Logging must not take the booth
-// screen down with it.
+// screen down with it. A move aside that fails is not that: the log goes on
+// in the same file and the move is tried again later.
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -51,13 +53,20 @@ export function formatLine(d: Date, level: LogLevel, text: string): string {
 	return `${stamp(d)} ${tag} ${text.replace(/\r?\n/g, '\n    ')}\n`
 }
 
-export function openLogFile(dir: string, opts: { limit?: number; now?: () => Date } = {}): LogFile {
+/** After a move aside that failed, how long before it is tried again. */
+export const ROTATE_RETRY_MS = 60_000
+
+export function openLogFile(dir: string, opts: { limit?: number; now?: () => Date; clock?: () => number } = {}): LogFile {
 	const limit = opts.limit ?? LOG_LIMIT
 	const now = opts.now ?? (() => new Date())
+	const clock = opts.clock ?? Date.now
 	const file = path.join(dir, LOG_NAME)
 	let fd: number | null = null
 	let size = 0
 	let broken = false
+	/** No move aside is tried before this, after one failed. */
+	let rotateAfter = 0
+	let saidRotate = false
 
 	const fail = (e: unknown) => {
 		broken = true
@@ -78,12 +87,41 @@ export function openLogFile(dir: string, opts: { limit?: number; now?: () => Dat
 		size = fs.fstatSync(fd).size
 	}
 
+	/** Move the log aside and start a fresh one. A move that fails (the old
+	 *  file held open by something on Windows, say) is not the end of the log:
+	 *  it goes on in the same file, over the limit, and the move is tried
+	 *  again after ROTATE_RETRY_MS. Only a log that cannot be opened again
+	 *  stops it. */
 	const rotate = () => {
 		if (fd !== null) fs.closeSync(fd)
 		fd = null
-		fs.renameSync(file, path.join(dir, OLD_LOG_NAME))
+		try {
+			fs.renameSync(file, path.join(dir, OLD_LOG_NAME))
+			saidRotate = false
+		} catch (e) {
+			rotateAfter = clock() + ROTATE_RETRY_MS
+			if (!saidRotate) process.stderr.write(`[log] cannot move ${file} aside: ${(e as Error).message}. Writing on in it; trying again later.\n`)
+			saidRotate = true
+		}
 		open()
 	}
+	/** The installed app and its watchdog (src/main/supervisor.ts) both write
+	 *  this file, each with its own handle. So before each line: if the other
+	 *  moved the log aside, this handle is on the old one, and the fresh one is
+	 *  opened; and the size is the file's, both writers' lines, not this
+	 *  handle's count alone, which let the file grow past the limit and left
+	 *  the watchdog's lines in the file moved aside, to be overwritten. A stat
+	 *  a line: the app logs events, not traffic. */
+	const follow = () => {
+		const onDisk = fs.statSync(file, { bigint: true, throwIfNoEntry: false })
+		const mine = fs.fstatSync(fd as number, { bigint: true })
+		if (onDisk === undefined || onDisk.ino !== mine.ino || onDisk.dev !== mine.dev) {
+			fs.closeSync(fd as number)
+			fd = null
+			open()
+		} else size = Number(mine.size)
+	}
+	const due = (adding: number) => size > 0 && size + adding > limit && clock() >= rotateAfter
 
 	try {
 		open()
@@ -98,7 +136,8 @@ export function openLogFile(dir: string, opts: { limit?: number; now?: () => Dat
 			if (broken || fd === null) return
 			const line = Buffer.from(formatLine(now(), level, text), 'utf8')
 			try {
-				if (size > 0 && size + line.length > limit) rotate()
+				follow()
+				if (due(line.length)) rotate()
 				fs.writeSync(fd as number, line)
 				size += line.length
 			} catch (e) {

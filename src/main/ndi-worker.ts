@@ -147,6 +147,26 @@ type Receiver = {
 	 *  under it, so a receiver let go then is destroyed when it returns. */
 	capturing: boolean
 	stopping: boolean
+	/** `NDIlib_recv_destroy` has run: it runs once, never on a freed receiver. */
+	destroyed: boolean
+	/** The copy buffers, kept while the frame's size holds: a frame is 5 to
+	 *  47 MB, and a new one each frame was that much garbage at 60 fps. Safe
+	 *  to reuse because MessagePortMain.postMessage serializes the message as
+	 *  it is called (its transfer list takes ports only, so a buffer is always
+	 *  copied): ✅ 2026-10-14, Electron 44, a buffer changed straight after
+	 *  postMessage arrived as it was when sent. */
+	buffers: Buffers
+}
+
+type Buffers = { out: Uint8Array | null; row: Uint8Array | null }
+
+/** A buffer of `bytes`, the one in `held[key]` if it is that size. */
+function reuse(held: Buffers, key: keyof Buffers, bytes: number): Uint8Array {
+	const b = held[key]
+	if (b !== null && b.length === bytes) return b
+	const fresh = new Uint8Array(bytes)
+	held[key] = fresh
+	return fresh
 }
 
 let ndi: Ndi | null = null
@@ -206,7 +226,7 @@ function sync(): void {
 		if (wanted.has(id) && sources.get(id) === r.source) continue
 		receivers.delete(id)
 		r.stopping = true
-		if (!r.capturing) ndi?.recvDestroy(r.native)
+		if (!r.capturing) destroy(r)
 		log(`stopped receiving "${r.source}"`)
 	}
 	if (ndi === null) return
@@ -234,6 +254,8 @@ function sync(): void {
 				copies: { frames: 0, ms: 0, since: performance.now(), came: 0, early: 0, busy: 0 },
 				capturing: false,
 				stopping: false,
+				destroyed: false,
+				buffers: { out: null, row: null },
 			}
 			receivers.set(id, r)
 			log(`receiving "${source}"`)
@@ -244,6 +266,13 @@ function sync(): void {
 	}
 }
 
+/** Give `r`'s receiver back to NDI, once. */
+function destroy(r: Receiver): void {
+	if (r.destroyed) return
+	r.destroyed = true
+	ndi?.recvDestroy(r.native)
+}
+
 /** Wait for `r`'s next frame on koffi's own thread, so this process's event
  *  loop stays free, then handle it and wait again. ✅ 2026-10-05: polling
  *  every 5 ms with no wait held the view near 20 fps, because Windows runs a
@@ -251,6 +280,12 @@ function sync(): void {
  *  next; waiting on NDI took 47 fps from Arena's 50 in plain Node. Every frame
  *  is taken as it comes, so none queue; those not due are given straight back. */
 function capture(id: string, r: Receiver): void {
+	// Let go between two captures (the next waits on setImmediate or a
+	// timer): sync() destroyed it then, so it is never captured from again.
+	if (r.stopping) {
+		destroy(r)
+		return
+	}
 	if (ndi === null) return
 	const lib = ndi
 	const v = {} as VideoFrame
@@ -259,7 +294,7 @@ function capture(id: string, r: Receiver): void {
 		r.capturing = false
 		if (r.stopping) {
 			if (err == null && type === FRAME_VIDEO) lib.recvFree(r.native, v)
-			lib.recvDestroy(r.native)
+			destroy(r)
 			return
 		}
 		if (err != null) {
@@ -293,27 +328,29 @@ const memcpy = (() => {
 })()
 
 /** `frame` thinned by `step`, copied out of NDI's memory: only the rows kept
- *  are copied, then every `step`th pixel of each. */
-function thin(frame: VideoFrame, step: number): { data: Uint8Array; width: number; height: number } {
+ *  are copied, then every `step`th pixel of each. Into `held`'s buffers,
+ *  which the next frame of the same size overwrites. */
+function thin(frame: VideoFrame, step: number, held: Buffers): { data: Uint8Array; width: number; height: number } {
 	const { xres, yres, line_stride_in_bytes: stride } = frame
 	const base = BigInt(koffi.address(frame.p_data))
 	if (step === 1) {
-		const out = new Uint8Array(xres * 4 * yres)
+		const out = reuse(held, 'out', xres * 4 * yres)
 		if (stride === xres * 4) memcpy(out, base, out.length)
 		else for (let y = 0; y < yres; y++) memcpy(out.subarray(y * xres * 4), base + BigInt(y * stride), xres * 4)
 		return { data: out, width: xres, height: yres }
 	}
 	const width = Math.floor(xres / step)
 	const height = Math.floor(yres / step)
-	const row = new Uint8Array(xres * 4)
-	const row32 = new Uint32Array(row.buffer)
-	const out = new Uint32Array(width * height)
+	const row = reuse(held, 'row', xres * 4)
+	const row32 = new Uint32Array(row.buffer, row.byteOffset, xres)
+	const bytes = reuse(held, 'out', width * height * 4)
+	const out = new Uint32Array(bytes.buffer, bytes.byteOffset, width * height)
 	for (let y = 0; y < height; y++) {
 		memcpy(row, base + BigInt(y * step * stride), xres * 4)
 		const to = y * width
 		for (let x = 0; x < width; x++) out[to + x] = row32[x * step]!
 	}
-	return { data: new Uint8Array(out.buffer), width, height }
+	return { data: bytes, width, height }
 }
 
 /** A frame from `r`: thinned, copied and sent to each page ready for one, if
@@ -345,7 +382,7 @@ function handle(id: string, r: Receiver, frame: VideoFrame): void {
 	const space = spaces.length === 0 ? null : spaces.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b))
 	const step = ndiStep(full, space)
 	const copyStart = performance.now()
-	const { data, width, height } = thin(frame, step)
+	const { data, width, height } = thin(frame, step, r.buffers)
 	r.copies.frames += 1
 	r.copies.ms += performance.now() - copyStart
 	// Every 30 s it is shown, what it costs: where a slow picture is slow.
