@@ -11,8 +11,10 @@ import {
 	lookbookStem,
 	lookbookThumbUrl,
 	mediaCodeOf,
+	isCopyName,
 	nzDate,
 	offeredServices,
+	versionOf,
 	sameKey,
 	sameMarkFrom,
 	sameMarksFrom,
@@ -290,4 +292,32 @@ test('the New Zealand date, and days ahead across a month', () => {
 	// 2026-10-03 20:00 UTC is Sunday morning in Auckland (NZDT, +13).
 	assert.equal(nzDate(new Date('2026-10-03T20:00:00Z')), '2026-10-04')
 	assert.equal(nzDate(new Date('2026-10-03T20:00:00Z'), 30), '2026-11-03')
+	assert.equal(nzDate(new Date('2026-10-03T20:00:00Z'), -4), '2026-09-30')
+	// Before the change to NZDT, the day before in UTC.
+	assert.equal(nzDate(new Date('2026-01-01T10:59:00Z')), '2026-01-01')
+	assert.equal(nzDate(new Date('2025-12-31T10:59:00Z')), '2025-12-31')
+	assert.equal(nzDate(new Date('2025-12-31T11:00:00Z')), '2026-01-01')
+})
+
+test('a version is a v after a separator, or a capital V after a small letter', () => {
+	assert.equal(versionOf('/storage/library/C/CB095-Sunday-RelationshipSeries-v5_1789627559514.png'), 5)
+	assert.equal(versionOf('CF100-Thing_V2.png'), 2)
+	assert.equal(versionOf('CF588-Sunday-ReloSeries-WalkInV2'), 2)
+	assert.equal(versionOf('CF100-Thing v3 - Copy.png'), 3)
+	assert.equal(versionOf('CF100-Thing.v4.png'), 4)
+	// A word ending in v and a number is not a version.
+	assert.equal(versionOf('CF100-Thing-Rev3.png'), null)
+	assert.equal(versionOf('CF100-ThingMov2.png'), null)
+	assert.equal(versionOf('CF100-Thing.png'), null)
+})
+
+test("a copy's marks, as Windows, macOS and the browsers write them, and not a year in brackets", () => {
+	assert.equal(isCopyName('CF449-Sunday-Bibles - Copy.png'), true)
+	assert.equal(isCopyName('CF449-Sunday-Bibles - Copy (2).png'), true)
+	assert.equal(isCopyName('CF449-Sunday-Bibles copy.png'), true)
+	assert.equal(isCopyName('CF449-Sunday-Bibles (1).png'), true)
+	assert.equal(isCopyName('CF449-Sunday-Easter(2026).png'), false)
+	assert.equal(isCopyName('CF449-Sunday-Easter (2026).png'), false)
+	assert.equal(isCopyName('CF449-Sunday-Bibles.png'), false)
+	assert.equal(versionOf('CF449-Sunday-Easter (2026)'), null)
 })

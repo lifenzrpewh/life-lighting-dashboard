@@ -102,8 +102,11 @@ export type Session = 'AM' | 'PM' | 'EVENT'
 export const SESSIONS: readonly Session[] = ['AM', 'PM', 'EVENT']
 
 export function sessionOf(service: { name: string }): Session {
-	if (/\bPM\b/i.test(service.name)) return 'PM'
-	if (/\bAM\b/i.test(service.name)) return 'AM'
+	// Not `\b`: there is no word boundary between a digit and a letter, so
+	// `Central 9:30AM` and `6pm` would read as EVENT and Load would write the
+	// wrong playlist. Any non-letter (or the start) before, no letter after.
+	if (/(?:^|[^A-Za-z])PM(?![A-Za-z])/i.test(service.name)) return 'PM'
+	if (/(?:^|[^A-Za-z])AM(?![A-Za-z])/i.test(service.name)) return 'AM'
 	return 'EVENT'
 }
 

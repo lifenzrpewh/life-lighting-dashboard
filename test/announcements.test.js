@@ -42,6 +42,12 @@ test('announcements: AM or PM by the service\'s name, else EVENT', () => {
 	assert.equal(playlistFor({ name: 'Central PM 18th October' }), PLAYLIST_PM)
 	assert.equal(playlistFor({ name: 'Central Team Night' }), PLAYLIST_EVENT)
 	assert.equal(sessionOf({ name: 'Central PM 18th October' }), 'PM')
+	// No word boundary between a digit and a letter: a time still says it.
+	assert.equal(sessionOf({ name: 'Central 9:30AM' }), 'AM')
+	assert.equal(sessionOf({ name: 'North 6pm Service' }), 'PM')
+	assert.equal(sessionOf({ name: 'AM Central' }), 'AM')
+	// Inside a word it is not one.
+	assert.equal(sessionOf({ name: 'Campus Program Night' }), 'EVENT')
 	assert.equal(outputName('Notices ', 'AM'), 'Notices AM')
 })
 

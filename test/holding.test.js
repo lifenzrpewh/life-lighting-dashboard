@@ -701,10 +701,87 @@ test('where a moment may be put by hand: its layer, not a reserved column, not a
 })
 
 test('a one-off put by hand inside the named columns: its background follows, said as beside it', () => {
+	// NSL is not on this run sheet, so its column is no one's: the one-off put
+	// there by hand stays, and its background follows over the normal one.
 	const s = composition()
-	s.layers[3].slots[11] = clip('CF702-Conf-WorshipNight.png') // the last PROMO, by hand
-	const p = planPlacements([...FULL, oneOff('Worship Night', 'CF702', 'CB702')], s).placements.find((x) => x.code === 'CB702')
-	assert.equal(p.column, 12)
+	s.layers[3].slots[5] = clip('CF702-Conf-WorshipNight.png') // NSL, by hand
+	const items = [...FULL.filter((x) => x.label !== 'NSL'), oneOff('Worship Night', 'CF702', 'CB702')]
+	const p = planPlacements(items, s).placements.find((x) => x.code === 'CB702')
+	assert.equal(p.column, 6)
 	assert.equal(p.why, 'follows')
-	assert.match(placementWords(p), /^HOLD BG · PROMO \(column 12\), beside its foreground$/)
+	assert.match(placementWords(p), /^HOLD BG · NSL \(column 6\), beside its foreground, replacing CB095$/)
+})
+
+test('one moment a column: two items finding the same column by name do not share its clip', () => {
+	// Two WTLs with different foregrounds: the first keeps WTL, the second is said.
+	const items = [...ITEMS, item('Welcome again', 'WTL', ['CB095', 'CF470'], { CB095: F.CB095, CF470: L('CF470-Sunday-WelcomeAgain') })]
+	const s = composition()
+	const { placements, unplaced, columns } = planPlacements(items, s)
+	assert.equal(columns.get(1), 4)
+	assert.equal(columns.has(items.length - 1), false)
+	const lost = unplaced.find((u) => u.code === 'CF470')
+	assert.equal(lost.kind, 'taken')
+	assert.match(lost.detail, /^WTL \(column 5\) is already Welcome \(WTL\)'s; place it by hand$/)
+	assert.equal(placements.some((p) => p.code === 'CF470'), false)
+	// Update all never loads two codes into one clip.
+	const { steps } = updatePlan(items, s, new Set())
+	const owners = new Map()
+	for (const step of steps) for (const id of step.request.clipIds) {
+		assert.equal(owners.get(id) ?? step.request.code, step.request.code, `clip ${id} in two steps`)
+		owners.set(id, step.request.code)
+	}
+	// Walk In and Pre both find PRE: the second, with its own foreground, is said.
+	const pre = [...ITEMS, item('Pre-service', 'Pre', ['CF471'], { CF471: L('CF471-Sunday-PreService') })]
+	assert.equal(planPlacements(pre, s).unplaced.find((u) => u.code === 'CF471').kind, 'taken')
+	// The same moment twice (only codes the first has) shares its column.
+	const twice = [...ITEMS, item('Welcome', 'WTL', ['CB095', 'CF445'], pick('CB095', 'CF445'))]
+	const r = planPlacements(twice, s)
+	assert.equal(r.columns.get(twice.length - 1), 4)
+	assert.equal(r.unplaced.some((u) => u.item === twice.length - 1), false)
+})
+
+test('a title beginning End is POST, unless it is an announcement', () => {
+	const s = composition()
+	const items = [...ITEMS.slice(0, -1), item('End of Service Announcements', 'Notices', ['CF820'], { CF820: L('CF820-Sunday-Notices') })]
+	const p = planPlacements(items, s).placements.find((x) => x.code === 'CF820')
+	assert.equal(p.why, 'promo')
+	assert.equal(p.columnName, 'PROMO')
+	const end = planPlacements([...ITEMS.slice(0, -1), item('End', null, ['CF588'], pick('CF588'))], s).placements.find((x) => x.code === 'CF588')
+	assert.equal(end.columnName, 'POST')
+})
+
+test('a column named for something else is never taken by name, nor counted a PROMO', () => {
+	// An item labelled Countdown does not find COUNTDOWN.
+	const s = composition()
+	const items = [...ITEMS, item('Countdown', 'Countdown', ['CF830'], { CF830: L('CF830-Sunday-Countdown') })]
+	const r = planPlacements(items, s)
+	assert.equal(r.placements.some((p) => p.code === 'CF830' && p.column === 3), false)
+	assert.notEqual(r.columns.get(items.length - 1), 2)
+	// PROMO VIDEO is a video column: no announcement goes there, and the
+	// normal background's gaps stop at the last real PROMO.
+	const names = [...NAMES.slice(0, 8), 'PROMO VIDEO', 'PROMO', 'PROMO', 'PROMO']
+	const v = composition(names)
+	const prayer = at(planPlacements(ITEMS, v).placements, 'Prayer & Fasting', 'CF594')
+	assert.equal(prayer.column, 10)
+	assert.ok(planPlacements(ITEMS, v).placements.every((p) => p.column !== 9))
+	assert.ok(backgroundGaps(ITEMS, v).every((p) => p.column !== 9))
+})
+
+test("a one-off's code in a clip this plan replaces is not already on its layer", () => {
+	// CF702 put by hand in the last PROMO, which Promo B takes in order: CF812
+	// goes there, so the one-off goes past the named columns, its background with it.
+	const s = wide(2)
+	s.layers[3].slots[11] = clip('CF702-Conf-WorshipNight.png')
+	const r = planPlacements([...FULL, oneOff('Worship Night', 'CF702', 'CB702')], s)
+	assert.equal(at(r.placements, 'Promo B', 'CF812').column, 12)
+	assert.equal(r.settled.some((x) => x.code === 'CF702'), false)
+	const fg = r.placements.find((x) => x.code === 'CF702')
+	assert.equal(fg.column, 13)
+	assert.equal(fg.why, 'overflow')
+	assert.equal(r.placements.find((x) => x.code === 'CB702').column, 13)
+	// Without a spare column it is said, not settled where it is about to go.
+	const tight = composition()
+	tight.layers[3].slots[11] = clip('CF702-Conf-WorshipNight.png')
+	const t = planPlacements([...FULL, oneOff('Worship Night', 'CF702', 'CB702')], tight)
+	assert.equal(t.unplaced.find((u) => u.code === 'CF702').didntFit, true)
 })
