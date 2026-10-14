@@ -29,7 +29,7 @@ import type { SettingsView } from '../../shared/settings.js'
 
 import { ArenaEditor, ConsoleEditor, ConsoleInfo, CueInfo, OnTimeEditor, ProPresenterEditor, VideoInfo } from './settings/connection-editors.js'
 import { AdminSettings } from './settings/admin.js'
-import { AboutFoot, ThisScreen, UpdatesCard } from './settings/computer.js'
+import { AboutFoot, StartAtLogin, ThisScreen, UpdatesCard } from './settings/computer.js'
 import { HoldingSettings } from './settings/holding.js'
 import type { ArenaStatus } from '../../shared/arena.js'
 import { isDefault } from '../../shared/holding-map.js'
@@ -289,6 +289,7 @@ export function SettingsPanel({
 							<>
 								<DetailHead title="This computer" />
 								<ThisScreen windowed={view.windowed} save={save} />
+								<StartAtLogin />
 								<UpdatesCard updates={updates} />
 							</>
 						) : row === null ? null : (

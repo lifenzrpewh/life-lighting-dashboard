@@ -194,6 +194,10 @@ const api = {
 	/** Windows' folder picker, starting at `start`: the folder picked, or null
  *  when cancelled. Operator mode only (main answers null otherwise). */
 	chooseFolder: (start: string | null): Promise<string | null> => ipcRenderer.invoke('folder:choose', start),
+	/** Whether the installed app starts at login, as the system says. */
+	loginItem: (): Promise<{ available: boolean; on: boolean } | null> => ipcRenderer.invoke('login:get'),
+	/** Start at login on or off (Admin only), and what the system says after. */
+	setLoginItem: (on: boolean): Promise<{ available: boolean; on: boolean } | null> => ipcRenderer.invoke('login:set', on),
 	/** This computer's network addresses (not loopback), for the console's OSC row. */
 	hereAddresses: (): Promise<string[]> => ipcRenderer.invoke('net:here'),
 	/** Arena on this computer, if it answers on a usual port (Admin only). */

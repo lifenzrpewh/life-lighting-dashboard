@@ -58,7 +58,7 @@ import type { Channel, LinkState } from '../shared/reading.js'
 import { unread } from '../shared/reading.js'
 import type { Showfile } from '../shared/showfile.js'
 import type { Mode, PaneRect } from '../shared/ma-pane.js'
-import { isLoopback, patchFrom, replyPortOf } from '../shared/settings.js'
+import { changedFields, isLoopback, patchFrom, replyPortOf } from '../shared/settings.js'
 import { createMaPane, type MaPane } from './ma-pane.js'
 import { createCuePane, type CuePane } from './cue-pane.js'
 import { openSettings, type SettingsStore } from './settings.js'
@@ -154,6 +154,7 @@ let videoFeed: VideoFeed | null = null
 let ndi: Ndi | null = null
 let updates: Updates | null = null
 const BOOTED_AT = Date.now()
+type LoginItem = { available: boolean; on: boolean }
 /** Where Arena's web server usually is: its default, and 8090, where it moves
  *  when the MA web remote has 8080 on the same computer. */
 const ARENA_PORTS = [8080, 8090]
@@ -557,6 +558,20 @@ app.whenReady().then(() => {
 		}
 		return null
 	})
+	// Start at login (the owner, 2026-10-13): the installed app only, which
+	// registers Paua.exe itself, so a login starts the watchdog with it
+	// (./entry.ts). A checkout keeps scripts/windows/install-startup.cmd. What
+	// the screen shows is read back from the system after each set, not taken
+	// on trust: a managed machine may refuse it.
+	const loginItem = (): LoginItem => ({ available: app.isPackaged, on: app.isPackaged && app.getLoginItemSettings().openAtLogin })
+	ipcMain.handle('login:get', (e): LoginItem | null => (fromKiosk(e) ? loginItem() : null))
+	ipcMain.handle('login:set', (e, on: unknown): LoginItem | null => {
+		if (operatorOnly(e) !== null || typeof on !== 'boolean' || !app.isPackaged) return null
+		app.setLoginItemSettings({ openAtLogin: on })
+		const now = loginItem()
+		console.log(`[kiosk] start at login ${on ? 'on' : 'off'} asked; the system says ${now.on ? 'on' : 'off'}`)
+		return now
+	})
 	ipcMain.handle('folder:choose', async (e, start: unknown): Promise<string | null> => {
 		if (operatorOnly(e) !== null) return null
 		const owner = BrowserWindow.fromWebContents(e.sender)
@@ -898,7 +913,12 @@ app.whenReady().then(() => {
 		if (mode !== 'operator') return { ok: false, errors: { form: 'Settings can be changed in Admin only.' } }
 		const patch = patchFrom(raw)
 		if (patch === null) return { ok: false, errors: { form: 'Those settings could not be read.' } }
+		const before = settings.view()
 		const checked = settings.save(patch)
+		if (checked.ok) {
+			const changed = changedFields(before, checked.settings, patch)
+			if (changed.length > 0) console.log(`[settings] saved in Admin: ${changed.join('; ')}`)
+		}
 		// The renderer is told whether it worked, never handed the settings back:
 		// it asks for the view again, which carries no passwords.
 		return checked.ok ? { ok: true } : checked

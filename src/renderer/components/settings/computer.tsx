@@ -33,6 +33,48 @@ export function ThisScreen({ windowed, save }: { windowed: boolean; save: Save }
 	)
 }
 
+/** Start at login: the installed app on this computer opens itself when the
+ *  booth's user logs in. Says what the system holds, read back after a tap. */
+export function StartAtLogin() {
+	const [item, setItem] = useState<{ available: boolean; on: boolean } | null>(null)
+	const [refused, setRefused] = useState(false)
+	useEffect(() => void window.life?.loginItem().then(setItem), [])
+	if (item === null) return null
+	const set = (on: boolean) =>
+		void window.life?.setLoginItem(on).then((now) => {
+			if (now === null) return
+			setItem(now)
+			setRefused(now.on !== on)
+		})
+	return (
+		<Card>
+			<SectionTitle>Start at login</SectionTitle>
+			{item.available ? (
+				<div className="flex flex-wrap items-center gap-4">
+					<Segmented
+						label="Start at login"
+						value={item.on}
+						onChange={set}
+						options={[
+							{ value: true, label: 'On' },
+							{ value: false, label: 'Off' },
+						]}
+					/>
+					<span className={`text-sm ${refused ? 'text-warn' : 'text-booth-dim'}`}>
+						{refused
+							? 'This computer did not keep that: its policy may not allow apps to start at login.'
+							: item.on
+								? 'Pāua opens when this computer’s user logs in.'
+								: 'Pāua is opened by hand.'}
+					</span>
+				</div>
+			) : (
+				<p className="text-sm text-booth-dim">For the installed app. A checkout starts at login with scripts/windows/install-startup.cmd.</p>
+			)}
+		</Card>
+	)
+}
+
 /** Which build this is and where it logs: what a field tester's report needs.
  *  At the foot of Settings' list, whichever page is open. */
 export function AboutFoot() {

@@ -37,8 +37,10 @@ export type Settings = {
 	/** The Port of the console's OSC entry, where commands (channel A) go. */
 	oscPort: number
 	/** Where this computer listens for the console (channels B and C). Null
-	 *  means the same as `oscPort`, which is MA's own model: an entry has one
-	 *  Port, used both ways (docs/MA3_READ_MODEL.md § One Port, both directions).
+	 *  means worked out (`sameReplyPortOf`): the same as `oscPort`, which is
+	 *  MA's own model, an entry has one Port used both ways
+	 *  (docs/MA3_READ_MODEL.md § One Port, both directions), or the next one up
+	 *  for onPC on this computer.
 	 *
 	 *  It differs only when grandMA3 onPC runs on this computer, whose address is
 	 *  then 127.0.0.1. onPC holds every row's port itself (✅ 2026-09-30), so
@@ -513,6 +515,32 @@ export function patchFrom(raw: unknown): SettingsPatch | null {
 		if (!(key in r)) continue
 		if (!ok(r[key])) return null
 		Object.assign(out, { [key]: r[key] })
+	}
+	return out
+}
+
+/** What a save changed, in words for the log (the field reports' "who changed
+ *  the address"): each field with its old and new value, a list by its count,
+ *  and passwords and the passcode only as set or removed, never a value. */
+export function changedFields(before: Settings, after: Settings, patch: SettingsPatch): string[] {
+	const out: string[] = []
+	const word = (v: unknown) => (v === null ? 'blank' : typeof v === 'string' ? `"${v}"` : String(v))
+	for (const key of Object.keys(after) as (keyof Settings)[]) {
+		const a = before[key]
+		const b = after[key]
+		if (Array.isArray(a) || Array.isArray(b)) {
+			if (JSON.stringify(a) === JSON.stringify(b)) continue
+			const n = (v: unknown) => (Array.isArray(v) ? v.length : 0)
+			out.push(key === 'off' ? `off: ${(b as string[]).join(', ') || 'none'}` : `${key}: ${n(a)} → ${n(b)}${n(a) === n(b) ? ' (edited)' : ''}`)
+		} else if (a !== b) out.push(`${key}: ${word(a)} → ${word(b)}`)
+	}
+	for (const [key, name] of [
+		['volunteerPassword', 'volunteer password'],
+		['operatorPassword', 'admin MA password'],
+		['adminPasscode', 'Admin passcode'],
+	] as const) {
+		const v = patch[key]
+		if (v !== undefined) out.push(`${name} ${v === null ? 'removed' : 'set'}`)
 	}
 	return out
 }

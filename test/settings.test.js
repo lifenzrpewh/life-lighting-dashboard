@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_SETTINGS, applyPatch, fromDisk, inUse, isLoopback, patchFrom, replyPortOf } from '../dist/src/shared/settings.js'
+import { DEFAULT_SETTINGS, applyPatch, changedFields, fromDisk, inUse, isLoopback, patchFrom, replyPortOf } from '../dist/src/shared/settings.js'
 
 test('first boot has no console address, rather than a guessed one', () => {
 	assert.equal(DEFAULT_SETTINGS.consoleHost, null)
@@ -171,4 +171,13 @@ test('one unreadable embed on disk costs that embed, not the list (and its sign-
 	assert.deepEqual(fromDisk({ embeds: 'nonsense' }).embeds, [])
 	const patched = applyPatch(DEFAULT_SETTINGS, { embeds: [sheet, tooLong] })
 	assert.equal(patched.ok, false, 'a patch from the panel is still all or nothing')
+})
+
+test('a save says in words what it changed, and never a password', () => {
+	const after = applyPatch(DEFAULT_SETTINGS, { consoleHost: '10.11.60.40', off: ['arena'] })
+	assert.ok(after.ok)
+	const lines = changedFields(DEFAULT_SETTINGS, after.settings, { consoleHost: '10.11.60.40', volunteerPassword: 'secret', adminPasscode: null })
+	assert.deepEqual(lines, ['consoleHost: blank → "10.11.60.40"', 'off: arena', 'volunteer password set', 'Admin passcode removed'])
+	assert.ok(!lines.join(' ').includes('secret'))
+	assert.deepEqual(changedFields(DEFAULT_SETTINGS, DEFAULT_SETTINGS, {}), [])
 })
