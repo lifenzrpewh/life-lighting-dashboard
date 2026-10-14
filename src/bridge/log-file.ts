@@ -14,7 +14,8 @@
 // before) and a fresh one starts, so a booth PC left running for months holds
 // at most two files' worth. Appended across runs, not started fresh on each,
 // because kiosk.cmd restarts a crashed app: a fresh file per run would keep
-// only the run after the crash.
+// only the run after the crash. The installed app's watchdog writes the same
+// file from its own process, so the size is read from the file, not counted.
 //
 // NEVER THROWS: a log that cannot be written (a full disk, a folder gone)
 // stops writing and says so once on stderr. Logging must not take the booth
@@ -104,6 +105,22 @@ export function openLogFile(dir: string, opts: { limit?: number; now?: () => Dat
 		}
 		open()
 	}
+	/** The installed app and its watchdog (src/main/supervisor.ts) both write
+	 *  this file, each with its own handle. So before each line: if the other
+	 *  moved the log aside, this handle is on the old one, and the fresh one is
+	 *  opened; and the size is the file's, both writers' lines, not this
+	 *  handle's count alone, which let the file grow past the limit and left
+	 *  the watchdog's lines in the file moved aside, to be overwritten. A stat
+	 *  a line: the app logs events, not traffic. */
+	const follow = () => {
+		const onDisk = fs.statSync(file, { bigint: true, throwIfNoEntry: false })
+		const mine = fs.fstatSync(fd as number, { bigint: true })
+		if (onDisk === undefined || onDisk.ino !== mine.ino || onDisk.dev !== mine.dev) {
+			fs.closeSync(fd as number)
+			fd = null
+			open()
+		} else size = Number(mine.size)
+	}
 	const due = (adding: number) => size > 0 && size + adding > limit && clock() >= rotateAfter
 
 	try {
@@ -119,6 +136,7 @@ export function openLogFile(dir: string, opts: { limit?: number; now?: () => Dat
 			if (broken || fd === null) return
 			const line = Buffer.from(formatLine(now(), level, text), 'utf8')
 			try {
+				follow()
 				if (due(line.length)) rotate()
 				fs.writeSync(fd as number, line)
 				size += line.length
