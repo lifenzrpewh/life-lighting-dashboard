@@ -226,7 +226,9 @@ export function Confirm({ m }: { m: MediaCheckState }) {
 											? 'looking…'
 											: 'not checked'
 										: src.from === 'drive'
-											? 'drive'
+											? src.by === 'name'
+												? 'drive, by name'
+												: 'drive'
 											: src.from === 'lookbook'
 												? 'lookbook only'
 												: `left out: ${src.detail}`}

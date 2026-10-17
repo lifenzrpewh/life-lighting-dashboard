@@ -22,6 +22,8 @@
 //   there.
 // - Nothing is overwritten: a file of the same name already in the local
 //   folder is used if it is the same size, and otherwise left alone and said.
+//   An operator may then say to replace it (the owner, 2026-10-18): the old
+//   one is moved to `Replaced` in the local folder, never deleted.
 // - Never into a clip that is playing, unless the operator said yes to
 //   replacing that very clip on screen at the confirmation (`allowLive`, the
 //   owner, 2026-10-05: "happy to have it override the live clip, with an extra
@@ -53,6 +55,10 @@ export type FetchRequest = {
 	 *  code (the owner, 2026-10-13: "show drive matches"), in place of the one
 	 *  of the lookbook's size. Main uses it only if its own search finds it. */
 	drivePick?: string
+	/** Move a different local file of the same name aside and copy over it.
+	 *  Set only by main, on an operator's Replace after a clash
+	 *  (`MediaFetch.replace`); the page cannot send it. */
+	replaceLocal?: boolean
 }
 
 /** One file on the graphics drive carrying a code, for the operator to see. */
@@ -62,6 +68,8 @@ export type DriveFile = {
 	mtimeMs: number
 	/** The lookbook's size: the lookbook's very file. */
 	matches: boolean
+	/** The lookbook's name (`nameKey`), whatever its size. */
+	named: boolean
 	/** Named as a copy (` - Copy`). */
 	copy: boolean
 	/** The one Fetch would take, without a pick. */
@@ -73,7 +81,8 @@ export type DriveMatches = { ok: true; files: DriveFile[]; lookbookSize: number 
 /** Where a code's file will come from, said at the confirmation before
  *  anything is sent. */
 export type MediaSource =
-	| { from: 'drive'; file: string }
+	/** `by`: matched to the lookbook's file by its size, or only by its name. */
+	| { from: 'drive'; file: string; by: 'size' | 'name' }
 	/** Not on the drive, or the drive's is another version: only with the
 	 *  operator's yes. */
 	| { from: 'lookbook'; why: string }
@@ -93,7 +102,9 @@ export type FetchState =
 	| { state: 'sent'; file: string; clips: number; from: 'drive' | 'lookbook'; doubted?: string }
 	/** Copied, not loaded: nothing in Arena to load it into. */
 	| { state: 'copied'; file: string; from: 'drive' | 'lookbook' }
-	| { state: 'failed'; detail: string }
+	/** `clash`: the local folder already holds a different file of this
+	 *  name; an operator may say to replace it. */
+	| { state: 'failed'; detail: string; clash?: true }
 	/** Failed, but an operator said it is in Arena all the same ("It's there",
 	 *  the owner, 2026-10-13): counted as loaded, shown in orange. */
 	| { state: 'by-hand'; detail: string }

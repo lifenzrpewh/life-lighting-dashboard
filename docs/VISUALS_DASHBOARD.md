@@ -778,6 +778,24 @@ play from). Rules and states: `src/shared/media-fetch.ts`.
     ✅ **Through the button, 2026-10-05 11:12** (the owner's Update all, in paua.log): CF464
     "not on the drive" and CB105 "another version" downloaded from the lookbook into `D:\Holding`
     and loaded, into HOLD FG column 6 and HOLD BG column 3.
+- **By name as well as size** (the owner, 2026-10-18: "since the lookbook isn't working
+  properly it thinks the files in the graphics drive aren't there"). When no drive file is the
+  lookbook's size, or the lookbook gives no size, one of the lookbook's **name** is taken
+  (`pickDriveFile`, `nameKey`: case, copy marks, the lookbook's upload time and runs of spaces,
+  dots, dashes and underscores ignored, so `-v4` and `-v5` stay apart), plain before a copy,
+  newest first. The walk finds a file of that name even when it lacks the code. The
+  confirmation says **drive, by name**, the drive list tags **the lookbook's name**, the log
+  says "by its name: not the lookbook's size". Size still wins when both exist. A file loaded
+  by name still reads "different file" against the lookbook by size afterwards: **Arena's is
+  right** settles it. ⚠️ Only in tests and a scratch run of main's queue on the Mac.
+- **Replace the local file** (the owner, 2026-10-18: an override for "a different X is already
+  in the local folder; nothing was overwritten"). That failure now carries `clash`, and Admin
+  sees **Replace the local file** beside it (Lookbook's problem card, Compare), a second tap to
+  be sure. Main runs the same request again (`MediaFetch.replace`, `media:replace`; the page
+  cannot set `replaceLocal` itself) with the old file moved to `Replaced\<name> (replaced
+  <date time>)` in the local folder, never deleted; one Arena holds open and cannot be moved
+  is said, not overwritten. Every clip with that path plays the new file. ⚠️ Not yet seen on
+  screen, nor on Windows with Arena holding the file.
 - **Browse** (the owner's ask, 2026-10-05): beside each folder on the Arena row, Windows' own
   folder picker over the window that asked; the pick fills the field, Save keeps it. Admin
   only. ⚠️ Not opened from a session (it would raise a dialog on the owner's screen).

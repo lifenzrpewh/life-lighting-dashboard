@@ -183,6 +183,9 @@ const api = {
 	mediaDrive: (code: string, lookbookPath: string | null): Promise<DriveMatches> => ipcRenderer.invoke('media:drive', code, lookbookPath),
 	/** "It's there": a failed code set aside as in Arena all the same. Admin only. */
 	mediaThere: (code: string): Promise<{ ok: true } | { ok: false; detail: string }> => ipcRenderer.invoke('media:there', code),
+	/** Replace: a fetch that met a different local file of its name, again, with
+	 *  that file moved aside to Replaced. Admin only. */
+	mediaReplace: (code: string): Promise<{ ok: true } | { ok: false; detail: string }> => ipcRenderer.invoke('media:replace', code),
 	/** Where each request's file would come from (the drive, or the lookbook),
 	 *  for the confirmation to say and ask about before anything is sent. */
 	mediaSources: (requests: FetchRequest[]): Promise<Record<string, MediaSource>> => ipcRenderer.invoke('media:sources', requests),

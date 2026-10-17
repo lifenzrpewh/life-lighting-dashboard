@@ -64,9 +64,30 @@ export function codesIn(stem: string): string[] {
 	return [...new Set((stem.match(CODES_IN) ?? []).map((c) => c.toUpperCase()))]
 }
 
+/** A name as two of the same file are told apart by eye (the owner,
+ *  2026-10-18: the drive's files checked by name as well, for when the
+ *  lookbook's sizes cannot be trusted): no case, no lookbook upload time, no
+ *  copy marks, and runs of spaces, dots, dashes and underscores alike.
+ *  `CF588-Walk_In - Copy` and `cf588 walk in` are one name. */
+export function nameKey(stem: string): string {
+	return stem
+		.replace(/_\d{10,}$/, '')
+		.replace(COPY_MARKS, '')
+		.toLowerCase()
+		.replace(/[\s._-]+/g, ' ')
+		.trim()
+}
+
+const COPY_MARKS = /(?:[\s_-]+copy(?:\s*\(\d+\))?|\s*\(\d+\))$/i
+
+const stemOf = (file: string) => path.basename(file, path.extname(file))
+
 /** A walk of the graphics folder, once: each code to the files carrying it,
- *  in the walk's order, and how many entries were looked at. */
-type CodeWalk = { ok: true; byCode: Map<string, string[]>; looked: number; finds: Map<string, Promise<FindResult>> } | { ok: false; detail: string }
+ *  each name (`nameKey`) to the files of that name, in the walk's order, and
+ *  how many entries were looked at. */
+type CodeWalk =
+	| { ok: true; byCode: Map<string, string[]>; byName: Map<string, string[]>; looked: number; finds: Map<string, Promise<FindResult>> }
+	| { ok: false; detail: string }
 
 /** Walks kept a short while, by folder and options: a batch (a Place all, the
  *  sources for a confirmation, a week's announcements) asks up to 50 codes,
@@ -80,11 +101,12 @@ export const CODE_INDEX_MS = 30_000
 /** As `findByCode`, from one walk of `root` shared by every code asked within
  *  `maxAgeMs` (CODE_INDEX_MS). A folder that cannot be walked is not kept, so
  *  one that comes back is walked again at once. Files are looked at (their
- *  size and time) only for the codes asked, once per walk. */
+ *  size and time) only for the codes asked, once per walk. With `name` (the
+ *  lookbook's file name), a file of that name is found too, code or not. */
 export async function findByCodeIndexed(
 	root: string,
 	code: string,
-	opts: { maxDepth?: number; limit?: number; maxAgeMs?: number } = {},
+	opts: { maxDepth?: number; limit?: number; maxAgeMs?: number; name?: string } = {},
 ): Promise<FindResult> {
 	if (!/^[A-Za-z]{2}\d{3}$/.test(code)) return { ok: false, detail: `${code} is not a media code` }
 	const maxAge = opts.maxAgeMs ?? CODE_INDEX_MS
@@ -104,24 +126,30 @@ export async function findByCodeIndexed(
 	const walk = await held.walk
 	if (!walk.ok) return walk
 	const want = code.toUpperCase()
-	let find = walk.finds.get(want)
+	const name = opts.name === undefined ? '' : nameKey(opts.name)
+	const key2 = `${want}|${name}`
+	let find = walk.finds.get(key2)
 	if (find === undefined) {
-		find = statAll(walk.byCode.get(want) ?? []).then((found) => ({ ok: true, found, looked: walk.looked }) as const)
-		walk.finds.set(want, find)
+		const files = [...new Set([...(walk.byCode.get(want) ?? []), ...(name === '' ? [] : (walk.byName.get(name) ?? []))])]
+		find = statAll(files).then((found) => ({ ok: true, found, looked: walk.looked }) as const)
+		walk.finds.set(key2, find)
 	}
 	return find
 }
 
 async function walkCodes(root: string, opts: { maxDepth?: number; limit?: number }): Promise<CodeWalk> {
 	const byCode = new Map<string, string[]>()
+	const byName = new Map<string, string[]>()
+	const add = (map: Map<string, string[]>, key: string, file: string) => {
+		const list = map.get(key)
+		if (list === undefined) map.set(key, [file])
+		else list.push(file)
+	}
 	const walked = await walkMedia(root, opts, (file, stem) => {
-		for (const c of codesIn(stem)) {
-			const list = byCode.get(c)
-			if (list === undefined) byCode.set(c, [file])
-			else list.push(file)
-		}
+		for (const c of codesIn(stem)) add(byCode, c, file)
+		add(byName, nameKey(stem), file)
 	})
-	return walked.ok ? { ok: true, byCode, looked: walked.looked, finds: new Map() } : walked
+	return walked.ok ? { ok: true, byCode, byName, looked: walked.looked, finds: new Map() } : walked
 }
 
 /** Each file's size and time, newest first; one gone since the walk is left out. */
@@ -193,18 +221,79 @@ async function walkMedia(
 export function pickBySize(found: Found[], size: number): { pick: Found } | { pick: null; why: 'not-there' | 'other-version' } {
 	const same = found.filter((f) => f.size === size)
 	if (same.length === 0) return { pick: null, why: found.length === 0 ? 'not-there' : 'other-version' }
-	const copy = (f: Found) => (/(?:[\s_-]+copy(?:\s*\(\d+\))?|\s*\(\d+\))$/i.test(path.basename(f.path, path.extname(f.path))) ? 1 : 0)
-	same.sort((a, b) => copy(a) - copy(b) || b.mtimeMs - a.mtimeMs)
+	same.sort(plainFirst)
 	return { pick: same[0] as Found }
 }
 
-export type CopyResult = { ok: true; path: string; copied: boolean } | { ok: false; detail: string }
+/** A plain name before a `- Copy` or `(2)`, then newest first. */
+const plainFirst = (a: Found, b: Found) => copyRank(a) - copyRank(b) || b.mtimeMs - a.mtimeMs
+const copyRank = (f: Found) => (COPY_MARKS.test(stemOf(f.path)) ? 1 : 0)
+
+/** Which drive file Fetch takes for the lookbook's `want` (its file name):
+ *  the one of the lookbook's size (`pickBySize`), else one of the lookbook's
+ *  name (`nameKey`), plain before a copy, newest first. The name is the
+ *  fallback the owner asked for (2026-10-18): a lookbook that says the wrong
+ *  size, or none, made the drive's own file look absent. `size` null: by name
+ *  only. */
+export function pickDriveFile(
+	found: Found[],
+	size: number | null,
+	want: string,
+): { pick: Found; by: 'size' | 'name' } | { pick: null; why: 'not-there' | 'other-version' } {
+	if (size !== null) {
+		const bySize = pickBySize(found, size)
+		if (bySize.pick !== null) return { pick: bySize.pick, by: 'size' }
+	}
+	const key = nameKey(want)
+	const named = key === '' ? [] : found.filter((f) => nameKey(stemOf(f.path)) === key).sort(plainFirst)
+	if (named[0] !== undefined) return { pick: named[0], by: 'name' }
+	return { pick: null, why: found.length === 0 ? 'not-there' : 'other-version' }
+}
+
+/** `clash`: a different file of that name is already in the local folder. */
+export type CopyResult = { ok: true; path: string; copied: boolean } | { ok: false; detail: string; clash?: true }
+
+/** Where a local file goes when an operator says to replace it (the owner,
+ *  2026-10-18: an override for "a different file is already in the local
+ *  folder"): a `Replaced` folder beside it, named with when, so nothing is
+ *  lost. Refused, and said, when it cannot be moved (Arena may have it open). */
+async function moveAside(dest: string): Promise<{ ok: true } | { ok: false; detail: string }> {
+	const d = new Date()
+	const two = (n: number) => String(n).padStart(2, '0')
+	const when = `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`
+	const ext = path.extname(dest)
+	const aside = path.join(path.dirname(dest), 'Replaced', `${path.basename(dest, ext)} (replaced ${when})${ext}`)
+	try {
+		await fs.promises.mkdir(path.dirname(aside), { recursive: true })
+		await fs.promises.rename(dest, aside)
+		console.log(`[media] moved the old ${path.basename(dest)} aside to ${aside}`)
+		return { ok: true }
+	} catch (e) {
+		return { ok: false, detail: `the local ${path.basename(dest)} could not be moved aside (Arena may have it open): ${(e as Error).message}` }
+	}
+}
+
+/** A file of `dest`'s name already there: used when it is `size` long, moved
+ *  aside when `replace`, and otherwise left alone and said. Null: copy. */
+async function already(dest: string, size: number, replace: boolean): Promise<CopyResult | null> {
+	let there: fs.Stats
+	try {
+		there = await fs.promises.stat(dest)
+	} catch {
+		return null // Not there: copy it.
+	}
+	if (there.size === size) return { ok: true, path: dest, copied: false }
+	if (!replace) return { ok: false, detail: `a different ${path.basename(dest)} is already in the local folder; nothing was overwritten`, clash: true }
+	const moved = await moveAside(dest)
+	return moved.ok ? null : moved
+}
 
 /** Copy `src` into `destDir` under its own name, reporting bytes as they go.
  *  Written to `<name>.partial` and renamed when whole, so Arena never sees half
  *  a file. A file of that name already there is used when it is the same size
- *  and left alone otherwise: nothing is overwritten. */
-export async function copyInto(src: string, destDir: string, onProgress: (done: number, total: number) => void): Promise<CopyResult> {
+ *  and left alone otherwise: nothing is overwritten. With `replace` (an
+ *  operator's say-so), a different one is moved aside to `Replaced` first. */
+export async function copyInto(src: string, destDir: string, onProgress: (done: number, total: number) => void, replace = false): Promise<CopyResult> {
 	let total: number
 	try {
 		total = (await fs.promises.stat(src)).size
@@ -217,13 +306,8 @@ export async function copyInto(src: string, destDir: string, onProgress: (done: 
 		return { ok: false, detail: `the local folder ${destDir} is not there` }
 	}
 	const dest = path.join(destDir, path.basename(src))
-	try {
-		const there = await fs.promises.stat(dest)
-		if (there.size === total) return { ok: true, path: dest, copied: false }
-		return { ok: false, detail: `a different ${path.basename(src)} is already in the local folder; nothing was overwritten` }
-	} catch {
-		// Not there: copy it.
-	}
+	const there = await already(dest, total, replace)
+	if (there !== null) return there
 	const partial = `${dest}.partial`
 	// One left by a copy that was cut off is ours, and only half a file.
 	await fs.promises.rm(partial, { force: true }).catch(() => {})
@@ -257,7 +341,7 @@ export function fileUrlOf(file: string): string {
 /** Download `url` into `destDir` as `name`, as `copyInto` copies: to
  *  `<name>.partial`, renamed only when whole and `size` bytes long; a file of
  *  that name already there is used when it is that size and otherwise left
- *  alone. Used only for the lookbook's own files (src/main/media-fetch.ts). */
+ *  alone (or moved aside, with `replace`). Used only for the lookbook's own files (src/main/media-fetch.ts). */
 export async function downloadInto(
 	url: string,
 	destDir: string,
@@ -265,6 +349,7 @@ export async function downloadInto(
 	size: number,
 	onProgress: (done: number, total: number) => void,
 	timeoutMs = 10 * 60_000,
+	replace = false,
 ): Promise<CopyResult> {
 	try {
 		if (!(await fs.promises.stat(destDir)).isDirectory()) return { ok: false, detail: `the local folder ${destDir} is not a folder` }
@@ -272,13 +357,8 @@ export async function downloadInto(
 		return { ok: false, detail: `the local folder ${destDir} is not there` }
 	}
 	const dest = path.join(destDir, name)
-	try {
-		const there = await fs.promises.stat(dest)
-		if (there.size === size) return { ok: true, path: dest, copied: false }
-		return { ok: false, detail: `a different ${name} is already in the local folder; nothing was overwritten` }
-	} catch {
-		// Not there: download it.
-	}
+	const there = await already(dest, size, replace)
+	if (there !== null) return there
 	const partial = `${dest}.partial`
 	await fs.promises.rm(partial, { force: true }).catch(() => {})
 	let done = 0

@@ -41,7 +41,7 @@ import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
 import { useOperator } from '../mode.js'
 import { ArenaReading } from './ArenaView.js'
-import { FileCompare, ThereButton, needsLook } from './FileCompare.js'
+import { FileCompare, ReplaceButton, ThereButton, needsLook } from './FileCompare.js'
 import { Confirm, FetchWords, ServiceLine, SmallButton, fetchShort, under } from './MediaCheck.js'
 import { Button } from './ui.js'
 import { chipLabel, formatAge, staleContent } from './vocabulary.js'
@@ -645,6 +645,7 @@ function Problem({
 				<span className="ml-auto flex items-center gap-2">
 					{(kind === 'look' || kind === 'missing') && <SmallButton onClick={onCompare}>Compare</SmallButton>}
 					{kind === 'no-place' && <SmallButton onClick={onSlot}>Choose a slot</SmallButton>}
+					{kind === 'failed' && m.fetches[code]?.state === 'failed' && m.fetches[code].clash === true && <ReplaceButton onClick={() => m.replaceLocal(code)} />}
 					{kind === 'failed' && <ThereButton onClick={() => m.itsThere(code)} />}
 				</span>
 			)}

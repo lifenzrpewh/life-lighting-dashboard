@@ -183,6 +183,16 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		}
 	}
 
+	/** Replace the local file (the owner, 2026-10-18): a fetch that found a
+	 *  different file of its name in the local folder, again, the old one moved
+	 *  to Replaced there. */
+	const replaceLocal = (code: string) => {
+		clearRefusal(code)
+		void life?.mediaReplace(code).then((r) => {
+			if (!r.ok) setRefused((x) => ({ ...x, [code]: r.detail }))
+		})
+	}
+
 	const readServices = () => {
 		if (life === undefined) return
 		setServices({ kind: 'reading' })
@@ -447,6 +457,7 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		lastRun,
 		markSame,
 		itsThere,
+		replaceLocal,
 		/** Placed by hand for this service, and the actions on them. */
 		pins,
 		unpin: (item: number) => savePins(pins.filter((p) => p.item !== item)),

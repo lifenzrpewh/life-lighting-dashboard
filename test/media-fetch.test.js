@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { codesIn, copyInto, downloadInto, fileUrlOf, findByCode, findByCodeIndexed, findMedia, pickBySize } from '../dist/src/bridge/media-files.js'
+import { codesIn, copyInto, downloadInto, fileUrlOf, findByCode, findByCodeIndexed, findMedia, nameKey, pickBySize, pickDriveFile } from '../dist/src/bridge/media-files.js'
 import http from 'node:http'
 import { fetchRequestFrom, isFolderPath, isPlainName, runCounts, runRequestFrom } from '../dist/src/shared/media-fetch.js'
 import { openWire } from '../dist/src/bridge/arena-control.js'
@@ -49,8 +49,49 @@ test('a copy lands whole, is reused when the same, and never overwrites a differ
 	const clash = await copyInto(src, to, () => {})
 	assert.equal(clash.ok, false)
 	assert.match(clash.detail, /nothing was overwritten/)
+	assert.equal(clash.clash, true)
 	assert.equal(fs.readFileSync(first.path, 'utf8'), 'someone else’s file')
 	assert.match((await copyInto(src, path.join(to, 'missing'), () => {})).detail, /not there/)
+
+	// Replace, on an operator's say-so: the different one is moved to
+	// Replaced, never deleted, and the right one copied in its place.
+	const replaced = await copyInto(src, to, () => {}, true)
+	assert.deepEqual(replaced, { ok: true, path: first.path, copied: true })
+	assert.equal(fs.readFileSync(first.path).length, 300_000)
+	const aside = fs.readdirSync(path.join(to, 'Replaced'))
+	assert.equal(aside.length, 1)
+	assert.match(aside[0], /^CB095 Loop \(replaced \d{4}-\d\d-\d\d \d{6}\)\.mov$/)
+	assert.equal(fs.readFileSync(path.join(to, 'Replaced', aside[0]), 'utf8'), 'someone else’s file')
+	// The same file already there is used, replace or not: nothing moved.
+	assert.deepEqual(await copyInto(src, to, () => {}, true), { ok: true, path: first.path, copied: false })
+	assert.equal(fs.readdirSync(path.join(to, 'Replaced')).length, 1)
+})
+
+test('a drive file of the lookbook\'s name is taken when none is its size', async () => {
+	assert.equal(nameKey('CF588-Walk_In - Copy'), 'cf588 walk in')
+	assert.equal(nameKey('cf588 walk in'), 'cf588 walk in')
+	assert.equal(nameKey('CF588-Walk-In_1789857226772'), 'cf588 walk in')
+	assert.notEqual(nameKey('CF588-Walk-In-v4'), nameKey('CF588-Walk-In-v5'))
+	const f = (p, size, mtimeMs = 1) => ({ path: p, size, mtimeMs })
+	const found = [f('/g/CF588-Walk In - Copy.mov', 40, 9), f('/g/CF588-Walk In.mov', 41, 2), f('/g/CF588-old.mov', 50, 5)]
+	// The lookbook's size wins.
+	assert.deepEqual(pickDriveFile(found, 50, 'CF588-Walk-In'), { pick: found[2], by: 'size' })
+	// None of its size (a lookbook that says the wrong one): its name, plain before a copy.
+	assert.deepEqual(pickDriveFile(found, 99, 'CF588-Walk-In'), { pick: found[1], by: 'name' })
+	// No size at all: its name.
+	assert.deepEqual(pickDriveFile(found, null, 'cf588_walk_in'), { pick: found[1], by: 'name' })
+	// Neither: another version, or not there.
+	assert.deepEqual(pickDriveFile(found, 99, 'CF588-Walk-In-v5'), { pick: null, why: 'other-version' })
+	assert.deepEqual(pickDriveFile([], 99, 'CF588-Walk-In'), { pick: null, why: 'not-there' })
+
+	// On the drive, a file of the lookbook's name is found even without the code.
+	const root = temp()
+	fs.writeFileSync(path.join(root, 'Walk In Loop.mov'), 'x'.repeat(7))
+	fs.writeFileSync(path.join(root, 'CF588 other.mov'), 'x'.repeat(8))
+	const plain = await findByCodeIndexed(root, 'CF588', { maxAgeMs: 0 })
+	assert.deepEqual(plain.found.map((x) => path.basename(x.path)), ['CF588 other.mov'])
+	const named = await findByCodeIndexed(root, 'CF588', { name: 'Walk-In-Loop' })
+	assert.deepEqual(named.found.map((x) => path.basename(x.path)).sort(), ['CF588 other.mov', 'Walk In Loop.mov'])
 })
 
 test('a copy cut off before leaves no half file behind for the next', async () => {

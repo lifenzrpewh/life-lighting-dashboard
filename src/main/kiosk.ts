@@ -540,6 +540,14 @@ app.whenReady().then(() => {
 		if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return { ok: false, detail: 'not a code' }
 		return mediaFetch.there(code)
 	})
+	// Replace (the owner, 2026-10-18): a fetch that met a different local file of
+	// its name, run again with that file moved to Replaced. Admin only.
+	ipcMain.handle('media:replace', (e, code: unknown): { ok: true } | { ok: false; detail: string } => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
+		if (typeof code !== 'string' || !/^[A-Z]{2}\d{3}$/.test(code)) return { ok: false, detail: 'not a code' }
+		return mediaFetch.replace(code)
+	})
 	// Browse for a folder (the Arena row's two folders): Windows' own picker,
 	// over the window that asked. Only the path comes back; Save keeps it.
 	// This computer's own addresses, for Settings › Console to say where the

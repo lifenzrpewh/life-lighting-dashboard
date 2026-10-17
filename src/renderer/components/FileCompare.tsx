@@ -15,7 +15,7 @@
 // only those.
 
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Hand } from 'lucide-react'
+import { ChevronDown, ChevronRight, Hand, Replace } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaSlot, type ArenaStatus } from '../../shared/arena.js'
 import { clipsToUpdate, codesOn, slotCode, slotMark, type SlotMark } from '../../shared/holding.js'
@@ -116,6 +116,7 @@ export function FileCompare({
 						<SmallButton onClick={() => m.markSame({ code, file: arenaFile, want, same: true })}>Arena&rsquo;s is right</SmallButton>
 					)}
 					{!under(fetch) && mark === 'missing' && <ThereButton onClick={() => m.itsThere(code)} />}
+					{fetch?.state === 'failed' && fetch.clash === true && <ReplaceButton onClick={() => m.replaceLocal(code)} />}
 					<FetchWords fetch={fetch} refused={m.refused[code]} />
 				</div>
 			)}
@@ -208,6 +209,7 @@ function DriveFiles({
 										{megabytes(f.size)} · {when(f.mtimeMs)}
 									</span>
 									{f.matches && <Tag tone="good">the lookbook&rsquo;s file</Tag>}
+									{!f.matches && f.named && <Tag tone="plain">the lookbook&rsquo;s name</Tag>}
 									{f.copy && <Tag tone="plain">a copy</Tag>}
 									{f.chosen && <Tag tone="plain">Fetch uses this</Tag>}
 									{inArena === name.toLowerCase() && <Tag tone="plain">the name Arena has</Tag>}
@@ -219,9 +221,13 @@ function DriveFiles({
 								</li>
 							)
 						})}
-						{read.lookbookSize === null && <li className="text-booth-dim">The lookbook did not say its file&rsquo;s size, so none is matched by size.</li>}
+						{read.lookbookSize === null && <li className="text-booth-dim">The lookbook did not say its file&rsquo;s size, so its name is matched instead.</li>}
 						{read.lookbookSize !== null && !read.files.some((f) => f.matches) && (
-							<li className="text-warn">None is the lookbook&rsquo;s file (by size): Fetch would download the lookbook&rsquo;s own, if you say yes.</li>
+							<li className="text-warn">
+								{read.files.some((f) => f.chosen)
+									? 'None is the lookbook’s size: Fetch uses the one of the lookbook’s name.'
+									: 'None is the lookbook’s file (by size or name): Fetch would download the lookbook’s own, if you say yes.'}
+							</li>
 						)}
 					</ul>
 				))}
@@ -238,6 +244,30 @@ export function Picture({ url, large = false, fill = false }: { url: string | nu
 	const size = fill ? 'absolute inset-0 size-full' : large ? 'h-36 w-64' : 'h-12 w-20'
 	if (url === null || failed === url) return <span className={`${size} shrink-0 rounded-ctl bg-booth-raise`} />
 	return <img src={url} alt="" draggable={false} onError={() => setFailed(url)} className={`${size} shrink-0 rounded-ctl bg-booth-raise ${fill ? 'object-cover' : 'object-contain'}`} />
+}
+
+/** Replace the local file (the owner, 2026-10-18: an override when "a
+ *  different file is already in the local folder"): a second tap to be sure,
+ *  since every clip with that file plays the new one. The old one is kept in
+ *  the local folder's Replaced folder. */
+export function ReplaceButton({ onClick }: { onClick: () => void }) {
+	const [sure, setSure] = useState(false)
+	useEffect(() => {
+		if (!sure) return
+		const t = setTimeout(() => setSure(false), 4000)
+		return () => clearTimeout(t)
+	}, [sure])
+	return (
+		<button
+			type="button"
+			onClick={() => (sure ? onClick() : setSure(true))}
+			title="The local one is moved to Replaced in the local folder, and the right one copied in its place"
+			className={`flex h-8 shrink-0 items-center gap-1.5 rounded-ctl px-2.5 text-xs font-medium ${sure ? 'bg-overtime/20 text-overtime ring-1 ring-overtime/60 ring-inset' : 'bg-warn/15 text-warn hover:bg-warn/25'}`}
+		>
+			<Replace size={13} aria-hidden />
+			{sure ? 'Tap again to replace' : 'Replace the local file'}
+		</button>
+	)
 }
 
 /** "It's there" (the owner, 2026-10-13): Pāua's reading set aside on an
