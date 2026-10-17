@@ -2,7 +2,7 @@
 	"name": "paua",
 	"productName": "Paua",
 	"description": "Pāua: the booth dashboard for lighting and visuals at LIFE.",
-	"version": "1.6.0",
+	"version": "1.6.1",
 	"private": true,
 	"type": "module",
 	"engines": {

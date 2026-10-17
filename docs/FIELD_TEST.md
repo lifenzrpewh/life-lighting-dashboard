@@ -93,6 +93,18 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.6.1** (2026-10-18): 1.6.0 with two Fetch fixes (`docs/VISUALS_DASHBOARD.md` § Fetching
+media). Reads updates from this repo; publish it on `paua-releases` too for booths still on
+1.1.0 to 1.4.0 (the bridge).
+
+**Fetch** (1.6.1)
+- [ ] A code whose drive file has the lookbook's name but not its size (or with the lookbook not answering sizes): Update all's confirmation says **drive, by name**, not "lookbook only", and Load puts the drive's file in
+- [ ] The drive list (Compare › on the graphics drive) tags that file **the lookbook's name** and **Fetch uses this**
+- [ ] `-v4` on the drive against `-v5` in the lookbook is still not taken by name
+- [ ] A different file of the same name already in the local folder: the fetch fails saying so, and Admin sees **Replace the local file**; one tap asks again, the second replaces it and loads it
+- [ ] The old one is in the local folder's `Replaced` folder, named with the date and time
+- [ ] The same with Arena playing the old file: it says it could not be moved aside, and nothing is overwritten
+
 **1.6.0** (2026-10-15): the review's fixes, Settings laid out again, start at login, the setup
 file. Reads updates from this repo; publish it on `paua-releases` too for booths still on 1.1.0
 to 1.4.0 (the bridge).

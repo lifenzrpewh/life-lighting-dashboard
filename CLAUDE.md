@@ -323,6 +323,12 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-18: v1.6.1 tagged** at the owner's ask: 1.6.0 with two Fetch fixes from the owner. The
+drive's file is found **by the lookbook's name** when none is its size (a lookbook giving wrong or
+no sizes made the drive's files look absent), and **Replace the local file** for "a different file
+is already in the local folder" (the old one moved to `Replaced`). Tests and a scratch run of
+main's queue on the Mac only (`docs/FIELD_TEST.md` § 1.6.1). Publishing the draft is the owner's.
+
 **2026-10-15: v1.6.0 tagged** at the owner's ask, with `review-fixes` merged: a read-only review
 of the whole app (four reviews, then fixes on their own branch), the owner's answers taken in two
 short rounds. In it:
