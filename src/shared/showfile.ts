@@ -9,11 +9,18 @@
 // (see `name`), so comparing them at this end could disagree with the guard that
 // actually refuses the save. They are carried to be shown, and that is all.
 
-/** How long a read may go before a quiet gap asks again. The cadence and why it
- *  is this slow are in src/bridge/showfile.ts. One minute since 2026-10-02 (was
- *  five): the watcher carries every change but a Load, which ends it, so this
- *  is how soon a Load reaches the chip on a quiet console (the owner's call). */
+/** How long a read may go before a quiet gap asks again, while no watcher is
+ *  known to be running on the console. The cadence and why it is this slow are
+ *  in src/bridge/showfile.ts. One minute since 2026-10-02 (was five). */
 export const SHOW_REFRESH_MS = 60_000
+
+/** The same, while LifeBridge's watcher has said it is running (2026-10-21,
+ *  was the minute above throughout). The watcher pushes every change itself and
+ *  says when it ends, so an ask is only a check that it is still there: ten
+ *  minutes cuts the console's command line from about sixty asks an hour to
+ *  six. A Load ends the watcher, but drops the link while it loads, and link-up
+ *  asks at once. */
+export const SHOW_WATCHED_REFRESH_MS = 10 * 60_000
 
 /** How long an ask may take before it counts as unanswered. A plugin call is
  *  slower than a bare SendOSC, and a busy console slower still; an answer after
@@ -21,11 +28,12 @@ export const SHOW_REFRESH_MS = 60_000
 export const SHOW_TIMEOUT_MS = 5_000
 
 /** A name older than this is STALE. Derived, not configured: on a quiet console
- *  a read is at most one refresh old, plus the 15 s quiet spell before the gap
- *  that asks (QUIET_MS in src/bridge/ping.ts; a test holds the two together),
- *  plus the answer. Older means the console has been too busy to ask, and a
- *  Load could have happened unseen. */
-export const SHOW_STALE_AFTER_MS = SHOW_REFRESH_MS + 15_000 + SHOW_TIMEOUT_MS
+ *  with its watcher running a read is at most one watched refresh old (each ask
+ *  is answered with the name), plus the 15 s quiet spell before the gap that
+ *  asks (QUIET_MS in src/bridge/ping.ts; a test holds the two together), plus
+ *  the answer. Older means the console has been too busy to ask. A failed ask
+ *  ages the name at once, whatever this says (readingOf). */
+export const SHOW_STALE_AFTER_MS = SHOW_WATCHED_REFRESH_MS + 15_000 + SHOW_TIMEOUT_MS
 
 export type Showfile = {
 	/** The loaded show, normalised as SaveGuard normalises it: no path, no

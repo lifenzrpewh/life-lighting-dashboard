@@ -93,6 +93,19 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**LifeBridge, the booth build** (on main since 2026-10-21, not in a build yet): after Central's
+console crashed running an old LifeBridge (`docs/MA3_READ_MODEL.md` § Suspected in a console
+crash). The booth plugin is show, watch and shows only, stamped with its build; the probe is
+`LifeBridgeProbe`, never for a booth. Only as the controlled retest, at a quiet time, onPC first.
+- [ ] Pāua on the old LifeBridge (or any other build): the showfile chip says which build is on the console and which this Pāua works with, and to delete it, import, restart Pāua; `paua.log` says the same once, and the console's command line gets no more `Call Plugin "LifeBridge"` lines
+- [ ] Delete LifeBridge on the console (not import over it), import this version's `console-plugin/LifeBridge.xml`, restart Pāua: the chip reads the show
+- [ ] A tap on LifeBridge in the plugin pool: nothing on the command line at all
+- [ ] On a quiet console, the command line shows a `Call Plugin "LifeBridge" "watch"` about every ten minutes, not every minute
+- [ ] After thirty minutes, the watcher says `expired` and Pāua starts a fresh one within a second or two (two lines and the reply)
+- [ ] Save As from Pāua: the chip has the new name within about two seconds
+- [ ] The console's log over the session: no `HookObjectChange` line, no LifeBridge error
+- [ ] Every show the booth loads re-saved with this LifeBridge in it, once the retest is clean
+
 **1.6.1** (2026-10-18): 1.6.0 with two Fetch fixes (`docs/VISUALS_DASHBOARD.md` § Fetching
 media). Reads updates from this repo; publish it on `paua-releases` too for booths still on
 1.1.0 to 1.4.0 (the bridge).

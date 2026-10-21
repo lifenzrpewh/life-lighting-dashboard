@@ -4,8 +4,12 @@
 // LifeBridge packs the names into a few messages, each one line on the LD's
 // command line:
 //
-//   /life/shows ,s "<version>|<way>|<part>/<parts>|<name>|<name>…"
-//   /life/shows ,s "<version>|unreadable|<ways tried>"
+//   /life/shows ,s "<build>|<version>|<way>|<part>/<parts>|<name>|<name>…"
+//   /life/shows ,s "<build>|<version>|unreadable|<ways tried>"
+//
+// A build other than LIFEBRIDGE_BUILD (or none, every build before 2026-10-21)
+// is `other-build`, and nothing in it is read: the link then stops calling the
+// plugin, as it does for the showfile (./showfile.ts).
 //
 // THE RULES THIS FILE ENFORCES: a list is whole or it is not a list. Every part
 // from 1 to n arrives or the ask fails; a part missing is never a shorter list,
@@ -13,14 +17,17 @@
 // And an unreadable folder is a failure with its reason, never "no shows".
 
 import type { OscMessage } from './osc.js'
+import { LIFEBRIDGE_BUILD } from '../shared/lifebridge-build.js'
 import { loadProblem, type ShowList } from '../shared/showfile-write.js'
+import { otherBuildDetail } from './showfile.js'
 
 export type ShowsReply =
 	| { kind: 'part'; version: string; way: string; part: number; parts: number; shows: { name: string; loadable: boolean }[] }
 	| { kind: 'unreadable'; version: string; detail: string }
-	/** The LifeBridge on the console predates `shows`: delete it and import
-	 *  this build (re-importing over it keeps the old code, ❌ 2026-09-21). */
-	| { kind: 'no-verb' }
+	/** The LifeBridge on the console is not this build: another stamp, or none
+	 *  (a build before stamps, `unknown verb shows` included). Delete it and
+	 *  import this build (re-importing over it keeps the old code, ❌ 2026-09-21). */
+	| { kind: 'other-build'; build: string | null }
 
 export type ShowsReadResult =
 	| { ok: true; reply: ShowsReply }
@@ -31,13 +38,16 @@ export function readShows(message: OscMessage, prefix: string): ShowsReadResult 
 	const bare = prefix.replace(/^\/+|\/+$/g, '')
 	const only = message.args.length === 1 && message.args[0]?.type === 's' ? message.args[0].value : null
 	if (message.address === `/${bare}/error`) {
-		if (only === 'unknown verb shows') return { ok: true, reply: { kind: 'no-verb' } }
+		if (only === 'unknown verb shows') return { ok: true, reply: { kind: 'other-build', build: null } }
 		return { ok: false, reason: 'other-channel', detail: `${message.address} is not about shows` }
 	}
 	if (message.address !== `/${bare}/shows`) return { ok: false, reason: 'other-channel', detail: `${message.address} is not shows` }
 	if (only === null) return { ok: false, reason: 'bad-args', detail: 'expected one string' }
 
-	const fields = only.split('|')
+	const [build, ...fields] = only.split('|')
+	if (build !== LIFEBRIDGE_BUILD) {
+		return { ok: true, reply: { kind: 'other-build', build: build !== undefined && /^lb-[0-9a-f]{8}$/.test(build) ? build : null } }
+	}
 	const [version, way, count] = fields
 	if (!version || !way || count === undefined) return { ok: false, reason: 'bad-args', detail: `not a shows reply: ${JSON.stringify(only)}` }
 	if (way === 'unreadable') return { ok: true, reply: { kind: 'unreadable', version, detail: fields.slice(2).join('|') || 'no reason given' } }
@@ -70,9 +80,7 @@ export function collectShowList(): ShowListCollector {
 	let expected: number | null = null
 	return {
 		offer(reply) {
-			if (reply.kind === 'no-verb') {
-				return { ok: false, detail: 'LifeBridge on the console is older than the show list: delete it there and import this build.' }
-			}
+			if (reply.kind === 'other-build') return { ok: false, detail: otherBuildDetail(reply.build) }
 			if (reply.kind === 'unreadable') return { ok: false, detail: `The console could not list its shows (${reply.detail}).` }
 			if (expected !== null && reply.parts !== expected) return { ok: false, detail: 'The show list came in two different shapes; ask again.' }
 			expected = reply.parts

@@ -2,54 +2,62 @@
 // answers add up to.
 //
 // WHY IT ASKS SO RARELY: every ask is two lines on the console's command line,
-// `call Plugin "LifeBridge" "show"` and the `SendOSC` it runs, and the lines push
+// `call Plugin "LifeBridge" "watch"` and the `SendOSC` it runs, and the lines push
 // the LD's own history out of view (❌ 2026-09-30, the one-a-second ping). So it
-// asks when the link comes up, and after that at most once every
-// SHOW_REFRESH_MS, only in a quiet gap: when a ping is going out anyway because
-// the console has said nothing for 15 s. A console the LD is working is never
-// asked (agreed with the operator, 2026-09-30). About two lines a minute on a
-// quiet console since the refresh went to one minute (2026-10-02), none on a
-// busy one.
+// asks when the link comes up, and after that only in a quiet gap: when a ping
+// is going out anyway because the console has said nothing for 15 s. A console
+// the LD is working is never asked (agreed with the operator, 2026-09-30).
 //
-// WHY IT ASKS AGAIN AT ALL: a Load or a Save As at the console changes the name
-// and need not drop the link. Link-up alone could hold the old name for a whole
-// service. A minute is the most it can be behind on a quiet console; on a
-// busy one it ages, and says so (SHOW_STALE_AFTER_MS, in src/shared/showfile.ts
-// with the other timings, because the renderer needs it).
+// WATCHED, NOT ONLY ASKED (✅ onPC 2.3.2.0, 2026-10-02). Each ask is `watch`:
+// LifeBridge answers as `show` does, then keeps a loop on the console that reads
+// the name each second and pushes it only when it changes. So a Save As reaches
+// the chip in about a second. A push needs no ask in flight: `reply` records
+// whatever the console says (docs/MA3_READ_MODEL.md § The showfile, watched).
+//
+// THE WATCHER SETS THE CADENCE (2026-10-21). It says `started` or `already`
+// when asked, and `expired` when its lifetime (thirty minutes) runs out, or
+// `stopped`. While it runs, a quiet gap asks only every SHOW_WATCHED_REFRESH_MS,
+// a check that it is still there; once it has ended, or before it has said
+// anything, every SHOW_REFRESH_MS. `expired` is asked again at once, quiet or
+// not, so the console is never long without one: one line every half hour. A
+// link-up always asks, because a Load (which ends the watcher) drops the link.
 //
 // THE RULE THIS FILE ENFORCES: the Channel holds only what the console said.
 // An ask with no answer becomes a timeout, never a name; a failed read keeps
 // the last good name only as `lastOk`, which readingOf shows with its age.
 //
-// WATCHED, NOT ONLY ASKED (✅ onPC 2.3.2.0, 2026-10-02). Each ask is `watch`
-// rather than `show`: LifeBridge answers as `show` does, then keeps a loop on the
-// console that reads the name each second and pushes it only when it changes.
-// So a Load or Save As reaches the chip in about a second, and the asks above
-// are what restart a watcher that has stopped (docs/MA3_READ_MODEL.md § The
-// showfile, watched). A push needs no ask in flight: `reply` records whatever
-// the console says. A plugin older than `watch` says so, and is asked `show`
-// until the next link-up.
-//
-// AN OLD PROBE STOPS THE ASKING (2026-10-21). A LifeBridge from before verbs
-// answers every call with its whole probe, `HookObjectChange` included, and
-// asked once a minute that is suspected in Central's console crash of
-// 2026-10-19/20 (docs/MA3_READ_MODEL.md § Suspected in a console crash). So a
-// probe that answers an ask ends every plugin call from this link, for good:
-// not at the next link-up, which a flapping link could make often. A new link
-// (a restart of Pāua, or the console's settings saved) asks again.
+// ONE BUILD, OR NO ASKS (2026-10-21). Central's console crashed twice running a
+// month-old LifeBridge that ran its whole probe, `HookObjectChange` included, on
+// every ask (docs/MA3_READ_MODEL.md § Suspected in a console crash). A console
+// keeps running whatever plugin it loaded last, so this Pāua works only with the
+// LifeBridge built beside it (LIFEBRIDGE_BUILD). A reply from any other build,
+// or the old probe answering an ask, ends every plugin call from this link, for
+// good: not at the next link-up, which a flapping link could make often. The
+// chip says what to do. A new link (a restart of Pāua, or the console's settings
+// saved) asks again.
 //
 // Deliberately time-free, like ping.ts: the caller passes a monotonic `now`.
 
+import { LIFEBRIDGE_BUILD } from '../shared/lifebridge-build.js'
 import type { Channel, ReadResult } from '../shared/reading.js'
 import { record, unread } from '../shared/reading.js'
-import { SHOW_REFRESH_MS, SHOW_TIMEOUT_MS, type Showfile } from '../shared/showfile.js'
+import { SHOW_REFRESH_MS, SHOW_TIMEOUT_MS, SHOW_WATCHED_REFRESH_MS, type Showfile } from '../shared/showfile.js'
 import type { ShowReply } from './channel-c.js'
 
 /** The command that asks. `Call Plugin` passes the verb (✅ 2026-09-30, onPC
- *  2.3.2.0: `Call Plugin "LifeBridge" "ping <t>"` arrived exact). `watch` by
- *  default; `show` for a plugin that has said it has no `watch`. */
-export function showCommand(verb: 'watch' | 'show' = 'watch'): string {
-	return `Call Plugin "LifeBridge" "${verb}"`
+ *  2.3.2.0: `Call Plugin "LifeBridge" "ping <t>"` arrived exact). */
+export function showCommand(): string {
+	return 'Call Plugin "LifeBridge" "watch"'
+}
+
+/** What the chip and the show list say once the old probe has answered. */
+export const OLD_PROBE_DETAIL =
+	'LifeBridge on the console is the September test build, which runs its whole probe on every ask, so Pāua has stopped asking. Delete it on the console, import the LifeBridge.xml from this version of Pāua, then restart Pāua.'
+
+/** What they say once a LifeBridge of another build has answered. */
+export function otherBuildDetail(build: string | null): string {
+	const which = build === null ? 'an older build, from before build stamps' : `build ${build}`
+	return `LifeBridge on the console is ${which}, and this Pāua works only with ${LIFEBRIDGE_BUILD}, so it has stopped asking. Delete it on the console, import the LifeBridge.xml from this version of Pāua, then restart Pāua.`
 }
 
 /** Why the chance to ask came up. */
@@ -59,6 +67,8 @@ export type AskMoment =
 	| 'link-up'
 	/** A ping is going out on a live link: the console has been quiet. */
 	| 'quiet-gap'
+	/** The watcher said `expired`: start a fresh one now, quiet or not. */
+	| 'watch-ended'
 
 export type ShowfileReader = {
 	/** Should an ask go out now? Never while one is in flight. */
@@ -72,25 +82,20 @@ export type ShowfileReader = {
 	/** Everything the console has said about its showfile. The same object until
 	 *  something new is recorded, so a caller can tell when it changed. */
 	channel(now: number): Channel<Showfile>
-	/** The console answered a plugin call with the old probe: no plugin call
-	 *  may go to it again from this link. For an ask other than this reader's
-	 *  (the show list). */
-	oldProbe(now: number): void
+	/** The console answered another plugin call (the show list) with something
+	 *  that is not this build: no plugin call may go to it again from this link. */
+	refuse(now: number, detail: string): void
 	/** Why no plugin call may go to this console, or null. */
 	refused(): string | null
 }
-
-/** What the chip and the show list say once the old probe has answered. */
-export const OLD_PROBE_DETAIL =
-	'LifeBridge on the console is the September test build, which runs its whole probe on every ask, so Pāua has stopped asking. Delete it on the console, import this build, then restart Pāua.'
 
 export function createShowfileReader(): ShowfileReader {
 	let channel = unread<Showfile>()
 	let askedAt: number | null = null
 	let lastAskAt: number | null = null
-	/** Whether the console's LifeBridge knows `watch`, as far as we know. */
-	let verb: 'watch' | 'show' = 'watch'
-	let oldProbeSeen = false
+	/** Whether a watcher has said it is running, and has not said it ended. */
+	let watching = false
+	let refusal: string | null = null
 
 	const put = (result: ReadResult<Showfile>) => {
 		channel = record(channel, result)
@@ -100,32 +105,36 @@ export function createShowfileReader(): ShowfileReader {
 		if (askedAt === null || now - askedAt < SHOW_TIMEOUT_MS) return
 		put({ ok: false, reason: 'timeout', at: askedAt + SHOW_TIMEOUT_MS })
 		askedAt = null
+		// An unanswered ask is no evidence of a watcher.
+		watching = false
 	}
 
-	const oldProbe = (now: number) => {
+	const refuse = (now: number, detail: string) => {
 		askedAt = null
-		if (oldProbeSeen) return
-		oldProbeSeen = true
-		put({ ok: false, reason: 'error', at: now, detail: OLD_PROBE_DETAIL })
+		watching = false
+		if (refusal !== null) return
+		refusal = detail
+		put({ ok: false, reason: 'error', at: now, detail })
 	}
 
 	return {
 		due(now, moment) {
 			expire(now)
-			if (oldProbeSeen || askedAt !== null) return false
-			// A link-up is the moment a plugin may have been re-imported, so a
-			// console that refused `watch` is offered it again.
+			if (refusal !== null || askedAt !== null) return false
 			if (moment === 'link-up') {
-				verb = 'watch'
+				// A Load ends the watcher and drops the link: assume none.
+				watching = false
 				return true
 			}
+			if (moment === 'watch-ended') return true
 			// Timed from the last ASK, not the last good read. A console without
-			// the verb, or without the plugin, would otherwise be asked in every
-			// quiet gap, two lines each, for as long as it stayed broken.
-			return lastAskAt === null || now - lastAskAt >= SHOW_REFRESH_MS
+			// the plugin would otherwise be asked in every quiet gap, two lines
+			// each, for as long as it stayed broken.
+			const every = watching ? SHOW_WATCHED_REFRESH_MS : SHOW_REFRESH_MS
+			return lastAskAt === null || now - lastAskAt >= every
 		},
 
-		command: () => showCommand(verb),
+		command: showCommand,
 
 		asked(now) {
 			expire(now)
@@ -134,22 +143,29 @@ export function createShowfileReader(): ShowfileReader {
 		},
 
 		reply(reply, now) {
-			if (reply.kind === 'probe') {
-				// Only an answer to our ask counts: someone running `probe` by hand
-				// on a current build is not a reason to stop. Timed from the ask
-				// itself, so an answer that lands after the timeout still counts.
-				if (lastAskAt !== null && now - lastAskAt < SHOW_TIMEOUT_MS * 2) oldProbe(now)
-				return
+			switch (reply.kind) {
+				case 'probe':
+					// Only an answer to our ask counts: someone running the probe by
+					// hand is not a reason to stop. Timed from the ask itself, so an
+					// answer that lands after the timeout still counts.
+					if (lastAskAt !== null && now - lastAskAt < SHOW_TIMEOUT_MS * 2) refuse(now, OLD_PROBE_DETAIL)
+					return
+				case 'other-build':
+					// Unambiguous, asked or pushed: whatever runs there is not ours.
+					return refuse(now, otherBuildDetail(reply.build))
+				case 'watch':
+					expire(now)
+					if (reply.state === 'started' || reply.state === 'already') {
+						watching = true
+					} else {
+						// Ended: the next quiet gap asks (and link.ts asks at once
+						// for `expired`).
+						watching = false
+						lastAskAt = null
+					}
+					return
 			}
 			expire(now)
-			if (reply.kind === 'no-watch') {
-				// The ask was answered, with no name: ask `show` at the next quiet
-				// gap rather than waiting out a whole refresh for it.
-				askedAt = null
-				lastAskAt = null
-				verb = 'show'
-				return
-			}
 			// Recorded whether or not an ask is in flight: a late answer, or one to
 			// someone else's ask, is still what the console said when it said it.
 			askedAt = null
@@ -158,13 +174,6 @@ export function createShowfileReader(): ShowfileReader {
 					return put({ ok: true, value: reply.show, at: now })
 				case 'unreadable':
 					return put({ ok: false, reason: 'error', at: now, detail: 'the console could not read its own showfile name' })
-				case 'no-verb':
-					return put({
-						ok: false,
-						reason: 'error',
-						at: now,
-						detail: 'LifeBridge on the console is older than the show verb: delete it, then import it again',
-					})
 			}
 		},
 
@@ -173,8 +182,8 @@ export function createShowfileReader(): ShowfileReader {
 			return channel
 		},
 
-		oldProbe,
+		refuse,
 
-		refused: () => (oldProbeSeen ? OLD_PROBE_DETAIL : null),
+		refused: () => refusal,
 	}
 }

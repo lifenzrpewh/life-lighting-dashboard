@@ -1,5 +1,8 @@
--- Offline harness for LifeBridge. Mocks the entire MA3 API and runs the plugin
--- end to end, the way the Show Creator's harnesses do. Never shipped to a desk.
+-- Offline harness for LifeBridge and LifeBridgeProbe. Mocks the entire MA3 API
+-- and runs each plugin end to end, the way the Show Creator's harnesses do.
+-- Never shipped to a desk. The booth plugin (show, watch, shows) and the desk
+-- probe (probe, ping, pool) were one file until 2026-10-21; each scenario says
+-- which it runs by setting PLUGIN.
 --
 --   lua console-plugin/_test_lifebridge.lua
 --
@@ -21,6 +24,14 @@ end
 -- ----------------------------- the MA3 mock --------------------------------
 
 local cmds, prints, files
+
+local BOOTH = 'console-plugin/LifeBridge.lua'
+local PROBE = 'console-plugin/LifeBridgeProbe.lua'
+local PLUGIN = PROBE
+
+--- The booth build's stamp, the first field of every reply it sends.
+local B
+for line in io.lines(BOOTH) do B = B or line:match("^local BUILD = '([^']*)'$") end
 
 --- Every call to HookObjectChange, across every scenario. Must stay zero: the
 --- probe's calls to it are suspected in Central's crash of 2026-10-19/20.
@@ -127,7 +138,7 @@ local function run(setup, writablePattern, ...)
   cmds, prints, files = {}, {}, {}
   mockIO(writablePattern)
   setup()
-  local main = assert(loadfile('console-plugin/LifeBridge.lua'))()
+  local main = assert(loadfile(PLUGIN))()
   local ok, err = pcall(main, ...)
   io.open = realOpen
   return ok, err, cmds, prints
@@ -140,7 +151,7 @@ local function runTwice(setup, writablePattern, argsA, argsB)
   cmds, prints, files = {}, {}, {}
   mockIO(writablePattern)
   setup()
-  local main = assert(loadfile('console-plugin/LifeBridge.lua'))()
+  local main = assert(loadfile(PLUGIN))()
   -- CLAUDE.md promises any Lua 5.x runs this harness; unpack moved in 5.2.
   local unpack_ = table.unpack or unpack
   local okA = pcall(main, unpack_(argsA or {}))
@@ -319,6 +330,8 @@ do
     table.concat(p, '\n'))
 end
 
+PLUGIN = BOOTH
+
 -- 4b. `show` — the loaded showfile, and SaveGuard's verdict on it.
 --     The verdict must be SaveGuard's exactly, so these mirror its rules: path
 --     and `.show` stripped, the UserVar or else SaveGuard's own default, and an
@@ -334,13 +347,15 @@ local function showEnvironment(showfile, baseVar)
   end
 end
 
---- The one reply, split into its fields. Nil unless exactly one `/show`.
+--- The one reply, split into its fields after the build stamp. Nil unless
+--- exactly one `/show` carrying this build.
 local function showFields(c)
   if #c ~= 1 then return nil end
   local body = c[1]:match('^SendOSC %d+ "/show,s,(.*)"$')
   if body == nil then return nil end
   local fields = {}
   for part in (body .. '|'):gmatch('([^|]*)|') do fields[#fields + 1] = part end
+  if table.remove(fields, 1) ~= B then return nil end
   return fields
 end
 
@@ -405,6 +420,8 @@ do
   check('show twice: the same message', c[1] == c[2], table.concat(c, '\n'))
 end
 
+PLUGIN = PROBE
+
 -- 5. `pool` — resolving what a channel B address points at.
 do
   local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/', {}, 'pool')
@@ -442,6 +459,8 @@ do
   check('unknown verb: writes no file', next(files) == nil)
 end
 
+PLUGIN = BOOTH
+
 -- 6b. No verb at all: a tap on the plugin in the pool, or a call that lost its
 --     argument. It used to run the whole probe; it must now do nothing, on
 --     every kind of console, and on the MA3 signature with no string in it.
@@ -460,6 +479,20 @@ for _, case in ipairs({
   check(label .. 'writes no file', next(files) == nil)
 end
 
+-- 6c. The booth build has no probe, pool or ping: each is an unknown verb there,
+--     said once with the build, and nothing else.
+for _, verb in ipairs({ 'probe', 'pool', 'ping 42', 'pnig' }) do
+  local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/', {}, verb)
+  local label = 'booth ' .. verb .. ': '
+  check(label .. 'does not throw', ok, tostring(err))
+  check(label .. 'one /error with the build',
+    #c == 1 and c[1]:find('^SendOSC 3 "/error,s,' .. B:gsub('%-', '%%-') .. '|unknown verb ') ~= nil, table.concat(c, '\n'))
+  check(label .. 'prints nothing', #p == 0, table.concat(p, '\n'))
+  check(label .. 'writes no file', next(files) == nil)
+end
+
+PLUGIN = PROBE
+
 -- 7. Calling twice on ONE loaded chunk. Every scenario above reloads the file,
 --    which is exactly why the desk run reported 27/30 — three runs of 9/10
 --    accumulating in module state — and nothing here noticed.
@@ -477,6 +510,8 @@ do
     #c - firstCmds == firstCmds, string.format('first %d, second %d', firstCmds, #c - firstCmds))
 end
 
+PLUGIN = BOOTH
+
 -- 8. `watch` — answers as `show` does, then stays, pushing only on a change.
 --    Run as the console runs it: inside a coroutine, resumed after each yield.
 --    One chunk throughout, because the watcher is module state on purpose.
@@ -486,14 +521,14 @@ do
   local showfile = '/shows/test.show'
   showEnvironment(showfile, 'Mount Eden Base')()
   _G.Root = function() return { manetsocket = { showfile = showfile }, Version = '2.3.2.0' } end
-  local main = assert(loadfile('console-plugin/LifeBridge.lua'))()
+  local main = assert(loadfile(PLUGIN))()
   local co = coroutine.create(function() return main('watch') end)
   local oscOf = function(i) return cmds[i] and cmds[i]:match('^SendOSC %d+ "(.-)"$') end
 
   local ok, slept = coroutine.resume(co)
   check('watch: starts without throwing', ok, tostring(slept))
-  check('watch: answers with the show first', oscOf(1) == '/show,s,2.3.2.0|other|uservar|test|Mount Eden Base', tostring(cmds[1]))
-  check('watch: then says it started', oscOf(2) == '/watch,s,started', tostring(cmds[2]))
+  check('watch: answers with the show first', oscOf(1) == '/show,s,' .. B .. '|2.3.2.0|other|uservar|test|Mount Eden Base', tostring(cmds[1]))
+  check('watch: then says it started', oscOf(2) == '/watch,s,' .. B .. '|started', tostring(cmds[2]))
   check('watch: then yields, one second', coroutine.status(co) == 'suspended' and slept == 1, tostring(slept))
 
   coroutine.resume(co)
@@ -501,7 +536,7 @@ do
 
   showfile = '/shows/Mount Eden Base.show'
   coroutine.resume(co)
-  check('watch: a change is pushed once', #cmds == 3 and oscOf(3) == '/show,s,2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base',
+  check('watch: a change is pushed once', #cmds == 3 and oscOf(3) == '/show,s,' .. B .. '|2.3.2.0|base|uservar|Mount Eden Base|Mount Eden Base',
     table.concat(cmds, '\n'))
   coroutine.resume(co)
   check('watch: and not again while it holds', #cmds == 3, table.concat(cmds, '\n'))
@@ -509,19 +544,39 @@ do
   -- A second watch, as the dashboard's next ask: answers, does not stack.
   local okB = pcall(main, 'watch')
   check('watch again: answers and returns', okB and oscOf(4) ~= nil and oscOf(4):match('^/show,s,') ~= nil, tostring(cmds[4]))
-  check('watch again: says one is already running', oscOf(5) == '/watch,s,already', tostring(cmds[5]))
+  check('watch again: says one is already running', oscOf(5) == '/watch,s,' .. B .. '|already', tostring(cmds[5]))
 
   pcall(main, 'unwatch')
   check('unwatch: sends nothing itself', #cmds == 5, table.concat(cmds, '\n'))
   coroutine.resume(co)
   check('unwatch: the loop ends at its next wake', coroutine.status(co) == 'dead')
-  check('unwatch: and says it stopped', oscOf(6) == '/watch,s,stopped', tostring(cmds[6]))
+  check('unwatch: and says it stopped', oscOf(6) == '/watch,s,' .. B .. '|stopped', tostring(cmds[6]))
 
   local onlyOsc = true
   for _, c in ipairs(cmds) do if not c:match('^SendOSC %d+ ".*"$') then onlyOsc = false end end
   check('watch: SendOSC is the only command it ever sent', onlyOsc, table.concat(cmds, '\n'))
   check('watch: prints nothing', #prints == 0, table.concat(prints, '\n'))
   check('watch: writes no file', next(files) == nil)
+
+  -- Bounded: a watcher left alone ends itself after its lifetime, says
+  -- `expired`, and the next `watch` starts a fresh one.
+  cmds = {}
+  local lifetime
+  for line in io.lines(BOOTH) do lifetime = lifetime or tonumber(line:match('^local WATCH_LIFETIME_WAKES = (%d+)')) end
+  check('watch lifetime: about thirty minutes', lifetime ~= nil and lifetime >= 600 and lifetime <= 3600, tostring(lifetime))
+  local long = coroutine.create(function() return main('watch') end)
+  coroutine.resume(long)
+  local wakes = 0
+  while coroutine.status(long) == 'suspended' and wakes <= (lifetime or 0) + 5 do
+    coroutine.resume(long)
+    wakes = wakes + 1
+  end
+  check('watch lifetime: ends by itself after its wakes', coroutine.status(long) == 'dead' and wakes == lifetime,
+    string.format('%d wakes, %s', wakes, coroutine.status(long)))
+  check('watch lifetime: says expired', oscOf(#cmds) == '/watch,s,' .. B .. '|expired', tostring(cmds[#cmds]))
+  check('watch lifetime: nothing between start and expiry on a quiet show', #cmds == 3, table.concat(cmds, '\n'))
+  pcall(main, 'watch')
+  check('watch lifetime: the next watch starts a fresh one', oscOf(#cmds) == '/watch,s,' .. B .. '|started', tostring(cmds[#cmds]))
   io.open = realOpen
 end
 
@@ -543,8 +598,8 @@ local function showsReplies(c)
   local out = {}
   for _, line in ipairs(c) do
     local body = line:match('^SendOSC %d+ "/shows,s,(.*)"$')
-    if body == nil then return nil end
-    out[#out + 1] = body
+    if body == nil or body:sub(1, #B + 1) ~= B .. '|' then return nil end
+    out[#out + 1] = body:sub(#B + 2)
   end
   return out
 end
@@ -605,13 +660,25 @@ end
 --     § Suspected in a console crash): no scenario may call it, and the source
 --     may not name it outside a comment.
 check('no scenario called HookObjectChange', hookCalls == 0, tostring(hookCalls))
-do
+for _, file in ipairs({ BOOTH, PROBE }) do
   local named = false
-  for line in io.lines('console-plugin/LifeBridge.lua') do
+  for line in io.lines(file) do
     local code = line:gsub('%-%-.*$', '')
     if code:find('HookObjectChange', 1, true) or code:find('Unhook', 1, true) then named = true end
   end
-  check('the source never names HookObjectChange outside a comment', not named)
+  check(file .. ' never names HookObjectChange outside a comment', not named)
+end
+
+-- The booth build issues SendOSC and nothing else, by its source: no Printf, no
+-- io, no os, and Cmd only inside sendOsc.
+do
+  local bad = {}
+  for line in io.lines(BOOTH) do
+    local code = line:gsub('%-%-.*$', '')
+    if code:find('Printf', 1, true) or code:find('io%.') or code:find('os%.') then bad[#bad + 1] = line end
+    if code:find('Cmd(', 1, true) and not code:find("Cmd(sformat('SendOSC", 1, true) then bad[#bad + 1] = line end
+  end
+  check('booth: SendOSC is the only command, and no print, file or os call', #bad == 0, table.concat(bad, '\n'))
 end
 
 print(string.format('%d checks, %d failed', checks, failures))

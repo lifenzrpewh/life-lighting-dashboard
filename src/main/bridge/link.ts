@@ -19,7 +19,7 @@ import { performance } from 'node:perf_hooks'
 import { readPing, readShow } from '../../bridge/channel-c.js'
 import type { OscMessage } from '../../bridge/osc.js'
 import { createLinkTracker, pingCommand, type PingStats } from '../../bridge/ping.js'
-import { createShowfileReader, OLD_PROBE_DETAIL, type AskMoment } from '../../bridge/showfile.js'
+import { createShowfileReader, OLD_PROBE_DETAIL, otherBuildDetail, type AskMoment } from '../../bridge/showfile.js'
 import { collectShowList, readShows, type ShowListCollector } from '../../bridge/show-list.js'
 import {
 	loadCommand,
@@ -169,10 +169,15 @@ export function startLink(options: {
 			const show = readShow(message, options.prefix)
 			if (show.ok && show.reply.kind === 'probe' && listing !== null) {
 				// The old probe answered the show list's call: same verdict.
-				showfile.oldProbe(clock())
+				showfile.refuse(clock(), OLD_PROBE_DETAIL)
 				listing.done({ ok: false, detail: OLD_PROBE_DETAIL })
-			} else if (show.ok) showfile.reply(show.reply, clock())
+			} else if (show.ok) {
+				showfile.reply(show.reply, clock())
+				// The watcher's lifetime ran out: a fresh one now, quiet or not.
+				if (show.reply.kind === 'watch' && show.reply.state === 'expired') askShow('watch-ended')
+			}
 			const shows = readShows(message, options.prefix)
+			if (shows.ok && shows.reply.kind === 'other-build') showfile.refuse(clock(), otherBuildDetail(shows.reply.build))
 			if (shows.ok && listing !== null) {
 				const list = listing.collector.offer(shows.reply)
 				if (list !== null) listing.done(list)

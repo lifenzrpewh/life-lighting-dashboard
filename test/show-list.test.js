@@ -2,10 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { collectShowList, readShows } from '../dist/src/bridge/show-list.js'
+import { LIFEBRIDGE_BUILD as B } from '../dist/src/shared/lifebridge-build.js'
 
 const msg = (address, value) => ({ address, args: [{ type: 's', value }] })
+/** As this build of LifeBridge sends it: its stamp first. */
 const read = (value, address = '/life/shows') => {
-	const r = readShows(msg(address, value), 'life')
+	const r = readShows(msg(address, address === '/life/shows' ? `${B}|${value}` : value), 'life')
 	assert.ok(r.ok, r.detail)
 	return r.reply
 }
@@ -36,7 +38,10 @@ test('an unreadable folder and an old plugin are failures with their reasons, ne
 	const c2 = collectShowList()
 	const old = c2.offer(read('unknown verb shows', '/life/error'))
 	assert.equal(old.ok, false)
-	assert.match(old.detail, /delete it there and import/)
+	assert.match(old.detail, /an older build, from before build stamps/)
+	// Another stamp, or an unstamped reply: another build, nothing read.
+	assert.deepEqual(readShows(msg('/life/shows', 'lb-0badc0de|2.3.2.0|w|1/1|A'), 'life').reply, { kind: 'other-build', build: 'lb-0badc0de' })
+	assert.deepEqual(readShows(msg('/life/shows', '2.3.2.0|w|1/1|A'), 'life').reply, { kind: 'other-build', build: null })
 	// Another verb's error is not ours.
 	assert.equal(readShows(msg('/life/error', 'unknown verb pool'), 'life').ok, false)
 })
@@ -54,7 +59,7 @@ test('parts are gathered in order, and the list is only whole when every part is
 
 test('a reply of the wrong shape is refused, not read loosely', () => {
 	for (const bad of ['2.3.2.0|w|0/1|A', '2.3.2.0|w|3/2|A', '2.3.2.0|w|x|A', '2.3.2.0']) {
-		assert.equal(readShows(msg('/life/shows', bad), 'life').ok, false, bad)
+		assert.equal(readShows(msg('/life/shows', `${B}|${bad}`), 'life').ok, false, bad)
 	}
 	assert.equal(readShows(msg('/life/show', '2.3.2.0|w|1/1|A'), 'life').ok, false)
 })

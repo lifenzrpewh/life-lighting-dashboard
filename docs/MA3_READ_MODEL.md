@@ -161,6 +161,12 @@ What the repo adds (2026-10-21, from git, not the desk):
   every plugin call from that link, link-ups included, and the showfile chip says to
   delete LifeBridge, import the current build and restart Pāua. A probe nobody asked
   for (someone running it by hand) changes nothing.
+- **Split, stamped and bounded, the same day.** The booth's LifeBridge is `show`, `watch`
+  and `shows` only; the probe, `ping` and `pool` are `LifeBridgeProbe`, for onPC and test
+  shows (a tap runs it). Every booth reply starts with a build stamp, a hash of the
+  plugin's code, and Pāua refuses any other build, stamped or not, the same way it refuses
+  the old probe. The watcher ends itself after 30 minutes. Reply formats in § The
+  showfile, watched.
 
 ## ⚠️ `SELECTIONDATA` is always present
 
@@ -468,6 +474,20 @@ a loop on the console reads the same two values once a second
 returned) and `"stopped"` (after `unwatch`) say what the loop did. The dashboard
 asks `watch` wherever it asked `show`, so a stopped watcher is restarted by the
 next ask, at no extra cost in lines.
+
+⚠️ **Since 2026-10-21 (the booth build, not yet on a console):** every reply starts
+with the plugin's build stamp, and the watcher is bounded.
+
+```
+/show  ,s "<build>|<version>|base|<from>|<name>|<base>"   (or other, or <version>|unreadable)
+/watch ,s "<build>|started"   "<build>|already"   "<build>|expired"   "<build>|stopped"
+/shows ,s "<build>|<version>|<way>|<part>/<parts>|<name>|…"
+```
+
+The watcher says `expired` after 1800 wakes (30 minutes) and ends; Pāua asks again at
+once. While one runs, Pāua asks only every 10 minutes in a quiet gap, a check that it is
+still there; otherwise every minute, as before. A reply from any other build (another
+stamp, or none) stops every plugin call from that link.
 
 Observed on "test", with the plugin deleted and imported first:
 
