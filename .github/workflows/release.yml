@@ -133,6 +133,17 @@ jobs:
           pattern: Paua-*
           path: files
           merge-multiple: true
+      # The booth LifeBridge this version works with (its build stamp is
+      # src/shared/lifebridge-build.ts): the chip tells a booth to import the
+      # LifeBridge.xml from this version, so the release carries it. Never the
+      # probe (LifeBridgeProbe.xml), which is not for a booth.
+      - uses: actions/checkout@v6
+        with:
+          path: src
+          sparse-checkout: console-plugin/LifeBridge.xml
+          sparse-checkout-cone-mode: false
+      - name: Add the booth LifeBridge
+        run: cp src/console-plugin/LifeBridge.xml files/LifeBridge.xml
       - name: Draft a release holding both
         env:
           GH_TOKEN: ${{ github.token }}

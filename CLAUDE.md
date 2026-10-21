@@ -324,6 +324,11 @@ run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
 
+**2026-10-21: v1.7.0 tagged** at the owner's ask: the booth LifeBridge (split, stamped, bounded,
+below) and Pāua refusing any other build, nothing else since 1.6.1. The release carries the
+booth's `LifeBridge.xml` (the workflow adds it). Tests only; ⚠️ not on onPC or a console
+(`docs/FIELD_TEST.md` § 1.7.0). Publishing the draft, here and on `paua-releases`, is the owner's.
+
 **2026-10-21: LifeBridge is suspected in a crash of Central's MA3 Light** (2.3.2.0, 19 and 20
 Oct, the Expansion Builders dinner; `Program Error Memory` after `watch` asks, `HookObjectChange`
 errors at lines 405–406). Removed from that console by the owner's tech. Lines 405–406 place it

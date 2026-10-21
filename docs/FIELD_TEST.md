@@ -93,10 +93,14 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
-**LifeBridge, the booth build** (on main since 2026-10-21, not in a build yet): after Central's
-console crashed running an old LifeBridge (`docs/MA3_READ_MODEL.md` § Suspected in a console
-crash). The booth plugin is show, watch and shows only, stamped with its build; the probe is
-`LifeBridgeProbe`, never for a booth. Only as the controlled retest, at a quiet time, onPC first.
+**1.7.0** (2026-10-21): LifeBridge for the booth, after Central's console crashed running an
+old one (`docs/MA3_READ_MODEL.md` § Suspected in a console crash). Nothing else new since 1.6.1.
+The release carries `LifeBridge.xml`, the only build this Pāua works with (`lb-148dad65`).
+Publish it on `paua-releases` too for booths still on 1.1.0 to 1.4.0 (the bridge).
+
+**LifeBridge, the booth build** (1.7.0): show, watch and shows only, stamped with its build;
+the probe is `LifeBridgeProbe`, never for a booth. Only as the controlled retest, at a quiet
+time, onPC first. Until then, a booth on 1.7.0 with no LifeBridge just reads no show name.
 - [ ] Pāua on the old LifeBridge (or any other build): the showfile chip says which build is on the console and which this Pāua works with, and to delete it, import, restart Pāua; `paua.log` says the same once, and the console's command line gets no more `Call Plugin "LifeBridge"` lines
 - [ ] Delete LifeBridge on the console (not import over it), import this version's `console-plugin/LifeBridge.xml`, restart Pāua: the chip reads the show
 - [ ] A tap on LifeBridge in the plugin pool: nothing on the command line at all
