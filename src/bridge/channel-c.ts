@@ -56,6 +56,13 @@ export type ShowReply =
 	/** The LifeBridge loaded predates `watch`, and said `unknown verb watch`.
 	 *  Not a failure of the read: the reader asks `show` instead. */
 	| { kind: 'no-watch' }
+	/** A `/probe/…` push. Pāua never asks for the probe, so one that answers an
+	 *  ask is a LifeBridge from before verbs (2026-09-20/21), which runs its
+	 *  whole probe, `HookObjectChange` included, on every call: suspected in
+	 *  Central's console crash of 2026-10-19/20 (docs/MA3_READ_MODEL.md
+	 *  § Suspected in a console crash). The reader decides whether it answered
+	 *  an ask; someone running `probe` by hand is not one. */
+	| { kind: 'probe' }
 
 export type ShowReadResult =
 	| { ok: true; reply: ShowReply }
@@ -85,6 +92,8 @@ export function readShow(message: OscMessage, prefix: string): ShowReadResult {
 		if (only === 'unknown verb watch') return { ok: true, reply: { kind: 'no-watch' } }
 		return { ok: false, reason: 'other-channel', detail: `${message.address} is not about show` }
 	}
+
+	if (message.address.startsWith(`/${bare}/probe/`)) return { ok: true, reply: { kind: 'probe' } }
 
 	const address = `/${bare}/show`
 	if (message.address !== address) {

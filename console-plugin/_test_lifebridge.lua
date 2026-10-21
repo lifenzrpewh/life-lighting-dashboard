@@ -22,6 +22,10 @@ end
 
 local cmds, prints, files
 
+--- Every call to HookObjectChange, across every scenario. Must stay zero: the
+--- probe's calls to it are suspected in Central's crash of 2026-10-19/20.
+local hookCalls = 0
+
 --- Intercept io.open so the harness never touches real disk. The plugin's
 --- fallback path list includes /Users/Shared/MA3/, which exists and is
 --- world-writable on the dev Mac — an unmocked run would write there for real.
@@ -80,7 +84,7 @@ local function installCommon(seq)
   _G.GetVar = function(_, k) return k == 'SGV2_BaseShow' and 'LIFE Basefile Master' or nil end
   _G.Version = function() return '2.3.2.0' end
   _G.MyHandle = function() return 'plugin-handle' end
-  _G.HookObjectChange = function() return 7 end
+  _G.HookObjectChange = function() hookCalls = hookCalls + 1; return 7 end
   _G.UnhookMultiple = function() end
 end
 
@@ -152,7 +156,7 @@ print('LifeBridge harness')
 
 -- 1. Rich console.
 do
-  local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/')
+  local ok, err, c, p = run(richEnvironment, '^/Users/Shared/LIFE/', 'probe')
   check('rich: does not throw', ok, tostring(err))
   check('rich: emits commands', #c > 0)
   check('rich: prints results', #p > 5)
@@ -160,7 +164,7 @@ do
   local joined = table.concat(p, '\n')
   for _, name in ipairs({ 'args.received', 'console.version', 'osc.int', 'osc.float',
                           'osc.string', 'sequence.access', 'cue.read', 'recipe.read',
-                          'hook.objectchange', 'timing.slice', 'showfile.identity' }) do
+                          'timing.slice', 'showfile.identity' }) do
     check('rich: probe reported -- ' .. name, joined:find(name, 1, true) ~= nil)
   end
 
@@ -198,7 +202,7 @@ do
       if cmd:find('[2.3.2.0]', 1, true) then stamped = stamped + 1 end
     end
   end
-  check('rich: emits a line per probe', resultLines >= 11, tostring(resultLines))
+  check('rich: emits a line per probe', resultLines >= 10, tostring(resultLines))
   check('rich: every emitted line is version-stamped', resultLines == stamped,
     string.format('%d of %d', stamped, resultLines))
 
@@ -210,10 +214,7 @@ do
     reportPath == '/Users/Shared/LIFE/LifeBridge-probe.txt', tostring(reportPath))
   if report then
     check('rich: report names the MA3 version', report:find('2.3.2.0', 1, true) ~= nil)
-    -- 10 of 11: this scenario calls main with NO arguments, so args.received
-    -- correctly fails. That is the honest result on a console where verb
-    -- dispatch is unavailable, and the ping scenario below covers the other case.
-    check('rich: report carries the summary', report:find('10/11 passed', 1, true) ~= nil, report)
+    check('rich: report carries the summary', report:find('10/10 passed', 1, true) ~= nil, report)
     check('rich: report carries the property dumps',
       report:find('## Property dumps', 1, true) ~= nil and report:find('Selection', 1, true) ~= nil)
     for _, name in ipairs({ 'osc.string', 'cue.read', 'recipe.read', 'timing.slice' }) do
@@ -236,7 +237,7 @@ end
 
 -- 1b. Only a later candidate path is writable: must fall through, not give up.
 do
-  local _, _, _, p = run(richEnvironment, '^/Users/Shared/MA3/')
+  local _, _, _, p = run(richEnvironment, '^/Users/Shared/MA3/', 'probe')
   local path = next(files)
   check('fallback: uses a later candidate path',
     path == '/Users/Shared/MA3/LifeBridge-probe.txt', tostring(path))
@@ -246,7 +247,7 @@ end
 
 -- 1c. Nothing is writable: must say so rather than pretend it saved.
 do
-  local ok, err, _, p = run(richEnvironment, nil)
+  local ok, err, _, p = run(richEnvironment, nil, 'probe')
   check('no-disk: does not throw', ok, tostring(err))
   check('no-disk: writes nothing', next(files) == nil)
   check('no-disk: says the report could not be written',
@@ -256,7 +257,7 @@ end
 -- 1d. A console that answers every read with nil. v0 scored 10/10 against
 --     exactly this; v1 must refuse to.
 do
-  local ok, err, _, p = run(lyingEnvironment, '^/Users/Shared/LIFE/')
+  local ok, err, _, p = run(lyingEnvironment, '^/Users/Shared/LIFE/', 'probe')
   check('lying: does not throw', ok, tostring(err))
   local joined = table.concat(p, '\n')
   check('lying: cue.read fails rather than inventing a value',
@@ -269,7 +270,7 @@ end
 
 -- 2. Bare console: every API missing.
 do
-  local ok, err, c, p = run(bareEnvironment, nil)
+  local ok, err, c, p = run(bareEnvironment, nil, 'probe')
   check('bare: does not throw', ok, tostring(err))
   local joined = table.concat(p, '\n')
   check('bare: reports FAIL, not a fake pass', joined:find('FAIL', 1, true) ~= nil)
@@ -283,7 +284,7 @@ end
 
 -- 3. Hostile console: every accessor raises.
 do
-  local ok, err, c, p = run(hostileEnvironment, nil)
+  local ok, err, c, p = run(hostileEnvironment, nil, 'probe')
   check('hostile: does not throw', ok, tostring(err))
   local joined = table.concat(p, '\n')
   check('hostile: reports failures', joined:find('FAIL', 1, true) ~= nil)
@@ -441,17 +442,35 @@ do
   check('unknown verb: writes no file', next(files) == nil)
 end
 
+-- 6b. No verb at all: a tap on the plugin in the pool, or a call that lost its
+--     argument. It used to run the whole probe; it must now do nothing, on
+--     every kind of console, and on the MA3 signature with no string in it.
+for _, case in ipairs({
+  { 'rich', richEnvironment, {} },
+  { 'signature', richEnvironment, { {}, false, {}, {} } },
+  { 'blank', richEnvironment, { '   ' } },
+  { 'hostile', hostileEnvironment, {} },
+}) do
+  local unpack_ = table.unpack or unpack
+  local ok, err, c, p = run(case[2], '^/Users/Shared/LIFE/', unpack_(case[3]))
+  local label = 'no verb (' .. case[1] .. '): '
+  check(label .. 'does not throw', ok, tostring(err))
+  check(label .. 'sends nothing', #c == 0, table.concat(c, '\n'))
+  check(label .. 'prints nothing', #p == 0, table.concat(p, '\n'))
+  check(label .. 'writes no file', next(files) == nil)
+end
+
 -- 7. Calling twice on ONE loaded chunk. Every scenario above reloads the file,
 --    which is exactly why the desk run reported 27/30 — three runs of 9/10
 --    accumulating in module state — and nothing here noticed.
 do
-  local ok, firstCmds, c, p = runTwice(richEnvironment, '^/Users/Shared/LIFE/', {}, {})
+  local ok, firstCmds, c, p = runTwice(richEnvironment, '^/Users/Shared/LIFE/', { 'probe' }, { 'probe' })
   check('twice: neither call throws', ok)
   local joined = table.concat(p, '\n')
   check('twice: the second run does not double the tally',
-    joined:find('20/22 passed', 1, true) == nil, joined)
+    joined:find('20/20 passed', 1, true) == nil, joined)
   check('twice: the second run reports its own result',
-    select(2, joined:gsub('10/11 passed', '')) == 2, joined)
+    select(2, joined:gsub('10/10 passed', '')) == 2, joined)
   -- Same work, twice: a second run that emitted more lines than the first is
   -- accumulating something.
   check('twice: the second run emits the same number of messages',
@@ -579,6 +598,20 @@ do
   local r = showsReplies(c)
   check('shows unreadable: says so, never an empty list',
     r ~= nil and #r == 1 and r[1] == '2.3.2.0|unreadable|no show folder found', table.concat(c, '\n'))
+end
+
+-- 10. HookObjectChange, never. Its calls in the 2026-09-21 probe are suspected
+--     in Central's console crash of 2026-10-19/20 (docs/MA3_READ_MODEL.md
+--     § Suspected in a console crash): no scenario may call it, and the source
+--     may not name it outside a comment.
+check('no scenario called HookObjectChange', hookCalls == 0, tostring(hookCalls))
+do
+  local named = false
+  for line in io.lines('console-plugin/LifeBridge.lua') do
+    local code = line:gsub('%-%-.*$', '')
+    if code:find('HookObjectChange', 1, true) or code:find('Unhook', 1, true) then named = true end
+  end
+  check('the source never names HookObjectChange outside a comment', not named)
 end
 
 print(string.format('%d checks, %d failed', checks, failures))

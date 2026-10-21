@@ -42,9 +42,9 @@ The full read model is in `docs/MA3_READ_MODEL.md`.
 |---|---|
 | ✅ `src/bridge/export-parse.ts` | Export XML parser, verified against the real 856-file / 431 MB library. |
 | ✅ `spikes/scan-exports.mjs` | Derives `export-blacklist.json`. No desk needed. |
-| ✅ `console-plugin/LifeBridge.lua` | Probe v1, run on the console 2026-09-21 — pushed 14 results back over `SendOSC`. Read-only on the show. `OSC_ENTRY = 3`. |
+| ✅ `console-plugin/LifeBridge.lua` | Probe v1, run on the console 2026-09-21 — pushed 14 results back over `SendOSC`. Read-only on the show. `OSC_ENTRY = 3`. **Since 2026-10-21:** no `HookObjectChange` anywhere (suspected in Central's crash), a call with no verb does nothing, and the probe is the `probe` verb. ⚠️ That build not yet on a console. |
 | ✅ `scripts/build-plugin-xml.mjs` | Embeds the Lua into a self-contained importable XML. Round-trip verified before the file lands. |
-| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 240 checks. |
+| ✅ `console-plugin/_test_lifebridge.lua` | Offline harness, 268 checks. Fails if any scenario calls `HookObjectChange` or the source names it outside a comment, and if a no-verb call sends, prints or writes anything. |
 | ✅ `spikes/osc-probe.mjs` | Both directions exercised on the desk 2026-09-21. `--listen-only` watches without sending; decodes OSC args properly. |
 | ✅ `src/shared/reading.ts` | The four states as types. `matchReading` has no default branch, so rendering a timeout as a value does not compile. 10 tests. |
 | ✅ `src/main` · `src/preload` · `src/renderer` | Electron kiosk: windows on a grid, the status bar and Connections. Builds, runs, renders all four states. The link round-trips through LifeBridge (`src/main/bridge/link.ts`, below). |
@@ -219,7 +219,8 @@ and a station that falls out of session keeps answering confidently and wrongly.
 - **`CUEOUTFADE` defaults to the string `"CueTiming"`.** Writing it explicitly is
   what creates a split `0/0`. Set `CUEINFADE` only.
 - **`HookObjectChange` does not install.** Poll instead — the sequence exposes
-  `CURRENTCUE`/`CUENO`/`CUENAME` directly and a read is 0.01 ms.
+  `CURRENTCUE`/`CUENO`/`CUENAME` directly and a read is 0.01 ms. **And never call it on a
+  console:** the probe's repeated calls are suspected in Central's crash of 2026-10-19/20.
 - **`ObjectList` returns `{}`, not nil, for a missing object.** An empty table is
   truthy; treating it as a hit reports every sequence as present.
 
@@ -322,6 +323,19 @@ self-update and start at login, the next steps. Close the installed copy before 
 run: one kiosk per computer, so the second only focuses the first.
 
 ## Next session starts here
+
+**2026-10-21: LifeBridge is suspected in a crash of Central's MA3 Light** (2.3.2.0, 19 and 20
+Oct, the Expansion Builders dinner; `Program Error Memory` after `watch` asks, `HookObjectChange`
+errors at lines 405–406). Removed from that console by the owner's tech. Lines 405–406 place it
+as the **2026-09-21 probe build** (`0df9542`), which runs the whole probe, hook calls included, on
+every `watch` Pāua asks, once a minute. Suspected, not proven: `docs/MA3_READ_MODEL.md` § Suspected
+in a console crash. **Before any LifeBridge goes back on a console:** take `HookObjectChange` out
+of the plugin, make a call with no verb do nothing, and have Pāua stop asking (and say so) when the
+console answers with the old probe. **All three done the same day** (not in a build): the harness
+fails if `HookObjectChange` comes back; a probe push answering Pāua's ask ends every plugin call from
+that link (the chip says to delete, import and restart Pāua; `OLD_PROBE_DETAIL` in
+`src/bridge/showfile.ts`). Any LifeBridge going back on a console is this build, **deleted and
+imported** (never imported over), and only as the controlled retest the owner's tech plans.
 
 **2026-10-18: v1.6.1 tagged** at the owner's ask: 1.6.0 with two Fetch fixes from the owner. The
 drive's file is found **by the lookbook's name** when none is its size (a lookbook giving wrong or

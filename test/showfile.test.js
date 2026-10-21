@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import { readShow } from '../dist/src/bridge/channel-c.js'
 import { encodeOscString } from '../dist/src/bridge/osc.js'
 import { QUIET_MS } from '../dist/src/bridge/ping.js'
-import { createShowfileReader, showCommand } from '../dist/src/bridge/showfile.js'
+import { createShowfileReader, OLD_PROBE_DETAIL, showCommand } from '../dist/src/bridge/showfile.js'
 import { readingOf } from '../dist/src/shared/reading.js'
 import { SHOW_REFRESH_MS, SHOW_STALE_AFTER_MS, SHOW_TIMEOUT_MS } from '../dist/src/shared/showfile.js'
 
@@ -182,6 +182,61 @@ test('a plugin without watch is asked show at the next quiet gap, and offered wa
 	assert.equal(r.command(), 'Call Plugin "LifeBridge" "show"')
 	assert.equal(r.due(T0 + 40_000, 'link-up'), true)
 	assert.equal(r.command(), 'Call Plugin "LifeBridge" "watch"')
+})
+
+// --- the old probe: suspected in Central's crash, 2026-10-19/20 ---------------
+
+test('any probe push under our prefix is recognised as the probe', () => {
+	// The 2026-09-21 build sends /probe/int, /probe/float and /probe/string as it
+	// goes, then /probe/summary and a /probe/result per probe.
+	for (const m of [
+		msg('/life/probe/int', { type: 'i', value: 1 }),
+		msg('/life/probe/summary', str('MA3 2.3.2.0: 9/10 passed')),
+		msg('/life/probe/result', str('[2.3.2.0] hook.objectchange=FAIL exists but no call form returned a hook id')),
+	]) {
+		assert.deepEqual(readShow(m, 'life'), { ok: true, reply: { kind: 'probe' } }, m.address)
+	}
+	assert.equal(readShow(msg('/companion/probe/summary', str('x')), 'life').reason, 'other-channel')
+	assert.equal(readShow(msg('/life/probes', str('x')), 'life').reason, 'other-channel')
+})
+
+test('the old probe answering an ask stops every ask from this link, link-up included', () => {
+	const r = createShowfileReader()
+	assert.equal(r.refused(), null)
+	assert.equal(r.due(T0, 'link-up'), true)
+	r.asked(T0)
+	r.reply({ kind: 'probe' }, T0 + 40)
+	r.reply({ kind: 'probe' }, T0 + 41)
+	const latest = r.channel(T0 + 41).latest
+	assert.equal(latest.ok, false)
+	assert.equal(latest.detail, OLD_PROBE_DETAIL)
+	assert.match(OLD_PROBE_DETAIL, /Delete it on the console, import this build, then restart Pāua/)
+	assert.equal(r.refused(), OLD_PROBE_DETAIL)
+	// An hour of quiet gaps and link-ups: not one more call to the plugin.
+	for (let now = T0 + QUIET_MS; now < T0 + 60 * 60_000; now += QUIET_MS) {
+		assert.equal(r.due(now, 'quiet-gap'), false)
+		assert.equal(r.due(now, 'link-up'), false)
+	}
+	assert.equal(r.channel(T0 + 60 * 60_000).latest.detail, OLD_PROBE_DETAIL, 'never overwritten by a timeout')
+})
+
+test('a probe that lands just after the ask timed out still counts', () => {
+	const r = createShowfileReader()
+	r.asked(T0)
+	assert.equal(r.channel(T0 + SHOW_TIMEOUT_MS).latest.reason, 'timeout')
+	r.reply({ kind: 'probe' }, T0 + SHOW_TIMEOUT_MS + 500)
+	assert.equal(r.channel(T0 + SHOW_TIMEOUT_MS + 500).latest.detail, OLD_PROBE_DETAIL)
+	assert.equal(r.due(T0 + SHOW_REFRESH_MS, 'quiet-gap'), false)
+})
+
+test('a probe nobody asked for (run by hand on a current build) changes nothing', () => {
+	const r = createShowfileReader()
+	r.asked(T0)
+	r.reply(SHOW, T0 + 50)
+	r.reply({ kind: 'probe' }, T0 + 30_000)
+	assert.equal(r.refused(), null)
+	assert.equal(r.channel(T0 + 30_000).latest.value.name, 'Mount Eden Base')
+	assert.equal(r.due(T0 + SHOW_REFRESH_MS, 'quiet-gap'), true)
 })
 
 test('a push from the watcher is recorded with no ask in flight', () => {

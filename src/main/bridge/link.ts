@@ -19,7 +19,7 @@ import { performance } from 'node:perf_hooks'
 import { readPing, readShow } from '../../bridge/channel-c.js'
 import type { OscMessage } from '../../bridge/osc.js'
 import { createLinkTracker, pingCommand, type PingStats } from '../../bridge/ping.js'
-import { createShowfileReader, type AskMoment } from '../../bridge/showfile.js'
+import { createShowfileReader, OLD_PROBE_DETAIL, type AskMoment } from '../../bridge/showfile.js'
 import { collectShowList, readShows, type ShowListCollector } from '../../bridge/show-list.js'
 import {
 	loadCommand,
@@ -167,7 +167,11 @@ export function startLink(options: {
 			const answered = read.ok && tracker.answer(read.reply.echo, clock()).ok
 			if (!answered && message.address.startsWith(ours)) tracker.heard(clock())
 			const show = readShow(message, options.prefix)
-			if (show.ok) showfile.reply(show.reply, clock())
+			if (show.ok && show.reply.kind === 'probe' && listing !== null) {
+				// The old probe answered the show list's call: same verdict.
+				showfile.oldProbe(clock())
+				listing.done({ ok: false, detail: OLD_PROBE_DETAIL })
+			} else if (show.ok) showfile.reply(show.reply, clock())
 			const shows = readShows(message, options.prefix)
 			if (shows.ok && listing !== null) {
 				const list = listing.collector.offer(shows.reply)
@@ -177,7 +181,7 @@ export function startLink(options: {
 		},
 		listShows() {
 			if (listing !== null) return listing.promise
-			const why = cannotSend()
+			const why = cannotSend() ?? showfile.refused()
 			if (why !== null) return Promise.resolve({ ok: false, detail: why })
 			let done: (list: ShowList) => void = () => {}
 			const promise = new Promise<ShowList>((resolve) => {

@@ -30,6 +30,14 @@
 // the console says. A plugin older than `watch` says so, and is asked `show`
 // until the next link-up.
 //
+// AN OLD PROBE STOPS THE ASKING (2026-10-21). A LifeBridge from before verbs
+// answers every call with its whole probe, `HookObjectChange` included, and
+// asked once a minute that is suspected in Central's console crash of
+// 2026-10-19/20 (docs/MA3_READ_MODEL.md § Suspected in a console crash). So a
+// probe that answers an ask ends every plugin call from this link, for good:
+// not at the next link-up, which a flapping link could make often. A new link
+// (a restart of Pāua, or the console's settings saved) asks again.
+//
 // Deliberately time-free, like ping.ts: the caller passes a monotonic `now`.
 
 import type { Channel, ReadResult } from '../shared/reading.js'
@@ -64,7 +72,17 @@ export type ShowfileReader = {
 	/** Everything the console has said about its showfile. The same object until
 	 *  something new is recorded, so a caller can tell when it changed. */
 	channel(now: number): Channel<Showfile>
+	/** The console answered a plugin call with the old probe: no plugin call
+	 *  may go to it again from this link. For an ask other than this reader's
+	 *  (the show list). */
+	oldProbe(now: number): void
+	/** Why no plugin call may go to this console, or null. */
+	refused(): string | null
 }
+
+/** What the chip and the show list say once the old probe has answered. */
+export const OLD_PROBE_DETAIL =
+	'LifeBridge on the console is the September test build, which runs its whole probe on every ask, so Pāua has stopped asking. Delete it on the console, import this build, then restart Pāua.'
 
 export function createShowfileReader(): ShowfileReader {
 	let channel = unread<Showfile>()
@@ -72,6 +90,7 @@ export function createShowfileReader(): ShowfileReader {
 	let lastAskAt: number | null = null
 	/** Whether the console's LifeBridge knows `watch`, as far as we know. */
 	let verb: 'watch' | 'show' = 'watch'
+	let oldProbeSeen = false
 
 	const put = (result: ReadResult<Showfile>) => {
 		channel = record(channel, result)
@@ -83,10 +102,17 @@ export function createShowfileReader(): ShowfileReader {
 		askedAt = null
 	}
 
+	const oldProbe = (now: number) => {
+		askedAt = null
+		if (oldProbeSeen) return
+		oldProbeSeen = true
+		put({ ok: false, reason: 'error', at: now, detail: OLD_PROBE_DETAIL })
+	}
+
 	return {
 		due(now, moment) {
 			expire(now)
-			if (askedAt !== null) return false
+			if (oldProbeSeen || askedAt !== null) return false
 			// A link-up is the moment a plugin may have been re-imported, so a
 			// console that refused `watch` is offered it again.
 			if (moment === 'link-up') {
@@ -108,6 +134,13 @@ export function createShowfileReader(): ShowfileReader {
 		},
 
 		reply(reply, now) {
+			if (reply.kind === 'probe') {
+				// Only an answer to our ask counts: someone running `probe` by hand
+				// on a current build is not a reason to stop. Timed from the ask
+				// itself, so an answer that lands after the timeout still counts.
+				if (lastAskAt !== null && now - lastAskAt < SHOW_TIMEOUT_MS * 2) oldProbe(now)
+				return
+			}
 			expire(now)
 			if (reply.kind === 'no-watch') {
 				// The ask was answered, with no name: ask `show` at the next quiet
@@ -139,5 +172,9 @@ export function createShowfileReader(): ShowfileReader {
 			expire(now)
 			return channel
 		},
+
+		oldProbe,
+
+		refused: () => (oldProbeSeen ? OLD_PROBE_DETAIL : null),
 	}
 }

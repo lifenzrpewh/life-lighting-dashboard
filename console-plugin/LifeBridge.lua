@@ -11,8 +11,10 @@
 --        lets us push cue names and JSON, and nothing has tested it.)
 --     2. Which object-model API actually reads a cue list, cue timing and
 --        recipe lines? Several shapes exist in the codebase; this tries each.
---     3. Does `HookObjectChange` exist? If it fires on cue changes the bridge
---        becomes push-driven and stops polling entirely.
+--     3. (Was: does `HookObjectChange` install? It did not, and the probe's
+--        repeated calls to it are suspected in Central's console crash of
+--        2026-10-19/20, so it is gone, and the harness fails if it comes back.
+--        docs/MA3_READ_MODEL.md § Suspected in a console crash.)
 --     4. How long does reading N sequences take? This sizes the slice budget.
 --     5. Can we read the loaded showfile name and the SGV2_BaseShow UserVar?
 --
@@ -396,38 +398,6 @@ local function probeRecipeRead()
   return false, 'no recipe line found on any probe sequence'
 end
 
---- Run 1: exists, but the 2-arg call returned nil -- it did not install, and v0
---- called that a PASS. The symbol table suggests
---- HookObjectChange(callback, handle, plugin_handle[, target]).
-local function probeHook()
-  if HookObjectChange == nil then
-    return false, 'HookObjectChange is not defined in this Lua environment'
-  end
-  local seq
-  for _, no in ipairs(PROBE_SEQUENCES) do
-    seq = seq or resolveSequence(no)
-  end
-  if seq == nil then return false, 'no sequence to hook' end
-
-  local cb = function() end
-  local plugin
-  pcall(function() plugin = MyHandle and MyHandle() or nil end)
-
-  local attempts = {
-    { '3-arg (cb, obj, plugin)', function() return HookObjectChange(cb, seq, plugin) end },
-    { '2-arg (cb, obj)', function() return HookObjectChange(cb, seq) end },
-  }
-  for _, a in ipairs(attempts) do
-    local ok, id = pcall(a[2])
-    if ok and id ~= nil then
-      if UnhookMultiple then pcall(function() UnhookMultiple(seq) end) end
-      return true, sformat('installed via %s, id=%s -- now change a cue and watch for a callback',
-        a[1], tostring(id))
-    end
-  end
-  return false, 'exists but no call form returned a hook id -- treat push as unavailable, keep polling'
-end
-
 --- Sizes the slice budget: how long does reading a sequence actually cost?
 local function probeTiming()
   local t0 = os.clock()
@@ -543,8 +513,7 @@ end
 --- later version stop scanning and index directly.
 local function probeArgs()
   if #receivedArgs == 0 then
-    return false, 'no arguments received — verb dispatch is unavailable on this '
-      .. 'console, and `Call Plugin "LifeBridge" ping` runs this whole probe instead'
+    return false, 'no arguments received — verb dispatch is unavailable on this console'
   end
   return true, 'argv: ' .. tconcat(receivedArgs, ' | ')
 end
@@ -867,7 +836,15 @@ local function main(...)
     return poolVerb()
   end
 
-  if verb ~= '' then
+  -- No verb does nothing at all: no probe, no line, no packet. It used to run
+  -- the whole probe, so a tap on the plugin in the pool, or a build that lost
+  -- its argument, put ten probes and a disk write on a live console, and the
+  -- 2026-09-21 build ran exactly that on every `watch` Pāua asked
+  -- (docs/MA3_READ_MODEL.md § Suspected in a console crash). The probe is now
+  -- asked for by name: `Call Plugin "LifeBridge" "probe"`.
+  if verb == '' then return end
+
+  if verb ~= 'probe' then
     -- An unrecognised verb must NOT fall through to the full probe. A typo would
     -- then look like it had worked, and produce thirty lines of unrelated output
     -- that someone would reasonably read as the answer to what they asked.
@@ -895,7 +872,6 @@ local function main(...)
   probe('sequence.access', probeSequenceAccess)
   probe('cue.read', probeCueRead)
   probe('recipe.read', probeRecipeRead)
-  probe('hook.objectchange', probeHook)
   probe('timing.slice', probeTiming)
   probe('showfile.identity', probeShowfile)
 

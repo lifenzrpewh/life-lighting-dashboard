@@ -121,6 +121,47 @@ It exists in the environment, but neither `(cb, obj)` nor `(cb, obj, pluginHandl
 returned a hook id. **Treat push as unavailable and poll.** Re-test on 2.5; the
 symbol table suggests a 4-arg form with a target that we have not found.
 
+### ⚠️ Suspected in a console crash — Central MA3 Light, 2.3.2.0, 19 and 20 Oct 2026
+
+Central's console rebooted during the Expansion Builders dinner. Its crash logs of 19
+and 20 October both end `Program Error Memory`, shortly after `Call Plugin
+"LifeBridge" "watch"`, and LifeBridge logs `HookObjectChange` errors at **lines
+405–406, wrong parameter #3** (should be the plugin handle). The owner's console tech
+removed LifeBridge. A suspected trigger, not a confirmed cause: the 21 October log
+has the same errors on runs that did not crash, and `Program Error Memory` alone does
+not say RAM ran out. Console clock and timezone against the crash times not yet
+checked.
+
+What the repo adds (2026-10-21, from git, not the desk):
+- **Lines 405–406 are the hook calls of one build only: `0df9542`, the 2026-09-21
+  probe**, before LifeBridge had verbs. Every later build has them at 412–418. So
+  Central ran the first desk run's import, a month old (the in-memory cache, CLAUDE.md
+  § Plugin deployment).
+- **That build ignores its argument and runs the whole probe on every call.** So each
+  `watch` Pāua asked ran ten probes: both `HookObjectChange` forms on a probe sequence,
+  the timing loop, a report file written to disk, about twelve `SendOSC` lines. No
+  `/show` came back, the ask timed out, and Pāua asked again at the next quiet gap: up
+  to **once a minute for as long as Pāua ran**.
+- **Parameter #3 is nil** because the probe takes the plugin handle from a global
+  `MyHandle()`, which MA3 does not define (the handle comes as `main`'s fourth
+  argument). The 2-arg form then runs with no plugin handle at all. Whether it
+  quietly installs a hook while returning nil is unknown; if it does, it is never
+  unhooked (the cleanup runs only on a returned id), and each run leaves another
+  callback into a plugin MA3 may since have reloaded. That is the most plausible way
+  for this to corrupt memory rather than merely log an error, and it is a guess.
+
+**Changed 2026-10-21, in the repo (not yet on a console):**
+- **`HookObjectChange` is gone from LifeBridge.** The harness fails if any scenario
+  calls it, or if the source names it outside a comment.
+- **A call with no verb does nothing**: no probe, no line, no packet. (Before, a tap
+  on the plugin in the pool ran the whole probe.) The probe is now asked for by name,
+  `Call Plugin "LifeBridge" "probe"`.
+- **Pāua stops asking when the old probe answers.** A `/<prefix>/probe/…` push within
+  two timeouts of Pāua's own ask (`readShow` → `probe`; `createShowfileReader`) ends
+  every plugin call from that link, link-ups included, and the showfile chip says to
+  delete LifeBridge, import the current build and restart Pāua. A probe nobody asked
+  for (someone running it by hand) changes nothing.
+
 ## ⚠️ `SELECTIONDATA` is always present
 
 It appears as a Lua table on **every** cue part, including ones that export fine.
