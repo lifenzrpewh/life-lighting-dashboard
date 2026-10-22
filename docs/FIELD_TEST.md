@@ -93,6 +93,10 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.8.0** (2026-10-22): in the Lookbook, where each moment lands, Move with swaps, the Map size,
+and badges that name the problem (§ Where it lands, below). Nothing else new since 1.7.0.
+Publish it on `paua-releases` too for booths still on 1.1.0 to 1.4.0 (the bridge).
+
 **1.7.0** (2026-10-21): LifeBridge for the booth, after Central's console crashed running an
 old one (`docs/MA3_READ_MODEL.md` § Suspected in a console crash). Nothing else new since 1.6.1.
 The release carries `LifeBridge.xml`, the only build this Pāua works with (`lb-148dad65`).
@@ -189,7 +193,7 @@ sections below.
 - [ ] On a card not ticked, tap one chip: just that part is picked
 - [ ] The confirmation (1.5.0): one line of how many files and from where, the questions, **Show each** for every step
 
-**Where it lands** (after 1.7.0; the owner's picks, 2026-10-22)
+**Where it lands** (1.8.0; the owner's picks, 2026-10-22)
 - [ ] A card with a problem names it on its badge: Wrong file?, File missing, No spot, Didn't load; two or more say "2 problems"
 - [ ] Every card: "Lands in PROMO 2 · column 12 · replaces …" over a strip with its column lit; matches where Arena puts it after Load
 - [ ] **Move** on a promo: PROMO columns and the spare ones past them lit, never WTL, PRE and the like; another promo's says "Swap with …"
