@@ -500,6 +500,9 @@ export function planPlacements(
 	// Placed by hand for this service: that column, before any rule, and no
 	// PROMO or one-off may take it.
 	const pinned = livePins(items, pins)
+	// A move into a column Arena has since reserved (renamed COUNTDOWN, say),
+	// or that is no longer there, is dropped: the moment goes back to its rule.
+	if (home !== undefined) for (const [i, c] of pinned) if (c >= home.slots.length || reserved(home, c + 1, status, map)) pinned.delete(i)
 	const pinnedColumns = new Set(pinned.values())
 	// ONE MOMENT A COLUMN, whatever gave it the column (by hand, by name, a
 	// PROMO): two items whose labels find the same column (two WTLs, Walk In
@@ -1405,9 +1408,7 @@ export function moveTargets(
 	const layer = type === null ? undefined : layerFor(status, type)
 	const out = new Map<number, { column: number; swap: number | null }>()
 	if (layer === undefined) return out
-	const names = columnNamesOf(layer, status)
-	const last = lastNamed(layer, status)
-	const movable = (c: number) => (isPromoName(names[c] ?? '') || (unnamed(names[c] ?? '') && c > last)) && !reserved(layer, c + 1, status, map) && slotCell(layer, c + 1, status, map).kind === 'auto'
+	const movable = (c: number) => movableColumn(layer, c, status, map)
 	const holders = holdersOf(planPlacements(items, status, map, pins))
 	const here = [...holders].find(([, i]) => i === what.item)?.[0]
 	layer.slots.forEach((slot, c) => {
@@ -1417,6 +1418,56 @@ export function moveTargets(
 		else if (here !== undefined && movable(here) && keyCodeOf(items[other] as LookbookItem, map) !== null) out.set(slot.id, { column: c + 1, swap: other })
 	})
 	return out
+}
+
+/** Several moments placed at once (the owner, 2026-10-22: "a lot of unknowns
+ *  … select multiple"): from `start` (from 1) forward, in run-sheet order, each
+ *  the next column a move may go to (`moveTargets`' rule: PROMO or spare, not
+ *  reserved), skipping one another moment has and one whose clip is on screen
+ *  on the moment's layer. The moments placed may take one another's columns.
+ *  What does not fit before the last column is said, never wrapped round. */
+export function placeFrom(
+	items: LookbookItem[],
+	status: ArenaStatus,
+	what: readonly { item: number; code: string }[],
+	start: number,
+	map: HoldingMap = DEFAULT_MAP,
+	pins: readonly Pin[] = [],
+): { pins: Pin[]; landed: { item: number; column: number }[]; didntFit: number[] } {
+	const moving = [...what].sort((a, b) => a.item - b.item)
+	const ids = new Set(moving.map((w) => w.item))
+	const holders = holdersOf(planPlacements(items, status, map, pins.filter((p) => !ids.has(p.item))))
+	const taken = new Set([...holders].filter(([, i]) => !ids.has(i)).map(([c]) => c))
+	const next = pins.filter((p) => !ids.has(p.item))
+	const landed: { item: number; column: number }[] = []
+	const didntFit: number[] = []
+	let c = start - 1
+	for (const w of moving) {
+		const type = layerOfCode(map, w.code)
+		const layer = type === null ? undefined : layerFor(status, type)
+		if (layer === undefined) {
+			didntFit.push(w.item)
+			continue
+		}
+		const ok = (col: number) => movableColumn(layer, col, status, map) && !taken.has(col) && layer.slots[col]?.state !== 'playing'
+		while (c < layer.slots.length && !ok(c)) c += 1
+		if (c >= layer.slots.length) {
+			didntFit.push(w.item)
+			continue
+		}
+		next.push({ item: w.item, code: w.code, column: c + 1 })
+		landed.push({ item: w.item, column: c + 1 })
+		taken.add(c)
+		c += 1
+	}
+	return { pins: next, landed, didntFit }
+}
+
+/** A column (from 0) a moment may be moved into: a PROMO, or an unnamed one
+ *  past the last named column; not reserved; one the map leaves to the rules. */
+function movableColumn(layer: ArenaLayer, c: number, status: ArenaStatus, map: HoldingMap): boolean {
+	const names = columnNamesOf(layer, status)
+	return (isPromoName(names[c] ?? '') || (unnamed(names[c] ?? '') && c > lastNamed(layer, status))) && !reserved(layer, c + 1, status, map) && slotCell(layer, c + 1, status, map).kind === 'auto'
 }
 
 /** The pins after moving a moment to `column` (from 1): its pin there, and,

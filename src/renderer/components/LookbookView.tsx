@@ -38,8 +38,8 @@
 // are ../../shared/holding.ts (`looksOf`, `lookSteps`, `moveTargets`), the same
 // as Update all's, never a second guess.
 
-import { useEffect, useState } from 'react'
-import { Check, FileX, Grid3x3, LayoutGrid, Minus, Rows3, Square, RefreshCw, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, FileX, Grid3x3, LayoutGrid, Minus, Rows3, Square, RefreshCw, Undo2, X } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaLayer, type ArenaStatus } from '../../shared/arena.js'
 import { checkAnnouncements, sessionOf, wantedAnnouncements } from '../../shared/announcements.js'
@@ -154,6 +154,7 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 	const holding = holdingLayers(status)[0]
 	const headerNames = holding === undefined ? status.columns.map((c) => c.name) : columnNamesOf(holding, status)
 	const named = headerNames.some((n) => !unnamedColumn(n))
+	const landedColumns = new Set(looks.flatMap((l) => (l.lands === null ? [] : [l.lands.column])))
 	const shown = onlyNeeds ? looks.filter((l) => states.get(l.item) === 'needs') : looks
 
 	return (
@@ -188,6 +189,8 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 							)}
 						</span>
 					)}
+					{operator && m.undoable !== null && <UndoButton m={m} />}
+					{m.undoWords !== null && <span className="min-w-0 truncate text-booth-dim">{m.undoWords}</span>}
 					<span className="ml-auto flex shrink-0 items-center gap-2">
 						<SizeSwitch size={size} onSize={setSize} />
 						{operator && parts > 0 && (
@@ -244,12 +247,50 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 							}}
 							lowerThirds={lowerThirds}
 							columnNames={headerNames}
+							landed={landedColumns}
 						/>
 					))}
 				</div>
 				{m.runSheet !== null && looks.length === 0 && <p className="p-6 text-center text-booth-dim">This run sheet has no media.</p>}
 			</div>
 		</div>
+	)
+}
+
+/** Undo the newest move (one tap: only the plan changes) or load (two taps:
+ *  it writes to Arena, each clip its old file back), naming what it undoes
+ *  (the owner, 2026-10-22). It stays until the next action. */
+function UndoButton({ m }: { m: MediaCheckState }) {
+	const [armed, setArmed] = useState(false)
+	const u = m.undoable
+	useEffect(() => {
+		if (!armed) return
+		const id = setTimeout(() => setArmed(false), 5000)
+		return () => clearTimeout(id)
+	}, [armed])
+	if (u === null) return null
+	if (u.kind === 'load' && armed)
+		return (
+			<button
+				type="button"
+				onClick={() => {
+					setArmed(false)
+					void m.undo()
+				}}
+				className="h-8 shrink-0 rounded-ctl bg-state-down px-2.5 font-bold text-black"
+			>
+				Put back {u.clips} clip{u.clips === 1 ? '' : 's'}? Tap again
+			</button>
+		)
+	return (
+		<button
+			type="button"
+			onClick={() => (u.kind === 'load' ? setArmed(true) : void m.undo())}
+			className="h-8 max-w-[28rem] shrink-0 truncate rounded-ctl bg-booth-raise px-2.5 hover:bg-booth-hover"
+		>
+			<Undo2 size={14} className="mr-1 inline align-[-2px]" aria-hidden />
+			Undo: {u.label}
+		</button>
 	)
 }
 
@@ -339,6 +380,7 @@ function Card({
 	onLoad,
 	lowerThirds,
 	columnNames,
+	landed,
 }: {
 	m: MediaCheckState
 	status: ArenaStatus
@@ -358,6 +400,8 @@ function Card({
 	lowerThirds: ReadonlyMap<string, 'there' | 'missing'>
 	/** HOLDING's column names, for the strip. */
 	columnNames: string[]
+	/** The columns moments land in (Doors Open's CF588 in PRE is not End's stray). */
+	landed: ReadonlySet<number>
 }) {
 	// What is open under the card: a code's files compared, or a slot to choose.
 	const [open, setOpen] = useState<{ kind: 'compare' | 'slot'; code: string } | null>(null)
@@ -374,6 +418,14 @@ function Card({
 	// Load says what it loads when only some parts are picked: "Load BG".
 	const loadWords = picked.length > 0 && picked.length < loadable.length ? `Load ${picked.map(typeOf).join(', ')}` : 'Load'
 	const key = keyOf(look, item)
+	// Its foreground loaded in another column too (a move undone after Load):
+	// said, so the old one is not fired by mistake.
+	const fg = look.codes.find((c) => c.type === 'F')
+	const fgLayer = status.layers.find((l) => layerKeyOf(l) === 'F')
+	const strays =
+		fg === undefined || fgLayer === undefined || look.lands === null
+			? []
+			: fgLayer.slots.flatMap((slot, i) => (i + 1 !== look.lands?.column && !landed.has(i + 1) && slotCode(slot) === fg.code ? [i + 1] : []))
 
 	const picture = (
 		<div className={`relative w-full overflow-hidden bg-black ${size === 'rows' ? 'rounded-ctl' : ''}`} style={{ aspectRatio: '5800 / 2037' }}>
@@ -432,6 +484,11 @@ function Card({
 				</div>
 			)}
 			{look.lands !== null && <Lands lands={look.lands} names={columnNames} big={big} />}
+			{look.lands !== null && strays.length > 0 && (
+				<p className="rounded-ctl bg-warn/10 px-2.5 py-1.5 text-sm text-warn">
+					A copy is also in {strays.map((c) => columnName(columnNames, c)).join(', ')} from before: fire {columnName(columnNames, look.lands.column)}, not that.
+				</p>
+			)}
 			{operator && (loadable.length > 0 || pinned || (key !== undefined && look.lands !== null && state !== 'loading')) && (
 				<div className="flex flex-wrap items-center gap-2">
 					{loadable.length > 0 && (
@@ -690,7 +747,7 @@ function SlotPicker({ m, status, what, here, onDone }: { m: MediaCheckState; sta
 							type="button"
 							disabled={target === undefined}
 							onClick={() => {
-								m.askMoveTo(what, i + 1)
+								m.moveTo(what, i + 1)
 								onDone()
 							}}
 							className={`flex w-28 shrink-0 flex-col gap-1 text-left ${target !== undefined || here === i + 1 ? '' : 'opacity-35'}`}
@@ -720,8 +777,28 @@ function keyOf(look: Look, item: LookbookItem | undefined) {
 
 /** The Map size (the owner, 2026-10-22): Arena's holding grid as Arena lays it
  *  out, each column's moment written over it, its clips as they are or, dashed,
- *  as they will be. Tap a moment to see where it lands; in Admin, then a lit
- *  column to move it there, on another moment's a swap, as Move does. */
+ *  as they will be. Tap a moment to see where it lands; in Admin, a lit column
+ *  moves it there (another moment's, a swap), as Move does.
+ *
+ *  After the first try ("waaaaay too small", the same day): it fills the
+ *  window's height by default, S/M/L beside it, sideways scroll past the edge;
+ *  a moment is dragged to a lit column (on touch, held a moment first, so a
+ *  swipe still scrolls; tap then tap still works, WCAG 2.5.7); several are
+ *  ticked and placed from one column forward, shown first, then Place n
+ *  (`placeFrom`). A move is the plan only; Undo on the top line takes it back. */
+type MapSize = 'fit' | 's' | 'm' | 'l'
+const MAP_SIZE_KEY = 'paua.lookbook.mapSize'
+function storedMapSize(): MapSize {
+	try {
+		const v = localStorage.getItem(MAP_SIZE_KEY)
+		return v === 's' || v === 'm' || v === 'l' ? v : 'fit'
+	} catch {
+		return 'fit'
+	}
+}
+/** How long a finger rests on a clip before it lifts to drag. */
+const HOLD_MS = 350
+
 function LandingMap({
 	m,
 	status,
@@ -738,6 +815,47 @@ function LandingMap({
 	names: string[]
 }) {
 	const [chosen, setChosen] = useState<number | null>(null)
+	const [ticked, setTicked] = useState<ReadonlySet<number>>(new Set())
+	const [start, setStart] = useState<number | null>(null)
+	const [said, setSaid] = useState<string | null>(null)
+	const [size, setSizeState] = useState<MapSize>(storedMapSize)
+	const [area, setArea] = useState({ w: 0, h: 0 })
+	const [drag, setDrag] = useState<{ item: number; x: number; y: number; over: number | null } | null>(null)
+	const rootRef = useRef<HTMLDivElement>(null)
+	const topRef = useRef<HTMLDivElement>(null)
+	const scrollRef = useRef<HTMLDivElement>(null)
+	const dragging = useRef(false)
+	// When a lifted drag ended: a mouse's click follows at once, a finger's never.
+	const draggedAt = useRef(0)
+	const setSize = (s: MapSize) => {
+		setSizeState(s)
+		try {
+			localStorage.setItem(MAP_SIZE_KEY, s)
+		} catch {
+			// Kept for this view only.
+		}
+	}
+	// The space the Lookbook gives the Map: its scrolling body.
+	useEffect(() => {
+		const body = rootRef.current?.parentElement
+		if (body === null || body === undefined) return
+		const read = () => setArea({ w: body.clientWidth, h: body.clientHeight })
+		read()
+		const ro = new ResizeObserver(read)
+		ro.observe(body)
+		return () => ro.disconnect()
+	}, [])
+	// While a finger drags a clip, the page must not scroll under it.
+	useEffect(() => {
+		const el = scrollRef.current
+		if (el === null) return
+		const stop = (e: TouchEvent) => {
+			if (dragging.current) e.preventDefault()
+		}
+		el.addEventListener('touchmove', stop, { passive: false })
+		return () => el.removeEventListener('touchmove', stop)
+	}, [])
+
 	const items = m.runSheet ?? []
 	const today = codesOn(items)
 	const layers = holdingLayers(status).filter((l) => layerKeyOf(l) !== null)
@@ -745,101 +863,307 @@ function LandingMap({
 	const columns = Array.from({ length: width }, (_, i) => i + 1)
 	const momentAt = new Map<number, Look>()
 	for (const l of looks) if (l.lands !== null && !momentAt.has(l.lands.column)) momentAt.set(l.lands.column, l)
-	const chosenLook = looks.find((l) => l.item === chosen)
-	const key = chosenLook === undefined ? undefined : keyOf(chosenLook, items[chosenLook.item])
-	const lit = new Map<number, number | null>()
-	if (operator && chosenLook !== undefined && key !== undefined) for (const t of m.moveTargets({ item: chosenLook.item, code: key.code }).values()) lit.set(t.column, t.swap)
-	const planned = [...m.placements.filter((p) => p.item >= 0), ...m.fills]
-	const troubled = new Set(looks.flatMap((l) => problemsOf(l, m).map((p) => p.code)))
-	const noSpot = looks.filter((l) => l.lands === null && l.codes.some((c) => c.state === 'no-place'))
+	const lookOf = (item: number | null) => looks.find((l) => l.item === item)
+	const whatOf = (item: number) => {
+		const l = lookOf(item)
+		const k = l === undefined ? undefined : keyOf(l, items[l.item])
+		return k === undefined ? null : { item, code: k.code }
+	}
 	const nameOf = (l: Look) => items[l.item]?.label ?? items[l.item]?.title ?? ''
 	// Over a column named for its label (WTL), the title says more (Welcome).
 	const squash = (n: string) => n.toUpperCase().replace(/[^A-Z0-9]/g, '')
 	const headOf = (l: Look, column: number) => (squash(nameOf(l)) === squash(names[column - 1] ?? '') ? (items[l.item]?.title ?? '') : nameOf(l))
+	const noSpot = looks.filter((l) => l.lands === null && l.codes.some((c) => c.state === 'no-place'))
+
+	// What is being moved: a drag, or the moment tapped. Its lit columns.
+	const moving = drag?.item ?? chosen
+	const movingWhat = moving === null ? null : whatOf(moving)
+	const lit = new Map<number, number | null>()
+	if (operator && movingWhat !== null && ticked.size === 0) for (const t of m.moveTargets(movingWhat).values()) lit.set(t.column, t.swap)
+	// Several ticked: where they would land from the column tapped.
+	const tickedWhat = [...ticked].flatMap((i) => {
+		const w = whatOf(i)
+		return w === null ? [] : [w]
+	})
+	const preview = start === null ? null : m.previewPlace(tickedWhat, start)
+	const landsAt = new Map((preview?.landed ?? []).map((l) => [l.column, l.item]))
+
+	const planned = [...m.placements.filter((p) => p.item >= 0), ...m.fills]
+	const troubled = new Set(looks.flatMap((l) => problemsOf(l, m).map((p) => p.code)))
+	const thinName = (c: number) => unnamedColumn(names[c - 1] ?? '') || /count\s*down|video|broadcast/i.test(names[c - 1] ?? '')
+	// No moment's and named for nothing (or COUNTDOWN and the like): a sliver,
+	// even when the normal background goes in it; never one that may be picked.
+	const lastName = Math.max(...names.map((n, i) => (unnamedColumn(n) ? -1 : i + 1)))
+	const thin = (c: number) => !momentAt.has(c) && !lit.has(c) && !landsAt.has(c) && thinName(c) && !(c > lastName && ticked.size > 0)
+
+	// The cell size: the window's height shared by the rows, or a fixed width.
+	const topH = topRef.current?.offsetHeight ?? 96
+	const headH = 44
+	const fitH = Math.max(48, Math.floor((area.h - 32 - topH - headH - 12 - 4 * layers.length) / Math.max(1, layers.length)))
+	const label = 40
+	const allW = Math.max(40, Math.floor((area.w - 32 - label - 4 * width) / Math.max(1, columns.filter((c) => !thin(c)).length + 0.35 * columns.filter(thin).length)))
+	const cellW = size === 'fit' ? Math.round((fitH * 16) / 9) : size === 's' ? allW : size === 'm' ? 220 : 320
+	const cellH = size === 'fit' ? fitH : Math.round((cellW * 9) / 16)
+	const grid = { gridTemplateColumns: `${label}px ${columns.map((c) => `${thin(c) ? Math.max(20, Math.round(cellW * 0.35)) : cellW}px`).join(' ')}` }
+
+	const clearTicks = () => {
+		setTicked(new Set())
+		setStart(null)
+	}
+	const tick = (item: number) => {
+		setTicked((was) => {
+			const next = new Set(was)
+			if (next.has(item)) next.delete(item)
+			else next.add(item)
+			return next
+		})
+		setStart(null)
+		setChosen(null)
+	}
+	const moveTo = (item: number, column: number) => {
+		const w = whatOf(item)
+		if (w === null) return
+		m.moveTo(w, column)
+		setChosen(null)
+		setSaid(null)
+	}
 	const tap = (column: number) => {
-		if (chosenLook !== undefined && key !== undefined && lit.has(column)) {
-			m.askMoveTo({ item: chosenLook.item, code: key.code }, column)
-			return setChosen(null)
+		if (ticked.size > 0) {
+			if (operator) setStart(column)
+			return
 		}
+		if (chosen !== null && lit.has(column)) return moveTo(chosen, column)
 		const at = momentAt.get(column)
 		setChosen(at === undefined || at.item === chosen ? null : at.item)
+		setSaid(null)
 	}
-	// A column no moment uses and named for nothing (or COUNTDOWN and the like) is a sliver.
-	const thin = (c: number) => !momentAt.has(c) && !lit.has(c) && (unnamedColumn(names[c - 1] ?? '') || /count\s*down|video|broadcast/i.test(names[c - 1] ?? '')) && !planned.some((p) => p.column === c)
-	const grid = { gridTemplateColumns: `2.5rem ${columns.map((c) => (thin(c) ? 'minmax(0,0.35fr)' : 'minmax(0,1fr)')).join(' ')}` }
+	const place = () => {
+		if (start === null) return
+		const r = m.placeFrom(tickedWhat, start)
+		if (r === null) return
+		const missed = r.didntFit.map((i) => items[i]?.label ?? items[i]?.title ?? '').filter((n) => n !== '')
+		setSaid(missed.length > 0 ? `Placed ${r.landed.length}; no free column left for ${missed.join(', ')}` : null)
+		clearTicks()
+	}
+
+	// Drag: a mouse lifts a clip once it moves; a finger once it has rested
+	// HOLD_MS without moving, so a swipe still scrolls.
+	const press = (e: React.PointerEvent, column: number) => {
+		const at = momentAt.get(column)
+		if (!operator || at === undefined || ticked.size > 0 || whatOf(at.item) === null || e.button !== 0) return
+		const x0 = e.clientX
+		const y0 = e.clientY
+		const el = e.currentTarget as HTMLElement
+		const id = e.pointerId
+		let lifted = false
+		let timer: number | undefined
+		const lift = (x: number, y: number) => {
+			lifted = true
+			dragging.current = true
+			try {
+				el.setPointerCapture(id)
+			} catch {
+				// Released already.
+			}
+			setChosen(null)
+			setDrag({ item: at.item, x, y, over: null })
+		}
+		const columnUnder = (x: number, y: number) => {
+			const hit = document.elementsFromPoint(x, y).find((n) => n instanceof HTMLElement && n.dataset['col'] !== undefined) as HTMLElement | undefined
+			return hit === undefined ? null : Number(hit.dataset['col'])
+		}
+		const onMove = (ev: PointerEvent) => {
+			if (ev.pointerId !== id) return
+			const far = Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8
+			if (!lifted) {
+				if (ev.pointerType === 'mouse' && far) lift(ev.clientX, ev.clientY)
+				else if (far) end()
+				return
+			}
+			setDrag({ item: at.item, x: ev.clientX, y: ev.clientY, over: columnUnder(ev.clientX, ev.clientY) })
+		}
+		const onUp = (ev: PointerEvent) => {
+			if (ev.pointerId !== id) return
+			const wasLifted = lifted
+			end()
+			if (!wasLifted) return
+			draggedAt.current = Date.now()
+			const to = columnUnder(ev.clientX, ev.clientY)
+			setDrag(null)
+			const targets = new Map([...m.moveTargets(whatOf(at.item) as Choosing).values()].map((t) => [t.column, t.swap]))
+			if (to !== null && targets.has(to)) moveTo(at.item, to)
+			else setSaid('Not moved: drop it on a lit column.')
+		}
+		const end = () => {
+			window.clearTimeout(timer)
+			window.removeEventListener('pointermove', onMove)
+			window.removeEventListener('pointerup', onUp)
+			window.removeEventListener('pointercancel', onCancel)
+			dragging.current = false
+		}
+		const onCancel = (ev: PointerEvent) => {
+			if (ev.pointerId !== id) return
+			end()
+			setDrag(null)
+		}
+		window.addEventListener('pointermove', onMove)
+		window.addEventListener('pointerup', onUp)
+		window.addEventListener('pointercancel', onCancel)
+		if (e.pointerType !== 'mouse') timer = window.setTimeout(() => lift(x0, y0), HOLD_MS)
+	}
+	// A drag that ends without a lift is a tap; a lifted one already moved.
+	const click = (column: number) => {
+		if (Date.now() - draggedAt.current < 400) return
+		if (drag !== null) return
+		tap(column)
+	}
+
+	const chosenLook = lookOf(chosen)
+	const words =
+		said !== null ? (
+			said
+		) : ticked.size > 0 ? (
+			start === null ? (
+				`${ticked.size} ticked. Tap the column to place ${ticked.size === 1 ? 'it' : 'them'} from; taken, named and on-screen columns are skipped.`
+			) : (
+				`From ${columnName(names, start)}: ${(preview?.landed ?? []).map((l) => `${items[l.item]?.label ?? items[l.item]?.title} → ${columnName(names, l.column)}`).join(', ') || 'nothing fits'}${(preview?.didntFit.length ?? 0) > 0 ? `; ${preview?.didntFit.length} won't fit` : ''}.`
+			)
+		) : drag !== null ? (
+			`Drop ${nameOf(lookOf(drag.item) as Look)} on a lit column${lit.size > 0 ? '; on another moment’s, the two swap' : ': nowhere free'}.`
+		) : chosenLook !== undefined ? (
+			<>
+				<b className="font-bold text-booth-ink">{nameOf(chosenLook)}</b>
+				{chosenLook.lands !== null ? ` ${chosenLook.lands.replaces !== null ? 'lands in' : 'is in'} ${columnName(names, chosenLook.lands.column)}` : ' has no spot yet'}
+				{chosenLook.lands?.replaces != null && (chosenLook.lands.replaces === 'empty' ? ' · into an empty clip' : ` · replaces ${chosenLook.lands.replaces}`)}
+				{chosenLook.lands?.why === 'moved' && ' · moved for this service'}
+				{operator && (lit.size > 0 ? '. Tap a lit column to move it; on another moment’s, the two swap.' : '. Nowhere free to move it.')}
+			</>
+		) : (
+			`Dashed: will load · faded: not this service · amber: a problem · green: on screen.${operator ? ' Drag a moment (hold first on touch) or tap it, then a lit column. Tick several to place them together.' : ' Tap a moment to see where it lands.'}`
+		)
 
 	return (
-		<div className="mx-auto flex max-w-[2200px] flex-col gap-3">
-			<div className="grid gap-1" style={grid}>
-				<span />
-				{columns.map((c) => {
-					const name = names[c - 1] ?? ''
-					const at = momentAt.get(c)
-					const me = at !== undefined && at.item === chosen
-					const swap = lit.get(c)
-					return (
-						<button
-							key={c}
-							type="button"
-							onClick={() => tap(c)}
-							title={unnamedColumn(name) ? `Column ${c}` : name}
-							className={`flex min-w-0 flex-col items-center rounded-ctl px-0.5 py-1 text-center ${me ? 'bg-accent text-accent-ink' : lit.has(c) ? 'ring-2 ring-accent-hi' : 'hover:bg-booth-hover'}`}
-						>
-							<span className={`w-full truncate text-xs font-bold ${me ? '' : /^promo/i.test(name.trim()) ? 'text-accent-hi' : 'text-booth-dim'}`}>{thin(c) ? '' : unnamedColumn(name) ? c : name}</span>
-							<span className={`w-full truncate text-xs ${me ? '' : at !== undefined && states.get(at.item) === 'needs' ? 'text-warn' : 'text-booth-ink'}`}>
-								{swap != null ? 'swap' : at === undefined ? '\u00a0' : headOf(at, c)}
-							</span>
-						</button>
-					)
-				})}
-				{layers.map((layer) => (
-					<MapRow key={layer.id} layer={layer} columns={columns} planned={planned} items={items} today={today} troubled={troubled} lit={lit} chosenColumn={chosenLook?.lands?.column ?? null} thin={thin} onTap={tap} />
-				))}
-			</div>
-			<p className="rounded-ctl bg-booth-panel px-3 py-2 text-sm text-booth-dim">
-				{chosenLook !== undefined ? (
-					<>
-						<b className="font-bold text-booth-ink">{nameOf(chosenLook)}</b>
-						{chosenLook.lands !== null ? ` ${chosenLook.lands.replaces !== null ? 'lands in' : 'is in'} ${chosenLook.lands.name === '' ? `column ${chosenLook.lands.column}` : `${chosenLook.lands.name} · column ${chosenLook.lands.column}`}` : ' has no spot yet'}
-						{chosenLook.lands?.replaces != null && (chosenLook.lands.replaces === 'empty' ? ' · into an empty clip' : ` · replaces ${chosenLook.lands.replaces}`)}
-						{chosenLook.lands?.why === 'moved' && ' · moved for this service'}
-						{operator && (lit.size > 0 ? '. Tap a lit column to move it; on another moment\u2019s, the two swap.' : '. Nowhere free to move it.')}
-					</>
-				) : (
-					`Dashed: will load · faded: not this service · amber: a problem · green: on screen. Tap a moment to see where it lands${operator ? ', then a lit column to move it' : ''}.`
+		<div ref={rootRef} className="mx-auto flex max-w-full flex-col gap-2">
+			<div ref={topRef} className="flex flex-col gap-2">
+				<div className="flex flex-wrap items-center gap-2">
+					<span role="radiogroup" aria-label="Map size" className="inline-flex rounded-ctl bg-booth-raise p-1">
+						{(['fit', 's', 'm', 'l'] as const).map((s) => (
+							<button
+								key={s}
+								type="button"
+								role="radio"
+								aria-checked={s === size}
+								onClick={() => setSize(s)}
+								title={s === 'fit' ? 'Fill the window' : s === 's' ? 'Every column on screen' : s === 'm' ? 'Medium' : 'Large'}
+								className={`h-8 min-w-10 rounded-[3px] px-2 text-sm font-bold ${s === size ? 'bg-accent text-accent-ink' : 'text-booth-dim hover:text-booth-ink'}`}
+							>
+								{s === 'fit' ? 'Fit' : s.toUpperCase()}
+							</button>
+						))}
+					</span>
+					<p className="min-w-0 flex-1 rounded-ctl bg-booth-panel px-3 py-1.5 text-sm text-booth-dim">{words}</p>
+					{ticked.size > 0 && start !== null && (preview?.landed.length ?? 0) > 0 && (
+						<Button variant="primary" size="sm" onClick={place}>
+							Place {preview?.landed.length}
+						</Button>
+					)}
+					{ticked.size > 0 && <SmallButton onClick={clearTicks}>Untick all</SmallButton>}
+				</div>
+				{noSpot.length > 0 && (
+					<div className="flex flex-wrap items-center gap-2 text-sm">
+						<span className="text-warn">No spot:</span>
+						{noSpot.map((l) => (
+							<button
+								key={l.item}
+								type="button"
+								onClick={() => (operator ? tick(l.item) : undefined)}
+								aria-pressed={ticked.has(l.item)}
+								className={`flex h-10 items-center gap-2 rounded-ctl px-3 ${ticked.has(l.item) ? 'bg-accent text-accent-ink' : 'bg-warn/15 text-warn hover:bg-warn/25'}`}
+							>
+								{operator && <span className={`grid size-5 place-items-center rounded-[3px] border-2 ${ticked.has(l.item) ? 'border-accent-ink' : 'border-current'}`}>{ticked.has(l.item) && <Check size={14} strokeWidth={3} aria-hidden />}</span>}
+								{nameOf(l)}
+							</button>
+						))}
+					</div>
 				)}
-			</p>
-			{noSpot.length > 0 && (
-				<div className="flex flex-wrap items-center gap-2 text-sm">
-					<span className="text-warn">No spot:</span>
-					{noSpot.map((l) => (
-						<button
-							key={l.item}
-							type="button"
-							onClick={() => setChosen(l.item === chosen ? null : l.item)}
-							className={`h-8 rounded-ctl px-2.5 ${l.item === chosen ? 'bg-accent text-accent-ink' : 'bg-warn/15 text-warn hover:bg-warn/25'}`}
-						>
-							{nameOf(l)}
-						</button>
+			</div>
+			<div ref={scrollRef} className="overflow-x-auto pb-1">
+				<div className="grid w-max gap-1" style={grid}>
+					<span className="sticky left-0 z-10 bg-booth-ground" />
+					{columns.map((c) => {
+						const at = momentAt.get(c)
+						const me = at !== undefined && (at.item === chosen || at.item === drag?.item)
+						const swap = lit.get(c)
+						const landing = landsAt.get(c)
+						const isTicked = at !== undefined && ticked.has(at.item)
+						return (
+							<div
+								key={c}
+								data-col={c}
+								onPointerDown={(e) => press(e, c)}
+								onClick={() => click(c)}
+								title={unnamedColumn(names[c - 1] ?? '') ? `Column ${c}` : names[c - 1]}
+								style={{ height: headH }}
+								className={`relative flex min-w-0 cursor-pointer select-none flex-col items-center justify-center rounded-ctl pr-1 text-center ${operator && at !== undefined && !thin(c) ? 'pl-7' : 'pl-1'} ${me || landing !== undefined ? 'bg-accent text-accent-ink' : drag?.over === c && lit.has(c) ? 'bg-accent-hi/30' : lit.has(c) ? 'ring-2 ring-accent-hi' : start === c ? 'ring-2 ring-accent-hi' : 'hover:bg-booth-hover'}`}
+							>
+								<span className={`w-full truncate text-xs font-bold ${me || landing !== undefined ? '' : /^promo/i.test((names[c - 1] ?? '').trim()) ? 'text-accent-hi' : 'text-booth-dim'}`}>{thin(c) ? '' : unnamedColumn(names[c - 1] ?? '') ? c : names[c - 1]}</span>
+								<span className={`w-full truncate text-xs ${me || landing !== undefined ? '' : at !== undefined && states.get(at.item) === 'needs' ? 'text-warn' : 'text-booth-ink'}`}>
+									{landing !== undefined ? `→ ${items[landing]?.label ?? items[landing]?.title}` : swap != null ? 'swap' : at === undefined ? ' ' : headOf(at, c)}
+								</span>
+								{operator && at !== undefined && !thin(c) && whatOf(at.item) !== null && (
+									<button
+										type="button"
+										aria-label={`Tick ${nameOf(at)}`}
+										aria-pressed={isTicked}
+										onPointerDown={(e) => e.stopPropagation()}
+										onClick={(e) => {
+											e.stopPropagation()
+											tick(at.item)
+										}}
+										className={`absolute top-0.5 left-0.5 grid size-6 place-items-center rounded-[3px] border-2 ${isTicked ? 'border-accent-hi bg-accent-hi text-black' : 'border-booth-edge bg-booth-ground/70'}`}
+									>
+										{isTicked && <Check size={14} strokeWidth={3} aria-hidden />}
+									</button>
+								)}
+							</div>
+						)
+					})}
+					{layers.map((layer) => (
+						<MapRow
+							key={layer.id}
+							layer={layer}
+							columns={columns}
+							planned={planned}
+							items={items}
+							today={today}
+							troubled={troubled}
+							lit={lit}
+							over={drag?.over ?? null}
+							chosenColumn={lookOf(chosen ?? drag?.item ?? null)?.lands?.column ?? null}
+							height={cellH}
+							thin={thin}
+							onPress={press}
+							onTap={click}
+						/>
 					))}
 				</div>
-			)}
-			{m.pins.length > 0 && operator && (
-				<p className="text-xs text-booth-dim">
-					{m.pins.length} moved for this service:{' '}
-					{m.pins.map((p, i) => (
-						<span key={p.item}>
-							{i > 0 && ', '}
-							{items[p.item]?.label ?? items[p.item]?.title}{' '}
-							<button type="button" onClick={() => m.unpin(p.item)} className="underline hover:text-booth-ink">
-								Put back
-							</button>
-						</span>
-					))}
-				</p>
+			</div>
+			{drag !== null && (
+				<div
+					className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rotate-[-2deg] rounded-ctl bg-accent px-3 py-2 text-sm font-bold text-accent-ink shadow-lg"
+					style={{ left: drag.x, top: drag.y }}
+				>
+					{nameOf(lookOf(drag.item) as Look)}
+				</div>
 			)}
 		</div>
 	)
+}
+
+/** A column in words: `PROMO 2`, or `column 14`. */
+function columnName(names: string[], column: number): string {
+	const n = names[column - 1] ?? ''
+	return unnamedColumn(n) ? `column ${column}` : n
 }
 
 /** One layer of the Map: each clip as it is, or, dashed, what will load into it. */
@@ -851,8 +1175,11 @@ function MapRow({
 	today,
 	troubled,
 	lit,
+	over,
 	chosenColumn,
+	height,
 	thin,
+	onPress,
 	onTap,
 }: {
 	layer: ArenaLayer
@@ -862,14 +1189,17 @@ function MapRow({
 	today: ReadonlySet<string>
 	troubled: ReadonlySet<string>
 	lit: ReadonlyMap<number, number | null>
+	over: number | null
 	chosenColumn: number | null
+	height: number
 	thin: (c: number) => boolean
+	onPress: (e: React.PointerEvent, c: number) => void
 	onTap: (c: number) => void
 }) {
 	const k = layerKeyOf(layer)
 	return (
 		<>
-			<span className="self-center text-xs font-bold text-booth-dim" title={layer.name}>
+			<span className="sticky left-0 z-10 self-center bg-booth-ground text-xs font-bold text-booth-dim" title={layer.name}>
 				{k === 'F' ? 'FG' : k === 'B' ? 'BG' : 'A'}
 			</span>
 			{columns.map((c) => {
@@ -882,19 +1212,24 @@ function MapRow({
 				const old = p === undefined && slot.state !== 'empty' && (code === null || !today.has(code))
 				const ring = slot.state === 'playing' ? 'ring-2 ring-state-live' : code !== null && troubled.has(code) ? 'ring-2 ring-warn' : ''
 				const frame = p !== undefined ? 'border border-dashed border-accent-hi' : slot.state === 'empty' ? 'border border-dashed border-booth-edge' : 'bg-booth-raise'
+				const mark = c === chosenColumn ? 'outline outline-2 outline-accent' : over === c && lit.has(c) ? 'outline outline-4 outline-accent-hi' : lit.has(c) ? 'outline outline-1 outline-accent-hi' : ''
 				return (
-					<button
+					<div
 						key={c}
-						type="button"
+						data-col={c}
+						role="button"
+						tabIndex={-1}
+						onPointerDown={(e) => onPress(e, c)}
 						onClick={() => onTap(c)}
+						style={{ height }}
 						title={p !== undefined ? `${p.code} will load${p.replaces !== null ? `, replacing ${p.replaces.code ?? p.replaces.name}` : ''}` : slot.state === 'empty' ? 'Empty' : (code ?? slot.name)}
-						className={`relative block aspect-video min-w-0 overflow-hidden rounded-ctl ${frame} ${ring} ${old ? 'opacity-40' : ''} ${c === chosenColumn ? 'outline outline-2 outline-accent' : lit.has(c) ? 'outline outline-1 outline-accent-hi' : ''}`}
+						className={`relative block min-w-0 cursor-pointer select-none overflow-hidden rounded-ctl ${frame} ${ring} ${old ? 'opacity-40' : ''} ${mark}`}
 					>
 						{url !== null && !thin(c) && <Img url={url} cover />}
 						{code !== null && !thin(c) && (
-							<span className={`absolute inset-x-0 bottom-0 truncate px-1 text-[11px] font-mono ${p !== undefined ? 'bg-black/80 text-accent-hi' : 'bg-black/70'}`}>{code}</span>
+							<span className={`absolute inset-x-0 bottom-0 truncate px-1 font-mono ${height > 120 ? 'text-sm' : 'text-[11px]'} ${p !== undefined ? 'bg-black/80 text-accent-hi' : 'bg-black/70'}`}>{code}</span>
 						)}
-					</button>
+					</div>
 				)
 			})}
 		</>

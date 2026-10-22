@@ -1061,6 +1061,35 @@ Checked in the dev kiosk on the Mac over CDP against the stand-in widened to Cen
 and the lookbook's Central AM 25 Oct: the badges, Lands in, a swap from a card and back from the
 Map, Cancel keeping the move. ⚠️ Not against Arena, by finger, or a load through a move.
 
+**The Map, second round** (the owner tried 1.8.0 the same day: "waaaaay too small", and asked for
+drag to resize, a way to delete a mistake, drag and drop, and several unknowns at once; best
+practice looked up and put to them as options, their picks):
+- **Size**: **Fit** by default, the window's height shared by the rows, wider than the window
+  scrolling sideways; **S** every column on screen, **M** and **L** fixed (`paua.lookbook.mapSize`).
+  Stepped sizes, not a free drag (thumbnail grids snap to steps; a 44 pt touch target).
+- **Drag and drop**: the whole moment, onto a lit column (another moment's a swap). A mouse lifts
+  it once it moves; a finger after resting 350 ms, so a swipe still scrolls; the page does not
+  scroll under a dragged clip; a drop anywhere unlit moves nothing and says so. Tap, then tap,
+  still works (WCAG 2.5.7: nothing by dragging only).
+- **Several at once**: tick moments (a box on each column's heading, or the No spot chips), tap
+  the column to start from: the headings show where each would land, nothing changes until
+  **Place n**. `placeFrom`: run-sheet order, forward only, skipping taken, named, reserved and
+  on-screen columns; what does not fit is said, never wrapped round.
+- **Move now, load later**: a move, swap or batch changes the plan only (no confirmation); Load
+  or Update all loads, and asks as before.
+- **Undo** on the Lookbook's top line, naming the newest action, until the next: a move (one tap,
+  the plan only) or a **load** (two taps, it writes to Arena: main kept what each clip held, and
+  `undoSteps` puts that file back only while the clip still holds the load and is not on screen;
+  an empty one stays, since clearing was never tried). Undo instead of confirmations (NN/g), the
+  confirmation kept for writes to Arena (this project's rule).
+- **Edge cases, the owner's yes**: a move into a column Arena has since reserved or dropped is
+  dropped; a run sheet changed under a move drops it (as before); a move undone after its moment
+  loaded leaves a copy in the old column, said on the card ("fire PROMO 2, not that").
+Checked in the dev kiosk on the Mac over CDP against the 16-column stand-in: Fit and S, a mouse
+drag, a touch hold-and-drag swap, a quick swipe moving nothing, ticking two and Place 2, Undo of
+both, "1 won't fit". ⚠️ Undo of a load is unit-tested only (the stand-in ignores loads); nothing
+by finger or on Windows.
+
 Gone with Holding: the grid, the plan panel, the No column tray, the legend, the activity chips,
 the result line and Files to check (a card that needs a look says so; the filter gathers them).
 Update all, Clear old FGs (in its confirmation, or alone when nothing else is to load), pins

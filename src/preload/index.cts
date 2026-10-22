@@ -179,6 +179,8 @@ const api = {
 	 *  operator mode only. `lastMediaRun` is the latest, for the result line. */
 	runMedia: (run: RunRequest): Promise<FetchRun | { ok: false; detail: string }> => ipcRenderer.invoke('media:run', run),
 	lastMediaRun: (): Promise<FetchRun | null> => ipcRenderer.invoke('media:last-run'),
+	/** Undo the latest run's loads: each clip its old file back (Admin). */
+	undoMediaRun: (runId: number): Promise<{ ok: true; restored: number; left: string[] } | { ok: false; detail: string }> => ipcRenderer.invoke('media:undo', runId),
 	/** Every file on the graphics drive carrying a code, and which Fetch would take. */
 	mediaDrive: (code: string, lookbookPath: string | null): Promise<DriveMatches> => ipcRenderer.invoke('media:drive', code, lookbookPath),
 	/** "It's there": a failed code set aside as in Arena all the same. Admin only. */

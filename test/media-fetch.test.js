@@ -6,7 +6,7 @@ import path from 'node:path'
 
 import { codesIn, copyInto, downloadInto, fileUrlOf, findByCode, findByCodeIndexed, findMedia, nameKey, pickBySize, pickDriveFile } from '../dist/src/bridge/media-files.js'
 import http from 'node:http'
-import { fetchRequestFrom, isFolderPath, isPlainName, runCounts, runRequestFrom } from '../dist/src/shared/media-fetch.js'
+import { fetchRequestFrom, isFolderPath, isPlainName, runCounts, runRequestFrom, undoSteps } from '../dist/src/shared/media-fetch.js'
 import { openWire } from '../dist/src/bridge/arena-control.js'
 import { applyPatch, DEFAULT_SETTINGS } from '../dist/src/shared/settings.js'
 
@@ -290,4 +290,30 @@ test('a drive pick is a path string or nothing; main uses it only if its own sea
 	assert.equal('drivePick' in fetchRequestFrom(req), false)
 	assert.equal(fetchRequestFrom({ ...req, drivePick: 42 }), null)
 	assert.equal(fetchRequestFrom({ ...req, drivePick: 'a\nb' }), null)
+})
+
+test('Undo puts each clip\'s old file back, only while it still holds the load and is not on screen', () => {
+	const loaded = [
+		{ clipId: 1, code: 'CF601', before: 'C:\\Media\\CF455-Old.png', after: 'D:\\Holding\\CF601-Alpha.png' },
+		{ clipId: 2, code: 'CF601', before: null, after: 'D:\\Holding\\CF601-Alpha.png' },
+		{ clipId: 3, code: 'CF612', before: 'C:\\Media\\CF470.png', after: 'D:\\Holding\\CF612-Story.png' },
+		{ clipId: 4, code: 'CF612', before: 'C:\\Media\\CF470.png', after: 'D:\\Holding\\CF612-Story.png' },
+		{ clipId: 5, code: 'CF612', before: 'C:\\Media\\CF470.png', after: 'D:\\Holding\\CF612-Story.png' },
+	]
+	const now = {
+		1: { file: 'D:\\Holding\\cf601-alpha.png', playing: false },
+		2: { file: 'D:\\Holding\\CF601-Alpha.png', playing: false },
+		3: { file: 'D:\\Holding\\CF612-Story.png', playing: true },
+		4: { file: 'C:\\Media\\Something-else.png', playing: false },
+	}
+	assert.deepEqual(
+		undoSteps(loaded, (id) => now[id] ?? null).map((s) => [s.clipId, s.file, s.why]),
+		[
+			[1, 'C:\\Media\\CF455-Old.png', null],
+			[2, null, 'it was empty before'],
+			[3, null, 'it is on screen'],
+			[4, null, 'it holds something else now'],
+			[5, null, 'the clip is no longer in Arena'],
+		],
+	)
 })

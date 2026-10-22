@@ -176,6 +176,39 @@ export type FetchRun = {
 	refused: Record<string, string>
 	/** Set when every code has ended. */
 	ended: number | null
+	/** Clips it loaded that had a file before, which Undo can put back (the
+	 *  owner, 2026-10-22: "undo a load"); 0 when there is nothing to undo. */
+	undoable: number
+	/** Undo was pressed for this run. */
+	undone: boolean
+}
+
+/** One clip a run loaded a file into, and what it held before. */
+export type LoadedClip = { clipId: number; code: string; before: string | null; after: string }
+
+/** What Undo does with each clip a run loaded: put back the file it held
+ *  before, only while it still holds the run's file and is not on screen, and
+ *  only when it held one (an empty clip stays: clearing is not Undo's). Each
+ *  clip not put back says why. */
+export function undoSteps(
+	loaded: readonly LoadedClip[],
+	now: (clipId: number) => { file: string | null; playing: boolean } | null,
+): { clipId: number; code: string; file: string | null; why: string | null }[] {
+	const base = (p: string) => p.split(/[\\/]/).at(-1)?.toLowerCase() ?? ''
+	return loaded.map(({ clipId, code, before, after }) => {
+		const clip = now(clipId)
+		const why =
+			before === null
+				? 'it was empty before'
+				: clip === null
+					? 'the clip is no longer in Arena'
+					: clip.file === null || base(clip.file) !== base(after)
+						? 'it holds something else now'
+						: clip.playing
+							? 'it is on screen'
+							: null
+		return { clipId, code, file: why === null ? before : null, why }
+	})
 }
 
 export type RunRequest = { label: string; requests: FetchRequest[]; plan: string[]; already: number }
