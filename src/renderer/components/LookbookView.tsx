@@ -27,7 +27,9 @@
 //   its own lit, and has Move (Admin): its layer's clips, lit where it may go,
 //   a PROMO or spare column only, a taken one a swap. A move lasts this service.
 // - Card size is a zoom, per computer: Big (as the Lookbook was), Two a row,
-//   or Rows.
+//   Rows, or Map (the owner, 2026-10-22): Arena's holding grid, each column's
+//   moment over it, what will load dashed; tap a moment, then a lit column, to
+//   move it, as Move does.
 // - Lower thirds read-only from ProPresenter's announcement playlist (the
 //   Announcements view's check); loading them from here is for later.
 //
@@ -37,11 +39,11 @@
 // as Update all's, never a second guess.
 
 import { useEffect, useState } from 'react'
-import { Check, FileX, LayoutGrid, Minus, Rows3, Square, RefreshCw, X } from 'lucide-react'
+import { Check, FileX, Grid3x3, LayoutGrid, Minus, Rows3, Square, RefreshCw, X } from 'lucide-react'
 
 import { thumbnailUrl, type ArenaLayer, type ArenaStatus } from '../../shared/arena.js'
 import { checkAnnouncements, sessionOf, wantedAnnouncements } from '../../shared/announcements.js'
-import { COLUMN_NAMES, codesOn, columnNamesOf, holdingLayers, lookSteps, looksOf, slotCode, slotMark, type CodeState, type Landing, type Look, type UpdateStep } from '../../shared/holding.js'
+import { COLUMN_NAMES, codesOn, columnNamesOf, holdingLayers, layerKeyOf, lookSteps, looksOf, slotCode, slotMark, type CodeState, type Landing, type Look, type Placement, type UpdateStep } from '../../shared/holding.js'
 import { lookbookThumbUrl, mediaCodeOf, type LookbookItem } from '../../shared/media-check.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
@@ -56,13 +58,14 @@ export function LookbookView({ status, now }: { status: Channel<ArenaStatus> | n
 	return <ArenaReading status={status} now={now} render={(s, ageMs) => <Lookbook status={s} ageMs={ageMs} now={now} />} />
 }
 
-/** How big a card is: the owner's zoom (2026-10-14), Big by default. */
-type Size = 'big' | 'two' | 'rows'
+/** How big a card is: the owner's zoom (2026-10-14), Big by default; or the
+ *  Map in place of the cards (2026-10-22). */
+type Size = 'big' | 'two' | 'rows' | 'map'
 const SIZE_KEY = 'paua.lookbook.size'
 function storedSize(): Size {
 	try {
 		const v = localStorage.getItem(SIZE_KEY)
-		return v === 'two' || v === 'rows' ? v : 'big'
+		return v === 'two' || v === 'rows' || v === 'map' ? v : 'big'
 	} catch {
 		return 'big'
 	}
@@ -234,8 +237,9 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 				<Confirm key={m.asking?.id} m={m} />
 			</div>
 			<div className={`@container min-h-0 flex-1 overflow-y-auto p-4 ${ageMs !== null ? staleContent : ''}`}>
-				<div className={size === 'two' ? 'mx-auto grid max-w-[2200px] grid-cols-1 gap-4 @3xl:grid-cols-2' : `mx-auto flex max-w-[2200px] flex-col ${size === 'big' ? 'gap-6' : 'gap-2'}`}>
-					{shown.map((look) => (
+				{size === 'map' && <LandingMap m={m} status={status} looks={looks} states={states} operator={operator} names={headerNames} />}
+				<div hidden={size === 'map'} className={size === 'two' ? 'mx-auto grid max-w-[2200px] grid-cols-1 gap-4 @3xl:grid-cols-2' : `mx-auto flex max-w-[2200px] flex-col ${size === 'big' ? 'gap-6' : 'gap-2'}`}>
+					{(size === 'map' ? [] : shown).map((look) => (
 						<Card
 							key={look.item}
 							m={m}
@@ -271,6 +275,7 @@ function SizeSwitch({ size, onSize }: { size: Size; onSize: (s: Size) => void })
 		{ value: 'big', label: 'Big', icon: Square },
 		{ value: 'two', label: 'Two a row', icon: LayoutGrid },
 		{ value: 'rows', label: 'Rows', icon: Rows3 },
+		{ value: 'map', label: 'Map', icon: Grid3x3 },
 	]
 	return (
 		<span role="radiogroup" aria-label="Card size" className="inline-flex rounded-ctl bg-booth-raise p-1">
@@ -384,9 +389,7 @@ function Card({
 	const typeOf = (code: string) => TYPE_SHORT[look.codes.find((c) => c.code === code)?.type ?? ''] ?? code
 	// Load says what it loads when only some parts are picked: "Load BG".
 	const loadWords = picked.length > 0 && picked.length < loadable.length ? `Load ${picked.map(typeOf).join(', ')}` : 'Load'
-	// The piece it is moved by: its foreground, else background, else A-screen.
-	const movable = look.codes.filter((c) => c.state !== 'not-arena' && c.state !== 'no-file' && item.files[c.code] !== undefined)
-	const key = ['F', 'B', 'A'].map((t) => movable.find((c) => c.type === t)).find((c) => c !== undefined)
+	const key = keyOf(look, item)
 
 	const picture = (
 		<div className={`relative w-full overflow-hidden bg-black ${size === 'rows' ? 'rounded-ctl' : ''}`} style={{ aspectRatio: '5800 / 2037' }}>
@@ -722,6 +725,192 @@ function SlotPicker({ m, status, what, here, onDone }: { m: MediaCheckState; sta
 				})}
 			</div>
 		</div>
+	)
+}
+
+/** The piece a look is moved by: its foreground, else background, else A-screen. */
+function keyOf(look: Look, item: LookbookItem | undefined) {
+	const movable = look.codes.filter((c) => c.state !== 'not-arena' && c.state !== 'no-file' && item?.files[c.code] !== undefined)
+	return ['F', 'B', 'A'].map((t) => movable.find((c) => c.type === t)).find((c) => c !== undefined)
+}
+
+/** The Map size (the owner, 2026-10-22): Arena's holding grid as Arena lays it
+ *  out, each column's moment written over it, its clips as they are or, dashed,
+ *  as they will be. Tap a moment to see where it lands; in Admin, then a lit
+ *  column to move it there, on another moment's a swap, as Move does. */
+function LandingMap({
+	m,
+	status,
+	looks,
+	states,
+	operator,
+	names,
+}: {
+	m: MediaCheckState
+	status: ArenaStatus
+	looks: Look[]
+	states: ReadonlyMap<number, CardState>
+	operator: boolean
+	names: string[]
+}) {
+	const [chosen, setChosen] = useState<number | null>(null)
+	const items = m.runSheet ?? []
+	const today = codesOn(items)
+	const layers = holdingLayers(status).filter((l) => layerKeyOf(l) !== null)
+	const width = Math.max(names.length, ...layers.map((l) => l.slots.length))
+	const columns = Array.from({ length: width }, (_, i) => i + 1)
+	const momentAt = new Map<number, Look>()
+	for (const l of looks) if (l.lands !== null && !momentAt.has(l.lands.column)) momentAt.set(l.lands.column, l)
+	const chosenLook = looks.find((l) => l.item === chosen)
+	const key = chosenLook === undefined ? undefined : keyOf(chosenLook, items[chosenLook.item])
+	const lit = new Map<number, number | null>()
+	if (operator && chosenLook !== undefined && key !== undefined) for (const t of m.moveTargets({ item: chosenLook.item, code: key.code }).values()) lit.set(t.column, t.swap)
+	const planned = [...m.placements.filter((p) => p.item >= 0), ...m.fills]
+	const troubled = new Set(looks.flatMap((l) => problemsOf(l, m).map((p) => p.code)))
+	const noSpot = looks.filter((l) => l.lands === null && l.codes.some((c) => c.state === 'no-place'))
+	const nameOf = (l: Look) => items[l.item]?.label ?? items[l.item]?.title ?? ''
+	const tap = (column: number) => {
+		if (chosenLook !== undefined && key !== undefined && lit.has(column)) {
+			m.askMoveTo({ item: chosenLook.item, code: key.code }, column)
+			return setChosen(null)
+		}
+		const at = momentAt.get(column)
+		setChosen(at === undefined || at.item === chosen ? null : at.item)
+	}
+	// A column no moment uses and named for nothing (or COUNTDOWN and the like) is a sliver.
+	const thin = (c: number) => !momentAt.has(c) && !lit.has(c) && (unnamedColumn(names[c - 1] ?? '') || /count\s*down|video|broadcast/i.test(names[c - 1] ?? '')) && !planned.some((p) => p.column === c)
+	const grid = { gridTemplateColumns: `2.5rem ${columns.map((c) => (thin(c) ? 'minmax(0,0.35fr)' : 'minmax(0,1fr)')).join(' ')}` }
+
+	return (
+		<div className="mx-auto flex max-w-[2200px] flex-col gap-3">
+			<div className="grid gap-1" style={grid}>
+				<span />
+				{columns.map((c) => {
+					const name = names[c - 1] ?? ''
+					const at = momentAt.get(c)
+					const me = at !== undefined && at.item === chosen
+					const swap = lit.get(c)
+					return (
+						<button
+							key={c}
+							type="button"
+							onClick={() => tap(c)}
+							title={unnamedColumn(name) ? `Column ${c}` : name}
+							className={`flex min-w-0 flex-col items-center rounded-ctl px-0.5 py-1 text-center ${me ? 'bg-accent text-accent-ink' : lit.has(c) ? 'ring-2 ring-accent-hi' : 'hover:bg-booth-hover'}`}
+						>
+							<span className={`w-full truncate text-xs font-bold ${me ? '' : /^promo/i.test(name.trim()) ? 'text-accent-hi' : 'text-booth-dim'}`}>{thin(c) ? '' : unnamedColumn(name) ? c : name}</span>
+							<span className={`w-full truncate text-xs ${me ? '' : at !== undefined && states.get(at.item) === 'needs' ? 'text-warn' : 'text-booth-ink'}`}>
+								{swap != null ? 'swap' : at === undefined ? '\u00a0' : nameOf(at)}
+							</span>
+						</button>
+					)
+				})}
+				{layers.map((layer) => (
+					<MapRow key={layer.id} layer={layer} columns={columns} planned={planned} items={items} today={today} troubled={troubled} lit={lit} chosenColumn={chosenLook?.lands?.column ?? null} thin={thin} onTap={tap} />
+				))}
+			</div>
+			<p className="rounded-ctl bg-booth-panel px-3 py-2 text-sm text-booth-dim">
+				{chosenLook !== undefined ? (
+					<>
+						<b className="font-bold text-booth-ink">{nameOf(chosenLook)}</b>
+						{chosenLook.lands !== null ? ` ${chosenLook.lands.replaces !== null ? 'lands in' : 'is in'} ${chosenLook.lands.name === '' ? `column ${chosenLook.lands.column}` : `${chosenLook.lands.name} · column ${chosenLook.lands.column}`}` : ' has no spot yet'}
+						{chosenLook.lands?.replaces != null && (chosenLook.lands.replaces === 'empty' ? ' · into an empty clip' : ` · replaces ${chosenLook.lands.replaces}`)}
+						{chosenLook.lands?.why === 'moved' && ' · moved for this service'}
+						{operator && (lit.size > 0 ? '. Tap a lit column to move it; on another moment\u2019s, the two swap.' : '. Nowhere free to move it.')}
+					</>
+				) : (
+					`Dashed: will load · faded: not this service · amber: a problem · green: on screen. Tap a moment to see where it lands${operator ? ', then a lit column to move it' : ''}.`
+				)}
+			</p>
+			{noSpot.length > 0 && (
+				<div className="flex flex-wrap items-center gap-2 text-sm">
+					<span className="text-warn">No spot:</span>
+					{noSpot.map((l) => (
+						<button
+							key={l.item}
+							type="button"
+							onClick={() => setChosen(l.item === chosen ? null : l.item)}
+							className={`h-8 rounded-ctl px-2.5 ${l.item === chosen ? 'bg-accent text-accent-ink' : 'bg-warn/15 text-warn hover:bg-warn/25'}`}
+						>
+							{nameOf(l)}
+						</button>
+					))}
+				</div>
+			)}
+			{m.pins.length > 0 && operator && (
+				<p className="text-xs text-booth-dim">
+					{m.pins.length} moved for this service:{' '}
+					{m.pins.map((p, i) => (
+						<span key={p.item}>
+							{i > 0 && ', '}
+							{items[p.item]?.label ?? items[p.item]?.title}{' '}
+							<button type="button" onClick={() => m.unpin(p.item)} className="underline hover:text-booth-ink">
+								Put back
+							</button>
+						</span>
+					))}
+				</p>
+			)}
+		</div>
+	)
+}
+
+/** One layer of the Map: each clip as it is, or, dashed, what will load into it. */
+function MapRow({
+	layer,
+	columns,
+	planned,
+	items,
+	today,
+	troubled,
+	lit,
+	chosenColumn,
+	thin,
+	onTap,
+}: {
+	layer: ArenaLayer
+	columns: number[]
+	planned: Placement[]
+	items: LookbookItem[]
+	today: ReadonlySet<string>
+	troubled: ReadonlySet<string>
+	lit: ReadonlyMap<number, number | null>
+	chosenColumn: number | null
+	thin: (c: number) => boolean
+	onTap: (c: number) => void
+}) {
+	const k = layerKeyOf(layer)
+	return (
+		<>
+			<span className="self-center text-xs font-bold text-booth-dim" title={layer.name}>
+				{k === 'F' ? 'FG' : k === 'B' ? 'BG' : 'A'}
+			</span>
+			{columns.map((c) => {
+				const slot = layer.slots[c - 1]
+				if (slot === undefined) return <span key={c} />
+				const p = planned.find((x) => x.clipId === slot.id)
+				const code = p?.code ?? slotCode(slot)
+				const file = p === undefined ? null : (items.find((it) => it.files[p.code] !== undefined)?.files[p.code] ?? null)
+				const url = p !== undefined ? (file === null ? null : lookbookThumbUrl(file, 'thumbnail')) : slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
+				const old = p === undefined && slot.state !== 'empty' && (code === null || !today.has(code))
+				const ring = slot.state === 'playing' ? 'ring-2 ring-state-live' : code !== null && troubled.has(code) ? 'ring-2 ring-warn' : ''
+				const frame = p !== undefined ? 'border border-dashed border-accent-hi' : slot.state === 'empty' ? 'border border-dashed border-booth-edge' : 'bg-booth-raise'
+				return (
+					<button
+						key={c}
+						type="button"
+						onClick={() => onTap(c)}
+						title={p !== undefined ? `${p.code} will load${p.replaces !== null ? `, replacing ${p.replaces.code ?? p.replaces.name}` : ''}` : slot.state === 'empty' ? 'Empty' : (code ?? slot.name)}
+						className={`relative block aspect-video min-w-0 overflow-hidden rounded-ctl ${frame} ${ring} ${old ? 'opacity-40' : ''} ${c === chosenColumn ? 'outline outline-2 outline-accent' : lit.has(c) ? 'outline outline-1 outline-accent-hi' : ''}`}
+					>
+						{url !== null && !thin(c) && <Img url={url} cover />}
+						{code !== null && !thin(c) && (
+							<span className={`absolute inset-x-0 bottom-0 truncate px-1 text-[11px] font-mono ${p !== undefined ? 'bg-black/80 text-accent-hi' : 'bg-black/70'}`}>{code}</span>
+						)}
+					</button>
+				)
+			})}
+		</>
 	)
 }
 
