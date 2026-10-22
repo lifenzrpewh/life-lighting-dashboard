@@ -95,7 +95,8 @@ Tick what you saw; anything odd is worth a line.
 
 **1.8.1** (2026-10-22): the Map after the owner's first try of 1.8.0: it fills the window (Fit,
 S, M, L), drag and drop, tick several and Place n, moves without asking, and Undo for a move or a
-load (§ Where it lands, the last four). Publish it on `paua-releases` too.
+load (§ Where it lands, the last four). Published here only: every booth is on 1.4.1 or later, so
+`paua-releases` is no longer used (the owner, 2026-10-22).
 
 **1.8.0** (2026-10-22): in the Lookbook, where each moment lands, Move with swaps, the Map size,
 and badges that name the problem (§ Where it lands, below). Nothing else new since 1.7.0.
@@ -248,7 +249,7 @@ computer reaches it, Arena's graphics folder set; first run at Central 2026-10-1
 - [ ] **Save as a preset**, **Reset to defaults** (Holding back to the usual), **Use** (back again)
 - [ ] **To a file** on one computer, **Import** on another: the same map in use there
 
-**Updates** (from 1.4.1 read from this repo's published releases; 1.1.0 to 1.4.0 from the public `lifenzrpewh/paua-releases` repo with the `RELEASES_TOKEN` secret, and that version's draft published there)
+**Updates** (from 1.4.1 read from this repo's published releases; 1.1.0 to 1.4.0 read the public `lifenzrpewh/paua-releases` repo, the bridge, retired 2026-10-22 with every booth on 1.4.1 or later)
 - [ ] About a minute after the start, the bar says **Pāua <new> is out** (a download icon, quiet blue)
 - [ ] As a volunteer, tapping it asks for the Admin passcode; in Admin it opens Settings › This computer
 - [ ] **Check for updates** says "is the newest" when nothing is newer, and "Could not check: …" with the network unplugged (never "newest")

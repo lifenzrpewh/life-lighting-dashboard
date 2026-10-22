@@ -8,8 +8,9 @@
 // drafts after it, while the releases published here were never read). The
 // release build drafts each version here; publishing that draft is what rolls
 // an update out, so nothing reaches a booth until the owner says. From 1.4.1;
-// 1.1.0 to 1.4.0 still read paua-releases, so 1.4.1 is published there once too,
-// the bridge.
+// 1.1.0 to 1.4.0 read paua-releases, so versions were published there too, the
+// bridge, until every booth was on 1.4.1 or later (the owner, 2026-10-22): the
+// release build drafts only here since.
 //
 // THE RULES THIS FILE CARRIES:
 // - Checking is automatic; installing never is. A booth mid-service restarting

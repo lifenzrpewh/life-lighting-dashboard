@@ -5,7 +5,8 @@
 # A tag drafts the release here; installed copies from 1.4.1 update from this
 # repo's releases (src/shared/updates.ts), so publishing the draft is what
 # offers the version to the booths. 1.1.0 to 1.4.0 read the public
-# lifenzrpewh/paua-releases instead: a draft goes there too, for the bridge.
+# lifenzrpewh/paua-releases instead; the step drafting there too (the bridge)
+# was dropped on 2026-10-22, every booth being on 1.4.1 or later (the owner).
 # The files are the run's artifacts, downloaded from its page; a tag also
 # makes a DRAFT GitHub Release holding them, published by hand when the time
 # comes (GitHub as the place testers download from is the end goal).
@@ -150,20 +151,6 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" files/* --repo "${{ github.repository }}" \
             --draft --title "Pāua ${{ github.ref_name }}" --notes "Field-test build. How to install and what to check: docs/FIELD_TEST.md."
-      # The bridge (src/shared/updates.ts): booths on 1.1.0 to 1.4.0 read the
-      # public paua-releases repo. Publishing one version from 1.4.1 on there
-      # moves them onto this repo's releases for good; once every booth is past
-      # 1.4.0, drop this step and the RELEASES_TOKEN secret.
-      - name: Draft the same in paua-releases
-        env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "No RELEASES_TOKEN secret: skipped. Booths will not see this version until it is set and the build runs again."
-            exit 0
-          fi
-          gh release create "${{ github.ref_name }}" files/* --repo lifenzrpewh/paua-releases \
-            --draft --title "Pāua ${{ github.ref_name }}" --notes "Pāua ${{ github.ref_name }}. Publishing this draft offers it to every booth: Settings › This computer › Update."
 
   report:
     needs: [windows, mac]
