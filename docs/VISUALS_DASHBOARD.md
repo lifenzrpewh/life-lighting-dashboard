@@ -980,8 +980,9 @@ in this order, are in brackets. Each in the dev kiosk on the Mac over CDP, again
   following). A hand placement is a pin `{item, code, column}` per service on this computer
   (`paua.holding.pins`, 12 services). The planner puts every code of a pinned moment into that
   column first; no PROMO, one-off or overflow takes it; with no background of its own the normal
-  background follows. `pinTargets` lights every clip of the layer but reserved columns, cells
-  the map gives elsewhere and columns another moment has. Ways in: **Place…** on a code in the
+  background follows. Where it may go is `moveTargets` since 2026-10-22 (PROMO and spare columns,
+  a taken one a swap: § One Lookbook); `pinTargets` lit every clip of the layer but reserved
+  columns, cells the map gives elsewhere and columns another moment has. Ways in: **Place…** on a code in the
   plan, the No column tray, and **Place … elsewhere…** in Inspect. The pin is kept only when
   Load is pressed; the plan says "by hand" with an Undo.
 - **Same code, different file** (all four helpers). Side by side, with name, size and date
@@ -1020,10 +1021,11 @@ cluttered". The interview (two rounds of multiple choice) said:
   here later.
 
 What a card holds: the composed picture, the A-screen or lower third beside it, the title and
-label, a state (In Arena, To load, Needs you, Loading…, On screen), a chip per piece (`BG CB101
+label, a state (In Arena, To load, the problem's name since 2026-10-22, Loading…, On screen), a chip per piece (`BG CB101
 → WTL`, `FG CF445 may differ`, `LT CT108 in ProPresenter`), each problem with its fix (Compare
 opens the side-by-side; Choose a slot opens the moment's foreground layer, its free columns lit;
-It's there after a failed load), and, in Admin, a tick, Load, and Move… once it is in Arena.
+It's there after a failed load), and, in Admin, a tick, Load, and Move (on every card since
+2026-10-22; once it was in Arena only).
 **Parts, and a quieter confirmation** (the owner, 2026-10-14, later: "choose which PART of it you
 load, but keeping it clean", and the confirmation "cluttered and full"; both their picks from two
 options with previews). The chips are the switches: ticking a card lights every part with
@@ -1032,6 +1034,32 @@ picks just that part; the card's button says what it loads ("Load FG") and the t
 "Load n parts". The confirmation is one line ("Update all: 8 files into Arena", then "7 from the
 graphics drive · 1 only in the lookbook · 2 with no column: left out") and its questions; each
 step and where it comes from is under **Show each**.
+
+**Where it lands, and moving promos** (the owner, 2026-10-22: an easy way to change where a
+promo lands, and "no obvious idea what things are going where and whats landing where UNLESS you
+know the arena layout"; two rounds of multiple choice with mock-ups in Pāua's look). Their picks:
+- **The badge names the problem**, not "Needs you": Wrong file?, File missing, No spot, Didn't
+  load; "2 problems" for more; the top count "n problems".
+- **Every card says where it lands**: "Lands in PROMO 2 · column 12 · replaces CF455" ("In …" once
+  it is there; "into an empty clip"), over a strip of Arena's columns with its own lit
+  (`Look.lands`, worked out in `looksOf`: its own column, a PROMO, moved, or a spare one).
+- **Move on every card** (Admin), not only once in Arena: the moved code's layer, lit where it may
+  go: **PROMO columns and the unnamed ones past the last named column, never a column named for a
+  moment** (WTL, PRE, …), a reserved one, or where it is. Another moment's column is a **swap**:
+  only the two change places (`moveTargets`, `movePins`), and only when the one moving is itself
+  in a PROMO or spare column, so the other never lands in a named one. Shuffling the rest along
+  was the alternative, declined: more reloads.
+- **A move lasts this service** (a pin, as before) and is the plan at once; loading it is asked
+  apart, and Cancel leaves it moved and to load. "Moved for this service · Put back" (Put back
+  undoes that moment's pin only; after a swap, the other stays where it went).
+- **Map**, a fourth size beside Big, Two a row and Rows: Arena's holding grid as Arena lays it
+  out, each column's name and its moment over the FG, BG and A clips; what will load dashed with
+  the lookbook's picture, last week's faded, a problem amber, on screen green; a column nothing
+  uses and named for nothing a sliver. Tap a moment to see where it lands; in Admin, a lit column
+  moves it, "swap" on another moment's. Moments with no spot listed under it, tap to place.
+Checked in the dev kiosk on the Mac over CDP against the stand-in widened to Central's 16 columns
+and the lookbook's Central AM 25 Oct: the badges, Lands in, a swap from a card and back from the
+Map, Cancel keeping the move. ⚠️ Not against Arena, by finger, or a load through a move.
 
 Gone with Holding: the grid, the plan panel, the No column tray, the legend, the activity chips,
 the result line and Files to check (a card that needs a look says so; the filter gathers them).
