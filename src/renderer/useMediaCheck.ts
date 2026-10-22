@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import type { ArenaStatus } from '../shared/arena.js'
 import { useHoldingMap } from './holdingMapStore.js'
 import { layerOfCode } from '../shared/holding-map.js'
-import { backgroundGaps, codesOn, explainPlan, mergeSteps, moveTargets, movePins, oldForegrounds, pinsFrom, placementStep, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Pin, type PlanLine, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { backgroundGaps, codesOn, explainPlan, moveTargets, movePins, oldForegrounds, placeFrom, pinsFrom, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Pin, type PlanLine, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	lookbookStem,
@@ -272,9 +272,19 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 	}
 
 	const runSheet = service !== null && itemsFor === service.id && items.kind === 'read' && items.read.ok ? items.read.value : null
+	// The latest move, for Undo: the pins before it, for this service only.
+	const [lastMove, setLastMove] = useState<{ service: string; label: string; before: Pin[]; at: number } | null>(null)
+	const [undoWords, setUndoWords] = useState<string | null>(null)
 	// Placed by hand, for this service: one copy for every check (above).
 	const pinsBy = useSyncExternalStore(subscribe, () => pinsNow)
 	const pins: Pin[] = service === null ? NO_PINS : (pinsBy[service.id] ?? NO_PINS)
+	/** A move, a swap, a batch or a Put back: the new pins, and the old kept for Undo. */
+	const changePins = (next: Pin[], label: string) => {
+		if (service === null) return
+		setLastMove({ service: service.id, label, before: pins, at: Date.now() })
+		setUndoWords(null)
+		savePins(next)
+	}
 	const savePins = (next: Pin[]) => {
 		if (service === null) return
 		const { [service.id]: _, ...rest } = pinsNow
@@ -417,6 +427,17 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		ask(`Update all: ${plannedUpdate.steps.length === 1 ? '1 step' : `${plannedUpdate.steps.length} steps`}`, plannedUpdate.steps, plannedUpdate.unplaced, oldFgs)
 	const askClearOld = () => ask(`Clear old foregrounds: ${allOld.length}`, [], [], allOld)
 
+	// What Undo would take back: the newer of the latest move (this service's)
+	// and the latest load that put files into clips that held others.
+	const moveUndo = lastMove !== null && service !== null && lastMove.service === service.id ? lastMove : null
+	const loadUndo = lastRun !== null && lastRun.ended !== null && !lastRun.undone && lastRun.undoable > 0 ? lastRun : null
+	const undoable: { kind: 'move'; label: string; before: Pin[] } | { kind: 'load'; label: string; runId: number; clips: number } | null =
+		moveUndo !== null && (loadUndo === null || moveUndo.at > loadUndo.at)
+			? { kind: 'move', label: moveUndo.label, before: moveUndo.before }
+			: loadUndo !== null
+				? { kind: 'load', label: loadUndo.label, runId: loadUndo.id, clips: loadUndo.undoable }
+				: null
+
 	return {
 		/** The Holding map these were planned by. */
 		map,
@@ -460,20 +481,53 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		replaceLocal,
 		/** Moved for this service, and the actions on them. */
 		pins,
-		unpin: (item: number) => savePins(pins.filter((p) => p.item !== item)),
+		unpin: (item: number) => {
+			const name = runSheet?.[item]?.label ?? runSheet?.[item]?.title ?? ''
+			changePins(pins.filter((p) => p.item !== item), `Put back ${name}`)
+		},
 		/** Where a moment may be moved, by clip id, and whom each swaps with. */
 		moveTargets: (what: { item: number; code: string }) => (runSheet === null ? new Map<number, { column: number; swap: number | null }>() : moveTargets(runSheet, status, what, map, pins)),
 		/** Move a moment to `column` (from 1) for this service, swapping with
-		 *  the moment there. The move is the plan at once; loading it is asked
-		 *  apart, and Cancel leaves it moved and to load. */
-		askMoveTo: (what: { item: number; code: string }, column: number) => {
+		 *  the moment there. Only the plan changes (the owner, 2026-10-22: "move
+		 *  now, load later"); Undo takes it back, Load or Update all loads it. */
+		moveTo: (what: { item: number; code: string }, column: number) => {
 			if (runSheet === null) return
 			const next = movePins(runSheet, status, what, column, map, pins)
-			const moved = new Set(next.filter((p) => !pins.some((q) => q.item === p.item && q.column === p.column && q.code === p.code)).map((p) => p.item))
-			const steps = mergeSteps(planPlacements(runSheet, status, map, next).placements.filter((p) => moved.has(p.item)).map(placementStep))
-			const titles = [what.item, ...[...moved].filter((i) => i !== what.item)].map((i) => runSheet[i]?.label ?? runSheet[i]?.title ?? '')
-			savePins(next)
-			if (steps.length > 0) ask(titles.length > 1 ? `Swap ${titles[0]} and ${titles[1]}` : `Move ${titles[0]}`, steps)
+			const moved = [...new Set(next.filter((p) => !pins.some((q) => q.item === p.item && q.column === p.column && q.code === p.code)).map((p) => p.item))]
+			const titles = [what.item, ...moved.filter((i) => i !== what.item)].map((i) => runSheet[i]?.label ?? runSheet[i]?.title ?? '')
+			changePins(next, titles.length > 1 ? `Swap ${titles[0]} and ${titles[1]}` : `Move ${titles[0]}`)
+		},
+		/** Where several moments would land from `start` (from 1), not saved. */
+		previewPlace: (what: { item: number; code: string }[], start: number) => (runSheet === null || what.length === 0 ? null : placeFrom(runSheet, status, what, start, map, pins)),
+		/** Several moments from `start` (from 1) forward (`placeFrom`): the plan
+		 *  only, one Undo for all. Returns what landed and what did not fit. */
+		placeFrom: (what: { item: number; code: string }[], start: number) => {
+			if (runSheet === null || what.length === 0) return null
+			const r = placeFrom(runSheet, status, what, start, map, pins)
+			if (r.landed.length > 0) changePins(r.pins, `Place ${r.landed.length}`)
+			return r
+		},
+		/** The newest thing Undo would take back: a move (the plan) or a load
+		 *  (Arena's clips, their old files back), or null. */
+		undoable,
+		undoWords,
+		/** Undo the newest move, or the newest load (asked twice by the page:
+		 *  it writes to Arena). */
+		undo: async () => {
+			if (undoable === null) return
+			if (undoable.kind === 'move') {
+				savePins(undoable.before)
+				setLastMove(null)
+				setUndoWords(`Undone: ${undoable.label}`)
+				return
+			}
+			const r = await life?.undoMediaRun(undoable.runId)
+			if (r === undefined) return
+			setUndoWords(
+				!r.ok
+					? `Not undone: ${r.detail}`
+					: `Put back ${r.restored} clip${r.restored === 1 ? '' : 's'}${r.left.length > 0 ? `; left as they are: ${r.left.join('; ')}` : ''}`,
+			)
 		},
 		asking,
 		ask,

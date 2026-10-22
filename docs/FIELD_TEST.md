@@ -201,6 +201,10 @@ sections below.
 - [ ] **Put back** on a moved card; a swap's other card stays where it went
 - [ ] **Map** (the fourth size button): Central's columns in Arena's order, each moment's name over its clips; tap a promo, then a lit column: the same swap
 - [ ] As a volunteer: Lands in and the Map still there, no Move and nothing lit
+- [ ] The Map's **Fit** fills the screen with big thumbnails, sideways scroll for the rest; S shows every column
+- [ ] **Drag** a promo by finger: rest a moment, it lifts, lit columns, drop: moved; a quick swipe scrolls instead
+- [ ] **Tick** two moments, tap a column: the headings show where each lands; **Place 2**; a column on screen is skipped
+- [ ] **Undo** after a move (one tap) and after a Load (two taps): each clip's old file back, an empty one left and said
 
 **Announcements Load** (1.3.0; Admin; Settings › ProPresenter › Announcements: the folder as this
 computer reaches it, Arena's graphics folder set; first run at Central 2026-10-14 into PAUA TEST AM)
