@@ -13,7 +13,8 @@ import {
 	looksOf,
 	nameWords,
 	normalBackground,
-	pinTargets,
+	moveTargets,
+	movePins,
 	pinsFrom,
 	oldForegrounds,
 	placementWords,
@@ -686,18 +687,50 @@ test('a pin moves a moment with a column of its own, and no PROMO takes its colu
 	assert.ok(r.placements.filter((p) => p.item !== 2 && p.layer === 'HOLD FG').every((p) => p.column !== 11))
 })
 
-test('where a moment may be put by hand: its layer, not a reserved column, not a column another moment has', () => {
+test('where a moment may be moved: a PROMO or spare column on its layer, never a named one (the owner, 2026-10-22)', () => {
 	const s = wide(3)
 	const fg = s.layers[3]
-	const targets = pinTargets(ITEMS, s, { item: ITEMS.length - 1, code: 'CF588' }) // End's foreground
-	const cols = fg.slots.flatMap((slot, i) => (targets.has(slot.id) ? [i + 1] : []))
-	// Not COUNTDOWN (3) or VIDEO BG (4); not PRE, WTL, NSL, BIBLES, WTG or the PROMOs the
-	// announcements take; POST is End's own; 11 and 12 are PROMO columns no one took; past them, free.
-	assert.deepEqual(cols, [2, 11, 12, 13, 14, 15])
+	const cols = (targets) => fg.slots.flatMap((slot, i) => (targets.has(slot.id) ? [[i + 1, targets.get(slot.id).swap]] : []))
+	// End sits in POST, a named column: the free PROMOs (11, 12) and the spare
+	// columns past them; never COUNTDOWN, VIDEO BG, PRE, WTL, …; the PROMOs the
+	// announcements have are not offered, since End would put one in POST.
+	assert.deepEqual(cols(moveTargets(ITEMS, s, { item: ITEMS.length - 1, code: 'CF588' })), [[11, null], [12, null], [13, null], [14, null], [15, null]])
+	// Alpha sits in PROMO 2 (column 10): Prayer & Fasting's PROMO 1 is a swap.
+	assert.deepEqual(cols(moveTargets(ITEMS, s, { item: 5, code: 'CF562' })), [[9, 4], [11, null], [12, null], [13, null], [14, null], [15, null]])
 	// Only its own layer.
-	assert.ok(!s.layers[1].slots.some((slot) => targets.has(slot.id)))
+	assert.ok(!s.layers[1].slots.some((slot) => moveTargets(ITEMS, s, { item: 5, code: 'CF562' }).has(slot.id)))
 	// Storage: anything not a pin is dropped.
 	assert.deepEqual(pinsFrom([{ item: 1, code: 'CF465', column: 11, extra: 1 }, { item: -1, code: 'CF465', column: 2 }, 'x']), [{ item: 1, code: 'CF465', column: 11 }])
+})
+
+test('a move onto another promo swaps only the two; the rest stay (the owner, 2026-10-22)', () => {
+	const s = wide(3)
+	const promos = (r) => [...r.columns].filter(([i]) => i === 4 || i === 5).sort((a, b) => a[0] - b[0])
+	assert.deepEqual(promos(planPlacements(ITEMS, s)), [[4, 8], [5, 9]])
+	const pins = movePins(ITEMS, s, { item: 5, code: 'CF562' }, 9)
+	assert.deepEqual(pins, [{ item: 5, code: 'CF562', column: 9 }, { item: 4, code: 'CF594', column: 10 }])
+	const r = planPlacements(ITEMS, s, undefined, pins)
+	assert.deepEqual(promos(r), [[4, 9], [5, 8]])
+	assert.equal(r.whys.get(5), 'chosen')
+	// Into a free column: no swap, nothing else pinned.
+	assert.deepEqual(movePins(ITEMS, s, { item: 5, code: 'CF562' }, 12), [{ item: 5, code: 'CF562', column: 12 }])
+	// A second move replaces the first, and the other's pin with it.
+	assert.deepEqual(movePins(ITEMS, s, { item: 4, code: 'CF594' }, 11, undefined, pins), [{ item: 5, code: 'CF562', column: 9 }, { item: 4, code: 'CF594', column: 11 }])
+})
+
+test('each look says where it lands: its column, why, and what it replaces', () => {
+	const s = composition()
+	const looks = looksOf(ITEMS, s, new Set())
+	// Doors Open is in PRE already: nothing replaced.
+	assert.deepEqual(looks[0].lands, { column: 1, name: 'PRE', why: 'own', replaces: null })
+	// NSL replaces the old upstairs foreground in its own column.
+	assert.deepEqual(looks[2].lands, { column: 6, name: 'NSL', why: 'own', replaces: 'CF446' })
+	// Alpha takes the second PROMO, over last month's prayer foreground.
+	assert.deepEqual(looks[5].lands, { column: 10, name: 'PROMO', why: 'promo', replaces: 'CF593' })
+	// The preach background has no column of its own: none said.
+	assert.equal(looks[7].lands?.why === 'own', false)
+	// Moved: said so.
+	assert.equal(looksOf(ITEMS, s, new Set(), undefined, undefined, [{ item: 5, code: 'CF562', column: 11 }])[5].lands.why, 'moved')
 })
 
 test('a one-off put by hand inside the named columns: its background follows, said as beside it', () => {

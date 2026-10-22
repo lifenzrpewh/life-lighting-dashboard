@@ -470,6 +470,8 @@ export function planPlacements(
 	unplaced: Unplaced[]
 	/** Each item's column (counted from 0), for those that have one. */
 	columns: Map<number, number>
+	/** Why each of those is its column: by name, a PROMO, by hand. */
+	whys: Map<number, Placement['why']>
 	/** The column names the items were placed by. */
 	names: string[]
 	/** What needs nothing, and why. */
@@ -877,8 +879,13 @@ export function planPlacements(
 	}
 	placements.push(...fixed)
 	const columns = new Map<number, number>()
-	for (const [i, where] of columnOf) if (!('none' in where)) columns.set(i, where.column)
-	return { placements, unplaced, columns, names, settled }
+	const whys = new Map<number, Placement['why']>()
+	for (const [i, where] of columnOf) {
+		if ('none' in where) continue
+		columns.set(i, where.column)
+		whys.set(i, where.why)
+	}
+	return { placements, unplaced, columns, whys, names, settled }
 }
 
 /** The background the rest of the service uses (the owner, 2026-10-06): the
@@ -1144,12 +1151,44 @@ export type Look = {
 	live: boolean
 	/** Everything of Arena's is where it belongs and right. */
 	ready: boolean
+	/** Where it lands (the owner, 2026-10-22: "no obvious idea what things are
+	 *  going where … UNLESS you know the arena layout"), or null with no column. */
+	lands: Landing | null
+}
+
+/** Where a moment lands: the column its piece (foreground, else background,
+ *  else A-screen) is in or goes to, and why; what loading puts it over. */
+export type Landing = {
+	/** Counted from 1. */
+	column: number
+	/** The column's name; '' when Arena's default. */
+	name: string
+	/** Its own column by name; the next PROMO; moved for this service; a spare
+	 *  column past the named ones. */
+	why: 'own' | 'promo' | 'moved' | 'spare'
+	/** What loading replaces there: a code, else the clip's name; 'empty' for an
+	 *  empty clip; null when its piece is there already. */
+	replaces: string | null
 }
 
 /** Every run-sheet item as a look: what each of its codes is in Arena. */
 export function looksOf(items: LookbookItem[], status: ArenaStatus, marks: ReadonlySet<string>, sizes?: FileSizes, map: HoldingMap = DEFAULT_MAP, pins: readonly Pin[] = []): Look[] {
-	const { placements, unplaced, columns, names } = planPlacements(items, status, map, pins)
+	const { placements, unplaced, columns, whys, names, settled } = planPlacements(items, status, map, pins)
 	const today = codesOn(items)
+	const landing = (i: number): Landing | null => {
+		const mine = placements.filter((p) => p.item === i)
+		const key = ['F', 'B', 'A'].map((t) => mine.find((p) => layerOfCode(map, p.code) === t)).find((p) => p !== undefined)
+		const replaces = key === undefined ? null : key.replaces === null ? 'empty' : (key.replaces.code ?? key.replaces.name)
+		const column = columns.get(i)
+		if (column !== undefined) {
+			const why = whys.get(i)
+			return { column: column + 1, name: unnamed(names[column] ?? '') ? '' : (names[column] ?? ''), why: why === 'named' ? 'own' : why === 'chosen' ? 'moved' : 'promo', replaces }
+		}
+		// A one-off: where its foreground goes past the named columns, or sits.
+		const spare = key?.why === 'overflow' || key?.why === 'follows' ? key.column : settled.find((x) => x.item === i && x.why === 'on-layer')?.column
+		if (spare === undefined) return null
+		return { column: spare, name: unnamed(names[spare - 1] ?? '') ? '' : (names[spare - 1] ?? ''), why: 'spare', replaces }
+	}
 	// A code's worst mark over every clip carrying it: one of CB095's eighteen
 	// with an old file is enough to look at.
 	const worst = new Map<string, SlotMark>()
@@ -1189,6 +1228,7 @@ export function looksOf(items: LookbookItem[], status: ArenaStatus, marks: Reado
 			live,
 			// The lookbook having no file is the lookbook's to fix, not Arena's.
 			ready: codes.every((c) => c.state === 'ready' || c.state === 'not-arena' || c.state === 'no-file'),
+			lands: landing(i),
 		}
 	})
 }
@@ -1324,31 +1364,75 @@ export function explainPlan(
 	return lines
 }
 
-/** Where a moment may be put by hand (the owner, 2026-10-13: "place it
- *  anywhere with a confirm"; on its own layer only, the owner's answer): every
- *  clip of the chosen code's layer except a reserved column, one the map gives
- *  to something else, and a column another moment has (its own by name, a
- *  PROMO it took, a one-off's, another hand placement), since two moments
- *  cannot share a fired column. Its own column now is offered too. */
-export function pinTargets(
+/** The piece a moment is moved by: its foreground, else its background, else
+ *  its A-screen; the code a pin keeps. */
+export function keyCodeOf(item: LookbookItem, map: HoldingMap = DEFAULT_MAP): string | null {
+	const codes = arenaCodes(item, map).filter((c) => c.want !== null)
+	return (codes.find((c) => c.type === 'F') ?? codes.find((c) => c.type === 'B') ?? codes[0])?.code ?? null
+}
+
+/** Where a moment may be moved to (the owner, 2026-10-22: "PROMO and spare
+ *  columns"), by clip id: a PROMO column, or an unnamed one past the last named
+ *  column, on the moved code's layer; never a column named for a moment (WTL,
+ *  PRE, …), a reserved one, one the map gives to something else, or where it
+ *  is now. A column another moment has is offered as a SWAP (the owner's pick:
+ *  only the two change places), and only when the moment moving is itself in a
+ *  PROMO or spare column, so the other never lands in a named one. */
+export function moveTargets(
 	items: LookbookItem[],
 	status: ArenaStatus,
 	what: { item: number; code: string },
 	map: HoldingMap = DEFAULT_MAP,
 	pins: readonly Pin[] = [],
-): Set<number> {
+): Map<number, { column: number; swap: number | null }> {
 	const type = layerOfCode(map, what.code)
 	const layer = type === null ? undefined : layerFor(status, type)
-	if (layer === undefined) return new Set()
-	const { columns, placements, settled } = planPlacements(items, status, map, pins.filter((p) => p.item !== what.item))
-	const taken = new Set<number>()
-	for (const [i, c] of columns) if (i !== what.item) taken.add(c)
-	for (const p of placements) if (p.item >= 0 && p.item !== what.item && p.why === 'overflow') taken.add(p.column - 1)
-	for (const x of settled) if (x.item !== what.item && x.why === 'on-layer') taken.add(x.column - 1)
-	const out = new Set<number>()
-	layer.slots.forEach((slot, i) => {
-		if (taken.has(i) || reserved(layer, i + 1, status, map) || slotCell(layer, i + 1, status, map).kind !== 'auto') return
-		out.add(slot.id)
+	const out = new Map<number, { column: number; swap: number | null }>()
+	if (layer === undefined) return out
+	const names = columnNamesOf(layer, status)
+	const last = lastNamed(layer, status)
+	const movable = (c: number) => (isPromoName(names[c] ?? '') || (unnamed(names[c] ?? '') && c > last)) && !reserved(layer, c + 1, status, map) && slotCell(layer, c + 1, status, map).kind === 'auto'
+	const holders = holdersOf(planPlacements(items, status, map, pins))
+	const here = [...holders].find(([, i]) => i === what.item)?.[0]
+	layer.slots.forEach((slot, c) => {
+		if (c === here || !movable(c)) return
+		const other = holders.get(c)
+		if (other === undefined) out.set(slot.id, { column: c + 1, swap: null })
+		else if (here !== undefined && movable(here) && keyCodeOf(items[other] as LookbookItem, map) !== null) out.set(slot.id, { column: c + 1, swap: other })
 	})
+	return out
+}
+
+/** The pins after moving a moment to `column` (from 1): its pin there, and,
+ *  when another moment has that column, that one's pin where it was (a swap). */
+export function movePins(
+	items: LookbookItem[],
+	status: ArenaStatus,
+	what: { item: number; code: string },
+	column: number,
+	map: HoldingMap = DEFAULT_MAP,
+	pins: readonly Pin[] = [],
+): Pin[] {
+	const holders = holdersOf(planPlacements(items, status, map, pins))
+	const here = [...holders].find(([, i]) => i === what.item)?.[0]
+	const other = holders.get(column - 1)
+	const swap = other !== undefined && other !== what.item && here !== undefined ? other : undefined
+	const otherCode = swap === undefined ? null : keyCodeOf(items[swap] as LookbookItem, map)
+	const next = pins.filter((p) => p.item !== what.item && p.item !== swap)
+	next.push({ item: what.item, code: what.code, column })
+	if (swap !== undefined && otherCode !== null && here !== undefined) next.push({ item: swap, code: otherCode, column: here + 1 })
+	return next
+}
+
+/** Which moment has each column (from 0): by name, a PROMO, by hand, a
+ *  one-off's spare column or one it sits in; the first in run-sheet order. */
+function holdersOf(plan: ReturnType<typeof planPlacements>): Map<number, number> {
+	const out = new Map<number, number>()
+	const add = (column: number, item: number) => {
+		if (item >= 0 && !out.has(column)) out.set(column, item)
+	}
+	for (const [i, c] of [...plan.columns].sort((a, b) => a[0] - b[0])) add(c, i)
+	for (const p of plan.placements) if (p.why === 'overflow') add(p.column - 1, p.item)
+	for (const x of plan.settled) if (x.why === 'on-layer') add(x.column - 1, x.item)
 	return out
 }

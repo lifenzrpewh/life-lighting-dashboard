@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import type { ArenaStatus } from '../shared/arena.js'
 import { useHoldingMap } from './holdingMapStore.js'
 import { layerOfCode } from '../shared/holding-map.js'
-import { backgroundGaps, codesOn, explainPlan, oldForegrounds, pinTargets, pinsFrom, placementStep, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Pin, type PlanLine, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
+import { backgroundGaps, codesOn, explainPlan, moveTargets, movePins, oldForegrounds, pinsFrom, placementStep, planPlacements, slotCode, slotMark, updatePlan, type OldClip, type Pin, type PlanLine, type Placement, type Unplaced, type UpdateStep } from '../shared/holding.js'
 import {
 	checkMedia,
 	lookbookStem,
@@ -458,19 +458,22 @@ export function useMediaCheck(status: ArenaStatus, now: number, watchFetches: bo
 		markSame,
 		itsThere,
 		replaceLocal,
-		/** Placed by hand for this service, and the actions on them. */
+		/** Moved for this service, and the actions on them. */
 		pins,
 		unpin: (item: number) => savePins(pins.filter((p) => p.item !== item)),
-		/** The clips a moment may be put in by hand, by clip id. */
-		pinTargets: (what: { item: number; code: string }): Set<number> => (runSheet === null ? new Set() : pinTargets(runSheet, status, what, map, pins)),
-		/** Put a moment in `column` (from 1) by hand: asks first, every code of
-		 *  it into that column, and keeps the pin once Load is pressed. */
-		askPlaceAt: (what: { item: number; code: string }, column: number) => {
+		/** Where a moment may be moved, by clip id, and whom each swaps with. */
+		moveTargets: (what: { item: number; code: string }) => (runSheet === null ? new Map<number, { column: number; swap: number | null }>() : moveTargets(runSheet, status, what, map, pins)),
+		/** Move a moment to `column` (from 1) for this service, swapping with
+		 *  the moment there: asks first when it loads anything, and keeps the
+		 *  move once Load is pressed. */
+		askMoveTo: (what: { item: number; code: string }, column: number) => {
 			if (runSheet === null) return
-			const next = [...pins.filter((p) => p.item !== what.item), { item: what.item, code: what.code, column }]
-			const steps = planPlacements(runSheet, status, map, next).placements.filter((p) => p.item === what.item).map(placementStep)
+			const next = movePins(runSheet, status, what, column, map, pins)
+			const moved = new Set(next.filter((p) => !pins.some((q) => q.item === p.item && q.column === p.column && q.code === p.code)).map((p) => p.item))
+			const steps = planPlacements(runSheet, status, map, next).placements.filter((p) => moved.has(p.item)).map(placementStep)
+			const titles = [what.item, ...[...moved].filter((i) => i !== what.item)].map((i) => runSheet[i]?.label ?? runSheet[i]?.title ?? '')
 			if (steps.length === 0) savePins(next)
-			else ask('Place by hand', steps, [], [], () => savePins(next))
+			else ask(titles.length > 1 ? `Swap ${titles[0]} and ${titles[1]}` : `Move ${titles[0]}`, steps, [], [], () => savePins(next))
 		},
 		asking,
 		ask,

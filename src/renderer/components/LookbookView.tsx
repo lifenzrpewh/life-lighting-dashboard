@@ -21,7 +21,11 @@
 //   keeping it clean"): the chips are the switches. Ticking a card lights every
 //   part with something to load; a tap on a chip leaves that part out, or, on a
 //   card not ticked, picks just that part. Nothing else on screen.
-// - No grid: Choose a slot opens that layer's clips only, to tap one.
+// - Where it lands (the owner, 2026-10-22: "no obvious idea what things are
+//   going where … UNLESS you know the arena layout"): each card says "Lands in
+//   PROMO 2 · column 12 · replaces CF455" over a strip of Arena's columns with
+//   its own lit, and has Move (Admin): its layer's clips, lit where it may go,
+//   a PROMO or spare column only, a taken one a swap. A move lasts this service.
 // - Card size is a zoom, per computer: Big (as the Lookbook was), Two a row,
 //   or Rows.
 // - Lower thirds read-only from ProPresenter's announcement playlist (the
@@ -29,7 +33,7 @@
 //
 // Every change asks first (Confirm) and is Admin's: main refuses otherwise, and
 // for a volunteer the buttons are not drawn (the owner, 2026-10-06). The rules
-// are ../../shared/holding.ts (`looksOf`, `lookSteps`, `pinTargets`), the same
+// are ../../shared/holding.ts (`looksOf`, `lookSteps`, `moveTargets`), the same
 // as Update all's, never a second guess.
 
 import { useEffect, useState } from 'react'
@@ -37,7 +41,7 @@ import { Check, FileX, LayoutGrid, Minus, Rows3, Square, RefreshCw, X } from 'lu
 
 import { thumbnailUrl, type ArenaLayer, type ArenaStatus } from '../../shared/arena.js'
 import { checkAnnouncements, sessionOf, wantedAnnouncements } from '../../shared/announcements.js'
-import { COLUMN_NAMES, codesOn, columnNamesOf, holdingLayers, lookSteps, looksOf, slotCode, slotMark, type CodeState, type Look, type UpdateStep } from '../../shared/holding.js'
+import { COLUMN_NAMES, codesOn, columnNamesOf, holdingLayers, lookSteps, looksOf, slotCode, slotMark, type CodeState, type Landing, type Look, type UpdateStep } from '../../shared/holding.js'
 import { lookbookThumbUrl, mediaCodeOf, type LookbookItem } from '../../shared/media-check.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
@@ -66,7 +70,7 @@ function storedSize(): Size {
 
 const unnamedColumn = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim()) || name.trim() === ''
 
-/** A moment's code to put somewhere by hand, as `pinTargets` and `askPlaceAt` take it. */
+/** A moment's code to move, as `moveTargets` and `askMoveTo` take it. */
 type Choosing = { item: number; code: string }
 
 /** Each step once per code: two moments sharing a background load it once,
@@ -251,6 +255,7 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 								m.ask(`Load ${items[look.item]?.title ?? ''}`, steps, [], [], () => setPicks(look.item, []))
 							}}
 							lowerThirds={lowerThirds}
+							columnNames={headerNames}
 						/>
 					))}
 				</div>
@@ -344,6 +349,7 @@ function Card({
 	onPart,
 	onLoad,
 	lowerThirds,
+	columnNames,
 }: {
 	m: MediaCheckState
 	status: ArenaStatus
@@ -361,6 +367,8 @@ function Card({
 	/** Load this card: its picked parts, or all of it. */
 	onLoad: () => void
 	lowerThirds: ReadonlyMap<string, 'there' | 'missing'>
+	/** HOLDING's column names, for the strip. */
+	columnNames: string[]
 }) {
 	// What is open under the card: a code's files compared, or a slot to choose.
 	const [open, setOpen] = useState<{ kind: 'compare' | 'slot'; code: string } | null>(null)
@@ -376,7 +384,9 @@ function Card({
 	const typeOf = (code: string) => TYPE_SHORT[look.codes.find((c) => c.code === code)?.type ?? ''] ?? code
 	// Load says what it loads when only some parts are picked: "Load BG".
 	const loadWords = picked.length > 0 && picked.length < loadable.length ? `Load ${picked.map(typeOf).join(', ')}` : 'Load'
-	const firstArena = look.codes.find((c) => c.state !== 'not-arena' && c.state !== 'no-file' && item.files[c.code] !== undefined)
+	// The piece it is moved by: its foreground, else background, else A-screen.
+	const movable = look.codes.filter((c) => c.state !== 'not-arena' && c.state !== 'no-file' && item.files[c.code] !== undefined)
+	const key = ['F', 'B', 'A'].map((t) => movable.find((c) => c.type === t)).find((c) => c !== undefined)
 
 	const picture = (
 		<div className={`relative w-full overflow-hidden bg-black ${size === 'rows' ? 'rounded-ctl' : ''}`} style={{ aspectRatio: '5800 / 2037' }}>
@@ -434,28 +444,22 @@ function Card({
 					))}
 				</div>
 			)}
-			{operator && (loadable.length > 0 || pinned || (state === 'ready' && firstArena !== undefined)) && (
+			{look.lands !== null && <Lands lands={look.lands} names={columnNames} big={big} />}
+			{operator && (loadable.length > 0 || pinned || (key !== undefined && look.lands !== null && state !== 'loading')) && (
 				<div className="flex flex-wrap items-center gap-2">
 					{loadable.length > 0 && (
 						<Button variant="primary" size="sm" onClick={onLoad}>
 							{loadWords}
 						</Button>
 					)}
-					{pinned ? (
+					{key !== undefined && look.lands !== null && state !== 'loading' && <SmallButton onClick={() => setOpen({ kind: 'slot', code: key.code })}>Move</SmallButton>}
+					{pinned && (
 						<span className="text-xs text-booth-dim">
-							Placed by hand ·{' '}
+							Moved for this service ·{' '}
 							<button type="button" onClick={() => m.unpin(look.item)} className="underline hover:text-booth-ink">
-								Undo
+								Put back
 							</button>
 						</span>
-					) : (
-						state === 'ready' &&
-						firstArena !== undefined &&
-						look.column !== null && (
-							<button type="button" onClick={() => setOpen({ kind: 'slot', code: firstArena.code })} className="h-8 rounded-ctl px-2 text-xs text-booth-dim hover:bg-booth-hover hover:text-booth-ink">
-								Move…
-							</button>
-						)
 					)}
 				</div>
 			)}
@@ -482,7 +486,7 @@ function Card({
 			{open !== null && (
 				<div className="border-t border-booth-edge/60 p-3">
 					<div className="mb-2 flex items-center gap-2 text-sm">
-						<span className="font-medium">{open.kind === 'compare' ? `${open.code}: Arena's file and the lookbook's` : `Where ${open.code} goes, for this service`}</span>
+						<span className="font-medium">{open.kind === 'compare' ? `${open.code}: Arena's file and the lookbook's` : `Move ${item.label ?? item.title}: tap where it should land`}</span>
 						<button type="button" onClick={() => setOpen(null)} aria-label="Close" className="ml-auto grid size-9 place-items-center rounded-ctl hover:bg-booth-hover">
 							<X size={16} aria-hidden />
 						</button>
@@ -490,7 +494,7 @@ function Card({
 					{open.kind === 'compare' ? (
 						<Compare m={m} status={status} operator={operator} code={open.code} />
 					) : (
-						<SlotPicker m={m} status={status} what={{ item: look.item, code: open.code }} onDone={() => setOpen(null)} />
+						<SlotPicker m={m} status={status} what={{ item: look.item, code: open.code }} here={look.lands?.column ?? null} onDone={() => setOpen(null)} />
 					)}
 				</div>
 			)}
@@ -674,42 +678,83 @@ function Compare({ m, status, operator, code }: { m: MediaCheckState; status: Ar
 	)
 }
 
-/** Its layer's clips, to tap one: lit where the moment may go (`pinTargets`). */
-function SlotPicker({ m, status, what, onDone }: { m: MediaCheckState; status: ArenaStatus; what: Choosing; onDone: () => void }) {
-	const targets = m.pinTargets(what)
+/** Its layer's clips, to tap one: lit where the moment may go (`moveTargets`),
+ *  a taken one saying whom it swaps with. */
+function SlotPicker({ m, status, what, here, onDone }: { m: MediaCheckState; status: ArenaStatus; what: Choosing; here: number | null; onDone: () => void }) {
+	const targets = m.moveTargets(what)
 	const layer: ArenaLayer | undefined = status.layers.find((l) => l.slots.some((s) => targets.has(s.id)))
-	if (layer === undefined) return <p className="text-sm text-booth-dim">No free slot on its layer: every column there is another moment&rsquo;s or kept for something.</p>
+	if (layer === undefined) return <p className="text-sm text-booth-dim">Nowhere to move it: every PROMO and spare column is taken or kept for something.</p>
 	const names = columnNamesOf(layer, status)
+	const items = m.runSheet ?? []
 	return (
 		<div className="flex flex-col gap-2">
 			<p className="text-xs text-booth-dim">
-				{layer.name}: tap a lit slot. The rest of the moment follows into that column; it asks before loading.
+				{layer.name}: a PROMO or spare column. On another moment&rsquo;s, the two swap. The rest of the moment follows; it asks before loading.
 			</p>
 			<div className="flex gap-2 overflow-x-auto pb-1">
 				{layer.slots.map((slot, i) => {
-					const lit = targets.has(slot.id)
+					const target = targets.get(slot.id)
 					const name = names[i] ?? ''
 					const url = slot.thumbnail === null ? null : thumbnailUrl(slot.thumbnail)
+					const other = target?.swap == null ? null : items[target.swap]
 					return (
 						<button
 							key={slot.id}
 							type="button"
-							disabled={!lit}
+							disabled={target === undefined}
 							onClick={() => {
-								m.askPlaceAt(what, i + 1)
+								m.askMoveTo(what, i + 1)
 								onDone()
 							}}
-							className={`flex w-28 shrink-0 flex-col gap-1 text-left ${lit ? '' : 'opacity-35'}`}
+							className={`flex w-28 shrink-0 flex-col gap-1 text-left ${target !== undefined || here === i + 1 ? '' : 'opacity-35'}`}
 						>
-							<span className={`relative block h-16 w-28 overflow-hidden rounded-ctl ${slot.state === 'empty' ? 'border border-dashed border-booth-edge' : 'bg-booth-raise'} ${lit ? 'ring-2 ring-accent-hi' : ''}`}>
+							<span
+								className={`relative block h-16 w-28 overflow-hidden rounded-ctl ${slot.state === 'empty' ? 'border border-dashed border-booth-edge' : 'bg-booth-raise'} ${target !== undefined ? 'ring-2 ring-accent-hi' : here === i + 1 ? 'ring-2 ring-booth-ink' : ''}`}
+							>
 								{url !== null && <Img url={url} cover />}
 								{slot.state !== 'empty' && <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1.5 text-[11px]">{slotCode(slot) ?? slot.name}</span>}
 							</span>
 							<span className="truncate text-xs text-booth-dim">{unnamedColumn(name) ? `Column ${i + 1}` : name}</span>
+							{here === i + 1 && <span className="truncate text-xs font-bold">Here now</span>}
+							{other != null && <span className="truncate text-xs text-accent-hi">Swap with {other.label ?? other.title}</span>}
 						</button>
 					)
 				})}
 			</div>
+		</div>
+	)
+}
+
+/** Where a moment lands, in words over a strip of Arena's columns with its
+ *  own lit: anyone reads it, Arena or not. */
+function Lands({ lands, names, big }: { lands: Landing; names: string[]; big: boolean }) {
+	const where = lands.name === '' ? `column ${lands.column}` : lands.name
+	const extra = lands.name === '' ? null : `column ${lands.column}`
+	const going = lands.replaces !== null
+	const replaces = lands.replaces === null ? null : lands.replaces === 'empty' ? 'into an empty clip' : `replaces ${lands.replaces}`
+	return (
+		<div className="flex min-w-0 flex-col gap-1">
+			<div className="flex items-end gap-0.5" aria-hidden>
+				{names.map((n, i) => {
+					const me = i + 1 === lands.column
+					const plain = unnamedColumn(n)
+					return (
+						<span
+							key={i}
+							title={plain ? `Column ${i + 1}` : n}
+							className={`block min-w-0 overflow-hidden rounded-[2px] text-center text-[11px] leading-5 font-bold ${me ? 'h-5 bg-accent text-accent-ink' : `h-2.5 ${plain ? 'bg-booth-edge' : 'bg-booth-raise'}`}`}
+							style={{ flex: me ? '2.5 1 0' : plain ? '0.5 1 0' : '1 1 0' }}
+						>
+							{me ? (plain ? lands.column : n) : ''}
+						</span>
+					)
+				})}
+			</div>
+			<p className={`min-w-0 text-booth-dim ${big ? 'text-base' : 'text-sm'}`}>
+				{going ? 'Lands in' : 'In'} <b className="font-bold text-booth-ink">{where}</b>
+				{extra !== null && ` · ${extra}`}
+				{replaces !== null && ` · ${replaces}`}
+			</p>
 		</div>
 	)
 }
