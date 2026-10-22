@@ -7,11 +7,13 @@
 // Lookbook (one big card a moment) said the same things in five places, and
 // the owner wanted "easy to understand what is happening at a glance". So:
 // - One card per moment, in service order, with a state anyone reads from
-//   across the booth: In Arena, To load, Needs you, Loading, On screen.
+//   across the booth: In Arena, To load, Loading, On screen, or the problem
+//   itself (Wrong file?, File missing, No spot, Didn't load; "2 problems" for
+//   more), not a word that only says something is wrong (the owner, 2026-10-22).
 // - Its pieces as chips (BG, FG, A, LT), each saying where it goes or what is
 //   wrong in a word; nothing said about a piece that is right but its code.
 // - A problem sits on its own card with its fix there (Compare, Choose a slot,
-//   It's there), and the top line's "n need you" shows only those.
+//   It's there), and the top line's "n problems" shows only those.
 // - Load: tick cards and Load n, one confirmation for all of them; or Update
 //   all, as before. A card changes in place as its files load; the top count is
 //   the result.
@@ -120,6 +122,7 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 	const ready = count('ready')
 	const toLoad = count('load')
 	const needs = count('needs')
+	const problemCount = looks.reduce((n, l) => n + (states.get(l.item) === 'needs' ? groupProblems(problemsOf(l, m)).length : 0), 0)
 	const loading = count('loading')
 	// A part can be picked while its moment has a step for it: Admin, not loading.
 	const loadableCodes = (i: number): string[] =>
@@ -189,7 +192,7 @@ export function Lookbook({ status, ageMs, now, onBack }: { status: ArenaStatus; 
 									aria-pressed={onlyNeeds}
 									className={`h-8 rounded-ctl px-2.5 font-bold ${onlyNeeds ? 'bg-warn text-black' : 'bg-warn/15 text-warn hover:bg-warn/25'}`}
 								>
-									{needs} need{needs === 1 ? 's' : ''} you{onlyNeeds ? ' · show all' : ''}
+									{problemCount} problem{problemCount === 1 ? '' : 's'}{onlyNeeds ? ' · show all' : ''}
 								</button>
 							)}
 						</span>
@@ -399,7 +402,7 @@ function Card({
 					<h3 className={`min-w-0 font-extrabold tracking-tight ${big ? 'text-3xl' : 'text-lg'}`}>{item.title}</h3>
 					{item.label !== null && <span className={`min-w-0 text-booth-dim ${big ? 'text-xl' : 'text-sm'}`}>{item.label}</span>}
 				</div>
-				<StateBadge state={state} live={look.live} big={big} />
+				<StateBadge state={state} live={look.live} big={big} problems={groupProblems(problems)} />
 			</div>
 			<div className="flex flex-wrap gap-1.5">
 				{look.codes.map((c) => (
@@ -512,7 +515,10 @@ function Tick({ on, onClick }: { on: boolean | 'some'; onClick: () => void }) {
 	)
 }
 
-function StateBadge({ state, live, big }: { state: CardState; live: boolean; big: boolean }) {
+/** A problem's name on its card's badge. */
+const PROBLEM_BADGE: Record<Trouble['kind'], string> = { look: 'Wrong file?', missing: 'File missing', 'no-place': 'No spot', failed: "Didn't load" }
+
+function StateBadge({ state, live, big, problems }: { state: CardState; live: boolean; big: boolean; problems: Trouble[] }) {
 	const text = big ? 'text-base px-3 h-9' : 'text-xs px-2 h-7'
 	if (live) return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-state-live font-extrabold text-black ${text}`}>On screen</span>
 	switch (state) {
@@ -525,7 +531,7 @@ function StateBadge({ state, live, big }: { state: CardState; live: boolean; big
 		case 'load':
 			return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-accent-hi/15 font-bold text-accent-hi ${text}`}>To load</span>
 		case 'needs':
-			return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-warn font-bold text-black ${text}`}>Needs you</span>
+			return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-warn font-bold text-black ${text}`}>{problems.length === 1 ? PROBLEM_BADGE[(problems[0] as Trouble).kind] : `${problems.length} problems`}</span>
 		case 'loading':
 			return <span className={`inline-flex shrink-0 items-center rounded-ctl bg-booth-raise font-bold text-accent-hi ${text}`}>Loading…</span>
 		case 'other':
@@ -638,13 +644,13 @@ function Problem({
 				<FetchWords fetch={m.fetches[code]} refused={m.refused[code]} />
 			) : (
 				<span className="text-warn">
-					{kind === 'look' ? "Arena's file may not be the lookbook's" : kind === 'missing' ? 'Arena cannot find its file on this computer' : 'No column of its own, or none left: choose where it goes'}
+					{kind === 'look' ? "Arena's file may not be the lookbook's" : kind === 'missing' ? 'Arena cannot find its file on this computer' : 'No spot: no column of its own, or none left'}
 				</span>
 			)}
 			{operator && (
 				<span className="ml-auto flex items-center gap-2">
 					{(kind === 'look' || kind === 'missing') && <SmallButton onClick={onCompare}>Compare</SmallButton>}
-					{kind === 'no-place' && <SmallButton onClick={onSlot}>Choose a slot</SmallButton>}
+					{kind === 'no-place' && <SmallButton onClick={onSlot}>Choose a spot</SmallButton>}
 					{kind === 'failed' && m.fetches[code]?.state === 'failed' && m.fetches[code].clash === true && <ReplaceButton onClick={() => m.replaceLocal(code)} />}
 					{kind === 'failed' && <ThereButton onClick={() => m.itsThere(code)} />}
 				</span>

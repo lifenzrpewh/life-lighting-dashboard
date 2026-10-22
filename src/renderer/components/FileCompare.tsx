@@ -11,7 +11,7 @@
 //
 // Every load asks first, as everywhere (./MediaCheck.tsx Confirm). Files to
 // check, every such code on one screen, left with the Holding view
-// (2026-10-14): a Lookbook card that needs a look says so, and "need you" shows
+// (2026-10-14): a Lookbook card that needs a look says so, and "n problems" shows
 // only those.
 
 import { useEffect, useState } from 'react'
