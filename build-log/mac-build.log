@@ -1,0 +1,45 @@
+
+> paua@1.8.2 dist:mac
+> npm run build:app && electron-builder --mac --arm64 --publish never
+
+
+> paua@1.8.2 build:app
+> npm run build && tsc -p tsconfig.main.json && vite build
+
+
+> paua@1.8.2 build
+> rimraf dist && tsc -p tsconfig.json
+
+[36mvite v8.3.0 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 1966 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/renderer/index.html                                              0.69 kB │ gzip:   0.44 kB
+dist/renderer/assets/archivo-vietnamese-wght-normal-XAtsl5Q_.woff2   13.24 kB
+dist/renderer/assets/archivo-latin-ext-wght-normal-C4zznr8T.woff2    32.60 kB
+dist/renderer/assets/archivo-latin-wght-normal-E0tuGl4L.woff2        34.92 kB
+dist/renderer/assets/index-BFt3vfE3.css                              53.38 kB │ gzip:  10.08 kB
+dist/renderer/assets/index-BVfq5h8t.js                              532.81 kB │ gzip: 161.26 kB
+
+[33m[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 584ms[39m
+  • electron-builder  version=26.15.3 os=25.6.0
+  • loaded configuration  file=package.json ("build" field)
+  • author is missed in the package.json  appPackageFile=/Users/runner/work/life-lighting-dashboard/life-lighting-dashboard/package.json
+  • skipped dependencies rebuild  reason=npmRebuild is set to false
+  • packaging       platform=darwin arch=arm64 electron=44.4.3 appOutDir=release/mac-arm64
+  • downloaded      label=electron progress=100%
+  • downloaded electron zip extracted successfully  output=/Users/runner/work/life-lighting-dashboard/life-lighting-dashboard/release/mac-arm64
+  • searching for node modules  pm=npm searchDir=/Users/runner/work/life-lighting-dashboard/life-lighting-dashboard
+  • duplicate dependency references  dependencies=["string-width@4.2.3","string-width@4.2.3","strip-ansi@6.0.1","strip-ansi@6.0.1"]
+  • downloaded      label=icons-bundle.tar.gz progress=100%
+  • signing         file=release/mac-arm64/Paua.app platform=darwin type=distribution identityName=- identityHash=none provisioningProfile=none
+  • skipped macOS notarization  reason=`notarize` options were unable to be generated
+  • building        target=DMG arch=arm64 file=release/Paua-1.8.2-arm64.dmg
+  • downloaded      label=dmgbuild-bundle-arm64-75c8a6c.tar.gz progress=100%
+  • building block map  blockMapFile=release/Paua-1.8.2-arm64.dmg.blockmap

@@ -1,0 +1,2389 @@
+
+> paua@1.8.2 typecheck
+> tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.web.json
+
+
+> paua@1.8.2 build
+> rimraf dist && tsc -p tsconfig.json
+
+TAP version 13
+# Subtest: the timeout is 15 minutes unless a booth picks one of the others
+ok 1 - the timeout is 15 minutes unless a booth picks one of the others
+  ---
+  duration_ms: 3.7497
+  type: 'test'
+  ...
+# Subtest: a new passcode: four or more, no control characters, nothing invisible at its ends
+ok 2 - a new passcode: four or more, no control characters, nothing invisible at its ends
+  ---
+  duration_ms: 1.0361
+  type: 'test'
+  ...
+# Subtest: the passcode is kept only as a salted hash, and checked against it
+ok 3 - the passcode is kept only as a salted hash, and checked against it
+  ---
+  duration_ms: 608.1581
+  type: 'test'
+  ...
+# Subtest: five wrong tries, then a 30 s wait, then five more
+ok 4 - five wrong tries, then a 30 s wait, then five more
+  ---
+  duration_ms: 0.9685
+  type: 'test'
+  ...
+# Subtest: no passcode set: a tap goes straight in
+ok 5 - no passcode set: a tap goes straight in
+  ---
+  duration_ms: 0.2257
+  type: 'test'
+  ...
+# Subtest: the waits and wrong tries are said in words
+ok 6 - the waits and wrong tries are said in words
+  ---
+  duration_ms: 0.2642
+  type: 'test'
+  ...
+# Subtest: admin: leaving Show mode asks for Admin by default; the owner may make it a tap
+ok 7 - admin: leaving Show mode asks for Admin by default; the owner may make it a tap
+  ---
+  duration_ms: 0.3929
+  type: 'test'
+  ...
+# Subtest: announcement files: copied whole under a number, the same left alone, a replaced one replaced
+ok 8 - announcement files: copied whole under a number, the same left alone, a replaced one replaced
+  ---
+  duration_ms: 18.3708
+  type: 'test'
+  ...
+# Subtest: announcement files: last week's set aside into Old, never deleted, nothing replaced there
+ok 9 - announcement files: last week's set aside into Old, never deleted, nothing replaced there
+  ---
+  duration_ms: 11.0677
+  type: 'test'
+  ...
+# Subtest: announcements: every T code once, the standing notices first in their order (WTL, NSL, Bibles, WTG), then the rest in run-sheet order
+ok 10 - announcements: every T code once, the standing notices first in their order (WTL, NSL, Bibles, WTG), then the rest in run-sheet order
+  ---
+  duration_ms: 3.5955
+  type: 'test'
+  ...
+# Subtest: announcements: AM or PM by the service's name, else EVENT
+ok 11 - announcements: AM or PM by the service's name, else EVENT
+  ---
+  duration_ms: 0.7523
+  type: 'test'
+  ...
+# Subtest: announcements: Central's real playlist against its 11 October run sheet: all there, headers left alone
+ok 12 - announcements: Central's real playlist against its 11 October run sheet: all there, headers left alone
+  ---
+  duration_ms: 1.2115
+  type: 'test'
+  ...
+# Subtest: announcements: the next week against last week's playlist: the new promo missing, the old one extra
+ok 13 - announcements: the next week against last week's playlist: the new promo missing, the old one extra
+  ---
+  duration_ms: 0.766
+  type: 'test'
+  ...
+# Subtest: announcements: a second copy is extra; a run sheet with no T codes is never ok
+ok 14 - announcements: a second copy is extra; a run sheet with no T codes is never ok
+  ---
+  duration_ms: 0.4211
+  type: 'test'
+  ...
+# Subtest: ProPresenter: playlists in groups are found by name, case and spaces aside
+ok 15 - ProPresenter: playlists in groups are found by name, case and spaces aside
+  ---
+  duration_ms: 1.082
+  type: 'test'
+  ...
+# Subtest: ProPresenter: a playlist's items in order; a wrong shape fails whole
+ok 16 - ProPresenter: a playlist's items in order; a wrong shape fails whole
+  ---
+  duration_ms: 0.3375
+  type: 'test'
+  ...
+# Subtest: announcements: the write sends each section's header and its pictures by their Media Bin ids, in order
+ok 17 - announcements: the write sends each section's header and its pictures by their Media Bin ids, in order
+  ---
+  duration_ms: 1.4837
+  type: 'test'
+  ...
+# Subtest: announcements: nothing is written while one is missing from the media playlist, or with nothing wanted
+ok 18 - announcements: nothing is written while one is missing from the media playlist, or with nothing wanted
+  ---
+  duration_ms: 1.0466
+  type: 'test'
+  ...
+# Subtest: announcements: a lower third with no file in the folder (not made yet) is left out of the write and named
+ok 19 - announcements: a lower third with no file in the folder (not made yet) is left out of the write and named
+  ---
+  duration_ms: 0.9375
+  type: 'test'
+  ...
+# Subtest: announcements: last week's entry in the media playlist, its file set aside, is not this week's picture
+ok 20 - announcements: last week's entry in the media playlist, its file set aside, is not this week's picture
+  ---
+  duration_ms: 3.8637
+  type: 'test'
+  ...
+# Subtest: announcements: the settings, on by default, named as Central named them, and off hides the view
+ok 21 - announcements: the settings, on by default, named as Central named them, and off hides the view
+  ---
+  duration_ms: 2.323
+  type: 'test'
+  ...
+# Subtest: every cell and column is read, with the ids a tap fires
+ok 22 - every cell and column is read, with the ids a tap fires
+  ---
+  duration_ms: 9.362
+  type: 'test'
+  ...
+# Subtest: a column or clip state this does not know fails the composition whole
+ok 23 - a column or clip state this does not know fails the composition whole
+  ---
+  duration_ms: 3.469
+  type: 'test'
+  ...
+# Subtest: a clip whose file is not on this machine is listed, top layer first
+ok 24 - a clip whose file is not on this machine is listed, top layer first
+  ---
+  duration_ms: 3.6682
+  type: 'test'
+  ...
+# Subtest: a tap is one bodiless POST (Arena's short click), by id, on the clip or column
+ok 25 - a tap is one bodiless POST (Arena's short click), by id, on the clip or column
+  ---
+  duration_ms: 2.166
+  type: 'test'
+  ...
+# Subtest: clear disconnects the layer; the fader is a set on its master over the socket
+ok 26 - clear disconnects the layer; the fader is a set on its master over the socket
+  ---
+  duration_ms: 1.7392
+  type: 'test'
+  ...
+# Subtest: nothing is sent for what the composition does not hold, or the wrong shape
+ok 27 - nothing is sent for what the composition does not hold, or the wrong shape
+  ---
+  duration_ms: 2.1439
+  type: 'test'
+  ...
+# Subtest: no command can reach the endpoints that empty a slot or a layer
+ok 28 - no command can reach the endpoints that empty a slot or a layer
+  ---
+  duration_ms: 3.1221
+  type: 'test'
+  ...
+# Subtest: Clear old FGs empties only a HOLD FG clip still holding the code shown, never one on screen
+ok 29 - Clear old FGs empties only a HOLD FG clip still holding the code shown, never one on screen
+  ---
+  duration_ms: 2.4524
+  type: 'test'
+  ...
+# Subtest: the real composition: what plays, where, and how loud
+ok 30 - the real composition: what plays, where, and how loud
+  ---
+  duration_ms: 10.2378
+  type: 'test'
+  ...
+# Subtest: previewing elsewhere does not stop a clip playing
+ok 31 - previewing elsewhere does not stop a clip playing
+  ---
+  duration_ms: 2.162
+  type: 'test'
+  ...
+# Subtest: a clip whose file is not on this machine says so
+ok 32 - a clip whose file is not on this machine says so
+  ---
+  duration_ms: 1.7811
+  type: 'test'
+  ...
+# Subtest: Arena's placeholder thumbnail is no thumbnail
+ok 33 - Arena's placeholder thumbnail is no thumbnail
+  ---
+  duration_ms: 1.6207
+  type: 'test'
+  ...
+# Subtest: a composition of the wrong shape fails whole, saying what
+ok 34 - a composition of the wrong shape fails whole, saying what
+  ---
+  duration_ms: 8.8267
+  type: 'test'
+  ...
+# Subtest: main answers only thumbnail addresses on its scheme
+ok 35 - main answers only thumbnail addresses on its scheme
+  ---
+  duration_ms: 0.4146
+  type: 'test'
+  ...
+# Subtest: no selected deck is null, never the first deck
+ok 36 - no selected deck is null, never the first deck
+  ---
+  duration_ms: 1.4218
+  type: 'test'
+  ...
+# Subtest: subscriptions cover every level, and an update lands on its own
+ok 37 - subscriptions cover every level, and an update lands on its own
+  ---
+  duration_ms: 2.1664
+  type: 'test'
+  ...
+# Subtest: a run of updates lands each on its own, leaving what it does not touch shared
+ok 38 - a run of updates lands each on its own, leaving what it does not touch shared
+  ---
+  duration_ms: 2.6921
+  type: 'test'
+  ...
+# Subtest: a tree's status is worked out once, and a new tree gets its own
+ok 39 - a tree's status is worked out once, and a new tree gets its own
+  ---
+  duration_ms: 2.7198
+  type: 'test'
+  ...
+# Subtest: an update for another parameter is not ours; one of the wrong kind fails
+ok 40 - an update for another parameter is not ours; one of the wrong kind fails
+  ---
+  duration_ms: 1.519
+  type: 'test'
+  ...
+# Subtest: a clip's time left runs at its group's speed, as seen 2026-10-03
+ok 41 - a clip's time left runs at its group's speed, as seen 2026-10-03
+  ---
+  duration_ms: 1.8249
+  type: 'test'
+  ...
+# Subtest: play once counts down, holds at its end, and random has no end
+ok 42 - play once counts down, holds at its end, and random has no end
+  ---
+  duration_ms: 5.7547
+  type: 'test'
+  ...
+# Subtest: backwards counts to the start; paused keeps its time to the end
+ok 43 - backwards counts to the start; paused keeps its time to the end
+  ---
+  duration_ms: 0.3567
+  type: 'test'
+  ...
+# Subtest: a clip time reads as minutes and whole seconds, rounded up
+ok 44 - a clip time reads as minutes and whole seconds, rounded up
+  ---
+  duration_ms: 1.0125
+  type: 'test'
+  ...
+# Subtest: a clip off the timeline has no transport; a malformed one fails whole
+ok 45 - a clip off the timeline has no transport; a malformed one fails whole
+  ---
+  duration_ms: 2.4645
+  type: 'test'
+  ...
+# Subtest: messages as Arena sent them, 2026-10-03
+ok 46 - messages as Arena sent them, 2026-10-03
+  ---
+  duration_ms: 2.7076
+  type: 'test'
+  ...
+# Subtest: Arena 7.28 as seen 2026-10-02 decodes
+ok 47 - Arena 7.28 as seen 2026-10-02 decodes
+  ---
+  duration_ms: 2.0205
+  type: 'test'
+  ...
+# Subtest: something else on 8080 is an error, never an Arena of no version
+ok 48 - something else on 8080 is an error, never an Arena of no version
+  ---
+  duration_ms: 0.2541
+  type: 'test'
+  ...
+# Subtest: settings: no Arena until an address is set, then on 8080
+ok 49 - settings: no Arena until an address is set, then on 8080
+  ---
+  duration_ms: 1.8076
+  type: 'test'
+  ...
+# Subtest: settings: Arena survives the disk and the IPC boundary
+ok 50 - settings: Arena survives the disk and the IPC boundary
+  ---
+  duration_ms: 0.9752
+  type: 'test'
+  ...
+# Subtest: a camera's name drops Windows' USB ids, and is cut to fit a tab
+ok 51 - a camera's name drops Windows' USB ids, and is cut to fit a tab
+  ---
+  duration_ms: 1.7204
+  type: 'test'
+  ...
+# Subtest: a stored list of capture inputs is all good or nothing
+ok 52 - a stored list of capture inputs is all good or nothing
+  ---
+  duration_ms: 1.8476
+  type: 'test'
+  ...
+# Subtest: settings keep capture inputs, and a bad list off disk costs only itself
+ok 53 - settings keep capture inputs, and a bad list off disk costs only itself
+  ---
+  duration_ms: 1.4604
+  type: 'test'
+  ...
+# Subtest: a capture input is a view, by its shape, drawn by the page
+ok 54 - a capture input is a view, by its shape, drawn by the page
+  ---
+  duration_ms: 1.049
+  type: 'test'
+  ...
+# Subtest: the browser's refusals are said in words a booth can act on
+ok 55 - the browser's refusals are said in words a booth can act on
+  ---
+  duration_ms: 0.5416
+  type: 'test'
+  ...
+# Subtest: a capture input's row: off, not found is down, found is there, LIVE while shown
+ok 56 - a capture input's row: off, not found is down, found is there, LIVE while shown
+  ---
+  duration_ms: 0.5346
+  type: 'test'
+  ...
+# Subtest: the real desk packet decodes, and its padding is what OSC 1.0 says
+ok 57 - the real desk packet decodes, and its padding is what OSC 1.0 says
+  ---
+  duration_ms: 3.5201
+  type: 'test'
+  ...
+# Subtest: a string argument landing exactly on a 4-byte boundary still gets a terminator
+ok 58 - a string argument landing exactly on a 4-byte boundary still gets a terminator
+  ---
+  duration_ms: 0.4103
+  type: 'test'
+  ...
+# Subtest: an unsupported type tag fails the WHOLE message, not just that argument
+ok 59 - an unsupported type tag fails the WHOLE message, not just that argument
+  ---
+  duration_ms: 0.4307
+  type: 'test'
+  ...
+# Subtest: a truncated numeric argument is rejected rather than read short
+ok 60 - a truncated numeric argument is rejected rather than read short
+  ---
+  duration_ms: 0.3105
+  type: 'test'
+  ...
+# Subtest: an empty packet and a non-OSC payload both fail, with different reasons
+ok 61 - an empty packet and a non-OSC payload both fail, with different reasons
+  ---
+  duration_ms: 0.295
+  type: 'test'
+  ...
+# Subtest: an address with no type tags is a legal message with no arguments
+ok 62 - an address with no type tags is a legal message with no arguments
+  ---
+  duration_ms: 0.4364
+  type: 'test'
+  ...
+# Subtest: the desk message becomes an executor update, object taken from the last component
+ok 63 - the desk message becomes an executor update, object taken from the last component
+  ---
+  duration_ms: 0.6486
+  type: 'test'
+  ...
+# Subtest: the level is carried through unscaled — not normalised to 0..1
+ok 64 - the level is carried through unscaled — not normalised to 0..1
+  ---
+  duration_ms: 0.3704
+  type: 'test'
+  ...
+# Subtest: a channel C push is other-channel, not an error — they share one port
+ok 65 - a channel C push is other-channel, not an error — they share one port
+  ---
+  duration_ms: 0.6368
+  type: 'test'
+  ...
+# Subtest: another talker on the same port is ignored, because the prefix must match
+ok 66 - another talker on the same port is ignored, because the prefix must match
+  ---
+  duration_ms: 0.6927
+  type: 'test'
+  ...
+# Subtest: an unrecognised argument shape is refused rather than read three-of-many
+ok 67 - an unrecognised argument shape is refused rather than read three-of-many
+  ---
+  duration_ms: 0.4316
+  type: 'test'
+  ...
+# Subtest: newest wins per key, and the drain reports what it swallowed
+ok 68 - newest wins per key, and the drain reports what it swallowed
+  ---
+  duration_ms: 0.4218
+  type: 'test'
+  ...
+# Subtest: the last position of every fader survives — coalescing drops superseded, never unseen
+ok 69 - the last position of every fader survives — coalescing drops superseded, never unseen
+  ---
+  duration_ms: 1.3595
+  type: 'test'
+  ...
+# Subtest: key order is the order first seen, so tiles do not reshuffle when a fader moves
+ok 70 - key order is the order first seen, so tiles do not reshuffle when a fader moves
+  ---
+  duration_ms: 0.2305
+  type: 'test'
+  ...
+# Subtest: draining resets, and a quiet desk drains empty rather than repeating itself
+ok 71 - draining resets, and a quiet desk drains empty rather than repeating itself
+  ---
+  duration_ms: 0.2537
+  type: 'test'
+  ...
+# Subtest: the capture that motivated this: 771 packets over two controls become 2 updates
+ok 72 - the capture that motivated this: 771 packets over two controls become 2 updates
+  ---
+  duration_ms: 0.3436
+  type: 'test'
+  ...
+# Subtest: a setup file round-trips, and never carries a secret
+ok 73 - a setup file round-trips, and never carries a secret
+  ---
+  duration_ms: 3.9649
+  type: 'test'
+  ...
+# Subtest: a file that is not one, is newer, or carries a password or a stray item is refused whole
+ok 74 - a file that is not one, is newer, or carries a password or a stray item is refused whole
+  ---
+  duration_ms: 0.4024
+  type: 'test'
+  ...
+# Subtest: a connection that is not set up is off, never down
+ok 75 - a connection that is not set up is off, never down
+  ---
+  duration_ms: 1.4528
+  type: 'test'
+  ...
+# Subtest: the dot is the worst of what is set up, and off only when nothing is
+ok 76 - the dot is the worst of what is set up, and off only when nothing is
+  ---
+  duration_ms: 0.4645
+  type: 'test'
+  ...
+# Subtest: a polled source: live with its detail, stale with its age, down with the reason
+ok 77 - a polled source: live with its detail, stale with its age, down with the reason
+  ---
+  duration_ms: 0.9616
+  type: 'test'
+  ...
+# Subtest: the console: LIVE with its round trip, else unreachable
+ok 78 - the console: LIVE with its round trip, else unreachable
+  ---
+  duration_ms: 0.2892
+  type: 'test'
+  ...
+# Subtest: the Cue Manager: a page loaded is live, a failed load says why
+ok 79 - the Cue Manager: a page loaded is live, a failed load says why
+  ---
+  duration_ms: 0.2571
+  type: 'test'
+  ...
+# Subtest: a connection turned off is off, in its own words, and never touches the dot
+ok 80 - a connection turned off is off, in its own words, and never touches the dot
+  ---
+  duration_ms: 0.2161
+  type: 'test'
+  ...
+# Subtest: every view belongs to a connection, and the video feed is its own, not Arena’s
+ok 81 - every view belongs to a connection, and the video feed is its own, not Arena’s
+  ---
+  duration_ms: 0.3292
+  type: 'test'
+  ...
+# Subtest: the video feed: no sender is down; a sender is live, named with its size
+ok 82 - the video feed: no sender is down; a sender is live, named with its size
+  ---
+  duration_ms: 0.3442
+  type: 'test'
+  ...
+# Subtest: the video feed: a sender listed but no picture is never LIVE
+ok 83 - the video feed: a sender listed but no picture is never LIVE
+  ---
+  duration_ms: 0.5822
+  type: 'test'
+  ...
+# Subtest: the Timer view is on while either countdown program is
+ok 84 - the Timer view is on while either countdown program is
+  ---
+  duration_ms: 0.6449
+  type: 'test'
+  ...
+# Subtest: the first run since the rename moves the whole old profile in, Local State with it
+ok 85 - the first run since the rename moves the whole old profile in, Local State with it
+  ---
+  duration_ms: 14.0384
+  type: 'test'
+  ...
+# Subtest: kiosk.cmd's log already in the new folder does not stop the move, and stays
+ok 86 - kiosk.cmd's log already in the new folder does not stop the move, and stays
+  ---
+  duration_ms: 6.8245
+  type: 'test'
+  ...
+# Subtest: once the new profile exists, the old folder is never read again
+ok 87 - once the new profile exists, the old folder is never read again
+  ---
+  duration_ms: 3.5926
+  type: 'test'
+  ...
+# Subtest: a fresh machine just uses the new folder
+ok 88 - a fresh machine just uses the new folder
+  ---
+  duration_ms: 0.7516
+  type: 'test'
+  ...
+# Subtest: an address is a web page, with https:// added as a browser does
+ok 89 - an address is a web page, with https:// added as a browser does
+  ---
+  duration_ms: 2.2458
+  type: 'test'
+  ...
+# Subtest: a stored list of embeds is all good or nothing
+ok 90 - a stored list of embeds is all good or nothing
+  ---
+  duration_ms: 1.827
+  type: 'test'
+  ...
+# Subtest: settings keep embeds, and a bad one on disk costs only the embeds
+ok 91 - settings keep embeds, and a bad one on disk costs only the embeds
+  ---
+  duration_ms: 1.9472
+  type: 'test'
+  ...
+# Subtest: zoom moves by steps, and 0 is 100 %
+ok 92 - zoom moves by steps, and 0 is 100 %
+  ---
+  duration_ms: 0.3764
+  type: 'test'
+  ...
+# Subtest: an embed is a view: native, named by itself, kept in a stored layout
+ok 93 - an embed is a view: native, named by itself, kept in a stored layout
+  ---
+  duration_ms: 1.0577
+  type: 'test'
+  ...
+# Subtest: an embed view is on only while its embed exists and is on
+ok 94 - an embed view is on only while its embed exists and is on
+  ---
+  duration_ms: 0.5938
+  type: 'test'
+  ...
+# Subtest: its row: loaded, loading, not loading; not on screen is not down
+ok 95 - its row: loaded, loading, not loading; not on screen is not down
+  ---
+  duration_ms: 0.5936
+  type: 'test'
+  ...
+# Subtest: new ids are valid ids
+ok 96 - new ids are valid ids
+  ---
+  duration_ms: 0.3945
+  type: 'test'
+  ...
+# Subtest: synthetic: an absent CueInFade is null, not zero
+ok 97 - synthetic: an absent CueInFade is null, not zero
+  ---
+  duration_ms: 7.454
+  type: 'test'
+  ...
+# Subtest: synthetic: a space-padded cue number is trimmed; OffCue has no number
+ok 98 - synthetic: a space-padded cue number is trimmed; OffCue has no number
+  ---
+  duration_ms: 1.4917
+  type: 'test'
+  ...
+# Subtest: synthetic: a truncated export is rejected, never returned as a short sequence
+ok 99 - synthetic: a truncated export is rejected, never returned as a short sequence
+  ---
+  duration_ms: 0.794
+  type: 'test'
+  ...
+# Subtest: real library: the corpus parses, and only the known artifacts fail
+ok 100 - real library: the corpus parses, and only the known artifacts fail # SKIP no MA3 library on this machine (looked in C:\\Users\\runneradmin\\MALightingTechnology\\gma3_library\\datapools\\sequences, C:\\ProgramData\\MALightingTechnology\\gma3_library\\datapools\\sequences)
+  ---
+  duration_ms: 0.1782
+  type: 'test'
+  ...
+# Subtest: real library: HOUSE WHITE parses but is flagged as an export crash risk
+ok 101 - real library: HOUSE WHITE parses but is flagged as an export crash risk # SKIP no MA3 library on this machine (looked in C:\\Users\\runneradmin\\MALightingTechnology\\gma3_library\\datapools\\sequences, C:\\ProgramData\\MALightingTechnology\\gma3_library\\datapools\\sequences)
+  ---
+  duration_ms: 0.181
+  type: 'test'
+  ...
+# Subtest: real library: recipes keep selection and preset independently
+ok 102 - real library: recipes keep selection and preset independently # SKIP no MA3 library on this machine (looked in C:\\Users\\runneradmin\\MALightingTechnology\\gma3_library\\datapools\\sequences, C:\\ProgramData\\MALightingTechnology\\gma3_library\\datapools\\sequences)
+  ---
+  duration_ms: 0.2101
+  type: 'test'
+  ...
+# Subtest: an empty map is the default rules, exactly
+ok 103 - an empty map is the default rules, exactly
+  ---
+  duration_ms: 27.3311
+  type: 'test'
+  ...
+# Subtest: a column's own words take the items they name, and its default stops
+ok 104 - a column's own words take the items they name, and its default stops
+  ---
+  duration_ms: 2.5665
+  type: 'test'
+  ...
+# Subtest: words match the whole label, or as whole words anywhere in the title and label
+ok 105 - words match the whole label, or as whole words anywhere in the title and label
+  ---
+  duration_ms: 0.5969
+  type: 'test'
+  ...
+# Subtest: a column's default, said: a video column is never a PROMO's
+ok 106 - a column's default, said: a video column is never a PROMO's
+  ---
+  duration_ms: 0.484
+  type: 'test'
+  ...
+# Subtest: left alone: nothing placed, updated or cleared there
+ok 107 - left alone: nothing placed, updated or cleared there
+  ---
+  duration_ms: 3.1943
+  type: 'test'
+  ...
+# Subtest: the normal background where the map says, even over an item; none where it says the item only
+ok 108 - the normal background where the map says, even over an item; none where it says the item only
+  ---
+  duration_ms: 12.8782
+  type: 'test'
+  ...
+# Subtest: a fixed code goes where the map puts it, is never an old foreground, and has its own step
+ok 109 - a fixed code goes where the map puts it, is never an old foreground, and has its own step
+  ---
+  duration_ms: 4.4886
+  type: 'test'
+  ...
+# Subtest: a code family goes to the layer the map names, or nowhere
+ok 110 - a code family goes to the layer the map names, or nowhere
+  ---
+  duration_ms: 1.0992
+  type: 'test'
+  ...
+# Subtest: a map from a file is taken whole or not at all
+ok 111 - a map from a file is taken whole or not at all
+  ---
+  duration_ms: 2.1636
+  type: 'test'
+  ...
+# Subtest: a rule set back to its defaults leaves nothing behind
+ok 112 - a rule set back to its defaults leaves nothing behind
+  ---
+  duration_ms: 0.8677
+  type: 'test'
+  ...
+# Subtest: the words of a name leave out the code, Sunday, versions, months and campuses
+ok 113 - the words of a name leave out the code, Sunday, versions, months and campuses
+  ---
+  duration_ms: 4.5301
+  type: 'test'
+  ...
+# Subtest: the holding layers, top first, PLAYBACK last; a column named for something else is never placed into
+ok 114 - the holding layers, top first, PLAYBACK last; a column named for something else is never placed into
+  ---
+  duration_ms: 2.7196
+  type: 'test'
+  ...
+# Subtest: each clip's mark against today's run sheet
+ok 115 - each clip's mark against today's run sheet
+  ---
+  duration_ms: 1.641
+  type: 'test'
+  ...
+# Subtest: Doors Open goes in PRE and End in POST, on every layer; a code both use goes in both
+ok 116 - Doors Open goes in PRE and End in POST, on every layer; a code both use goes in both
+  ---
+  duration_ms: 8.2779
+  type: 'test'
+  ...
+# Subtest: the A-screen layer by its new name, A SCREEN BG (the owner, 2026-10-05), as by its old
+ok 117 - the A-screen layer by its new name, A SCREEN BG (the owner, 2026-10-05), as by its old
+  ---
+  duration_ms: 4.6487
+  type: 'test'
+  ...
+# Subtest: WTL, NSL, BIBLES and WTG go in their own columns by label, replacing what is there
+ok 118 - WTL, NSL, BIBLES and WTG go in their own columns by label, replacing what is there
+  ---
+  duration_ms: 1.2
+  type: 'test'
+  ...
+# Subtest: announcements go in PROMO 1 onwards in run-sheet order, whatever is there; never two in one (the owner, 2026-10-13)
+ok 119 - announcements go in PROMO 1 onwards in run-sheet order, whatever is there; never two in one (the owner, 2026-10-13)
+  ---
+  duration_ms: 1.5039
+  type: 'test'
+  ...
+# Subtest: a foreground with no column of its own queues with the announcements, in run-sheet order
+ok 120 - a foreground with no column of its own queues with the announcements, in run-sheet order
+  ---
+  duration_ms: 4.0789
+  type: 'test'
+  ...
+# Subtest: the names are read from the layer group's columns, the composition's only as a fallback
+ok 121 - the names are read from the layer group's columns, the composition's only as a fallback
+  ---
+  duration_ms: 1.9755
+  type: 'test'
+  ...
+# Subtest: what has no place is said, never guessed
+ok 122 - what has no place is said, never guessed
+  ---
+  duration_ms: 9.5422
+  type: 'test'
+  ...
+# Subtest: a one-off is placed by hand: once its code is on its layer, anywhere, it is done
+ok 123 - a one-off is placed by hand: once its code is on its layer, anywhere, it is done
+  ---
+  duration_ms: 4.1354
+  type: 'test'
+  ...
+# Subtest: an update goes into every clip with the old file, not the confirmed or the right ones
+ok 124 - an update goes into every clip with the old file, not the confirmed or the right ones
+  ---
+  duration_ms: 1.0055
+  type: 'test'
+  ...
+# Subtest: Update all: one step per code, its old clips and its missing columns together
+ok 125 - Update all: one step per code, its old clips and its missing columns together
+  ---
+  duration_ms: 4.5609
+  type: 'test'
+  ...
+# Subtest: each moment as a look: what each of its codes is in Arena, its column, and whether it is all there
+ok 126 - each moment as a look: what each of its codes is in Arena, its column, and whether it is all there
+  ---
+  duration_ms: 9.1301
+  type: 'test'
+  ...
+# Subtest: loading one look: its codes into its column, a shared code's old files everywhere
+ok 127 - loading one look: its codes into its column, a shared code's old files everywhere
+  ---
+  duration_ms: 2.3402
+  type: 'test'
+  ...
+# Subtest: old foregrounds: HOLD FG clips this run sheet does not use, never on screen, reserved or about to be loaded
+ok 128 - old foregrounds: HOLD FG clips this run sheet does not use, never on screen, reserved or about to be loaded
+  ---
+  duration_ms: 0.8458
+  type: 'test'
+  ...
+# Subtest: the normal background: what the rest of the service uses, not Doors Open, Pre & Post, Preach or announcements
+ok 129 - the normal background: what the rest of the service uses, not Doors Open, Pre & Post, Preach or announcements
+  ---
+  duration_ms: 0.5967
+  type: 'test'
+  ...
+# Subtest: the gaps in HOLD BG up to the last PROMO take the normal background (the owner, 2026-10-06)
+ok 130 - the gaps in HOLD BG up to the last PROMO take the normal background (the owner, 2026-10-06)
+  ---
+  duration_ms: 8.662
+  type: 'test'
+  ...
+# Subtest: a column named PREACH is the message background's home
+ok 131 - a column named PREACH is the message background's home
+  ---
+  duration_ms: 1.089
+  type: 'test'
+  ...
+# Subtest: overflow: a normal service that fits its named columns overflows nothing
+ok 132 - overflow: a normal service that fits its named columns overflows nothing
+  ---
+  duration_ms: 1.9916
+  type: 'test'
+  ...
+# Subtest: overflow: the extras go in run-sheet order into the empty clips past the last named column
+ok 133 - overflow: the extras go in run-sheet order into the empty clips past the last named column
+  ---
+  duration_ms: 6.1411
+  type: 'test'
+  ...
+# Subtest: overflow: never a loaded clip, never one on screen, never before the last named column
+ok 134 - overflow: never a loaded clip, never one on screen, never before the last named column
+  ---
+  duration_ms: 3.6552
+  type: 'test'
+  ...
+# Subtest: overflow: what still doesn't fit is said and waits in the tray, never dropped
+ok 135 - overflow: what still doesn't fit is said and waits in the tray, never dropped
+  ---
+  duration_ms: 4.511
+  type: 'test'
+  ...
+# Subtest: overflow: a code two one-offs share takes one clip, said once
+ok 136 - overflow: a code two one-offs share takes one clip, said once
+  ---
+  duration_ms: 5.1103
+  type: 'test'
+  ...
+# Subtest: overflow backgrounds and the normal background never meet
+ok 137 - overflow backgrounds and the normal background never meet
+  ---
+  duration_ms: 5.9478
+  type: 'test'
+  ...
+# Subtest: Clear old FGs: an overflow clip is this run sheet’s, never old; the last event’s leftovers are
+ok 138 - Clear old FGs: an overflow clip is this run sheet’s, never old; the last event’s leftovers are
+  ---
+  duration_ms: 3.2025
+  type: 'test'
+  ...
+# Subtest: the plan says, for every code, what Update all does with it or why it does nothing
+ok 139 - the plan says, for every code, what Update all does with it or why it does nothing
+  ---
+  duration_ms: 12.3055
+  type: 'test'
+  ...
+# Subtest: a one-off: its background goes into its foreground's column, wherever else its code is
+ok 140 - a one-off: its background goes into its foreground's column, wherever else its code is
+  ---
+  duration_ms: 5.4051
+  type: 'test'
+  ...
+# Subtest: a one-off: a HOLD BG clip this service does not use is replaced; one it uses, or on screen, is not
+ok 141 - a one-off: a HOLD BG clip this service does not use is replaced; one it uses, or on screen, is not
+  ---
+  duration_ms: 2.3327
+  type: 'test'
+  ...
+# Subtest: a one-off placed by hand: its background follows to where its foreground is
+ok 142 - a one-off placed by hand: its background follows to where its foreground is
+  ---
+  duration_ms: 1.746
+  type: 'test'
+  ...
+# Subtest: a one-off whose column's background cannot be taken says why, and its foreground still goes
+ok 143 - a one-off whose column's background cannot be taken says why, and its foreground still goes
+  ---
+  duration_ms: 1.5661
+  type: 'test'
+  ...
+# Subtest: It's there: a file Arena calls missing, said to be there, is right by hand; a same mark is not enough
+ok 144 - It's there: a file Arena calls missing, said to be there, is right by hand; a same mark is not enough
+  ---
+  duration_ms: 0.8843
+  type: 'test'
+  ...
+# Subtest: a pin: the whole moment goes into the chosen column, its background following, and stays there
+ok 145 - a pin: the whole moment goes into the chosen column, its background following, and stays there
+  ---
+  duration_ms: 7.3145
+  type: 'test'
+  ...
+# Subtest: a pin moves a moment with a column of its own, and no PROMO takes its column
+ok 146 - a pin moves a moment with a column of its own, and no PROMO takes its column
+  ---
+  duration_ms: 0.7785
+  type: 'test'
+  ...
+# Subtest: where a moment may be moved: a PROMO or spare column on its layer, never a named one (the owner, 2026-10-22)
+ok 147 - where a moment may be moved: a PROMO or spare column on its layer, never a named one (the owner, 2026-10-22)
+  ---
+  duration_ms: 13.2486
+  type: 'test'
+  ...
+# Subtest: a move onto another promo swaps only the two; the rest stay (the owner, 2026-10-22)
+ok 148 - a move onto another promo swaps only the two; the rest stay (the owner, 2026-10-22)
+  ---
+  duration_ms: 4.7406
+  type: 'test'
+  ...
+# Subtest: several placed at once: forward from the column tapped, in run-sheet order, skipping what is taken or on screen
+ok 149 - several placed at once: forward from the column tapped, in run-sheet order, skipping what is taken or on screen
+  ---
+  duration_ms: 5.9788
+  type: 'test'
+  ...
+# Subtest: a move into a column Arena has since reserved is dropped
+ok 150 - a move into a column Arena has since reserved is dropped
+  ---
+  duration_ms: 1.901
+  type: 'test'
+  ...
+# Subtest: each look says where it lands: its column, why, and what it replaces
+ok 151 - each look says where it lands: its column, why, and what it replaces
+  ---
+  duration_ms: 1.9607
+  type: 'test'
+  ...
+# Subtest: a one-off put by hand inside the named columns: its background follows, said as beside it
+ok 152 - a one-off put by hand inside the named columns: its background follows, said as beside it
+  ---
+  duration_ms: 1.2653
+  type: 'test'
+  ...
+# Subtest: one moment a column: two items finding the same column by name do not share its clip
+ok 153 - one moment a column: two items finding the same column by name do not share its clip
+  ---
+  duration_ms: 4.8414
+  type: 'test'
+  ...
+# Subtest: a title beginning End is POST, unless it is an announcement
+ok 154 - a title beginning End is POST, unless it is an announcement
+  ---
+  duration_ms: 1.5701
+  type: 'test'
+  ...
+# Subtest: a column named for something else is never taken by name, nor counted a PROMO
+ok 155 - a column named for something else is never taken by name, nor counted a PROMO
+  ---
+  duration_ms: 3.5787
+  type: 'test'
+  ...
+# Subtest: a one-off's code in a clip this plan replaces is not already on its layer
+ok 156 - a one-off's code in a clip this plan replaces is not already on its layer
+  ---
+  duration_ms: 1.9413
+  type: 'test'
+  ...
+# Subtest: the default is the screen before windows: run order on the left third, MA on the rest
+ok 157 - the default is the screen before windows: run order on the left third, MA on the rest
+  ---
+  duration_ms: 3.989
+  type: 'test'
+  ...
+# Subtest: a window fits on the screen, at least the smallest, over no other
+ok 158 - a window fits on the screen, at least the smallest, over no other
+  ---
+  duration_ms: 0.6
+  type: 'test'
+  ...
+# Subtest: a drag follows the finger, and an edge near another snaps onto it
+ok 159 - a drag follows the finger, and an edge near another snaps onto it
+  ---
+  duration_ms: 1.888
+  type: 'test'
+  ...
+# Subtest: a resized edge stops flush against a window in its way; a move over one is refused
+ok 160 - a resized edge stops flush against a window in its way; a move over one is refused
+  ---
+  duration_ms: 1.8598
+  type: 'test'
+  ...
+# Subtest: moving or resizing onto another window does nothing
+ok 161 - moving or resizing onto another window does nothing
+  ---
+  duration_ms: 0.3315
+  type: 'test'
+  ...
+# Subtest: a new window takes the biggest free place, or none when the screen is full
+ok 162 - a new window takes the biggest free place, or none when the screen is full
+  ---
+  duration_ms: 1.0953
+  type: 'test'
+  ...
+# Subtest: tabs: add shows it, select switches, remove shows the neighbour
+ok 163 - tabs: add shows it, select switches, remove shows the neighbour
+  ---
+  duration_ms: 0.866
+  type: 'test'
+  ...
+# Subtest: a tab turned off is passed over, and comes back when it is on
+ok 164 - a tab turned off is passed over, and comes back when it is on
+  ---
+  duration_ms: 0.4186
+  type: 'test'
+  ...
+# Subtest: the MA is drawn in one tab: the first showing it, unless moved
+ok 165 - the MA is drawn in one tab: the first showing it, unless moved
+  ---
+  duration_ms: 1.2721
+  type: 'test'
+  ...
+# Subtest: a stored layout holds, or is the default
+ok 166 - a stored layout holds, or is the default
+  ---
+  duration_ms: 2.3846
+  type: 'test'
+  ...
+# Subtest: a grid layout (cells, no v) comes back in units, each window where it was
+ok 167 - a grid layout (cells, no v) comes back in units, each window where it was
+  ---
+  duration_ms: 1.1134
+  type: 'test'
+  ...
+# Subtest: the slots layout from before the grid becomes two windows holding the same
+ok 168 - the slots layout from before the grid becomes two windows holding the same
+  ---
+  duration_ms: 0.2866
+  type: 'test'
+  ...
+# Subtest: fresh ids are unused
+ok 169 - fresh ids are unused
+  ---
+  duration_ms: 0.6408
+  type: 'test'
+  ...
+# Subtest: saved layouts: save, replace by name, delete, and a full list
+ok 170 - saved layouts: save, replace by name, delete, and a full list
+  ---
+  duration_ms: 0.5243
+  type: 'test'
+  ...
+# Subtest: the same arrangement, whichever tab shows
+ok 171 - the same arrangement, whichever tab shows
+  ---
+  duration_ms: 0.425
+  type: 'test'
+  ...
+# Subtest: saved layouts off storage: a broken one is dropped, the rest kept
+ok 172 - saved layouts off storage: a broken one is dropped, the rest kept
+  ---
+  duration_ms: 0.511
+  type: 'test'
+  ...
+# Subtest: the seam between the default windows drags both, and stops at the smallest
+ok 173 - the seam between the default windows drags both, and stops at the smallest
+  ---
+  duration_ms: 3.9592
+  type: 'test'
+  ...
+# Subtest: windows on one line move together; a stacked pair has a seam of its own
+ok 174 - windows on one line move together; a stacked pair has a seam of its own
+  ---
+  duration_ms: 1.1474
+  type: 'test'
+  ...
+# Subtest: a seam never runs a window into one that is not on it
+ok 175 - a seam never runs a window into one that is not on it
+  ---
+  duration_ms: 0.88
+  type: 'test'
+  ...
+# Subtest: a tab is dragged within its window or to another, keeping its id, shown where it lands
+ok 176 - a tab is dragged within its window or to another, keeping its id, shown where it lands
+  ---
+  duration_ms: 0.9157
+  type: 'test'
+  ...
+# Subtest: a tab named in its layout: kept through storage and a move, emptied back to its view
+ok 177 - a tab named in its layout: kept through storage and a move, emptied back to its view
+  ---
+  duration_ms: 1.0045
+  type: 'test'
+  ...
+# Subtest: a stored tab with no name, or one that will not do, is the view's name; the layout holds
+ok 178 - a stored tab with no name, or one that will not do, is the view's name; the layout holds
+  ---
+  duration_ms: 1.51
+  type: 'test'
+  ...
+# Subtest: one Video view for every feed: old NDI, capture and Video tabs become Video tabs with their feed
+ok 179 - one Video view for every feed: old NDI, capture and Video tabs become Video tabs with their feed
+  ---
+  duration_ms: 1.2265
+  type: 'test'
+  ...
+# Subtest: a Video tab: added with no feed, given one, saved with it; two tabs, two feeds
+ok 180 - a Video tab: added with no feed, given one, saved with it; two tabs, two feeds
+  ---
+  duration_ms: 0.7742
+  type: 'test'
+  ...
+# Subtest: a stored feed that will not do asks again; the layout holds
+ok 181 - a stored feed that will not do asks again; the layout holds
+  ---
+  duration_ms: 0.8266
+  type: 'test'
+  ...
+# Subtest: Holding became the Lookbook: an old Holding tab comes back as a Lookbook tab, name and place kept
+ok 182 - Holding became the Lookbook: an old Holding tab comes back as a Lookbook tab, name and place kept
+  ---
+  duration_ms: 0.3696
+  type: 'test'
+  ...
+# Subtest: a line carries local time, a level and the text
+ok 183 - a line carries local time, a level and the text
+  ---
+  duration_ms: 17.5352
+  type: 'test'
+  ...
+# Subtest: later lines of one entry are indented, so only an entry starts at the margin
+ok 184 - later lines of one entry are indented, so only an entry starts at the margin
+  ---
+  duration_ms: 5.9219
+  type: 'test'
+  ...
+# Subtest: writes are on disk at once, appended across runs, folder made if missing
+ok 185 - writes are on disk at once, appended across runs, folder made if missing
+  ---
+  duration_ms: 4.8934
+  type: 'test'
+  ...
+# Subtest: past the limit the log moves aside, replacing the one before, and a fresh one starts
+ok 186 - past the limit the log moves aside, replacing the one before, and a fresh one starts
+  ---
+  duration_ms: 12.2873
+  type: 'test'
+  ...
+# Subtest: a log already over the limit at start moves aside first
+ok 187 - a log already over the limit at start moves aside first
+  ---
+  duration_ms: 4.3294
+  type: 'test'
+  ...
+# Subtest: a log that cannot be written never throws into the app
+ok 188 - a log that cannot be written never throws into the app
+  ---
+  duration_ms: 1.9778
+  type: 'test'
+  ...
+# Subtest: two writers of one log (the app and its watchdog) share its size and follow its move aside
+ok 189 - two writers of one log (the app and its watchdog) share its size and follow its move aside
+  ---
+  duration_ms: 13.765
+  type: 'test'
+  ...
+# Subtest: a move aside that fails writes on in the same file, and is tried again later
+ok 190 - a move aside that fails writes on in the same file, and is tried again later
+  ---
+  duration_ms: 11.4291
+  type: 'test'
+  ...
+# Subtest: a console address becomes its web remote, with no credentials
+ok 191 - a console address becomes its web remote, with no credentials
+  ---
+  duration_ms: 3.595
+  type: 'test'
+  ...
+# Subtest: an address cannot smuggle in a port, path, userinfo or query
+ok 192 - an address cannot smuggle in a port, path, userinfo or query
+  ---
+  duration_ms: 0.3227
+  type: 'test'
+  ...
+# Subtest: Remote with no password is the bare address, the documented default
+ok 193 - Remote with no password is the bare address, the documented default
+  ---
+  duration_ms: 0.3179
+  type: 'test'
+  ...
+# Subtest: anyone else logs in by name, in the manual's own URL form
+ok 194 - anyone else logs in by name, in the manual's own URL form
+  ---
+  duration_ms: 0.3098
+  type: 'test'
+  ...
+# Subtest: a password cannot add parameters of its own
+ok 195 - a password cannot add parameters of its own
+  ---
+  duration_ms: 1.6028
+  type: 'test'
+  ...
+# Subtest: the pane may navigate within the console and nowhere else
+ok 196 - the pane may navigate within the console and nowhere else
+  ---
+  duration_ms: 0.4951
+  type: 'test'
+  ...
+# Subtest: operator mode lasts 15 idle minutes, not one moment less
+ok 197 - operator mode lasts 15 idle minutes, not one moment less
+  ---
+  duration_ms: 0.36
+  type: 'test'
+  ...
+# Subtest: Admin lasts as long as Settings says, when it says
+ok 198 - Admin lasts as long as Settings says, when it says
+  ---
+  duration_ms: 0.2073
+  type: 'test'
+  ...
+# Subtest: the web remote overlay reads as what MA itself says, in onPC 2.3.2.0 words
+ok 199 - the web remote overlay reads as what MA itself says, in onPC 2.3.2.0 words
+  ---
+  duration_ms: 0.7473
+  type: 'test'
+  ...
+# Subtest: an overlay it does not know is unread, never taken for connected
+ok 200 - an overlay it does not know is unread, never taken for connected
+  ---
+  duration_ms: 0.9993
+  type: 'test'
+  ...
+# Subtest: only the states MA never leaves by itself ask for a reload
+ok 201 - only the states MA never leaves by itself ask for a reload
+  ---
+  duration_ms: 0.4211
+  type: 'test'
+  ...
+# Subtest: a load gives up well before a person would, and a stuck page waits out MA's own retry
+ok 202 - a load gives up well before a person would, and a stuck page waits out MA's own retry
+  ---
+  duration_ms: 0.2294
+  type: 'test'
+  ...
+# Subtest: a code is found anywhere in a name, upper-cased, never inside a longer run
+ok 203 - a code is found anywhere in a name, upper-cased, never inside a longer run
+  ---
+  duration_ms: 3.9334
+  type: 'test'
+  ...
+# Subtest: a lookbook file's NAS name drops the upload stamp; Arena's keeps its own
+ok 204 - a lookbook file's NAS name drops the upload stamp; Arena's keeps its own
+  ---
+  duration_ms: 0.495
+  type: 'test'
+  ...
+# Subtest: the lookbook items decode, in order, each file under its code, the mask ignored
+ok 205 - the lookbook items decode, in order, each file under its code, the mask ignored
+  ---
+  duration_ms: 1.1021
+  type: 'test'
+  ...
+# Subtest: an item's picture is the lookbook's own composed preview, and nothing else
+ok 206 - an item's picture is the lookbook's own composed preview, and nothing else
+  ---
+  duration_ms: 1.5735
+  type: 'test'
+  ...
+# Subtest: a run sheet of the wrong shape fails whole
+ok 207 - a run sheet of the wrong shape fails whole
+  ---
+  duration_ms: 0.4255
+  type: 'test'
+  ...
+# Subtest: services and their campus decode; an id that is not a UUID never reaches a URL
+ok 208 - services and their campus decode; an id that is not a UUID never reaches a URL
+  ---
+  duration_ms: 1.1903
+  type: 'test'
+  ...
+# Subtest: every state: loaded, not in Arena, missing on disk, another version; T is not looked for
+ok 209 - every state: loaded, not in Arena, missing on disk, another version; T is not looked for
+  ---
+  duration_ms: 2.0169
+  type: 'test'
+  ...
+# Subtest: a right copy anywhere wins over a wrong one; the name is matched without case
+ok 210 - a right copy anywhere wins over a wrong one; the name is matched without case
+  ---
+  duration_ms: 0.4479
+  type: 'test'
+  ...
+# Subtest: a format change alone is the same version (owner, 2026-10-05)
+ok 211 - a format change alone is the same version (owner, 2026-10-05)
+  ---
+  duration_ms: 2.1797
+  type: 'test'
+  ...
+# Subtest: a name that may differ, marked the same by hand, holds for that pair of names only
+ok 212 - a name that may differ, marked the same by hand, holds for that pair of names only
+  ---
+  duration_ms: 1.6646
+  type: 'test'
+  ...
+# Subtest: with sizes, a file is the lookbook's by its size, whatever its name; without, by its name
+ok 213 - with sizes, a file is the lookbook's by its size, whatever its name; without, by its name
+  ---
+  duration_ms: 0.751
+  type: 'test'
+  ...
+# Subtest: marks from storage and from the page are checked
+ok 214 - marks from storage and from the page are checked
+  ---
+  duration_ms: 0.8349
+  type: 'test'
+  ...
+# Subtest: the run order's plan is read from the Cue Manager's address, nothing else
+ok 215 - the run order's plan is read from the Cue Manager's address, nothing else
+  ---
+  duration_ms: 0.4036
+  type: 'test'
+  ...
+# Subtest: a code the lookbook has no file for is never ok
+ok 216 - a code the lookbook has no file for is never ok
+  ---
+  duration_ms: 0.3722
+  type: 'test'
+  ...
+# Subtest: a generator or a clip with no code is not media; a clip named by code counts
+ok 217 - a generator or a clip with no code is not media; a clip named by code counts
+  ---
+  duration_ms: 0.36
+  type: 'test'
+  ...
+# Subtest: services: the booth's campus first, then soonest; past days left out
+ok 218 - services: the booth's campus first, then soonest; past days left out
+  ---
+  duration_ms: 23.934
+  type: 'test'
+  ...
+# Subtest: the New Zealand date, and days ahead across a month
+ok 219 - the New Zealand date, and days ahead across a month
+  ---
+  duration_ms: 21.562
+  type: 'test'
+  ...
+# Subtest: a version is a v after a separator, or a capital V after a small letter
+ok 220 - a version is a v after a separator, or a capital V after a small letter
+  ---
+  duration_ms: 0.7412
+  type: 'test'
+  ...
+# Subtest: a copy's marks, as Windows, macOS and the browsers write them, and not a year in brackets
+ok 221 - a copy's marks, as Windows, macOS and the browsers write them, and not a year in brackets
+  ---
+  duration_ms: 0.2592
+  type: 'test'
+  ...
+# Subtest: the lookbook file is found by name, any case, any media extension, newest first
+ok 222 - the lookbook file is found by name, any case, any media extension, newest first
+  ---
+  duration_ms: 73.7609
+  type: 'test'
+  ...
+# [media] moved the old CB095 Loop.mov aside to C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\paua-fetch-tpp7mF\\Replaced\\CB095 Loop (replaced 2026-10-22 074809).mov
+# Subtest: a copy lands whole, is reused when the same, and never overwrites a different file
+ok 223 - a copy lands whole, is reused when the same, and never overwrites a different file
+  ---
+  duration_ms: 27.1967
+  type: 'test'
+  ...
+# Subtest: a drive file of the lookbook's name is taken when none is its size
+ok 224 - a drive file of the lookbook's name is taken when none is its size
+  ---
+  duration_ms: 6.2906
+  type: 'test'
+  ...
+# Subtest: a copy cut off before leaves no half file behind for the next
+ok 225 - a copy cut off before leaves no half file behind for the next
+  ---
+  duration_ms: 7.3035
+  type: 'test'
+  ...
+# Subtest: Arena is given a file:/// address, spaces encoded
+ok 226 - Arena is given a file:/// address, spaces encoded
+  ---
+  duration_ms: 0.4649
+  type: 'test'
+  ...
+# Subtest: a request from the page is a code, a plain name and clips, and nothing else
+ok 227 - a request from the page is a code, a plain name and clips, and nothing else
+  ---
+  duration_ms: 1.4986
+  type: 'test'
+  ...
+# Subtest: folder settings are whole paths, and the copies have a folder of their own
+ok 228 - folder settings are whole paths, and the copies have a folder of their own
+  ---
+  duration_ms: 1.3966
+  type: 'test'
+  ...
+# Subtest: a file goes only into a clip still there and not playing, by open, never clear
+ok 229 - a file goes only into a clip still there and not playing, by open, never clear
+  ---
+  duration_ms: 0.6747
+  type: 'test'
+  ...
+# Subtest: on the drive, a code is found anywhere in a name; the one of the lookbook's size wins, a copy last
+ok 230 - on the drive, a code is found anywhere in a name; the one of the lookbook's size wins, a copy last
+  ---
+  duration_ms: 16.367
+  type: 'test'
+  ...
+# Subtest: one walk of the drive serves a batch of codes, finding what the single walk finds
+ok 231 - one walk of the drive serves a batch of codes, finding what the single walk finds
+  ---
+  duration_ms: 22.6124
+  type: 'test'
+  ...
+# Subtest: a lookbook download is whole or not at all, and never overwrites
+ok 232 - a lookbook download is whole or not at all, and never overwrites
+  ---
+  duration_ms: 6081.6517
+  type: 'test'
+  ...
+# Subtest: a run is a label, checked requests, its plan and a count; its result counted from the fetches
+ok 233 - a run is a label, checked requests, its plan and a count; its result counted from the fetches
+  ---
+  duration_ms: 0.748
+  type: 'test'
+  ...
+# Subtest: a drive pick is a path string or nothing; main uses it only if its own search finds it
+ok 234 - a drive pick is a path string or nothing; main uses it only if its own search finds it
+  ---
+  duration_ms: 0.281
+  type: 'test'
+  ...
+# Subtest: Undo puts each clip's old file back, only while it still holds the load and is not on screen
+ok 235 - Undo puts each clip's old file back, only while it still holds the load and is not on screen
+  ---
+  duration_ms: 0.4255
+  type: 'test'
+  ...
+# Subtest: a source is called by the part in brackets, cut to fit a tab
+ok 236 - a source is called by the part in brackets, cut to fit a tab
+  ---
+  duration_ms: 1.8281
+  type: 'test'
+  ...
+# Subtest: a stored list of sources is all good or nothing
+ok 237 - a stored list of sources is all good or nothing
+  ---
+  duration_ms: 1.9685
+  type: 'test'
+  ...
+# Subtest: settings keep NDI sources, and a bad list off disk costs only itself
+ok 238 - settings keep NDI sources, and a bad list off disk costs only itself
+  ---
+  duration_ms: 1.6816
+  type: 'test'
+  ...
+# Subtest: a source is a view, by its shape, and drawn by the page
+ok 239 - a source is a view, by its shape, and drawn by the page
+  ---
+  duration_ms: 1.0996
+  type: 'test'
+  ...
+# Subtest: a frame is thinned by whole steps, never below the space it fills
+ok 240 - a frame is thinned by whole steps, never below the space it fills
+  ---
+  duration_ms: 0.4503
+  type: 'test'
+  ...
+# Subtest: the picture says when it is missing, waiting, showing or stopped
+ok 241 - the picture says when it is missing, waiting, showing or stopped
+  ---
+  duration_ms: 0.5165
+  type: 'test'
+  ...
+# Subtest: a source's row: off, not found is down, found is there, LIVE while shown
+ok 242 - a source's row: off, not found is down, found is there, LIVE while shown
+  ---
+  duration_ms: 0.6774
+  type: 'test'
+  ...
+# Subtest: a command encodes to exactly the bytes OSC 1.0 says
+ok 243 - a command encodes to exactly the bytes OSC 1.0 says
+  ---
+  duration_ms: 3.4157
+  type: 'test'
+  ...
+# Subtest: an encoded command decodes back to itself
+ok 244 - an encoded command decodes back to itself
+  ---
+  duration_ms: 0.5851
+  type: 'test'
+  ...
+# Subtest: non-ASCII and NUL are refused, never sent in part
+ok 245 - non-ASCII and NUL are refused, never sent in part
+  ---
+  duration_ms: 0.3992
+  type: 'test'
+  ...
+# Subtest: the ping is one SendOSC through the reply row: one line on the command line
+ok 246 - the ping is one SendOSC through the reply row: one line on the command line
+  ---
+  duration_ms: 0.1524
+  type: 'test'
+  ...
+# Subtest: the reply row is the row LifeBridge sends through
+ok 247 - the reply row is the row LifeBridge sends through
+  ---
+  duration_ms: 1.6691
+  type: 'test'
+  ...
+# Subtest: an echo is the token, exactly as the ping carried it
+ok 248 - an echo is the token, exactly as the ping carried it
+  ---
+  duration_ms: 0.4331
+  type: 'test'
+  ...
+# Subtest: channel B and other channel C pushes are other-channel, not errors
+ok 249 - channel B and other channel C pushes are other-channel, not errors
+  ---
+  duration_ms: 0.2956
+  type: 'test'
+  ...
+# Subtest: a doubled prefix is not a ping: that was a sender addressing itself wrong
+ok 250 - a doubled prefix is not a ping: that was a sender addressing itself wrong
+  ---
+  duration_ms: 0.2253
+  type: 'test'
+  ...
+# Subtest: an echo of the wrong shape is refused
+ok 251 - an echo of the wrong shape is refused
+  ---
+  duration_ms: 0.7255
+  type: 'test'
+  ...
+# Subtest: boot is unreachable, since boot
+ok 252 - boot is unreachable, since boot
+  ---
+  duration_ms: 1.05
+  type: 'test'
+  ...
+# Subtest: an answered ping makes the link live, with its round trip
+ok 253 - an answered ping makes the link live, with its round trip
+  ---
+  duration_ms: 0.4946
+  type: 'test'
+  ...
+# Subtest: an echo from another run, or never sent, matches nothing
+ok 254 - an echo from another run, or never sent, matches nothing
+  ---
+  duration_ms: 0.4654
+  type: 'test'
+  ...
+# Subtest: each token answers once
+ok 255 - each token answers once
+  ---
+  duration_ms: 0.2139
+  type: 'test'
+  ...
+# Subtest: an answer after the timeout is ignored, and the ping counts as missed
+ok 256 - an answer after the timeout is ignored, and the ping counts as missed
+  ---
+  duration_ms: 0.2192
+  type: 'test'
+  ...
+# Subtest: the console talking cannot make a link live that has never answered
+ok 257 - the console talking cannot make a link live that has never answered
+  ---
+  duration_ms: 0.236
+  type: 'test'
+  ...
+# Subtest: a quiet console is asked once per quiet spell, not once a second
+ok 258 - a quiet console is asked once per quiet spell, not once a second
+  ---
+  duration_ms: 0.3444
+  type: 'test'
+  ...
+# Subtest: a console that keeps talking is never asked at all
+ok 259 - a console that keeps talking is never asked at all
+  ---
+  duration_ms: 1.246
+  type: 'test'
+  ...
+# Subtest: a healthy quiet console costs about four commands a minute
+ok 260 - a healthy quiet console costs about four commands a minute
+  ---
+  duration_ms: 0.4232
+  type: 'test'
+  ...
+# Subtest: a miss is confirmed at once, and three make it unreachable about 21 s after the last word
+ok 261 - a miss is confirmed at once, and three make it unreachable about 21 s after the last word
+  ---
+  duration_ms: 0.792
+  type: 'test'
+  ...
+# Subtest: one lost packet does not turn the screen red
+ok 262 - one lost packet does not turn the screen red
+  ---
+  duration_ms: 0.3551
+  type: 'test'
+  ...
+# Subtest: while down it retries slowly, and the console talking brings it straight back
+ok 263 - while down it retries slowly, and the console talking brings it straight back
+  ---
+  duration_ms: 0.5153
+  type: 'test'
+  ...
+# Subtest: a console that never answers is asked every RETRY_MS, and stays down since boot
+ok 264 - a console that never answers is asked every RETRY_MS, and stays down since boot
+  ---
+  duration_ms: 0.3243
+  type: 'test'
+  ...
+# Subtest: only one ping is ever in flight
+ok 265 - only one ping is ever in flight
+  ---
+  duration_ms: 1.3273
+  type: 'test'
+  ...
+# Subtest: a session that could break the command line is refused
+ok 266 - a session that could break the command line is refused
+  ---
+  duration_ms: 0.506
+  type: 'test'
+  ...
+# Subtest: a ping round-trips over real UDP: encode, send, decode, echo, match
+ok 267 - a ping round-trips over real UDP: encode, send, decode, echo, match
+  ---
+  duration_ms: 50.9268
+  type: 'test'
+  ...
+# Subtest: LifeBridge: the embedded XML is the current Lua, byte for byte
+ok 268 - LifeBridge: the embedded XML is the current Lua, byte for byte
+  ---
+  duration_ms: 10.7601
+  type: 'test'
+  ...
+# Subtest: LifeBridge: every block but the last is exactly 1024 bytes
+ok 269 - LifeBridge: every block but the last is exactly 1024 bytes
+  ---
+  duration_ms: 1.1983
+  type: 'test'
+  ...
+# Subtest: LifeBridge: the file starts with a UTF-8 BOM — MA3 will not import it otherwise
+ok 270 - LifeBridge: the file starts with a UTF-8 BOM — MA3 will not import it otherwise
+  ---
+  duration_ms: 0.5455
+  type: 'test'
+  ...
+# Subtest: LifeBridge: named, Size is the block count, and no external file path survives
+ok 271 - LifeBridge: named, Size is the block count, and no external file path survives
+  ---
+  duration_ms: 0.5848
+  type: 'test'
+  ...
+# Subtest: LifeBridgeProbe: the embedded XML is the current Lua, byte for byte
+ok 272 - LifeBridgeProbe: the embedded XML is the current Lua, byte for byte
+  ---
+  duration_ms: 0.6846
+  type: 'test'
+  ...
+# Subtest: LifeBridgeProbe: every block but the last is exactly 1024 bytes
+ok 273 - LifeBridgeProbe: every block but the last is exactly 1024 bytes
+  ---
+  duration_ms: 0.5855
+  type: 'test'
+  ...
+# Subtest: LifeBridgeProbe: the file starts with a UTF-8 BOM — MA3 will not import it otherwise
+ok 274 - LifeBridgeProbe: the file starts with a UTF-8 BOM — MA3 will not import it otherwise
+  ---
+  duration_ms: 1.2221
+  type: 'test'
+  ...
+# Subtest: LifeBridgeProbe: named, Size is the block count, and no external file path survives
+ok 275 - LifeBridgeProbe: named, Size is the block count, and no external file path survives
+  ---
+  duration_ms: 0.5135
+  type: 'test'
+  ...
+# Subtest: the two plugins never share a GUID, so importing one cannot replace the other
+ok 276 - the two plugins never share a GUID, so importing one cannot replace the other
+  ---
+  duration_ms: 0.8888
+  type: 'test'
+  ...
+# Subtest: LifeBridge carries its own stamp, and Pāua expects the same one
+ok 277 - LifeBridge carries its own stamp, and Pāua expects the same one
+  ---
+  duration_ms: 7.9193
+  type: 'test'
+  ...
+# Subtest: the stamp names the code: any change to it changes the stamp
+ok 278 - the stamp names the code: any change to it changes the stamp
+  ---
+  duration_ms: 1.3795
+  type: 'test'
+  ...
+# Subtest: a pop-out with nowhere remembered opens on the other display, centred
+ok 279 - a pop-out with nowhere remembered opens on the other display, centred
+  ---
+  duration_ms: 2.8075
+  type: 'test'
+  ...
+# Subtest: with one display it opens on the kiosk's, and never larger than it
+ok 280 - with one display it opens on the kiosk's, and never larger than it
+  ---
+  duration_ms: 0.3732
+  type: 'test'
+  ...
+# Subtest: a remembered place is kept while its top edge is on a display
+ok 281 - a remembered place is kept while its top edge is on a display
+  ---
+  duration_ms: 0.4025
+  type: 'test'
+  ...
+# Subtest: a remembered place on a display that has gone is not used
+ok 282 - a remembered place on a display that has gone is not used
+  ---
+  duration_ms: 0.3667
+  type: 'test'
+  ...
+# Subtest: remembered places off storage: only sane rectangles, only known views
+ok 283 - remembered places off storage: only sane rectangles, only known views
+  ---
+  duration_ms: 1.1334
+  type: 'test'
+  ...
+# Subtest: a pop-out page knows its view from its address; the kiosk's has none
+ok 284 - a pop-out page knows its view from its address; the kiosk's has none
+  ---
+  duration_ms: 0.5061
+  type: 'test'
+  ...
+# Subtest: boot is UNKNOWN, not off and not zero
+ok 285 - boot is UNKNOWN, not off and not zero
+  ---
+  duration_ms: 3.0283
+  type: 'test'
+  ...
+# Subtest: a fresh read is LIVE
+ok 286 - a fresh read is LIVE
+  ---
+  duration_ms: 0.4002
+  type: 'test'
+  ...
+# Subtest: an aged read is STALE and carries its age
+ok 287 - an aged read is STALE and carries its age
+  ---
+  duration_ms: 0.3407
+  type: 'test'
+  ...
+# Subtest: the plan's own example: a timeout four minutes after a good read shows "78% · 4m ago"
+ok 288 - the plan's own example: a timeout four minutes after a good read shows "78% · 4m ago"
+  ---
+  duration_ms: 0.2943
+  type: 'test'
+  ...
+# Subtest: a failure never overwrites the last good value
+ok 289 - a failure never overwrites the last good value
+  ---
+  duration_ms: 0.4474
+  type: 'test'
+  ...
+# Subtest: a failure with nothing behind it is UNKNOWN, carrying which kind
+ok 290 - a failure with nothing behind it is UNKNOWN, carrying which kind
+  ---
+  duration_ms: 0.2827
+  type: 'test'
+  ...
+# Subtest: UNREACHABLE drops even a fresh value to UNKNOWN
+ok 291 - UNREACHABLE drops even a fresh value to UNKNOWN
+  ---
+  duration_ms: 0.409
+  type: 'test'
+  ...
+# Subtest: matchReading forces a branch per state and is the only way to a value
+ok 292 - matchReading forces a branch per state and is the only way to a value
+  ---
+  duration_ms: 0.5147
+  type: 'test'
+  ...
+# Subtest: silence does not kill the link — only unanswered requests do
+ok 293 - silence does not kill the link — only unanswered requests do
+  ---
+  duration_ms: 0.6876
+  type: 'test'
+  ...
+# Subtest: a link that has never answered is unreachable, not live-with-zero-latency
+ok 294 - a link that has never answered is unreachable, not live-with-zero-latency
+  ---
+  duration_ms: 0.7018
+  type: 'test'
+  ...
+# Subtest: first boot has no console address, rather than a guessed one
+ok 295 - first boot has no console address, rather than a guessed one
+  ---
+  duration_ms: 3.2472
+  type: 'test'
+  ...
+# Subtest: a good patch applies, trimmed
+ok 296 - a good patch applies, trimmed
+  ---
+  duration_ms: 1.2321
+  type: 'test'
+  ...
+# Subtest: one bad field rejects the whole patch, and says which
+ok 297 - one bad field rejects the whole patch, and says which
+  ---
+  duration_ms: 1.2954
+  type: 'test'
+  ...
+# Subtest: an address with a scheme or port is refused, not half-used
+ok 298 - an address with a scheme or port is refused, not half-used
+  ---
+  duration_ms: 0.3561
+  type: 'test'
+  ...
+# Subtest: clearing the address or the operator user means unset, not empty
+ok 299 - clearing the address or the operator user means unset, not empty
+  ---
+  duration_ms: 0.2867
+  type: 'test'
+  ...
+# Subtest: an empty password is an error, so blank can only ever mean "unchanged"
+ok 300 - an empty password is an error, so blank can only ever mean "unchanged"
+  ---
+  duration_ms: 0.4787
+  type: 'test'
+  ...
+# Subtest: a corrupt file costs only the bad values
+ok 301 - a corrupt file costs only the bad values
+  ---
+  duration_ms: 1.2445
+  type: 'test'
+  ...
+# Subtest: a patch of the wrong shape off IPC is rejected whole, never dropped quietly
+ok 302 - a patch of the wrong shape off IPC is rejected whole, never dropped quietly
+  ---
+  duration_ms: 0.8677
+  type: 'test'
+  ...
+# Subtest: the reply port follows the console port unless it is set apart
+ok 303 - the reply port follows the console port unless it is set apart
+  ---
+  duration_ms: 0.8209
+  type: 'test'
+  ...
+# Subtest: a reply port set equal to the console port is stored as "same", not a copy
+ok 304 - a reply port set equal to the console port is stored as "same", not a copy
+  ---
+  duration_ms: 0.7568
+  type: 'test'
+  ...
+# Subtest: a bad OSC port rejects the patch and says which
+ok 305 - a bad OSC port rejects the patch and says which
+  ---
+  duration_ms: 0.4583
+  type: 'test'
+  ...
+# Subtest: onPC on this computer: replies on the next port up unless set, and one shared port refused
+ok 306 - onPC on this computer: replies on the next port up unless set, and one shared port refused
+  ---
+  duration_ms: 0.7312
+  type: 'test'
+  ...
+# Subtest: a connection turned off keeps its address, but main works as if it had none
+ok 307 - a connection turned off keeps its address, but main works as if it had none
+  ---
+  duration_ms: 0.4084
+  type: 'test'
+  ...
+# Subtest: the off list: unknown ids are refused in a patch, and dropped whole off disk
+ok 308 - the off list: unknown ids are refused in a patch, and dropped whole off disk
+  ---
+  duration_ms: 0.3605
+  type: 'test'
+  ...
+# Subtest: one unreadable embed on disk costs that embed, not the list (and its sign-ins)
+ok 309 - one unreadable embed on disk costs that embed, not the list (and its sign-ins)
+  ---
+  duration_ms: 1.9429
+  type: 'test'
+  ...
+# Subtest: a save says in words what it changed, and never a password
+ok 310 - a save says in words what it changed, and never a password
+  ---
+  duration_ms: 0.744
+  type: 'test'
+  ...
+# Subtest: a part reads as LifeBridge writes it, a changed name marked unloadable
+ok 311 - a part reads as LifeBridge writes it, a changed name marked unloadable
+  ---
+  duration_ms: 3.699
+  type: 'test'
+  ...
+# Subtest: an unreadable folder and an old plugin are failures with their reasons, never "no shows"
+ok 312 - an unreadable folder and an old plugin are failures with their reasons, never "no shows"
+  ---
+  duration_ms: 1.0468
+  type: 'test'
+  ...
+# Subtest: parts are gathered in order, and the list is only whole when every part is in
+ok 313 - parts are gathered in order, and the list is only whole when every part is in
+  ---
+  duration_ms: 0.6989
+  type: 'test'
+  ...
+# Subtest: a reply of the wrong shape is refused, not read loosely
+ok 314 - a reply of the wrong shape is refused, not read loosely
+  ---
+  duration_ms: 0.3763
+  type: 'test'
+  ...
+# Subtest: the stamp is the New Zealand date and time, whatever the computer thinks
+ok 315 - the stamp is the New Zealand date and time, whatever the computer thinks
+  ---
+  duration_ms: 21.8674
+  type: 'test'
+  ...
+# Subtest: the offered name is campus then stamp, within 31, the campus cut first
+ok 316 - the offered name is campus then stamp, within 31, the campus cut first
+  ---
+  duration_ms: 2.0436
+  type: 'test'
+  ...
+# Subtest: a Save As name is refused if MA would cut it, the link would change it, or it is the base
+ok 317 - a Save As name is refused if MA would cut it, the link would change it, or it is the base
+  ---
+  duration_ms: 1.4252
+  type: 'test'
+  ...
+# Subtest: the commands are exactly what is sent, and a Load always says what happens to the old show
+ok 318 - the commands are exactly what is sent, and a Load always says what happens to the old show
+  ---
+  duration_ms: 0.3507
+  type: 'test'
+  ...
+# Subtest: the ask is one plugin call, and it survives the trip to the console
+ok 319 - the ask is one plugin call, and it survives the trip to the console
+  ---
+  duration_ms: 2.6792
+  type: 'test'
+  ...
+# Subtest: the verb asked for is a verb LifeBridge dispatches
+ok 320 - the verb asked for is a verb LifeBridge dispatches
+  ---
+  duration_ms: 0.7529
+  type: 'test'
+  ...
+# Subtest: the stale threshold is derived from the watched cadence and the ping it rides on
+ok 321 - the stale threshold is derived from the watched cadence and the ping it rides on
+  ---
+  duration_ms: 0.1534
+  type: 'test'
+  ...
+# Subtest: the build Pāua expects is the stamp the plugin carries
+ok 322 - the build Pāua expects is the stamp the plugin carries
+  ---
+  duration_ms: 0.3743
+  type: 'test'
+  ...
+# Subtest: on the base show
+ok 323 - on the base show
+  ---
+  duration_ms: 1.2467
+  type: 'test'
+  ...
+# Subtest: on another show, against SaveGuard's default base
+ok 324 - on another show, against SaveGuard's default base
+  ---
+  duration_ms: 0.2972
+  type: 'test'
+  ...
+# Subtest: the verdict is the console's, never re-derived from the names
+ok 325 - the verdict is the console's, never re-derived from the names
+  ---
+  duration_ms: 0.173
+  type: 'test'
+  ...
+# Subtest: a console that cannot read its own showfile name says so
+ok 326 - a console that cannot read its own showfile name says so
+  ---
+  duration_ms: 0.1886
+  type: 'test'
+  ...
+# Subtest: any other build is recognised, and nothing it says is read as a name
+ok 327 - any other build is recognised, and nothing it says is read as a name
+  ---
+  duration_ms: 0.8394
+  type: 'test'
+  ...
+# Subtest: the watcher says what it did
+ok 328 - the watcher says what it did
+  ---
+  duration_ms: 1.1904
+  type: 'test'
+  ...
+# Subtest: another verb's refusal, a ping, and channel B are not show replies
+ok 329 - another verb's refusal, a ping, and channel B are not show replies
+  ---
+  duration_ms: 0.3727
+  type: 'test'
+  ...
+# Subtest: a reply of any other shape is refused, never read loosely
+ok 330 - a reply of any other shape is refused, never read loosely
+  ---
+  duration_ms: 0.2722
+  type: 'test'
+  ...
+# Subtest: boot is never-read: UNKNOWN, not a name
+ok 331 - boot is never-read: UNKNOWN, not a name
+  ---
+  duration_ms: 0.3329
+  type: 'test'
+  ...
+# Subtest: an answer is recorded as a read, when it arrived
+ok 332 - an answer is recorded as a read, when it arrived
+  ---
+  duration_ms: 0.2713
+  type: 'test'
+  ...
+# Subtest: an ask with no answer becomes a timeout, and never a name
+ok 333 - an ask with no answer becomes a timeout, and never a name
+  ---
+  duration_ms: 0.1757
+  type: 'test'
+  ...
+# Subtest: a timeout after a good read keeps the name, aged
+ok 334 - a timeout after a good read keeps the name, aged
+  ---
+  duration_ms: 0.2208
+  type: 'test'
+  ...
+# Subtest: a late answer is still what the console said, and replaces the timeout
+ok 335 - a late answer is still what the console said, and replaces the timeout
+  ---
+  duration_ms: 0.1388
+  type: 'test'
+  ...
+# Subtest: an unreadable name and an out-of-date plugin are failures with the reason
+ok 336 - an unreadable name and an out-of-date plugin are failures with the reason
+  ---
+  duration_ms: 0.297
+  type: 'test'
+  ...
+# Subtest: another build, asked or pushed, stops every ask from this link
+ok 337 - another build, asked or pushed, stops every ask from this link
+  ---
+  duration_ms: 0.3825
+  type: 'test'
+  ...
+# Subtest: a running watcher stretches the refresh to ten minutes
+ok 338 - a running watcher stretches the refresh to ten minutes
+  ---
+  duration_ms: 0.1972
+  type: 'test'
+  ...
+# Subtest: an expired watcher is asked again at once; a stopped one at the next quiet gap
+ok 339 - an expired watcher is asked again at once; a stopped one at the next quiet gap
+  ---
+  duration_ms: 0.1618
+  type: 'test'
+  ...
+# Subtest: no answer, or a link-up, means no watcher is assumed
+ok 340 - no answer, or a link-up, means no watcher is assumed
+  ---
+  duration_ms: 0.1474
+  type: 'test'
+  ...
+# Subtest: a watched quiet hour costs about six asks, not sixty
+ok 341 - a watched quiet hour costs about six asks, not sixty
+  ---
+  duration_ms: 0.2535
+  type: 'test'
+  ...
+# Subtest: any probe push under our prefix is recognised as the probe
+ok 342 - any probe push under our prefix is recognised as the probe
+  ---
+  duration_ms: 0.3574
+  type: 'test'
+  ...
+# Subtest: the old probe answering an ask stops every ask from this link, link-up included
+ok 343 - the old probe answering an ask stops every ask from this link, link-up included
+  ---
+  duration_ms: 0.2915
+  type: 'test'
+  ...
+# Subtest: a probe that lands just after the ask timed out still counts
+ok 344 - a probe that lands just after the ask timed out still counts
+  ---
+  duration_ms: 0.1661
+  type: 'test'
+  ...
+# Subtest: a probe nobody asked for (run by hand on a current build) changes nothing
+ok 345 - a probe nobody asked for (run by hand on a current build) changes nothing
+  ---
+  duration_ms: 0.1298
+  type: 'test'
+  ...
+# Subtest: a push from the watcher is recorded with no ask in flight
+ok 346 - a push from the watcher is recorded with no ask in flight
+  ---
+  duration_ms: 0.2135
+  type: 'test'
+  ...
+# Subtest: the channel is the same object until something new is recorded
+ok 347 - the channel is the same object until something new is recorded
+  ---
+  duration_ms: 0.1184
+  type: 'test'
+  ...
+# Subtest: a name is LIVE for one refresh cadence, then STALE with its age
+ok 348 - a name is LIVE for one refresh cadence, then STALE with its age
+  ---
+  duration_ms: 0.1314
+  type: 'test'
+  ...
+# Subtest: a dead link drops even a fresh name to UNKNOWN
+ok 349 - a dead link drops even a fresh name to UNKNOWN
+  ---
+  duration_ms: 0.1443
+  type: 'test'
+  ...
+# Subtest: link-up always asks: a load is a likely reason the link went down
+ok 350 - link-up always asks: a load is a likely reason the link went down
+  ---
+  duration_ms: 0.1215
+  type: 'test'
+  ...
+# Subtest: never two asks in flight
+ok 351 - never two asks in flight
+  ---
+  duration_ms: 0.1193
+  type: 'test'
+  ...
+# Subtest: a quiet gap asks only once a refresh is due
+ok 352 - a quiet gap asks only once a refresh is due
+  ---
+  duration_ms: 0.1152
+  type: 'test'
+  ...
+# Subtest: a console that never answers is not asked in every quiet gap
+ok 353 - a console that never answers is not asked in every quiet gap
+  ---
+  duration_ms: 0.3305
+  type: 'test'
+  ...
+# Subtest: a quiet hour costs about sixty asks: two command lines a minute
+ok 354 - a quiet hour costs about sixty asks: two command lines a minute
+  ---
+  duration_ms: 0.2787
+  type: 'test'
+  ...
+# Subtest: a clean quit stays quit
+ok 355 - a clean quit stays quit
+  ---
+  duration_ms: 1.4956
+  type: 'test'
+  ...
+# Subtest: a crash comes back after the delay, however it died
+ok 356 - a crash comes back after the delay, however it died
+  ---
+  duration_ms: 1.248
+  type: 'test'
+  ...
+# Subtest: too many crashes close together and it gives up, saying why
+ok 357 - too many crashes close together and it gives up, saying why
+  ---
+  duration_ms: 0.3336
+  type: 'test'
+  ...
+# Subtest: crashes long ago do not count against it
+ok 358 - crashes long ago do not count against it
+  ---
+  duration_ms: 1.175
+  type: 'test'
+  ...
+# Subtest: an exit in words
+ok 359 - an exit in words
+  ---
+  duration_ms: 0.3083
+  type: 'test'
+  ...
+# Subtest: OnTime: a running event counts to the next one, by name
+ok 360 - OnTime: a running event counts to the next one, by name
+  ---
+  duration_ms: 2.4611
+  type: 'test'
+  ...
+# Subtest: OnTime: between events in roll, the secondary timer counts to the next start
+ok 361 - OnTime: between events in roll, the secondary timer counts to the next start
+  ---
+  duration_ms: 0.2937
+  type: 'test'
+  ...
+# Subtest: OnTime: a reply of the wrong shape fails whole, never as a time
+ok 362 - OnTime: a reply of the wrong shape fails whole, never as a time
+  ---
+  duration_ms: 0.2045
+  type: 'test'
+  ...
+# Subtest: OnTime: counted down between reads only while live and running
+ok 363 - OnTime: counted down between reads only while live and running
+  ---
+  duration_ms: 0.3043
+  type: 'test'
+  ...
+# Subtest: ProPresenter: time strings, signed, with or without a fraction
+ok 364 - ProPresenter: time strings, signed, with or without a fraction
+  ---
+  duration_ms: 0.3187
+  type: 'test'
+  ...
+# Subtest: ProPresenter: every timer in its order, and the stage message
+ok 365 - ProPresenter: every timer in its order, and the stage message
+  ---
+  duration_ms: 0.5211
+  type: 'test'
+  ...
+# Subtest: ProPresenter 18.2 as seen 2026-10-02: a countdown that may not overrun ends complete
+ok 366 - ProPresenter 18.2 as seen 2026-10-02: a countdown that may not overrun ends complete
+  ---
+  duration_ms: 0.5285
+  type: 'test'
+  ...
+# Subtest: the chip follows the first counting timer unless one is named
+ok 367 - the chip follows the first counting timer unless one is named
+  ---
+  duration_ms: 0.4536
+  type: 'test'
+  ...
+# Subtest: a named timer ProPresenter does not have is missing, never another timer
+ok 368 - a named timer ProPresenter does not have is missing, never another timer
+  ---
+  duration_ms: 0.5946
+  type: 'test'
+  ...
+# Subtest: ProPresenter: a time it cannot read fails the read, not shown as zero
+ok 369 - ProPresenter: a time it cannot read fails the read, not shown as zero
+  ---
+  duration_ms: 0.7255
+  type: 'test'
+  ...
+# Subtest: OnTime is shown whenever an event is running there
+ok 370 - OnTime is shown whenever an event is running there
+  ---
+  duration_ms: 0.6109
+  type: 'test'
+  ...
+# Subtest: otherwise ProPresenter, alone
+ok 371 - otherwise ProPresenter, alone
+  ---
+  duration_ms: 0.2071
+  type: 'test'
+  ...
+# Subtest: an OnTime that cannot be read is said beside ProPresenter, not taken as idle
+ok 372 - an OnTime that cannot be read is said beside ProPresenter, not taken as idle
+  ---
+  duration_ms: 0.1916
+  type: 'test'
+  ...
+# Subtest: an OnTime gone quiet after saying stopped is said too, with its age
+ok 373 - an OnTime gone quiet after saying stopped is said too, with its age
+  ---
+  duration_ms: 0.1986
+  type: 'test'
+  ...
+# Subtest: a stale OnTime that last said running is still OnTime, aged
+ok 374 - a stale OnTime that last said running is still OnTime, aged
+  ---
+  duration_ms: 0.1761
+  type: 'test'
+  ...
+# Subtest: the named timer travels with the ProPresenter view
+ok 375 - the named timer travels with the ProPresenter view
+  ---
+  duration_ms: 0.1993
+  type: 'test'
+  ...
+# Subtest: one program set up is shown alone; none set up shows nothing
+ok 376 - one program set up is shown alone; none set up shows nothing
+  ---
+  duration_ms: 0.1789
+  type: 'test'
+  ...
+# Subtest: countdowns read as people read them
+ok 377 - countdowns read as people read them
+  ---
+  duration_ms: 0.2512
+  type: 'test'
+  ...
+# Subtest: settings: neither program is used until an address is set
+ok 378 - settings: neither program is used until an address is set
+  ---
+  duration_ms: 0.1346
+  type: 'test'
+  ...
+# Subtest: settings: ProPresenter on 1025 unless told otherwise
+ok 379 - settings: ProPresenter on 1025 unless told otherwise
+  ---
+  duration_ms: 1.0911
+  type: 'test'
+  ...
+# Subtest: settings: the timer fields survive the disk and the IPC boundary
+ok 380 - settings: the timer fields survive the disk and the IPC boundary
+  ---
+  duration_ms: 0.8789
+  type: 'test'
+  ...
+# Subtest: settings: the ProPresenter timer is named, or blank for whichever runs
+ok 381 - settings: the ProPresenter timer is named, or blank for whichever runs
+  ---
+  duration_ms: 0.7725
+  type: 'test'
+  ...
+# Subtest: a failed check never reads as up to date
+ok 382 - a failed check never reads as up to date
+  ---
+  duration_ms: 1.5605
+  type: 'test'
+  ...
+# Subtest: a new version names both versions
+ok 383 - a new version names both versions
+  ---
+  duration_ms: 0.2649
+  type: 'test'
+  ...
+# Subtest: a download says how far it has got, rounded
+ok 384 - a download says how far it has got, rounded
+  ---
+  duration_ms: 0.1915
+  type: 'test'
+  ...
+# Subtest: never checked is said, not taken as current
+ok 385 - never checked is said, not taken as current
+  ---
+  duration_ms: 0.1873
+  type: 'test'
+  ...
+# Subtest: no sender on the machine is said, not drawn as a black picture
+ok 386 - no sender on the machine is said, not drawn as a black picture
+  ---
+  duration_ms: 2.7144
+  type: 'test'
+  ...
+# Subtest: a sender with no frame yet is waiting, with whatever went wrong
+ok 387 - a sender with no frame yet is waiting, with whatever went wrong
+  ---
+  duration_ms: 0.2267
+  type: 'test'
+  ...
+# Subtest: frames arriving are showing; frames stopping is said, with how long
+ok 388 - frames arriving are showing; frames stopping is said, with how long
+  ---
+  duration_ms: 0.2634
+  type: 'test'
+  ...
+# Subtest: another sender's last frame is no picture: waiting, not its picture under this name
+ok 389 - another sender's last frame is no picture: waiting, not its picture under this name
+  ---
+  duration_ms: 0.2868
+  type: 'test'
+  ...
+# Subtest: Arena's 16-bit picture is refused in words that say what to change
+ok 390 - Arena's 16-bit picture is refused in words that say what to change
+  ---
+  duration_ms: 0.4444
+  type: 'test'
+  ...
+# Subtest: the picture is drawn whole, at the scale its space allows
+ok 391 - the picture is drawn whole, at the scale its space allows
+  ---
+  duration_ms: 0.313
+  type: 'test'
+  ...
+# Subtest: Fit sizes a pop-out to the picture, inside the room it has
+ok 392 - Fit sizes a pop-out to the picture, inside the room it has
+  ---
+  duration_ms: 0.327
+  type: 'test'
+  ...
+# Subtest: the graphics cards Chromium sees are said in a line, and counted
+ok 393 - the graphics cards Chromium sees are said in a line, and counted
+  ---
+  duration_ms: 0.228
+  type: 'test'
+  ...
+# Subtest: listed but never opened is said as two graphics cards, not left waiting
+ok 394 - listed but never opened is said as two graphics cards, not left waiting
+  ---
+  duration_ms: 0.5871
+  type: 'test'
+  ...
+# Subtest: every way of no picture has words; a frame through has none
+ok 395 - every way of no picture has words; a frame through has none
+  ---
+  duration_ms: 0.7091
+  type: 'test'
+  ...
+1..395
+# tests 395
+# suites 0
+# pass 392
+# fail 0
+# cancelled 0
+# skipped 3
+# todo 0
+# duration_ms 7694.4317
