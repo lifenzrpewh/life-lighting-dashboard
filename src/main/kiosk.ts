@@ -456,6 +456,12 @@ app.whenReady().then(() => {
 	const mediaFetch = createMediaFetch({
 		folders: () => ({ graphics: store.current().graphicsFolder, local: store.current().localMediaFolder }),
 		open: (clipId, file, live) => arena?.open(clipId, file, live) ?? Promise.resolve({ ok: false, detail: 'no Arena is set up' }),
+		clipNow: (clipId) => {
+			const latest = arena?.status()?.latest
+			if (latest === null || latest === undefined || !latest.ok) return null
+			const slot = latest.value.layers.flatMap((l) => l.slots).find((s) => s.id === clipId)
+			return slot === undefined ? null : { file: slot.file, playing: slot.state === 'playing' }
+		},
 		clipHas: (clipId, file) => {
 			const latest = arena?.status()?.latest
 			if (latest === null || latest === undefined || !latest.ok) return false
@@ -525,6 +531,14 @@ app.whenReady().then(() => {
 		return mediaFetch.run(run)
 	})
 	ipcMain.handle('media:last-run', (e): FetchRun | null => (fromOurs(e) ? mediaFetch.lastRun() : null))
+	// Undo the latest run's loads (./media-fetch.ts, `undo`): Admin only; the
+	// page names the run, main knows each clip's old file.
+	ipcMain.handle('media:undo', async (e, runId: unknown) => {
+		if (!fromOurs(e)) return { ok: false, detail: 'not from this app' }
+		if (mode !== 'operator') return { ok: false, detail: 'Admin only.' }
+		if (typeof runId !== 'number' || !Number.isSafeInteger(runId)) return { ok: false, detail: 'not a run' }
+		return mediaFetch.undo(runId)
+	})
 	// The graphics drive's files for a code (the owner, 2026-10-13: "show drive
 	// matches"): anyone may look; picking one to load is a fetch, Admin's.
 	ipcMain.handle('media:drive', async (e, code: unknown, lookbookPath: unknown): Promise<DriveMatches> => {

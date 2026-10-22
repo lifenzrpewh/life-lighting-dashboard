@@ -15,6 +15,7 @@ import {
 	normalBackground,
 	moveTargets,
 	movePins,
+	placeFrom,
 	pinsFrom,
 	oldForegrounds,
 	placementWords,
@@ -716,6 +717,33 @@ test('a move onto another promo swaps only the two; the rest stay (the owner, 20
 	assert.deepEqual(movePins(ITEMS, s, { item: 5, code: 'CF562' }, 12), [{ item: 5, code: 'CF562', column: 12 }])
 	// A second move replaces the first, and the other's pin with it.
 	assert.deepEqual(movePins(ITEMS, s, { item: 4, code: 'CF594' }, 11, undefined, pins), [{ item: 5, code: 'CF562', column: 9 }, { item: 4, code: 'CF594', column: 11 }])
+})
+
+test('several placed at once: forward from the column tapped, in run-sheet order, skipping what is taken or on screen', () => {
+	const events = [...FULL, oneOff('Speaker Intro', 'CF701'), oneOff('Story', 'CF702'), oneOff('Baptisms', 'CF703')]
+	const s = wide(4) // spare columns 13 to 16
+	const what = [2, 1, 0].map((k) => ({ item: FULL.length + k, code: `CF70${k + 1}` })) // ticked in any order
+	s.layers[3].slots[13].state = 'playing' // column 14 on screen
+	const r = placeFrom(events, s, what, 13)
+	assert.deepEqual(r.landed, [{ item: FULL.length, column: 13 }, { item: FULL.length + 1, column: 15 }, { item: FULL.length + 2, column: 16 }])
+	assert.deepEqual(r.didntFit, [])
+	// Started too late: what fits is placed, the rest said, never wrapped round.
+	const late = placeFrom(events, s, what, 15)
+	assert.deepEqual(late.landed.map((l) => l.column), [15, 16])
+	assert.deepEqual(late.didntFit, [FULL.length + 2])
+	// A named column is never taken: started at WTL, they go to the first free PROMO onwards.
+	const named = placeFrom(events, wide(4), what, 5)
+	assert.ok(named.landed.every((l) => l.column >= 11))
+	// The pins it makes are the plan.
+	const plan = planPlacements(events, s, undefined, r.pins)
+	assert.equal(plan.columns.get(FULL.length + 1), 14)
+})
+
+test('a move into a column Arena has since reserved is dropped', () => {
+	const pins = [{ item: 5, code: 'CF562', column: 12 }]
+	assert.equal(planPlacements(ITEMS, composition(), undefined, pins).columns.get(5), 11)
+	const renamed = composition([...NAMES.slice(0, 11), 'COUNTDOWN 2'])
+	assert.notEqual(planPlacements(ITEMS, renamed, undefined, pins).columns.get(5), 11)
 })
 
 test('each look says where it lands: its column, why, and what it replaces', () => {

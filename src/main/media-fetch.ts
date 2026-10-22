@@ -12,12 +12,13 @@
 // 2026-10-18: a lookbook not working properly made the drive's files look
 // absent), and the confirmation says it was by name.
 
+import fs from 'node:fs'
 import path from 'node:path'
 
 import { copyInto, downloadInto, findByCodeIndexed, nameKey, pickDriveFile, type Found } from '../bridge/media-files.js'
 import { isCopyName, lookbookStem } from '../shared/media-check.js'
 import type { ArenaCommandResult } from '../shared/arena.js'
-import { megabytes, runCounts, type DriveMatches, type FetchRequest, type FetchRun, type FetchState, type FetchStates, type MediaSource, type RunRequest } from '../shared/media-fetch.js'
+import { megabytes, runCounts, undoSteps, type DriveMatches, type LoadedClip, type FetchRequest, type FetchRun, type FetchState, type FetchStates, type MediaSource, type RunRequest } from '../shared/media-fetch.js'
 
 export type MediaFetch = {
 	/** Queue a fetch. Refused, with why, when one for that code is under way. */
@@ -37,6 +38,8 @@ export type MediaFetch = {
 	replace(code: string): { ok: true } | { ok: false; detail: string }
 	/** Where each request's file would come from, before anything is sent. */
 	sources(requests: FetchRequest[]): Promise<Record<string, MediaSource>>
+	/** Undo the latest run's loads (`undoSteps`): each clip its old file back. */
+	undo(runId: number): Promise<{ ok: true; restored: number; left: string[] } | { ok: false; detail: string }>
 }
 
 /** How long after Arena refuses a load to look at the clip again. */
@@ -49,6 +52,9 @@ export function createMediaFetch(opts: {
 	open: (clipId: number, file: string, live: boolean) => Promise<ArenaCommandResult>
 	/** Whether Arena's latest reading has `file` (by name) in the clip, found. */
 	clipHas: (clipId: number, file: string) => boolean
+	/** The clip's file in Arena's latest reading, and whether it is on screen;
+	 *  null when there is no such clip. */
+	clipNow: (clipId: number) => { file: string | null; playing: boolean } | null
 	lookbookSize: (libraryPath: string) => Promise<number | null>
 	lookbookUrl: (libraryPath: string) => string | null
 }): MediaFetch {
@@ -59,6 +65,8 @@ export function createMediaFetch(opts: {
 	let running = false
 	let last: FetchRun | null = null
 	let runs = 0
+	/** The latest run's loads, for Undo. */
+	let loadedClips: LoadedClip[] = []
 
 	const set = (code: string, state: FetchState) => {
 		states[code] = { ...state, at: Date.now() }
@@ -144,13 +152,18 @@ export function createMediaFetch(opts: {
 		const doubted: string[] = []
 		for (const [i, clipId] of req.clipIds.entries()) {
 			set(req.code, { state: 'loading', file, done: i, of: req.clipIds.length })
+			// What it held, for Undo: a file found on this computer, or nothing.
+			const was = opts.clipNow(clipId)?.file ?? null
+			const before = was !== null && fs.existsSync(was) ? was : null
 			const opened = await opts.open(clipId, copy.path, req.allowLive.includes(clipId))
+			if (opened.ok || opts.clipHas(clipId, copy.path)) loadedClips.push({ clipId, code: req.code, before, after: copy.path })
 			if (!opened.ok) {
 				// Arena said no; look again before believing it (the owner,
 				// 2026-10-13: a 404 for a clip that held the file). Arena pushes
 				// a changed composition on its own, so a moment is enough.
 				await new Promise((r) => setTimeout(r, READ_BACK_MS))
 				if (opts.clipHas(clipId, copy.path)) {
+					if (!loadedClips.some((l) => l.clipId === clipId && l.after === copy.path)) loadedClips.push({ clipId, code: req.code, before, after: copy.path })
 					console.log(`[media] ${req.code}: Arena said "${opened.detail}" for clip ${clipId}, but the clip reads back with ${file}`)
 					doubted.push(opened.detail)
 					continue
@@ -190,6 +203,7 @@ export function createMediaFetch(opts: {
 	const endRun = () => {
 		if (last === null || last.ended !== null || last.codes.some(busy)) return
 		last.ended = Date.now()
+		last.undoable = loadedClips.filter((l) => l.before !== null).length
 		const n = runCounts(last, states)
 		const parts = [`${n.loaded} loaded`, ...(n.doubted > 0 ? [`${n.doubted} of them after Arena said no`] : []), ...(n.byHand > 0 ? [`${n.byHand} said to be there by hand`] : []), ...(n.failed > 0 ? [`${n.failed} failed`] : []), ...(n.copied > 0 ? [`${n.copied} copied only`] : []), ...(last.already > 0 ? [`${last.already} already there`] : [])]
 		console.log(`[holding] ${last.label} done: ${parts.join(', ')}`)
@@ -216,8 +230,9 @@ export function createMediaFetch(opts: {
 			const codes: string[] = []
 			console.log(`[holding] ${label}`)
 			for (const line of plan) console.log(`[holding]   ${line}`)
-			const run: FetchRun = { id: ++runs, label, at: Date.now(), codes, already, refused, ended: null }
+			const run: FetchRun = { id: ++runs, label, at: Date.now(), codes, already, refused, ended: null, undoable: 0, undone: false }
 			last = run
+			loadedClips = []
 			for (const req of requests) {
 				if (busy(req.code)) {
 					refused[req.code] = `${req.code} is already being fetched`
@@ -276,6 +291,32 @@ export function createMediaFetch(opts: {
 			return { ok: true }
 		},
 		lastRun: () => (last === null ? null : { ...last, codes: [...last.codes], refused: { ...last.refused } }),
+		async undo(runId) {
+			const run = last
+			if (run === null || run.id !== runId) return { ok: false, detail: 'only the latest load can be undone' }
+			if (run.ended === null) return { ok: false, detail: 'it is still loading' }
+			if (run.undone) return { ok: false, detail: 'it was undone already' }
+			run.undone = true
+			console.log(`[holding] Undo ${run.label}`)
+			let restored = 0
+			const left: string[] = []
+			for (const step of undoSteps(loadedClips, opts.clipNow)) {
+				if (step.file === null) {
+					console.log(`[holding]   ${step.code}: clip ${step.clipId} left: ${step.why}`)
+					left.push(`${step.code}: ${step.why}`)
+					continue
+				}
+				const opened = await opts.open(step.clipId, step.file, false)
+				if (opened.ok || opts.clipHas(step.clipId, step.file)) {
+					restored += 1
+					console.log(`[holding]   ${step.code}: clip ${step.clipId} back to ${path.basename(step.file)}`)
+				} else {
+					console.log(`[holding]   ${step.code}: clip ${step.clipId} not put back: ${opened.ok ? 'it did not read back' : opened.detail}`)
+					left.push(`${step.code}: ${opened.ok ? 'it did not read back' : opened.detail}`)
+				}
+			}
+			return { ok: true, restored, left }
+		},
 		async sources(requests) {
 			const out: Record<string, MediaSource> = {}
 			for (const req of requests.slice(0, 50)) {
