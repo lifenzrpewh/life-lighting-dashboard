@@ -93,6 +93,9 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.8.2** (2026-10-22): Put back on the Map (tap a moved moment, or the list under the grid).
+Nothing else new since 1.8.1. Published here only.
+
 **1.8.1** (2026-10-22): the Map after the owner's first try of 1.8.0: it fills the window (Fit,
 S, M, L), drag and drop, tick several and Place n, moves without asking, and Undo for a move or a
 load (§ Where it lands, the last four). Published here only: every booth is on 1.4.1 or later, so
@@ -210,7 +213,7 @@ sections below.
 - [ ] **Drag** a promo by finger: rest a moment, it lifts, lit columns, drop: moved; a quick swipe scrolls instead
 - [ ] **Tick** two moments, tap a column: the headings show where each lands; **Place 2**; a column on screen is skipped
 - [ ] **Undo** after a move (one tap) and after a Load (two taps): each clip's old file back, an empty one left and said
-- [ ] **Put back** on the Map: tap a moved moment, Put back on the bar; or the list under the grid (after 1.8.1)
+- [ ] **Put back** on the Map: tap a moved moment, Put back on the bar; or the list under the grid (1.8.2)
 
 **Announcements Load** (1.3.0; Admin; Settings › ProPresenter › Announcements: the folder as this
 computer reaches it, Arena's graphics folder set; first run at Central 2026-10-14 into PAUA TEST AM)
