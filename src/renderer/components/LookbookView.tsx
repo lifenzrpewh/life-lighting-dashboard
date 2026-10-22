@@ -43,7 +43,7 @@ import { Check, FileX, Grid3x3, LayoutGrid, Minus, Rows3, Square, RefreshCw, X }
 
 import { thumbnailUrl, type ArenaLayer, type ArenaStatus } from '../../shared/arena.js'
 import { checkAnnouncements, sessionOf, wantedAnnouncements } from '../../shared/announcements.js'
-import { COLUMN_NAMES, codesOn, columnNamesOf, holdingLayers, layerKeyOf, lookSteps, looksOf, slotCode, slotMark, type CodeState, type Landing, type Look, type Placement, type UpdateStep } from '../../shared/holding.js'
+import { COLUMN_NAMES, codesOn, columnNamesOf, holdingLayers, layerKeyOf, lookSteps, looksOf, mergeSteps, slotCode, slotMark, type CodeState, type Landing, type Look, type Placement } from '../../shared/holding.js'
 import { lookbookThumbUrl, mediaCodeOf, type LookbookItem } from '../../shared/media-check.js'
 import type { Channel } from '../../shared/reading.js'
 import { useMediaCheck, type MediaCheckState } from '../useMediaCheck.js'
@@ -75,22 +75,6 @@ const unnamedColumn = (name: string) => /^column\s*#?\s*\d*$/i.test(name.trim())
 
 /** A moment's code to move, as `moveTargets` and `askMoveTo` take it. */
 type Choosing = { item: number; code: string }
-
-/** Each step once per code: two moments sharing a background load it once,
- *  into every clip either asked for. */
-function mergeSteps(steps: UpdateStep[]): UpdateStep[] {
-	const out = new Map<string, UpdateStep>()
-	for (const s of steps) {
-		const had = out.get(s.request.code)
-		if (had === undefined) out.set(s.request.code, s)
-		else
-			out.set(s.request.code, {
-				request: { ...had.request, clipIds: [...new Set([...had.request.clipIds, ...s.request.clipIds])] },
-				what: had.what === s.what ? had.what : `${had.what}; ${s.what}`,
-			})
-	}
-	return [...out.values()]
-}
 
 /** What a card says from across the booth. */
 type CardState = 'loading' | 'needs' | 'load' | 'ready' | 'other'
@@ -769,6 +753,9 @@ function LandingMap({
 	const troubled = new Set(looks.flatMap((l) => problemsOf(l, m).map((p) => p.code)))
 	const noSpot = looks.filter((l) => l.lands === null && l.codes.some((c) => c.state === 'no-place'))
 	const nameOf = (l: Look) => items[l.item]?.label ?? items[l.item]?.title ?? ''
+	// Over a column named for its label (WTL), the title says more (Welcome).
+	const squash = (n: string) => n.toUpperCase().replace(/[^A-Z0-9]/g, '')
+	const headOf = (l: Look, column: number) => (squash(nameOf(l)) === squash(names[column - 1] ?? '') ? (items[l.item]?.title ?? '') : nameOf(l))
 	const tap = (column: number) => {
 		if (chosenLook !== undefined && key !== undefined && lit.has(column)) {
 			m.askMoveTo({ item: chosenLook.item, code: key.code }, column)
@@ -800,7 +787,7 @@ function LandingMap({
 						>
 							<span className={`w-full truncate text-xs font-bold ${me ? '' : /^promo/i.test(name.trim()) ? 'text-accent-hi' : 'text-booth-dim'}`}>{thin(c) ? '' : unnamedColumn(name) ? c : name}</span>
 							<span className={`w-full truncate text-xs ${me ? '' : at !== undefined && states.get(at.item) === 'needs' ? 'text-warn' : 'text-booth-ink'}`}>
-								{swap != null ? 'swap' : at === undefined ? '\u00a0' : nameOf(at)}
+								{swap != null ? 'swap' : at === undefined ? '\u00a0' : headOf(at, c)}
 							</span>
 						</button>
 					)
@@ -931,8 +918,8 @@ function Lands({ lands, names, big }: { lands: Landing; names: string[]; big: bo
 						<span
 							key={i}
 							title={plain ? `Column ${i + 1}` : n}
-							className={`block min-w-0 overflow-hidden rounded-[2px] text-center text-[11px] leading-5 font-bold ${me ? 'h-5 bg-accent text-accent-ink' : `h-2.5 ${plain ? 'bg-booth-edge' : 'bg-booth-raise'}`}`}
-							style={{ flex: me ? '2.5 1 0' : plain ? '0.5 1 0' : '1 1 0' }}
+							className={`block min-w-0 overflow-hidden rounded-[2px] text-center text-[11px] leading-5 font-bold ${me ? 'h-5 bg-accent text-accent-ink' : `h-2.5 ${plain ? 'bg-booth-raise' : 'bg-booth-hover'}`}`}
+							style={{ flex: me ? '1.6 1 0' : plain ? '0.5 1 0' : '1 1 0' }}
 						>
 							{me ? (plain ? lands.column : n) : ''}
 						</span>

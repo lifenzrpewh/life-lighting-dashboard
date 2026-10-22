@@ -1364,6 +1364,22 @@ export function explainPlan(
 	return lines
 }
 
+/** Each step once per code: two moments sharing a background load it once,
+ *  into every clip either asked for. */
+export function mergeSteps(steps: UpdateStep[]): UpdateStep[] {
+	const out = new Map<string, UpdateStep>()
+	for (const s of steps) {
+		const had = out.get(s.request.code)
+		if (had === undefined) out.set(s.request.code, s)
+		else
+			out.set(s.request.code, {
+				request: { ...had.request, clipIds: [...new Set([...had.request.clipIds, ...s.request.clipIds])] },
+				what: had.what === s.what ? had.what : `${had.what}; ${s.what}`,
+			})
+	}
+	return [...out.values()]
+}
+
 /** The piece a moment is moved by: its foreground, else its background, else
  *  its A-screen; the code a pin keeps. */
 export function keyCodeOf(item: LookbookItem, map: HoldingMap = DEFAULT_MAP): string | null {

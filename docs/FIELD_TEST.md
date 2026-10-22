@@ -178,16 +178,25 @@ sections below.
 
 **One Lookbook** (1.4.0; Holding merged into it, 2026-10-14)
 - [ ] A Holding tab from before is a Lookbook tab, in the same place; + has no Holding
-- [ ] The top line: "n of m in Arena", "n to load", and "n need you", which shows only those; tap again for all
+- [ ] The top line: "n of m in Arena", "n to load", and "n problems" (was "n need you"), which shows only those; tap again for all
 - [ ] The size buttons: Big, Two a row, Rows; the choice is kept after a restart
 - [ ] Tick two cards, **Load 2**: one confirmation listing both, a shared background once; after Load, each card says Loading… then In Arena
-- [ ] A one-off with no column: "Choose a slot" shows its foreground layer, free columns lit; a tap asks, then it is placed (Placed by hand · Undo)
+- [ ] A one-off with no column: "Choose a spot" shows its foreground layer, free columns lit; a tap places it (Moved for this service · Put back) and asks to load
 - [ ] A file that differs: **Compare** on its card shows Arena's beside the lookbook's
 - [ ] Lower thirds (with ProPresenter set up): `LT CT108 in ProPresenter`, or amber "not in ProPresenter"
 - [ ] As a volunteer: no ticks or buttons, the states and chips still there
 - [ ] **Parts** (1.5.0): tick a card, tap its BG chip: the BG fades, the tick shows a dash, the button says **Load FG**; the top says **Load n parts**, and the confirmation lists only those
 - [ ] On a card not ticked, tap one chip: just that part is picked
 - [ ] The confirmation (1.5.0): one line of how many files and from where, the questions, **Show each** for every step
+
+**Where it lands** (after 1.7.0; the owner's picks, 2026-10-22)
+- [ ] A card with a problem names it on its badge: Wrong file?, File missing, No spot, Didn't load; two or more say "2 problems"
+- [ ] Every card: "Lands in PROMO 2 · column 12 · replaces …" over a strip with its column lit; matches where Arena puts it after Load
+- [ ] **Move** on a promo: PROMO columns and the spare ones past them lit, never WTL, PRE and the like; another promo's says "Swap with …"
+- [ ] A swap: the confirmation says "Swap A and B"; **Cancel** keeps them swapped and To load; Load puts each in its new column, nothing else moves
+- [ ] **Put back** on a moved card; a swap's other card stays where it went
+- [ ] **Map** (the fourth size button): Central's columns in Arena's order, each moment's name over its clips; tap a promo, then a lit column: the same swap
+- [ ] As a volunteer: Lands in and the Map still there, no Move and nothing lit
 
 **Announcements Load** (1.3.0; Admin; Settings › ProPresenter › Announcements: the folder as this
 computer reaches it, Arena's graphics folder set; first run at Central 2026-10-14 into PAUA TEST AM)
