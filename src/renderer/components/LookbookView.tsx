@@ -874,6 +874,9 @@ function LandingMap({
 	const squash = (n: string) => n.toUpperCase().replace(/[^A-Z0-9]/g, '')
 	const headOf = (l: Look, column: number) => (squash(nameOf(l)) === squash(names[column - 1] ?? '') ? (items[l.item]?.title ?? '') : nameOf(l))
 	const noSpot = looks.filter((l) => l.lands === null && l.codes.some((c) => c.state === 'no-place'))
+	// Moved by hand for this service (the owner, 2026-10-22): Put back here
+	// too, not only on the cards.
+	const moved = looks.filter((l) => l.lands?.why === 'moved')
 
 	// What is being moved: a drag, or the moment tapped. Its lit columns.
 	const moving = drag?.item ?? chosen
@@ -1068,6 +1071,16 @@ function LandingMap({
 						</Button>
 					)}
 					{ticked.size > 0 && <SmallButton onClick={clearTicks}>Untick all</SmallButton>}
+					{operator && ticked.size === 0 && chosenLook?.lands?.why === 'moved' && (
+						<SmallButton
+							onClick={() => {
+								m.unpin(chosenLook.item)
+								setChosen(null)
+							}}
+						>
+							Put back
+						</SmallButton>
+					)}
 				</div>
 				{noSpot.length > 0 && (
 					<div className="flex flex-wrap items-center gap-2 text-sm">
@@ -1148,6 +1161,20 @@ function LandingMap({
 					))}
 				</div>
 			</div>
+			{operator && moved.length > 0 && (
+				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-booth-dim">
+					<span>Moved for this service:</span>
+					{moved.map((l) => (
+						<span key={l.item} className="flex items-center gap-1.5">
+							<span className="text-booth-ink">{nameOf(l)}</span>
+							<span>→ {columnName(names, (l.lands as Landing).column)}</span>
+							<button type="button" onClick={() => m.unpin(l.item)} className="h-8 rounded-ctl px-1.5 underline hover:bg-booth-hover hover:text-booth-ink">
+								Put back
+							</button>
+						</span>
+					))}
+				</p>
+			)}
 			{drag !== null && (
 				<div
 					className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 rotate-[-2deg] rounded-ctl bg-accent px-3 py-2 text-sm font-bold text-accent-ink shadow-lg"
