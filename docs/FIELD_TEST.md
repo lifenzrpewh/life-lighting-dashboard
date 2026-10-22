@@ -93,6 +93,10 @@ more than a description of it.
 
 Tick what you saw; anything odd is worth a line.
 
+**1.8.1** (2026-10-22): the Map after the owner's first try of 1.8.0: it fills the window (Fit,
+S, M, L), drag and drop, tick several and Place n, moves without asking, and Undo for a move or a
+load (§ Where it lands, the last four). Publish it on `paua-releases` too.
+
 **1.8.0** (2026-10-22): in the Lookbook, where each moment lands, Move with swaps, the Map size,
 and badges that name the problem (§ Where it lands, below). Nothing else new since 1.7.0.
 Publish it on `paua-releases` too for booths still on 1.1.0 to 1.4.0 (the bridge).
