@@ -747,6 +747,13 @@ Later, not tonight:
 
 ### TODO, in order
 
+0. **Noted for later (the owner, 2026-10-22, "not now"):** (1) **Put back on the Map**: a moved
+   moment tapped on the Map shows Put back beside its words, and what is moved for this service
+   is listed under the grid (in 1.8.1 only the card sizes have Put back, and only in Admin, which
+   a reload leaves). (2) **A review of the Lookbook's wording and logic, backed by UI/UX
+   research** (NN/g, platform guidelines, plain language): every label, badge, problem line and
+   confirmation, and the flows (move, swap, Place n, Undo, Load), findings with sources and
+   proposed changes, put to the owner before any change.
 0. **Announcements Load** (branch `announcements-load`): ✅ run end to end into PAUA TEST AM at
    Central, 2026-10-14 evening. Left: the owner's word on merging, then the real
    "-Announcements AM" at a quiet time (its Finder-dragged pictures cannot be kept, so the write
