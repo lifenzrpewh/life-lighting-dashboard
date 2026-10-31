@@ -1,0 +1,12 @@
+Paua-1.9.0-arm64.dmg  135896390 bytes  sha256 6d4878236191fb3c543df885c1b41919ad1eef9aaa63880a34f18107d3628b00
+texture-bridge
+texture-bridge-darwin-arm64
+Executable=/Users/runner/work/life-lighting-dashboard/life-lighting-dashboard/release/mac-arm64/Paua.app/Contents/MacOS/Paua
+Identifier=org.lifenz.lighting-dashboard
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=438 flags=0x2(adhoc) hashes=3+7 location=embedded
+Signature=adhoc
+Info.plist entries=32
+TeamIdentifier=not set
+Sealed Resources version=2 rules=13 files=148
+Internal requirements count=0 size=12
